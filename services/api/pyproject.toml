@@ -12,6 +12,8 @@ dependencies = [
     "sqlalchemy>=2.0.54,<2.1",
     "alembic>=1.20,<1.21",
     "psycopg[binary]>=3.3.6,<3.4",
+    # IANA timezone database for zoneinfo validation; Windows and slim images ship none.
+    "tzdata>=2025.2",
 ]
 
 [dependency-groups]

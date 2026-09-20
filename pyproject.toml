@@ -25,6 +25,8 @@ mypy_path = "services/api:services/worker"
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib -ra"
 testpaths = ["services"]
+# Lets tests import shared helpers as `tests.support` (services/api/tests).
+pythonpath = ["services/api"]
 filterwarnings = [
     "error",
     # Third-party: Starlette's TestClient uses an alias that newer anyio deprecates.

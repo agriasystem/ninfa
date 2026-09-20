@@ -58,7 +58,9 @@ npm run db:current       # show the applied revision
 ```
 
 New revision: `uv run --all-packages alembic -c services/api/alembic.ini revision -m "message"`.
-The revision `0002` installs the Procrastinate job-queue schema (vendored SQL, see ADR 0005).
+Revisions: `0001` baseline, `0002` Procrastinate job-queue schema (vendored SQL, see ADR 0005),
+`0003` canonical data model and tenant core (see [data-model-v1.md](../architecture/data-model-v1.md)).
+Rolling back Gate 1 only: `uv run --all-packages alembic -c services/api/alembic.ini downgrade 0002_procrastinate_schema`.
 
 ## Run
 

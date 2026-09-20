@@ -1,1 +1,1 @@
-"""Reserved for a future gate — not implemented in Gate 0."""
+"""Ingestion: data sources, import jobs and import-file metadata (no real ingestion yet)."""

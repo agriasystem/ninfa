@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
-from app.core.errors import AppError
+from app.core.errors import AppError, NotFoundError
 from app.main import create_app
 
 
@@ -16,6 +16,10 @@ def _app_with_probe_routes(settings: Settings) -> FastAPI:
     @app.get("/probe/app-error")
     def app_error() -> None:
         raise AppError("thing_missing", "The thing is missing", status_code=404, details={"id": 7})
+
+    @app.get("/probe/not-found")
+    def not_found() -> None:
+        raise NotFoundError("Property")
 
     @app.get("/probe/boom")
     def boom() -> None:
@@ -72,3 +76,15 @@ def test_unhandled_exception_is_hidden_behind_generic_envelope(settings: Setting
     assert error["message"] == "Internal server error"
     assert "secret internal detail" not in response.text
     assert response.headers["X-Request-ID"] == error["request_id"]
+
+
+def test_not_found_error_becomes_a_404_envelope_that_reveals_nothing_else(
+    settings: Settings,
+) -> None:
+    with TestClient(_app_with_probe_routes(settings)) as client:
+        response = client.get("/probe/not-found")
+
+    assert response.status_code == 404
+    error = _assert_envelope(response.json(), "not_found")
+    assert error["message"] == "Property not found"
+    assert error["details"] is None

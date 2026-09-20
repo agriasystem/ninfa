@@ -7,16 +7,17 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import Engine, create_engine, text
+from sqlalchemy import Engine, text
 
 from app.core.config import get_settings
+from app.db.session import create_db_engine
 
 ALEMBIC_INI = Path(__file__).resolve().parents[1] / "alembic.ini"
 
 
 @pytest.fixture(scope="module")
 def engine(test_database_url: str) -> Iterator[Engine]:
-    test_engine = create_engine(test_database_url)
+    test_engine = create_db_engine(test_database_url)
     yield test_engine
     test_engine.dispose()
 
@@ -36,6 +37,11 @@ def test_test_suite_uses_the_test_database(test_database_url: str) -> None:
 def test_can_connect(engine: Engine) -> None:
     with engine.connect() as connection:
         assert connection.execute(text("SELECT 1")).scalar_one() == 1
+
+
+def test_sessions_run_in_utc(engine: Engine) -> None:
+    with engine.connect() as connection:
+        assert connection.execute(text("SHOW timezone")).scalar_one() == "UTC"
 
 
 def test_application_role_is_not_superuser(engine: Engine) -> None:

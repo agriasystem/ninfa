@@ -33,6 +33,16 @@ class AppError(Exception):
         self.details = details
 
 
+class NotFoundError(AppError):
+    """An entity does not exist *for the current tenant*.
+
+    Missing and "belongs to another workspace" are deliberately indistinguishable.
+    """
+
+    def __init__(self, entity: str) -> None:
+        super().__init__("not_found", f"{entity} not found", status_code=HTTPStatus.NOT_FOUND)
+
+
 def _request_id(request: Request) -> str | None:
     # Scope state survives even when the handler runs outside RequestIdMiddleware
     # (e.g. unhandled exceptions are answered by Starlette's outermost middleware).
