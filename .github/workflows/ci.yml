@@ -35,7 +35,11 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://ninfa_app:ci_only_password@127.0.0.1:5432/ninfa_test
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      # setup-uv publishes no floating major tag: pin the immutable v10.1.0 release by commit SHA.
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          # Same uv that generated uv.lock and validated Gate 0 locally (not "latest").
+          version: "0.11.31"
       - name: Install dependencies
         run: uv sync --all-packages --locked
       - name: Create application role and databases
