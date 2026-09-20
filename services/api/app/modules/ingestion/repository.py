@@ -1,10 +1,12 @@
 from collections.abc import Sequence
+from datetime import UTC, datetime
+from http import HTTPStatus
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
 from app.modules.ingestion.models import DataSource, ImportFile, ImportJob, ImportJobStatus
 from app.modules.ingestion.schemas import DataSourceCreate, ImportFileCreate, ImportJobCreate
@@ -110,6 +112,48 @@ class ImportJobRepository:
             query = query.where(ImportJob.status == status)
         return self._session.scalars(query.order_by(ImportJob.created_at)).all()
 
+    # --- lifecycle: PENDING -> RUNNING -> SUCCEEDED | FAILED (PENDING -> FAILED is allowed) ----
+
+    def _load_for_transition(self, import_job_id: UUID, allowed: set[ImportJobStatus]) -> ImportJob:
+        job = self.get(import_job_id)
+        if job is None:
+            raise NotFoundError("Import job")
+        if job.status not in allowed:
+            raise AppError(
+                "invalid_import_job_transition",
+                f"An import job that is {job.status.value} cannot make this transition",
+                status_code=HTTPStatus.CONFLICT,
+            )
+        return job
+
+    def start(self, import_job_id: UUID) -> ImportJob:
+        job = self._load_for_transition(import_job_id, {ImportJobStatus.PENDING})
+        job.status = ImportJobStatus.RUNNING
+        job.started_at = datetime.now(UTC)
+        self._session.flush()
+        return job
+
+    def succeed(self, import_job_id: UUID) -> ImportJob:
+        job = self._load_for_transition(import_job_id, {ImportJobStatus.RUNNING})
+        job.status = ImportJobStatus.SUCCEEDED
+        job.finished_at = datetime.now(UTC)
+        job.error_code = None
+        job.error_message = None
+        self._session.flush()
+        return job
+
+    def fail(self, import_job_id: UUID, *, error_code: str, error_message: str) -> ImportJob:
+        """Record the failure. The message must be non-sensitive: it is stored and shown."""
+        job = self._load_for_transition(
+            import_job_id, {ImportJobStatus.PENDING, ImportJobStatus.RUNNING}
+        )
+        job.status = ImportJobStatus.FAILED
+        job.finished_at = datetime.now(UTC)
+        job.error_code = error_code[:100]
+        job.error_message = error_message[:1000]
+        self._session.flush()
+        return job
+
 
 class ImportFileRepository:
     """Import-file metadata of ONE workspace. Nothing is uploaded or stored."""
@@ -157,3 +201,26 @@ class ImportFileRepository:
                 ImportFile.workspace_id == self._tenant.workspace_id, ImportFile.sha256 == sha256
             )
         ).all()
+
+    def find_successful_for_data_source(
+        self, data_source_id: UUID, sha256: str
+    ) -> ImportFile | None:
+        """The latest file with this content hash that a SUCCEEDED job of THIS data source
+        imported (a hash is never compared across data sources, properties or workspaces).
+        """
+        return self._session.scalar(
+            select(ImportFile)
+            .join(
+                ImportJob,
+                (ImportJob.workspace_id == ImportFile.workspace_id)
+                & (ImportJob.id == ImportFile.import_job_id),
+            )
+            .where(
+                ImportFile.workspace_id == self._tenant.workspace_id,
+                ImportFile.sha256 == sha256,
+                ImportJob.data_source_id == data_source_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+            )
+            .order_by(ImportFile.created_at.desc())
+            .limit(1)
+        )

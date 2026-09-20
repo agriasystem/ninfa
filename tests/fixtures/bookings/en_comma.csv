@@ -1,0 +1,4 @@
+Booking ID,Booked At,Check-in,Check-out,Status,Rooms,Room Revenue,Channel
+EN-1,2026-01-15 10:30,2026-03-10,2026-03-13,Confirmed,1,450.00,Booking.com
+EN-2,2026-01-16 11:00,2026-03-12,2026-03-14,Cancelled,2,300.50,Direct
+EN-3,2026-02-01T09:00:00+01:00,2026-04-01,2026-04-04,Confirmed,1,1050.00,Expedia

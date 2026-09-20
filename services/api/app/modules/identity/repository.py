@@ -3,7 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.exceptions import NotFoundError
 from app.core.validation import normalize_email
 from app.modules.identity.models import User
 from app.modules.identity.schemas import UserCreate

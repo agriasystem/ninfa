@@ -1,7 +1,9 @@
-# NINFA — Architecture v1 (Gate 0 + Gate 1)
+# NINFA — Architecture v1 (Gates 0–2)
 
-Scope: the technical foundation (Gate 0) and the canonical multi-tenant data core (Gate 1).
-No NINFA product feature is implemented. Data model: [data-model-v1.md](data-model-v1.md).
+Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1) and the
+booking ingestion with the canonical booking model (Gate 2). No NINFA product feature is
+implemented: data goes in and is stored correctly, nothing is computed from it yet.
+Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 
 ## Components
 
@@ -15,9 +17,9 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
 | `apps/web`          | Technical shell: shows whether the API is reachable. No product UI.         |
-| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core. |
-| `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists. |
-| PostgreSQL          | The single datastore: the multi-tenant core (Gate 1) and the job queue.     |
+| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core, the booking import service. |
+| `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists (the booking import is not a job yet: there is no file storage). |
+| PostgreSQL          | The single datastore: the multi-tenant core, the bookings and the job queue. |
 | `packages/contracts`| A few hand-written TypeScript types mirroring the backend (health, errors). |
 
 The worker imports the API package (`app.core.config`, `app.core.logging`): one backend codebase,
@@ -30,12 +32,16 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Four modules exist since Gate 1, each with `models.py`, `schemas.py` and `repository.py`:
-  `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties` (Property),
-  `ingestion` (DataSource, ImportJob, ImportFile). Importing `app.models` registers every model.
-- The directories for the future domains (`bookings`, `suppliers`, `invoices`, `labor`,
-  `normalization`, `data_quality`, `intelligence/*`, `decisions`, `decision_memory`, `ai/*`) are
-  empty package markers so the structure is settled before those domains land.
+- Five modules exist, each with `models.py`, `schemas.py` and `repository.py`: `identity` (User),
+  `tenancy` (Workspace, WorkspaceMembership), `properties` (Property), `ingestion` (DataSource,
+  ImportJob, ImportFile) since Gate 1, and `bookings` since Gate 2. Importing `app.models` registers
+  every model.
+- Application services (`bookings/service.py`) are plain classes: they depend on a `Session` and a
+  `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
+  endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
+- The directories for the future domains (`suppliers`, `invoices`, `labor`, `normalization`,
+  `data_quality`, `intelligence/*`, `decisions`, `decision_memory`, `ai/*`) are empty package
+  markers so the structure is settled before those domains land.
 - Splitting a module into a service is a possible future step, never a starting point.
 
 ## API conventions
@@ -87,6 +93,17 @@ Implemented in Gate 1 (details in [data-model-v1.md](data-model-v1.md) and ADR 0
   authentication; the authentication/authorization gate will be the only place that creates it for a
   request. PostgreSQL row-level security is deliberately not enabled yet; the schema is ready for it.
 
+## Booking ingestion (Gate 2)
+
+`BookingImportService` turns a customer's CSV/XLSX export into canonical bookings without the
+customer editing the file: a per-data-source **mapping** (confirmed once, remembered) tells which
+columns feed which canonical fields; **only mapped columns** are ever read; rows are normalised
+(time zones, `Decimal` money, statuses, channels), validated and **staged**; then written in **one
+atomic transaction** or not at all; re-imports are **idempotent** (identity = data source +
+`source_record_id`, change detection by fingerprint). Nothing is inferred: ambiguous dates and
+numbers, unknown statuses and unclear sheets are reported and need a configuration. Details,
+guarantees and error codes: [booking-data-v1.md](booking-data-v1.md), ADR 0008.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -95,8 +112,9 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 
 ## Not implemented yet (belongs to later gates)
 
-Authentication/authorization and any tenant-facing API, real ingestion (parsing, file upload,
-object storage, normalization), the Property Profile, and every business model (bookings, invoices,
-suppliers, labor, cost categories, metrics, baselines), the Decision Engine (expected, detection,
+Authentication/authorization and any tenant-facing API, file upload and object storage, the
+asynchronous ingestion job, costs and labor ingestion, the Property Profile, booking snapshots and
+every metric derived from bookings (occupancy, ADR, RevPAR, pickup, curves), other business models
+(suppliers, invoices, labor, cost categories, baselines), the Decision Engine (expected, detection,
 impact, priority, recommendation), decision memory, AI gateway / narrative / Ask NINFA, product UI,
 notifications, payments, analytics, deployment.

@@ -59,8 +59,10 @@ npm run db:current       # show the applied revision
 
 New revision: `uv run --all-packages alembic -c services/api/alembic.ini revision -m "message"`.
 Revisions: `0001` baseline, `0002` Procrastinate job-queue schema (vendored SQL, see ADR 0005),
-`0003` canonical data model and tenant core (see [data-model-v1.md](../architecture/data-model-v1.md)).
-Rolling back Gate 1 only: `uv run --all-packages alembic -c services/api/alembic.ini downgrade 0002_procrastinate_schema`.
+`0003` canonical data model and tenant core (see [data-model-v1.md](../architecture/data-model-v1.md)),
+`0004` booking ingestion (see [booking-data-v1.md](../architecture/booking-data-v1.md)).
+Rolling back Gate 2 only: `uv run --all-packages alembic -c services/api/alembic.ini downgrade 0003_canonical_data_model`;
+Gates 1 and 2: `... downgrade 0002_procrastinate_schema`.
 
 ## Run
 
@@ -80,6 +82,34 @@ Worker smoke test (proves queue, worker and database work together):
 uv run --all-packages python -m worker heartbeat      # enqueue the smoke job
 uv run --all-packages python -m worker run --once     # run queued jobs, then exit
 ```
+
+## Booking import (Gate 2)
+
+There is no public API for it yet (no authentication): the import is a Python service. Try it in a
+Python shell (`uv run --all-packages python`) against your development database, with a workspace,
+a property and a `BOOKINGS` / `FILE_UPLOAD` data source already created:
+
+```python
+from app.core.tenant import TenantContext
+from app.db.session import get_sessionmaker
+from app.modules.bookings.service import BookingImportService
+
+with get_sessionmaker()() as session:
+    service = BookingImportService(session, TenantContext(workspace_id))
+    content = open("export.csv", "rb").read()
+    suggestion = service.suggest_mapping(data_source_id, filename="export.csv", content=content)
+    # show suggestion.suggestions to the customer; they confirm the mapping and the formats
+    service.save_mapping(data_source_id, headers=suggestion.headers,
+                         column_mapping={"source_record_id": {"column": "ID Prenotazione"}, ...},
+                         format_options={"decimal_separator": ",", "thousands_separator": "."})
+    result = service.import_file(data_source_id, filename="export.csv", content=content)
+    print(result.status, result.error_code, result.bookings_created)
+```
+
+Supported files: `.csv` (UTF-8, Windows-1252; comma, semicolon or tab) and `.xlsx`. Synthetic
+fixtures for tests live in `tests/fixtures/bookings/` (see its README); `openpyxl` (the only
+dependency added by Gate 2) reads the workbooks. The database tests need the test database, as
+for every backend test.
 
 ## Quality
 

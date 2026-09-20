@@ -9,38 +9,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.exceptions import AppError, NotFoundError
 from app.core.request_id import REQUEST_ID_HEADER, request_id_var
 from app.schemas.errors import ErrorBody, ErrorResponse
 
 logger = logging.getLogger(__name__)
 
-
-class AppError(Exception):
-    """Base class for expected, client-facing errors raised by application code."""
-
-    def __init__(
-        self,
-        code: str,
-        message: str,
-        *,
-        status_code: int = HTTPStatus.BAD_REQUEST,
-        details: Any | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = int(status_code)
-        self.details = details
-
-
-class NotFoundError(AppError):
-    """An entity does not exist *for the current tenant*.
-
-    Missing and "belongs to another workspace" are deliberately indistinguishable.
-    """
-
-    def __init__(self, entity: str) -> None:
-        super().__init__("not_found", f"{entity} not found", status_code=HTTPStatus.NOT_FOUND)
+__all__ = ["AppError", "NotFoundError", "register_exception_handlers"]
 
 
 def _request_id(request: Request) -> str | None:

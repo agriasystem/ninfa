@@ -9,11 +9,17 @@ import psycopg.errors as pg
 import pytest
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
+from app.modules.bookings.repository import (
+    BookingChannelRepository,
+    BookingImportRowRepository,
+    BookingMappingProfileRepository,
+    BookingRepository,
+)
 from app.modules.identity.repository import UserRepository
 from app.modules.identity.schemas import UserCreate
-from app.modules.ingestion.models import DataSourceDomain, ImportJobStatus
+from app.modules.ingestion.models import DataSourceDomain, ImportJob, ImportJobStatus
 from app.modules.ingestion.repository import (
     DataSourceRepository,
     ImportFileRepository,
@@ -33,6 +39,10 @@ TENANT_REPOSITORIES = [
     DataSourceRepository,
     ImportJobRepository,
     ImportFileRepository,
+    BookingRepository,
+    BookingChannelRepository,
+    BookingMappingProfileRepository,
+    BookingImportRowRepository,
 ]
 
 
@@ -74,7 +84,7 @@ def test_every_query_in_a_tenant_repository_names_the_workspace(repository: type
     """Guard against a future method that forgets the workspace filter."""
     for name, method in inspect.getmembers(repository, inspect.isfunction):
         source = inspect.getsource(method)
-        if "select(" in source:
+        if "select(" in source or "update(" in source:
             assert "self._tenant.workspace_id" in source, f"{repository.__name__}.{name}"
 
 
@@ -442,4 +452,112 @@ def test_foreign_and_missing_entities_are_indistinguishable(
         missing.value.code,
         missing.value.message,
         missing.value.status_code,
+    )
+
+
+# --- ImportJobRepository lifecycle (used by the Gate 2 import) --------------------------------
+
+
+def status_of(job: ImportJob) -> ImportJobStatus:
+    return job.status
+
+
+def test_an_import_job_moves_pending_running_succeeded(
+    db_session: Session, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, _ = two_tenants
+    repo = ImportJobRepository(db_session, a.context)
+    job = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+    assert (job.status, job.started_at, job.finished_at) == (ImportJobStatus.PENDING, None, None)
+
+    repo.start(job.id)
+    assert job.status == ImportJobStatus.RUNNING and job.started_at is not None
+    repo.succeed(job.id)
+
+    assert status_of(job) == ImportJobStatus.SUCCEEDED
+    assert job.finished_at is not None and job.started_at <= job.finished_at
+    assert (job.error_code, job.error_message) == (None, None)
+
+
+@pytest.mark.parametrize("from_running", [False, True])
+def test_an_import_job_can_fail_before_or_after_starting(
+    db_session: Session, two_tenants: tuple[Tenant, Tenant], from_running: bool
+) -> None:
+    a, _ = two_tenants
+    repo = ImportJobRepository(db_session, a.context)
+    job = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+    if from_running:
+        repo.start(job.id)
+
+    repo.fail(job.id, error_code="SOME_CODE", error_message="x" * 5000)
+
+    assert (job.status, job.error_code) == (ImportJobStatus.FAILED, "SOME_CODE")
+    assert job.finished_at is not None
+    assert job.error_message is not None and len(job.error_message) == 1000  # bounded
+
+
+def test_invalid_import_job_transitions_are_refused(
+    db_session: Session, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, _ = two_tenants
+    repo = ImportJobRepository(db_session, a.context)
+    job = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+
+    with pytest.raises(AppError) as info:
+        repo.succeed(job.id)  # a PENDING job cannot succeed
+    assert (info.value.code, info.value.status_code) == ("invalid_import_job_transition", 409)
+
+    repo.start(job.id)
+    with pytest.raises(AppError):
+        repo.start(job.id)  # already running
+    repo.succeed(job.id)
+
+    with pytest.raises(AppError):
+        repo.start(job.id)  # a finished job is final
+    with pytest.raises(AppError):
+        repo.succeed(job.id)
+    with pytest.raises(AppError):
+        repo.fail(job.id, error_code="X", error_message="y")
+    assert status_of(job) == ImportJobStatus.SUCCEEDED
+
+
+def test_import_job_transitions_stay_inside_the_tenant(
+    db_session: Session, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, b = two_tenants
+    repo = ImportJobRepository(db_session, a.context)
+
+    with pytest.raises(NotFoundError):
+        repo.start(b.import_job.id)
+    with pytest.raises(NotFoundError):
+        repo.fail(b.import_job.id, error_code="X", error_message="y")
+    assert status_of(b.import_job) == ImportJobStatus.PENDING
+
+
+def test_a_file_hash_is_only_a_duplicate_within_the_same_data_source_and_after_success(
+    db_session: Session, factory: Factory, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, b = two_tenants
+    digest = "9a" * 32
+    other_source = factory.data_source(a.property)
+    repo = ImportFileRepository(db_session, a.context)
+    pending = factory.import_file(a.import_job, digest)  # its job is still PENDING
+
+    assert repo.find_successful_for_data_source(a.data_source.id, digest) is None
+
+    a.import_job.status = ImportJobStatus.RUNNING
+    a.import_job.started_at = datetime.now(UTC)
+    db_session.flush()
+    a.import_job.status = ImportJobStatus.SUCCEEDED
+    a.import_job.finished_at = datetime.now(UTC)
+    db_session.flush()
+
+    assert repo.find_successful_for_data_source(a.data_source.id, digest) == pending
+    assert repo.find_successful_for_data_source(other_source.id, digest) is None  # another source
+    assert repo.find_successful_for_data_source(b.data_source.id, digest) is None  # another tenant
+    assert (
+        ImportFileRepository(db_session, b.context).find_successful_for_data_source(
+            a.data_source.id, digest
+        )
+        is None
     )

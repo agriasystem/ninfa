@@ -180,17 +180,89 @@ normalisation. Create schemas use `extra="forbid"` and never contain `workspace_
   raises `NotFoundError` (indistinguishable cases). The composite FKs are the backstop.
 - Repositories `flush()` but never `commit()`: the caller owns the transaction.
 
-## Not in Gate 1
+## Gate 2 additions (booking ingestion)
 
-Bookings, snapshots, room inventory, suppliers, invoices, labor, cost categories, metrics,
-baselines, decisions, decision memory; authentication and any tenant-facing API; real ingestion,
-parsing, file upload/storage; PostgreSQL row-level security (the schema is compatible: every
+Migration `0004_booking_ingestion`. Full description: [booking-data-v1.md](booking-data-v1.md).
+
+```mermaid
+erDiagram
+    properties ||--o{ booking_channels : has
+    data_sources ||--o| booking_mapping_profiles : "confirmed mapping"
+    data_sources ||--o{ bookings : "identity per source"
+    booking_channels ||--o{ bookings : "sold through"
+    import_jobs ||--o{ bookings : "first / last"
+    import_files ||--o{ booking_import_rows : stages
+
+    bookings {
+        uuid id PK
+        uuid workspace_id
+        uuid property_id
+        uuid data_source_id
+        text source_record_id "unique per data source"
+        timestamptz booked_at
+        date check_in
+        date check_out
+        text status
+        numeric room_revenue "12,2"
+        text source_fingerprint
+        uuid first_import_job_id "immutable"
+        uuid last_import_job_id
+    }
+    booking_channels {
+        uuid id PK
+        text normalized_name "unique per property"
+        text channel_type
+        bool is_verified
+    }
+    booking_mapping_profiles {
+        uuid id PK
+        jsonb column_mapping
+        text header_signature
+    }
+    booking_import_rows {
+        uuid id PK
+        int row_number
+        jsonb mapped_payload "mapped columns only"
+        text validation_status "VALID INVALID IMPORTED"
+    }
+```
+
+| Table | Tenant integrity (composite FKs, all RESTRICT) | Uniqueness |
+| ----- | ---------------------------------------------- | ---------- |
+| `booking_channels` | `(workspace, property)` → `properties` | `(workspace, property, normalized_name)`; `(workspace, property, id)` as FK target |
+| `booking_mapping_profiles` | `(workspace, property, data_source)` → `data_sources` | `(workspace, data_source)` |
+| `bookings` | `(workspace, property, data_source)` → `data_sources`; `(workspace, property, channel)` → `booking_channels`; `(workspace, property, data_source, first/last_import_job)` → `import_jobs` | `(workspace, data_source, source_record_id)` |
+| `booking_import_rows` | `(workspace, import_job, import_file)` → `import_files` | `(workspace, import_file, row_number)` |
+
+Changes to Gate 1 tables (only additions): `import_jobs` gets
+`UNIQUE (workspace_id, property_id, data_source_id, id)` and `import_files` gets
+`UNIQUE (workspace_id, import_job_id, id)`, both as foreign-key targets.
+
+Additional conventions: money `NUMERIC(12,2)` (rates `NUMERIC(7,4)`), JSONB for configuration and
+staging (Python `None` is stored as SQL NULL in `normalized_payload`), and a trigger on `bookings`
+that refuses changes to its identity columns (`id`, tenant columns, `data_source_id`,
+`source_record_id`, `first_import_job_id`, `created_at`).
+
+Indexes added: `ix_bookings_workspace_id_property_id_check_in` (stay-date ranges of a property),
+`ix_bookings_workspace_id_property_id_status`, `ix_booking_import_rows_workspace_id_import_job_id`
+(rows of a job); the identity/uniqueness constraints above double as lookup indexes. The
+`(workspace, property)` and `(workspace, data_source)` access paths of `bookings` are the leading
+columns of existing indexes, so no separate index exists for them.
+
+Delete policy: every new foreign key is `RESTRICT` (bookings, channels, mapping and staging are
+operational records; nothing is cascaded away).
+
+## Not implemented yet
+
+Booking snapshots, room inventory, suppliers, invoices, labor, cost categories, metrics, baselines,
+decisions, decision memory; authentication and any tenant-facing API; file upload/storage and the
+asynchronous ingestion job; PostgreSQL row-level security (the schema is compatible: every
 tenant-owned table has a `workspace_id` column to write policies against).
 
 ## Adding a tenant-owned entity (checklist for later gates)
 
-1. Add `workspace_id UUID NOT NULL` and a composite FK to the parent
-   (`(workspace_id, parent_id) → parent(workspace_id, id)`), adding the unique key on the parent if
+1. Add `workspace_id UUID NOT NULL` (and `property_id` if the row belongs to a property) and a
+   composite FK to the parent (`(workspace_id, parent_id) → parent(workspace_id, id)`), adding the unique key on the parent if
    it does not exist. Choose `RESTRICT` unless the row is a pure link.
 2. Give every constraint and index an explicit name; write the migration by hand.
 3. Add a repository that takes a `TenantContext`; every query filters on `workspace_id`.

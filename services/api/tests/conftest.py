@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings, get_settings
 from app.db.session import create_db_engine
 from app.main import create_app
-from tests.support import Factory, Rejects, Tenant, alembic_config, make_rejects
+from tests.support import BookingFactory, Rejects, Tenant, alembic_config, make_rejects
 
 
 @pytest.fixture
@@ -62,11 +62,11 @@ def rejects(db_session: Session) -> Rejects:
 
 
 @pytest.fixture
-def factory(db_session: Session) -> Factory:
-    return Factory(db_session)
+def factory(db_session: Session) -> BookingFactory:
+    return BookingFactory(db_session)
 
 
 @pytest.fixture
-def two_tenants(factory: Factory) -> tuple[Tenant, Tenant]:
+def two_tenants(factory: BookingFactory) -> tuple[Tenant, Tenant]:
     """Workspace A and workspace B, each with property, data source and import job."""
     return factory.tenant(), factory.tenant()

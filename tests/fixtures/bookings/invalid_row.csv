@@ -1,0 +1,4 @@
+Booking ID,Booked At,Check-in,Check-out,Status,Rooms,Room Revenue,Channel
+BAD-1,2026-01-15 10:30,2026-03-10,2026-03-13,Confirmed,1,450.00,Booking.com
+BAD-2,2026-01-16 11:00,2026-03-14,2026-03-12,Confirmed,0,-300.50,Direct
+BAD-3,2026-01-17 12:00,2026-03-20,2026-03-22,Confirmed,1,100.00,Expedia
