@@ -1,0 +1,33 @@
+{
+  "name": "ninfa",
+  "private": true,
+  "description": "NINFA — Hospitality Decision Intelligence (monorepo root)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "setup": "npm install && uv sync --all-packages",
+    "dev:web": "npm run dev -w @ninfa/web",
+    "dev:api": "uv run --all-packages python -m app",
+    "dev:worker": "uv run --all-packages python -m worker run",
+    "db:migrate": "uv run --all-packages alembic -c services/api/alembic.ini upgrade head",
+    "db:current": "uv run --all-packages alembic -c services/api/alembic.ini current",
+    "test": "npm run test:web && npm run test:backend",
+    "test:web": "npm run test -w @ninfa/web",
+    "test:backend": "uv run --all-packages pytest",
+    "lint": "npm run lint:web && npm run lint:backend",
+    "lint:web": "npm run lint -w @ninfa/web",
+    "lint:backend": "uv run --all-packages ruff check services",
+    "typecheck": "npm run typecheck:web && npm run typecheck:backend",
+    "typecheck:web": "npm run typecheck --workspaces --if-present",
+    "typecheck:backend": "uv run --all-packages mypy services/api services/worker services/conftest.py",
+    "build": "npm run build -w @ninfa/web"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

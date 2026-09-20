@@ -1,0 +1,1 @@
+"""NINFA API application package."""

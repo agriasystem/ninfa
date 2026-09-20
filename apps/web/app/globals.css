@@ -1,0 +1,12 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
+
+main {
+  padding: 4rem 1.5rem;
+}
+
+.detail {
+  color: #666;
+}

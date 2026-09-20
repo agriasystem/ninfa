@@ -1,0 +1,32 @@
+# Virtual uv workspace root: shared tool configuration, no installable project.
+# Members: services/api (ninfa-api) and services/worker (ninfa-worker).
+
+[tool.uv.workspace]
+members = ["services/api", "services/worker"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = [".venv", "node_modules", ".next"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "N", "ASYNC"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "worker"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+explicit_package_bases = true
+mypy_path = "services/api:services/worker"
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib -ra"
+testpaths = ["services"]
+filterwarnings = [
+    "error",
+    # Third-party: Starlette's TestClient uses an alias that newer anyio deprecates.
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]

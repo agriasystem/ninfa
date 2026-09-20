@@ -1,0 +1,24 @@
+[project]
+name = "ninfa-worker"
+description = "NINFA background worker (Procrastinate on PostgreSQL)"
+dynamic = ["version"]
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "ninfa-api",
+    "procrastinate>=3.9,<3.10",
+]
+
+[tool.uv.sources]
+ninfa-api = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+# The worker ships with the backend: same version as ninfa-api.
+path = "../api/pyproject.toml"
+pattern = 'version = "(?P<version>[^"]+)"'
+
+[tool.hatch.build.targets.wheel]
+packages = ["worker"]

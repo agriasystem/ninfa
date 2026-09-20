@@ -1,0 +1,32 @@
+# Portable local PostgreSQL for NINFA.
+#
+# NOTE (Gate 0): this file has NOT been executed on the Gate 0 development machine because Docker
+# is not installed there. Gate 0 was validated against a native PostgreSQL 18 service instead
+# (see docs/development/local-development.md). Treat this file as untested until it is run once.
+#
+# The host port defaults to 5433 so it does not clash with a native PostgreSQL on 5432.
+# Variables come from the root `.env` (see .env.example).
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      # Container superuser (only used to bootstrap; the application uses `ninfa_app`).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Password given to the `ninfa_app` role; must match the one in DATABASE_URL.
+      NINFA_APP_PASSWORD: ${NINFA_APP_PASSWORD:?set NINFA_APP_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      # PostgreSQL 18+ images keep versioned data directories under /var/lib/postgresql.
+      - ninfa_pgdata:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./scripts/db:/bootstrap:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  ninfa_pgdata:

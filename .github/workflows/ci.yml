@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint, types, tests)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          # Throwaway CI-only credentials for an ephemeral container.
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://ninfa_app:ci_only_password@127.0.0.1:5432/ninfa_dev
+      TEST_DATABASE_URL: postgresql+psycopg://ninfa_app:ci_only_password@127.0.0.1:5432/ninfa_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - name: Install dependencies
+        run: uv sync --all-packages --locked
+      - name: Create application role and databases
+        run: >-
+          psql "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
+          -v app_password=ci_only_password -f scripts/db/bootstrap-local.sql
+      - run: uv run --all-packages ruff check services
+      - run: uv run --all-packages ruff format --check services
+      - run: uv run --all-packages mypy services/api services/worker
+      - name: Migrations
+        run: uv run --all-packages alembic -c services/api/alembic.ini upgrade head
+      - run: uv run --all-packages pytest
+
+  frontend:
+    name: Frontend (lint, types, tests, build)
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint -w @ninfa/web
+      - run: npm run typecheck --workspaces --if-present
+      - run: npm run test -w @ninfa/web
+      - run: npm run build -w @ninfa/web
