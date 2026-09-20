@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.exceptions import NotFoundError
 from app.core.tenant import TenantContext
 from app.modules.tenancy.models import MembershipRole, Workspace, WorkspaceMembership
 from app.modules.tenancy.schemas import MembershipCreate, WorkspaceCreate

@@ -14,7 +14,8 @@ from app.db.base import Base
 from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
-HEAD = "0003_canonical_data_model"
+HEAD = "0004_booking_ingestion"
+GATE_1_HEAD = "0003_canonical_data_model"
 GATE_0_HEAD = "0002_procrastinate_schema"
 GATE_1_TABLES = {
     "users",
@@ -25,6 +26,8 @@ GATE_1_TABLES = {
     "import_jobs",
     "import_files",
 }
+GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
+MODEL_TABLES = GATE_1_TABLES | GATE_2_TABLES
 GATE_0_TABLES = {
     "alembic_version",
     "procrastinate_jobs",
@@ -38,7 +41,7 @@ TENANT_OWNED_TABLES = {
     "data_sources",
     "import_jobs",
     "import_files",
-}
+} | GATE_2_TABLES
 
 
 def table_names(engine: Engine) -> set[str]:
@@ -54,7 +57,7 @@ def columns_of(engine: Engine) -> dict[str, list[tuple[str, str, bool]]]:
     inspector = inspect(engine)
     return {
         table: [(c["name"], str(c["type"]), c["nullable"]) for c in inspector.get_columns(table)]
-        for table in sorted(GATE_1_TABLES)
+        for table in sorted(MODEL_TABLES)
     }
 
 
@@ -75,7 +78,8 @@ def test_gate_0_migrations_are_untouched_and_gate_1_sits_on_top(test_database_ur
     assert scripts.get_heads() == [HEAD]
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
     assert revisions == {
-        HEAD: GATE_0_HEAD,
+        HEAD: GATE_1_HEAD,
+        GATE_1_HEAD: GATE_0_HEAD,
         GATE_0_HEAD: "0001_baseline",
         "0001_baseline": None,
     }
@@ -84,8 +88,10 @@ def test_gate_0_migrations_are_untouched_and_gate_1_sits_on_top(test_database_ur
 # --- upgrade / downgrade / re-upgrade --------------------------------------------------------
 
 
-def test_upgrade_creates_the_gate_1_schema_next_to_gate_0(db_engine: Engine, at_head: None) -> None:
-    assert table_names(db_engine) == GATE_0_TABLES | GATE_1_TABLES
+def test_upgrade_creates_the_gate_1_and_gate_2_schema_next_to_gate_0(
+    db_engine: Engine, at_head: None
+) -> None:
+    assert table_names(db_engine) == GATE_0_TABLES | MODEL_TABLES
     assert current_revision(db_engine) == HEAD
 
 
@@ -111,7 +117,7 @@ def test_re_upgrade_after_downgrade_recreates_an_identical_schema(
 
     assert columns_of(db_engine) == before
     assert current_revision(db_engine) == HEAD
-    assert table_names(db_engine) == GATE_0_TABLES | GATE_1_TABLES
+    assert table_names(db_engine) == GATE_0_TABLES | MODEL_TABLES
 
 
 def test_upgrade_is_idempotent_at_head(test_database_url: str, at_head: None) -> None:
@@ -141,7 +147,7 @@ def test_constraint_and_index_names_match_the_models(db_engine: Engine, at_head:
                     "SELECT c.conname FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid"
                     " WHERE t.relname = ANY(:tables) AND c.contype IN ('p', 'f', 'u', 'c')"
                 ),
-                {"tables": sorted(GATE_1_TABLES)},
+                {"tables": sorted(MODEL_TABLES)},
             ).scalars()
         )
         database_indexes = set(
@@ -150,11 +156,11 @@ def test_constraint_and_index_names_match_the_models(db_engine: Engine, at_head:
                     "SELECT indexname FROM pg_indexes WHERE schemaname = 'public'"
                     " AND tablename = ANY(:tables)"
                 ),
-                {"tables": sorted(GATE_1_TABLES)},
+                {"tables": sorted(MODEL_TABLES)},
             ).scalars()
         )
 
-    tables = [Base.metadata.tables[name] for name in GATE_1_TABLES]
+    tables = [Base.metadata.tables[name] for name in MODEL_TABLES]
     model_constraints = {c.name for table in tables for c in table.constraints}
     model_indexes = {index.name for table in tables for index in table.indexes}
 
@@ -212,7 +218,7 @@ def test_delete_policy_only_memberships_cascade(db_engine: Engine, at_head: None
         "fk_workspace_memberships_user_id_users",
     }
     assert {rule for name, rule in rules.items() if "membership" not in name} == {"RESTRICT"}
-    assert len(rules) == 6
+    assert len(rules) == 13  # 6 from Gate 1 + 7 from Gate 2; a new FK must be classified here
 
 
 def test_every_tenant_owned_table_has_a_not_null_workspace_id(
@@ -237,7 +243,7 @@ def test_identifiers_and_timestamps_use_uuid_and_timestamptz(
                 " WHERE table_schema = 'public' AND table_name = ANY(:tables)"
                 " AND (column_name = 'id' OR column_name LIKE '%\\_at')"
             ),
-            {"tables": sorted(GATE_1_TABLES)},
+            {"tables": sorted(MODEL_TABLES)},
         ).all()
 
     assert rows

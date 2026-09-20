@@ -122,6 +122,15 @@ class ImportJob(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         ),
         # Target of import_files' composite FK.
         UniqueConstraint("workspace_id", "id", name="uq_import_jobs_workspace_id_id"),
+        # Gate 2: target of the composite FKs that tie a booking to the jobs that created/updated
+        # it, so a job can only be referenced by rows of its own data source and property.
+        UniqueConstraint(
+            "workspace_id",
+            "property_id",
+            "data_source_id",
+            "id",
+            name="uq_import_jobs_workspace_id_property_id_data_source_id_id",
+        ),
         CheckConstraint(values_check("status", ImportJobStatus), name="status_valid"),
         CheckConstraint(
             "(status = 'PENDING' AND started_at IS NULL AND finished_at IS NULL)"
@@ -165,6 +174,14 @@ class ImportFile(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             ["import_jobs.workspace_id", "import_jobs.id"],
             name="fk_import_files_workspace_id_import_jobs",
             ondelete="RESTRICT",
+        ),
+        # Gate 2: target of the staging rows' composite FK, which pins a staged row's file to
+        # the staged row's job and workspace with a single key.
+        UniqueConstraint(
+            "workspace_id",
+            "import_job_id",
+            "id",
+            name="uq_import_files_workspace_id_import_job_id_id",
         ),
         CheckConstraint("btrim(original_filename) <> ''", name="original_filename_not_blank"),
         CheckConstraint("size_bytes IS NULL OR size_bytes >= 0", name="size_bytes_non_negative"),

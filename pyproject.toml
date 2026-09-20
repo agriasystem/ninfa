@@ -22,6 +22,11 @@ plugins = ["pydantic.mypy"]
 explicit_package_bases = true
 mypy_path = "services/api:services/worker"
 
+[[tool.mypy.overrides]]
+# openpyxl ships no type information and no stubs are installed (no dependency added for them).
+module = ["openpyxl", "openpyxl.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib -ra"
 testpaths = ["services"]

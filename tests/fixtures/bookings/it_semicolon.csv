@@ -1,0 +1,4 @@
+ID Prenotazione;Data Prenotazione;Data Arrivo;Data Partenza;Stato;Camere;Importo Camera;Canale
+IT-1;15/01/2026 10:30;10/03/2026;13/03/2026;Confermato;1;450,00;Booking.com
+IT-2;16/01/2026 11:00;12/03/2026;14/03/2026;Annullato;2;300,50;Diretto
+IT-3;01/02/2026 09:00;01/04/2026;04/04/2026;Confermato;1;1.050,00;Expedia

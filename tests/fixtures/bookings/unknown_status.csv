@@ -1,0 +1,3 @@
+Booking ID,Booked At,Check-in,Check-out,Status,Rooms,Room Revenue,Channel,guest_name,guest_email,guest_phone,Notes
+US-1,2026-01-15 10:30,2026-03-10,2026-03-13,Confirmed,1,450.00,Booking.com,Mario Rossi,mario@example.com,+39 000 0000001,x
+US-2,2026-01-16 11:00,2026-03-12,2026-03-14,Pending guarantee,1,300.50,Direct,Anna Bianchi,anna.bianchi@example.com,+39 000 0000002,y
