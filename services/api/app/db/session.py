@@ -1,15 +1,24 @@
 from collections.abc import Iterator
 from functools import lru_cache
+from typing import Any
 
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+import app.models  # noqa: F401  (registers every mapped class before the first query)
 from app.core.config import get_settings
+
+
+def create_db_engine(url: str, **kwargs: Any) -> Engine:
+    """Engine whose sessions always run in UTC, whatever the server's TimeZone setting is."""
+    return create_engine(
+        url, pool_pre_ping=True, connect_args={"options": "-c timezone=UTC"}, **kwargs
+    )
 
 
 @lru_cache
 def get_engine() -> Engine:
-    return create_engine(get_settings().sqlalchemy_url, pool_pre_ping=True)
+    return create_db_engine(get_settings().sqlalchemy_url)
 
 
 @lru_cache

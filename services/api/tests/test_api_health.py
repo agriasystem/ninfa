@@ -39,3 +39,12 @@ def test_health_replaces_unsafe_incoming_request_id(client: TestClient) -> None:
 
     assert response.headers["X-Request-ID"] != "bad id\twith spaces"
     assert " " not in response.headers["X-Request-ID"]
+
+
+def test_only_the_health_endpoint_is_public_until_authentication_exists(
+    client: TestClient,
+) -> None:
+    """Gate 1 adds tenant data but deliberately no API for it (see architecture-v1.md)."""
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert list(paths) == ["/api/v1/health"]

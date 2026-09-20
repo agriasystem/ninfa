@@ -1,1 +1,1 @@
-"""Reserved for a future gate — not implemented in Gate 0."""
+"""Properties: the hospitality structures owned by a workspace (identity only for now)."""

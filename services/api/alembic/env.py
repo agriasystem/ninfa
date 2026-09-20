@@ -7,11 +7,13 @@ overrides it programmatically with `config.attributes["database_url"]` (used by 
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine, pool
+from sqlalchemy import pool
 
 import app.models  # noqa: F401  (registers models on Base.metadata)
 from app.core.config import get_settings
 from app.db.base import Base
+from app.db.migration_filters import include_object
+from app.db.session import create_db_engine
 
 config = context.config
 
@@ -32,15 +34,22 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
+        compare_type=True,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def run_migrations_online() -> None:
-    engine = create_engine(_database_url(), poolclass=pool.NullPool)
+    engine = create_db_engine(_database_url(), poolclass=pool.NullPool)
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=include_object,
+            compare_type=True,
+        )
         with context.begin_transaction():
             context.run_migrations()
     engine.dispose()

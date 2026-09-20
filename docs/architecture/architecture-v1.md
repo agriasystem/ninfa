@@ -1,6 +1,7 @@
-# NINFA — Architecture v1 (Gate 0)
+# NINFA — Architecture v1 (Gate 0 + Gate 1)
 
-Scope: the technical foundation only. No NINFA product feature is implemented.
+Scope: the technical foundation (Gate 0) and the canonical multi-tenant data core (Gate 1).
+No NINFA product feature is implemented. Data model: [data-model-v1.md](data-model-v1.md).
 
 ## Components
 
@@ -14,9 +15,9 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
 | `apps/web`          | Technical shell: shows whether the API is reachable. No product UI.         |
-| `services/api`      | HTTP API under `/api/v1/`, config, logging, error model, database access.   |
+| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core. |
 | `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists. |
-| PostgreSQL          | The single datastore: application data (later) and the job queue.           |
+| PostgreSQL          | The single datastore: the multi-tenant core (Gate 1) and the job queue.     |
 | `packages/contracts`| A few hand-written TypeScript types mirroring the backend (health, errors). |
 
 The worker imports the API package (`app.core.config`, `app.core.logging`): one backend codebase,
@@ -29,15 +30,20 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- No module exists yet. The directories for the future domains (`properties`, `bookings`,
-  `suppliers`, `invoices`, `labor`, `ingestion`, `normalization`, `data_quality`,
-  `intelligence/*`, `decisions`, `decision_memory`, `ai/*`) are empty package markers so the
-  structure is settled before the first domain lands.
+- Four modules exist since Gate 1, each with `models.py`, `schemas.py` and `repository.py`:
+  `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties` (Property),
+  `ingestion` (DataSource, ImportJob, ImportFile). Importing `app.models` registers every model.
+- The directories for the future domains (`bookings`, `suppliers`, `invoices`, `labor`,
+  `normalization`, `data_quality`, `intelligence/*`, `decisions`, `decision_memory`, `ai/*`) are
+  empty package markers so the structure is settled before those domains land.
 - Splitting a module into a service is a possible future step, never a starting point.
 
 ## API conventions
 
 - Versioned prefix `/api/v1/`. Health: `GET /api/v1/health` → `{status, service, version}`.
+- **No business endpoint is exposed.** Tenant-facing APIs will be published together with the
+  authentication/authorization layer; exposing CRUD earlier (or faking the tenant with a header)
+  would suggest a security model that does not exist yet.
 - One error shape for every non-2xx response:
   `{"error": {"code", "message", "details", "request_id"}}`. Validation errors never echo the
   submitted values. Unhandled exceptions return a generic `internal_error`.
@@ -58,18 +64,28 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - The application connects with a dedicated non-superuser role (`ninfa_app`).
 - **Authentication and authorization are not implemented.** They arrive in a dedicated gate.
 
-## Multi-tenancy principle
+## Multi-tenancy
 
-NINFA is multi-tenant from day one, but nothing tenant-specific exists in Gate 0. The model the
-next gates must follow:
+NINFA is multi-tenant from day one. The workspace is the tenant boundary:
 
 ```
 USER → WORKSPACE MEMBERSHIP → PROPERTY ACCESS
 ```
 
-Every future read or write of business data must be scoped through this chain (workspace and
-property). No business query may be written without a tenant scope. Gate 0 keeps this easy to add:
-one database, one migration history, and a single place (`app/db`) through which the API opens sessions.
+A user may belong to several workspaces; a workspace owns one or more properties. Every future read
+or write of business data must be scoped through this chain.
+
+Implemented in Gate 1 (details in [data-model-v1.md](data-model-v1.md) and ADR 0006):
+
+- **Database-level isolation of relationships.** Tenant-owned tables carry an explicit
+  `workspace_id`, and composite foreign keys make it impossible for a row of workspace A to reference
+  a row of workspace B, even through buggy code or manual SQL.
+- **Explicit tenant scope in code.** `TenantContext(workspace_id)` is required to build any
+  tenant-owned repository; every query filters on it and no method takes a workspace argument.
+  There is no default and no "all tenants" mode.
+- **Not yet implemented:** deciding who may act on which workspace. `TenantContext` is *not*
+  authentication; the authentication/authorization gate will be the only place that creates it for a
+  request. PostgreSQL row-level security is deliberately not enabled yet; the schema is ready for it.
 
 ## Background processing
 
@@ -79,7 +95,8 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 
 ## Not implemented yet (belongs to later gates)
 
-Authentication/authorization, workspaces, properties and any business model (bookings, invoices,
-suppliers, labor), ingestion and normalization, the Decision Engine (expected, detection, impact,
-priority, recommendation), decision memory, AI gateway / narrative / Ask NINFA, product UI,
-notifications, payments, analytics, object storage, deployment.
+Authentication/authorization and any tenant-facing API, real ingestion (parsing, file upload,
+object storage, normalization), the Property Profile, and every business model (bookings, invoices,
+suppliers, labor, cost categories, metrics, baselines), the Decision Engine (expected, detection,
+impact, priority, recommendation), decision memory, AI gateway / narrative / Ask NINFA, product UI,
+notifications, payments, analytics, deployment.
