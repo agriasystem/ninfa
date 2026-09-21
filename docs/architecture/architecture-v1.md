@@ -1,15 +1,18 @@
-# NINFA — Architecture v1 (Gates 0–5)
+# NINFA — Architecture v1 (Gates 0–6)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
-booking snapshots (Gate 3), the first Expected baselines (Gate 4) and the first two revenue
-detectors (Gate 5). No NINFA product feature is implemented: data goes in, is stored correctly, is
-turned into daily "on the books" facts, into a historical "expected level" and into typed,
-non-persisted revenue evaluations; no alert, decision, priority or recommendation exists yet.
+booking snapshots (Gate 3), the first Expected baselines (Gate 4), the first two revenue
+detectors (Gate 5) and the supplier registry with the invoice ingestion (Gate 6). No NINFA product
+feature is implemented: data goes in, is stored correctly, is turned into daily "on the books" facts,
+into a historical "expected level" and into typed, non-persisted revenue evaluations, and purchase
+invoices become canonical suppliers, invoices and lines; no alert, decision, priority,
+recommendation or cost indicator exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
-[revenue-decisions-v1.md](revenue-decisions-v1.md).
+[revenue-decisions-v1.md](revenue-decisions-v1.md). Costs (suppliers and invoices):
+[cost-ingestion-v1.md](cost-ingestion-v1.md).
 
 ## Components
 
@@ -23,9 +26,9 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
 | `apps/web`          | Technical shell: shows whether the API is reachable. No product UI.         |
-| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core, the booking import service, the snapshot and Expected services. |
+| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
 | `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists (the booking import is not a job yet: there is no file storage). |
-| PostgreSQL          | The single datastore: the multi-tenant core, the bookings and the job queue. |
+| PostgreSQL          | The single datastore: the multi-tenant core, the bookings, the suppliers and invoices, and the job queue. |
 | `packages/contracts`| A few hand-written TypeScript types mirroring the backend (health, errors). |
 
 The worker imports the API package (`app.core.config`, `app.core.logging`): one backend codebase,
@@ -38,18 +41,20 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Eight modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
+- Ten modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
   (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2,
   `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3, `intelligence/expected`
   (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the first of the Decision
   Engine stages) and `intelligence/revenue` since Gate 5 (no model: two detectors and their typed
-  evaluations). Importing `app.models` registers every model.
+  evaluations), `suppliers` (Supplier, SupplierIdentifier, SupplierAlias, SupplierResolutionReview)
+  and `invoices` (Invoice, InvoiceLine, InvoiceMappingProfile, InvoiceImportRow) since Gate 6.
+  Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
   `snapshots/reconstruction.py`, `intelligence/expected/service.py`,
-  `intelligence/revenue/service.py`) are plain classes: they depend on a `Session` and a
+  `intelligence/revenue/service.py`, `invoices/service.py`, `suppliers/resolution.py`) are plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
-- The directories for the future domains (`suppliers`, `invoices`, `labor`, `normalization`,
+- The directories for the future domains (`labor`, `normalization`,
   `data_quality`, `intelligence/{detection,impact,priority,recommendation}`, `decisions`,
   `decision_memory`, `ai/*`) are empty package markers so the structure is settled before those
   domains land.
@@ -161,6 +166,22 @@ persisted (there is no Decision table yet), the service is read-only (no write, 
 and needs seven statements whatever the number of targets. No API, worker task, scheduler,
 migration or dependency was added. Details: [revenue-decisions-v1.md](revenue-decisions-v1.md), ADR 0011.
 
+## Cost ingestion (Gate 6)
+
+`InvoiceImportService` turns a customer's purchase invoices into canonical **suppliers, invoices and
+lines**: FatturaPA XML 1.2.x (one file may hold several documents; TD04/TD08 are credit notes) and
+structured CSV/XLSX (a per-data-source **mapping** confirmed once, only mapped columns read, rows
+grouped into invoices). The **Supplier Registry is workspace-wide**; the separate `SupplierResolver`
+resolves each supplier by **VAT number, then tax code, then IBAN hash, then exact name**, hashes the
+IBAN so **the raw IBAN is never stored**, and **never merges on a fuzzy match**: a similar name only
+opens a `PENDING` possible-duplicate review. An invoice is identified by property, supplier, number,
+date and kind (**not** by the data source), is **immutable** and carries **signed** amounts (a credit
+note is negative); re-imports are idempotent and a changed document is `INVOICE_DOCUMENT_CONFLICT`.
+Lines get a cost category by deterministic rules with a provenance confidence. Import is **atomic**:
+parse, validate and stage, then one transaction or nothing. **PDF, OCR and signed .p7m are not
+supported.** No cost baseline, cost per occupied room, anomaly, decision, API, worker task or
+scheduler was added. Details: [cost-ingestion-v1.md](cost-ingestion-v1.md), ADR 0012.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -170,8 +191,8 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 ## Not implemented yet (belongs to later gates)
 
 Authentication/authorization and any tenant-facing API, file upload and object storage, the
-asynchronous ingestion job, costs and labor ingestion, the Property Profile, RevPAR, scheduling of
-snapshot, Expected and revenue runs, other business models (suppliers, invoices, labor, cost
-categories, cost and labor baselines), the rest of the Decision Engine (persisted decisions, other
+asynchronous ingestion job, labor ingestion, PDF/OCR/signed invoices, supplier merge and review
+resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue and import
+runs, other business models (labor, cost and labor baselines, cost per occupied room), the rest of the Decision Engine (persisted decisions, other
 detectors, priority, recommendation, pricing), decision memory, AI gateway / narrative / Ask NINFA, product UI,
 notifications, payments, analytics, deployment.

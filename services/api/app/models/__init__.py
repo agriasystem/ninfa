@@ -27,8 +27,20 @@ from app.modules.intelligence.expected.models import (
     BookingExpectedBaseline,
     BookingExpectedComparable,
 )
+from app.modules.invoices.models import (
+    Invoice,
+    InvoiceImportRow,
+    InvoiceLine,
+    InvoiceMappingProfile,
+)
 from app.modules.properties.models import Property
 from app.modules.snapshots.models import BookingSnapshot, RoomInventoryDaily, SnapshotOrigin
+from app.modules.suppliers.models import (
+    Supplier,
+    SupplierAlias,
+    SupplierIdentifier,
+    SupplierResolutionReview,
+)
 from app.modules.tenancy.models import MembershipRole, Workspace, WorkspaceMembership
 
 __all__ = [
@@ -48,10 +60,18 @@ __all__ = [
     "ImportJob",
     "ImportJobStatus",
     "ImportRowStatus",
+    "Invoice",
+    "InvoiceImportRow",
+    "InvoiceLine",
+    "InvoiceMappingProfile",
     "MembershipRole",
     "Property",
     "RoomInventoryDaily",
     "SnapshotOrigin",
+    "Supplier",
+    "SupplierAlias",
+    "SupplierIdentifier",
+    "SupplierResolutionReview",
     "User",
     "Workspace",
     "WorkspaceMembership",

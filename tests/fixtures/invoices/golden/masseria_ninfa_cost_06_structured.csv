@@ -1,0 +1,14 @@
+Fornitore;P.IVA;Codice Fiscale;IBAN;Numero Fattura;Data;Tipo;Descrizione;Importo;Categoria;Imponibile;Riferimento cliente
+Software Salento S.r.l.;03444444444;;;SS-101;10/01/2026;Fattura;Licenza software gestionale annuale;1.200,00;;1.560,00;Rif. cliente riservato
+Software Salento S.r.l.;03444444444;;;SS-101;10/01/2026;Fattura;Canone SaaS channel manager;360,00;Canone;1.560,00;Rif. cliente riservato
+Software Salento S.r.l.;03444444444;;;SS-102;10/04/2026;Fattura;Assistenza software;240,00;;240,00;Rif. cliente riservato
+Bianchi Laura;;BNCLRA85M41H501Z;;BL-12;05/02/2026;Fattura;Consulenza contabile mensile;400,00;Consulenza;550,00;Rif. cliente riservato
+Bianchi Laura;;BNCLRA85M41H501Z;;BL-12;05/02/2026;Fattura;Elaborazione paghe;150,00;Consulenza;550,00;Rif. cliente riservato
+Bianchi Laura;;BNCLRA85M41H501Z;;BL-19;05/05/2026;Fattura;Consulenza contabile mensile;400,00;Consulenza;400,00;Rif. cliente riservato
+Trasporti Rapidi S.n.c.;03555555555;;DE89370400440532013000;TR-77;03/03/2026;Fattura;Trasporto ospiti aeroporto;90,00;Trasporto;155,50;Rif. cliente riservato
+Trasporti Rapidi S.n.c.;03555555555;;DE89370400440532013000;TR-77;03/03/2026;Fattura;Trasporto bagagli;45,50;Trasporto;155,50;Rif. cliente riservato
+Trasporti Rapidi S.n.c.;03555555555;;DE89370400440532013000;TR-77;03/03/2026;Fattura;Supplemento notturno;20,00;Trasporto;155,50;Rif. cliente riservato
+Trasporti Rapidi S.n.c.;03555555555;;DE89370400440532013000;TR-78;18/03/2026;Fattura;Transfer stazione;60,00;Trasporto;75,00;Rif. cliente riservato
+Trasporti Rapidi S.n.c.;03555555555;;DE89370400440532013000;TR-78;18/03/2026;Fattura;Attesa;15,00;Trasporto;75,00;Rif. cliente riservato
+Trasporti Rapidi S.n.c.;03555555555;;DE89370400440532013000;TR-NC-1;02/04/2026;Nota di credito;Storno transfer stazione;60,00;Trasporto;60,00;Rif. cliente riservato
+Trasporti Rapidi S.n.c.;03555555555;;DE89370400440532013000;TR-NC-2;02/05/2026;Nota di credito;Storno attesa;-15,00;Trasporto;-15,00;Rif. cliente riservato

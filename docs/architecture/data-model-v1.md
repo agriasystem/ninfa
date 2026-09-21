@@ -1,15 +1,17 @@
-# NINFA — Data model v1 (Gates 1–4)
+# NINFA — Data model v1 (Gates 1–6)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
 canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the daily booking
-snapshots (see "Gate 3 additions") and Gate 4 the Expected baselines (see "Gate 4 additions").
-**No invoices, suppliers, labor or decisions exist yet.**
+snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions") and
+Gate 6 the supplier registry and the invoices (see "Gate 6 additions"). **No labor or decisions
+exist yet.**
 
 Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
-`0005_booking_snapshots_metrics` (Gate 3) and `0006_expected_engine` (Gate 4), on top of
-`0001_baseline`, `0002_procrastinate_schema`. Code:
-`services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,intelligence/expected}/`.
+`0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4) and
+`0007_invoice_supplier_ingestion` (Gate 6), on top of `0001_baseline`, `0002_procrastinate_schema`.
+Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,
+intelligence/expected,suppliers,invoices}/`.
 
 ## Entity relationships
 
@@ -383,13 +385,105 @@ Gate 3 unique key. Delete policy: every new foreign key is `RESTRICT`.
 ## Gate 5: no schema change
 
 Revenue Decision Detection ([revenue-decisions-v1.md](revenue-decisions-v1.md)) reads snapshots,
-baselines and comparables and stores nothing: no table, column, index or migration (the head is
-still `0006_expected_engine`), and there is deliberately no `Decision`, `DecisionFact`,
+baselines and comparables and stores nothing: no table, column, index or migration (the head stayed
+`0006_expected_engine` until Gate 6), and there is deliberately no `Decision`, `DecisionFact`,
 `DecisionEvent`, `DecisionOutcome` or `DecisionMemory` table yet (ADR 0011).
+
+## Gate 6 additions (suppliers and invoices)
+
+Migration `0007_invoice_supplier_ingestion`. Full description:
+[cost-ingestion-v1.md](cost-ingestion-v1.md); decisions: ADR 0012.
+
+```mermaid
+erDiagram
+    workspaces ||--o{ suppliers : "owns (workspace-wide)"
+    suppliers ||--o{ supplier_identifiers : "identified by"
+    suppliers ||--o{ supplier_aliases : "spelled as"
+    suppliers ||--o{ supplier_resolution_reviews : "provisional / candidate"
+    properties ||--o{ invoices : "receives"
+    suppliers ||--o{ invoices : "issues"
+    data_sources ||--o{ invoices : "source of record"
+    import_jobs ||--o{ invoices : "created by"
+    import_files ||--o{ invoices : "read from"
+    invoices ||--|{ invoice_lines : has
+    data_sources ||--o| invoice_mapping_profiles : "one mapping"
+    import_files ||--o{ invoice_import_rows : "staged as"
+
+    suppliers {
+        uuid id PK
+        uuid workspace_id
+        text legal_name
+        text normalized_name
+        text country "ISO 3166 alpha-2 or NULL"
+        text default_cost_category "closed list or NULL"
+        bool is_active
+        bool is_verified "false when created by the resolver"
+    }
+    supplier_identifiers {
+        uuid id PK
+        text kind "VAT_NUMBER TAX_CODE IBAN_SHA256"
+        text normalized_value "never a raw IBAN"
+    }
+    invoices {
+        uuid id PK
+        uuid workspace_id
+        uuid property_id
+        uuid data_source_id
+        uuid supplier_id
+        text invoice_number
+        text normalized_invoice_number
+        date invoice_date
+        date due_date "NULL when several"
+        text document_kind "INVOICE CREDIT_NOTE"
+        text currency
+        numeric net_amount "14,2 signed"
+        numeric tax_amount "14,2 signed"
+        numeric gross_amount "14,2 signed"
+        text source_format "FATTURAPA_XML CSV XLSX"
+        text source_fingerprint
+        text supplier_resolution_method
+    }
+    invoice_lines {
+        uuid id PK
+        int source_line_number
+        numeric line_total "14,2 signed"
+        text cost_category
+        numeric classification_confidence "5,2"
+        text classification_method
+    }
+```
+
+| Table | Tenant integrity (composite FKs, all RESTRICT) | Uniqueness |
+| ----- | ---------------------------------------------- | ---------- |
+| `suppliers` | `workspace` → `workspaces` | `(workspace, id)` as FK target |
+| `supplier_identifiers` | `(workspace, supplier)` → `suppliers` | `(workspace, kind, normalized_value)` |
+| `supplier_aliases` | `(workspace, supplier)` → `suppliers`; `(workspace, data_source)` → `data_sources` (nullable) | `(workspace, supplier, normalized_name)`; **no** uniqueness on the name alone |
+| `supplier_resolution_reviews` | `(workspace, provisional)` and `(workspace, candidate)` → `suppliers` | `(workspace, provisional, candidate)`; `provisional <> candidate` |
+| `invoices` | `(workspace, property)` → `properties`; `(workspace, property, data_source)` → `data_sources`; `(workspace, supplier)` → `suppliers`; `(workspace, property, data_source, job)` → `import_jobs`; `(workspace, job, file)` → `import_files` | **identity** `(workspace, property, supplier, normalized number, date, kind)` — no data source; `(workspace, id)` as FK target |
+| `invoice_lines` | `(workspace, invoice)` → `invoices` | `(workspace, invoice, source_line_number)` |
+| `invoice_mapping_profiles` | `(workspace, property, data_source)` → `data_sources` | `(workspace, data_source)` |
+| `invoice_import_rows` | `(workspace, job, file)` → `import_files` | `(workspace, file, row_number)` |
+
+Change to a Gate 1 table (an addition only): `data_sources` gets `UNIQUE (workspace_id, id)`, a
+foreign-key target for the alias's optional data source. `invoices` and `invoice_lines` are immutable
+(no `updated_at`, a `BEFORE UPDATE` trigger that refuses every update; `DELETE` is not blocked,
+retention is a later gate). A supplier is workspace-wide and has no `property_id`; an invoice belongs
+to exactly one property. `CHECK`s keep the rows coherent: a credit note cannot have positive header
+amounts, an `IBAN_SHA256` value is 64 lowercase hex characters, a classification is `UNCLASSIFIED`
+if and only if its confidence is 0 (and then `OTHER`), a review is `PENDING` if and only if it has no
+`resolved_at`, a staging row is `INVALID` if and only if it has errors. Enumerations, including the
+cost categories, are `VARCHAR` with a named `CHECK`, never PostgreSQL enums. Money is
+`NUMERIC(14,2)`, quantity and unit price `NUMERIC(18,8)`, VAT rate `NUMERIC(6,2)`.
+
+Indexes added (only those with a job): `ix_suppliers_workspace_id_normalized_name`,
+`ix_supplier_aliases_workspace_id_normalized_name`, `ix_supplier_identifiers_workspace_id_supplier_id`,
+`ix_supplier_reviews_workspace_id_status`, `ix_invoices_workspace_id_property_id_invoice_date_supplier_id`,
+`ix_invoice_lines_workspace_id_cost_category`, `ix_invoice_import_rows_workspace_id_import_job_id`; the
+unique keys double as lookup indexes. Delete policy: every new foreign key is `RESTRICT`.
 
 ## Not implemented yet
 
-Suppliers, invoices, labor, cost categories, RevPAR metrics, cost and labor baselines,
+Labor, RevPAR metrics, cost and labor baselines, cost per occupied room,
 persisted decisions, other detectors, decision memory; authentication and any tenant-facing API; file upload/storage and the
 asynchronous ingestion job; PostgreSQL row-level security (the schema is compatible: every
 tenant-owned table has a `workspace_id` column to write policies against).

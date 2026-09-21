@@ -17,7 +17,7 @@ from tests.support import alembic_config
 
 GATE_2_HEAD = "0004_booking_ingestion"
 GATE_3_HEAD = "0005_booking_snapshots_metrics"
-HEAD = "0006_expected_engine"
+HEAD = "0007_invoice_supplier_ingestion"
 GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_3_FUNCTION = "booking_snapshots_forbid_update"
@@ -74,6 +74,8 @@ def test_head_is_the_snapshot_migration_with_its_tables_function_and_trigger(
         "trg_booking_snapshots_immutable",
         "trg_booking_expected_baselines_immutable",  # Gate 4, on top
         "trg_booking_expected_comparables_immutable",
+        "trg_invoices_immutable",  # Gate 6, on top
+        "trg_invoice_lines_immutable",
     }
 
 

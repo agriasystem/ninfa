@@ -1,0 +1,1350 @@
+{
+  "aggregates": {
+    "by_category": {
+      "FOOD": "488.40",
+      "LAUNDRY": "3633.00",
+      "OTHER": "4146.36",
+      "PROFESSIONAL_SERVICES": "1350.00",
+      "SOFTWARE": "1800.00",
+      "TRANSPORT": "155.50",
+      "UTILITIES": "6920.75"
+    },
+    "by_method": {
+      "DETERMINISTIC_RULE": "10515.75",
+      "EXPLICIT_SOURCE": "1865.50",
+      "SUPPLIER_DEFAULT": "1966.40",
+      "UNCLASSIFIED": "4146.36"
+    },
+    "by_month": {
+      "2026-01": "3118.10",
+      "2026-02": "3586.35",
+      "2026-03": "1343.21",
+      "2026-04": "3210.00",
+      "2026-05": "1818.60",
+      "2026-06": "5417.75"
+    },
+    "by_supplier": {
+      "S1": "3760.01",
+      "S2": "8058.10",
+      "S3": "2939.50",
+      "S4": "1800.00",
+      "S5": "1350.00",
+      "S6": "155.50",
+      "S7": "281.00",
+      "S9": "149.90"
+    },
+    "credit_note_count": 3,
+    "credit_note_line_total_sum": "-167.50",
+    "invoice_count": 29,
+    "invoices_by_format": {
+      "CSV": 8,
+      "FATTURAPA_XML": 17,
+      "XLSX": 4
+    },
+    "invoices_by_resolution_method": {
+      "CREATED_NEW": 22,
+      "CREATED_NEW_WITH_REVIEW": 1,
+      "EXACT_ALIAS": 1,
+      "EXACT_NAME": 1,
+      "IBAN_SHA256": 1,
+      "TAX_CODE": 1,
+      "VAT_NUMBER": 2
+    },
+    "line_count": 62,
+    "line_total_sum": "18494.01",
+    "other_lines": 20,
+    "supplier_count": 8
+  },
+  "csv_mapping": {
+    "category_mapping": {
+      "Canone": "SOFTWARE",
+      "Consulenza": "PROFESSIONAL_SERVICES",
+      "Trasporto": "TRANSPORT"
+    }
+  },
+  "iban_sha256": {
+    "A": "b84613f12f07e19880a16fd44defa4d9bfdf6eb180eb65fb12c4dbc633291ae6",
+    "B": "45c755c9e88ba16735daa1e465dde67bfcb209ea707ea9955ebb853683b8a248",
+    "C": "faf7e1c0107370ff6f5d03205da7d8ae41ba8e22b31e94b986a65210075d9a1d"
+  },
+  "invoices": [
+    {
+      "date": "2026-01-31",
+      "due_date": "2026-03-02",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Servizio lavanderia biancheria camere",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "300.00"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Noleggio biancheria ospiti",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "85.00"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Trasporto e ritiro",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "25.00"
+        }
+      ],
+      "net": "410.00",
+      "normalized_number": "LS/2026/001",
+      "number": "LS/2026/001",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "90.20",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-02-28",
+      "due_date": "2026-04-01",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Servizio lavanderia biancheria camere",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "237.50"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Noleggio biancheria ospiti",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "85.00"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Trasporto e ritiro",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "25.00"
+        }
+      ],
+      "net": "347.50",
+      "normalized_number": "LS/2026/002",
+      "number": "LS/2026/002",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "76.45",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-03-31",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Servizio lavanderia biancheria camere",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "350.00"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Noleggio biancheria ospiti",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "85.00"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Trasporto e ritiro straordinario",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "37.01"
+        }
+      ],
+      "net": "472.01",
+      "normalized_number": "LS/2026/003",
+      "number": "LS/2026/003",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "103.84",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-04-30",
+      "due_date": "2026-06-01",
+      "gross": "622.20",
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Servizio lavanderia biancheria camere",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "400.00"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Noleggio biancheria ospiti",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "85.00"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Trasporto e ritiro",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "25.00"
+        }
+      ],
+      "net": "510.00",
+      "normalized_number": "LS/2026/004",
+      "number": "LS/2026/004",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "112.20",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-04-15",
+      "due_date": null,
+      "gross": "-112.85",
+      "kind": "CREDIT_NOTE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Storno lavanderia biancheria camere (reclamo)",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "-62.50"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Storno noleggio biancheria ospiti",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "-20.00"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Storno trasporto",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "-10.00"
+        }
+      ],
+      "net": "-92.50",
+      "normalized_number": "NC/2026/001",
+      "number": "NC/2026/001",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "-20.35",
+      "type_code": "TD04"
+    },
+    {
+      "date": "2026-05-31",
+      "due_date": "2026-07-01",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Servizio lavanderia biancheria camere",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "525.00"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "80.00",
+          "description": "Noleggio biancheria ospiti",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "85.00"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Trasporto e ritiro",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "25.00"
+        }
+      ],
+      "net": "635.00",
+      "normalized_number": "LS/2026/005",
+      "number": "LS/2026/005",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "139.70",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-02-28",
+      "due_date": "2026-02-28",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "UTILITIES",
+          "confidence": "80.00",
+          "description": "Fornitura energia elettrica gennaio-febbraio",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "1520.40"
+        },
+        {
+          "category": "UTILITIES",
+          "confidence": "80.00",
+          "description": "Fornitura gas naturale gennaio-febbraio",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "812.35"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Oneri di sistema e imposte",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "356.10"
+        }
+      ],
+      "net": "2688.85",
+      "normalized_number": "EP/2026/0201",
+      "number": "EP/2026/0201",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S2",
+      "tax": "591.55",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-04-30",
+      "due_date": "2026-04-30",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "UTILITIES",
+          "confidence": "80.00",
+          "description": "Fornitura energia elettrica marzo-aprile",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "1610.75"
+        },
+        {
+          "category": "UTILITIES",
+          "confidence": "80.00",
+          "description": "Fornitura gas naturale marzo-aprile",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "640.20"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Oneri di sistema e imposte",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "361.55"
+        }
+      ],
+      "net": "2612.50",
+      "normalized_number": "EP/2026/0404",
+      "number": "EP/2026/0404",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S2",
+      "tax": "574.75",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-06-30",
+      "due_date": "2026-06-30",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "UTILITIES",
+          "confidence": "80.00",
+          "description": "Fornitura energia elettrica maggio-giugno",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "1985.10"
+        },
+        {
+          "category": "UTILITIES",
+          "confidence": "80.00",
+          "description": "Fornitura gas naturale maggio-giugno",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "233.05"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Oneri di sistema e imposte",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "402.30"
+        }
+      ],
+      "net": "2620.45",
+      "normalized_number": "EP/2026/0606",
+      "number": "EP/2026/0606",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S2",
+      "tax": "576.50",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-03-15",
+      "due_date": "2026-03-15",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "UTILITIES",
+          "confidence": "80.00",
+          "description": "Conguaglio energia elettrica",
+          "method": "DETERMINISTIC_RULE",
+          "n": 1,
+          "total": "118.90"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Conguaglio oneri",
+          "method": "UNCLASSIFIED",
+          "n": 2,
+          "total": "12.40"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Diritti di segreteria",
+          "method": "UNCLASSIFIED",
+          "n": 3,
+          "total": "5.00"
+        }
+      ],
+      "net": "136.30",
+      "normalized_number": "EP/2026/0203",
+      "number": "EP/2026/0203",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S2",
+      "tax": "29.99",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-01-20",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Olio extravergine di oliva 5 lt",
+          "method": "UNCLASSIFIED",
+          "n": 1,
+          "total": "933.60"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Farina di grano duro 25 kg",
+          "method": "UNCLASSIFIED",
+          "n": 2,
+          "total": "214.50"
+        }
+      ],
+      "net": "1148.10",
+      "normalized_number": "AM/2026/011",
+      "number": "AM/2026/011",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S3",
+      "tax": "114.81",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-03-12",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Pasta artigianale 500 g",
+          "method": "UNCLASSIFIED",
+          "n": 1,
+          "total": "370.00"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Passata di pomodoro",
+          "method": "UNCLASSIFIED",
+          "n": 2,
+          "total": "134.40"
+        }
+      ],
+      "net": "504.40",
+      "normalized_number": "AM/2026/031",
+      "number": "AM/2026/031",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S3",
+      "tax": "50.44",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-05-22",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Vino rosso 0,75 l",
+          "method": "UNCLASSIFIED",
+          "n": 1,
+          "total": "705.60"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Acqua minerale",
+          "method": "UNCLASSIFIED",
+          "n": 2,
+          "total": "93.00"
+        }
+      ],
+      "net": "798.60",
+      "normalized_number": "AM/2026/052",
+      "number": "AM/2026/052",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S3",
+      "tax": "79.86",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-06-15",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "90.00",
+          "description": "Servizio mensile",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 1,
+          "total": "480.00"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "90.00",
+          "description": "Servizio straordinario",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 2,
+          "total": "95.00"
+        }
+      ],
+      "net": "575.00",
+      "normalized_number": "LS/2026/006",
+      "number": "LS/2026/006",
+      "resolution_method": "VAT_NUMBER",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "126.50",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-06-30",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "90.00",
+          "description": "Servizio mensile",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 1,
+          "total": "505.00"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "90.00",
+          "description": "Consegna extra",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 2,
+          "total": "40.00"
+        }
+      ],
+      "net": "545.00",
+      "normalized_number": "LS/2026/007",
+      "number": "LS/2026/007",
+      "resolution_method": "VAT_NUMBER",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "119.90",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-06-20",
+      "due_date": "2026-07-20",
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "90.00",
+          "description": "Ritiro e lavaggio",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 1,
+          "total": "210.00"
+        },
+        {
+          "category": "LAUNDRY",
+          "confidence": "90.00",
+          "description": "Igienizzazione",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 2,
+          "total": "60.00"
+        }
+      ],
+      "net": "270.00",
+      "normalized_number": "LS/2026/008",
+      "number": "LS/2026/008",
+      "resolution_method": "IBAN_SHA256",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S1",
+      "tax": "59.40",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-01-10",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "SOFTWARE",
+          "confidence": "80.00",
+          "description": "Licenza software gestionale annuale",
+          "method": "DETERMINISTIC_RULE",
+          "n": 2,
+          "total": "1200.00"
+        },
+        {
+          "category": "SOFTWARE",
+          "confidence": "100.00",
+          "description": "Canone SaaS channel manager",
+          "method": "EXPLICIT_SOURCE",
+          "n": 3,
+          "total": "360.00"
+        }
+      ],
+      "net": "1560.00",
+      "normalized_number": "SS-101",
+      "number": "SS-101",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S4",
+      "tax": null,
+      "type_code": "Fattura"
+    },
+    {
+      "date": "2026-04-10",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "SOFTWARE",
+          "confidence": "80.00",
+          "description": "Assistenza software",
+          "method": "DETERMINISTIC_RULE",
+          "n": 4,
+          "total": "240.00"
+        }
+      ],
+      "net": "240.00",
+      "normalized_number": "SS-102",
+      "number": "SS-102",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S4",
+      "tax": null,
+      "type_code": "Fattura"
+    },
+    {
+      "date": "2026-02-05",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "PROFESSIONAL_SERVICES",
+          "confidence": "100.00",
+          "description": "Consulenza contabile mensile",
+          "method": "EXPLICIT_SOURCE",
+          "n": 5,
+          "total": "400.00"
+        },
+        {
+          "category": "PROFESSIONAL_SERVICES",
+          "confidence": "100.00",
+          "description": "Elaborazione paghe",
+          "method": "EXPLICIT_SOURCE",
+          "n": 6,
+          "total": "150.00"
+        }
+      ],
+      "net": "550.00",
+      "normalized_number": "BL-12",
+      "number": "BL-12",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S5",
+      "tax": null,
+      "type_code": "Fattura"
+    },
+    {
+      "date": "2026-05-05",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "PROFESSIONAL_SERVICES",
+          "confidence": "100.00",
+          "description": "Consulenza contabile mensile",
+          "method": "EXPLICIT_SOURCE",
+          "n": 7,
+          "total": "400.00"
+        }
+      ],
+      "net": "400.00",
+      "normalized_number": "BL-19",
+      "number": "BL-19",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S5",
+      "tax": null,
+      "type_code": "Fattura"
+    },
+    {
+      "date": "2026-03-03",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "TRANSPORT",
+          "confidence": "100.00",
+          "description": "Trasporto ospiti aeroporto",
+          "method": "EXPLICIT_SOURCE",
+          "n": 8,
+          "total": "90.00"
+        },
+        {
+          "category": "TRANSPORT",
+          "confidence": "100.00",
+          "description": "Trasporto bagagli",
+          "method": "EXPLICIT_SOURCE",
+          "n": 9,
+          "total": "45.50"
+        },
+        {
+          "category": "TRANSPORT",
+          "confidence": "100.00",
+          "description": "Supplemento notturno",
+          "method": "EXPLICIT_SOURCE",
+          "n": 10,
+          "total": "20.00"
+        }
+      ],
+      "net": "155.50",
+      "normalized_number": "TR-77",
+      "number": "TR-77",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S6",
+      "tax": null,
+      "type_code": "Fattura"
+    },
+    {
+      "date": "2026-03-18",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "TRANSPORT",
+          "confidence": "100.00",
+          "description": "Transfer stazione",
+          "method": "EXPLICIT_SOURCE",
+          "n": 11,
+          "total": "60.00"
+        },
+        {
+          "category": "TRANSPORT",
+          "confidence": "100.00",
+          "description": "Attesa",
+          "method": "EXPLICIT_SOURCE",
+          "n": 12,
+          "total": "15.00"
+        }
+      ],
+      "net": "75.00",
+      "normalized_number": "TR-78",
+      "number": "TR-78",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S6",
+      "tax": null,
+      "type_code": "Fattura"
+    },
+    {
+      "date": "2026-04-02",
+      "due_date": null,
+      "gross": null,
+      "kind": "CREDIT_NOTE",
+      "lines": [
+        {
+          "category": "TRANSPORT",
+          "confidence": "100.00",
+          "description": "Storno transfer stazione",
+          "method": "EXPLICIT_SOURCE",
+          "n": 13,
+          "total": "-60.00"
+        }
+      ],
+      "net": "-60.00",
+      "normalized_number": "TR-NC-1",
+      "number": "TR-NC-1",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S6",
+      "tax": null,
+      "type_code": "Nota di credito"
+    },
+    {
+      "date": "2026-05-02",
+      "due_date": null,
+      "gross": null,
+      "kind": "CREDIT_NOTE",
+      "lines": [
+        {
+          "category": "TRANSPORT",
+          "confidence": "100.00",
+          "description": "Storno attesa",
+          "method": "EXPLICIT_SOURCE",
+          "n": 14,
+          "total": "-15.00"
+        }
+      ],
+      "net": "-15.00",
+      "normalized_number": "TR-NC-2",
+      "number": "TR-NC-2",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "CSV",
+      "supplier": "S6",
+      "tax": null,
+      "type_code": "Nota di credito"
+    },
+    {
+      "date": "2026-06-05",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Verdure fresche di stagione",
+          "method": "UNCLASSIFIED",
+          "n": 1,
+          "total": "184.70"
+        },
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Frutta di stagione",
+          "method": "UNCLASSIFIED",
+          "n": 2,
+          "total": "96.30"
+        }
+      ],
+      "net": "281.00",
+      "normalized_number": "AMS/2026/1",
+      "number": "AMS/2026/1",
+      "resolution_method": "CREATED_NEW_WITH_REVIEW",
+      "source_format": "FATTURAPA_XML",
+      "supplier": "S7",
+      "tax": "28.10",
+      "type_code": "TD01"
+    },
+    {
+      "date": "2026-06-08",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "FOOD",
+          "confidence": "90.00",
+          "description": "Olio extravergine di oliva 5 lt",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 2,
+          "total": "421.20"
+        },
+        {
+          "category": "FOOD",
+          "confidence": "90.00",
+          "description": "Passata di pomodoro",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 3,
+          "total": "67.20"
+        }
+      ],
+      "net": null,
+      "normalized_number": "AM-501",
+      "number": "AM-501",
+      "resolution_method": "EXACT_NAME",
+      "source_format": "XLSX",
+      "supplier": "S3",
+      "tax": null,
+      "type_code": null
+    },
+    {
+      "date": "2026-06-12",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "PROFESSIONAL_SERVICES",
+          "confidence": "100.00",
+          "description": "Consulenza contabile mensile",
+          "method": "EXPLICIT_SOURCE",
+          "n": 4,
+          "total": "400.00"
+        }
+      ],
+      "net": null,
+      "normalized_number": "BL-24",
+      "number": "BL-24",
+      "resolution_method": "TAX_CODE",
+      "source_format": "XLSX",
+      "supplier": "S5",
+      "tax": null,
+      "type_code": null
+    },
+    {
+      "date": "2026-06-28",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "LAUNDRY",
+          "confidence": "90.00",
+          "description": "Lavaggio straordinario",
+          "method": "SUPPLIER_DEFAULT",
+          "n": 5,
+          "total": "88.00"
+        }
+      ],
+      "net": null,
+      "normalized_number": "LS-XLS-1",
+      "number": "LS-XLS-1",
+      "resolution_method": "EXACT_ALIAS",
+      "source_format": "XLSX",
+      "supplier": "S1",
+      "tax": null,
+      "type_code": null
+    },
+    {
+      "date": "2026-06-15",
+      "due_date": null,
+      "gross": null,
+      "kind": "INVOICE",
+      "lines": [
+        {
+          "category": "OTHER",
+          "confidence": "0.00",
+          "description": "Materiale vario",
+          "method": "UNCLASSIFIED",
+          "n": 6,
+          "total": "149.90"
+        }
+      ],
+      "net": null,
+      "normalized_number": "NF-1",
+      "number": "NF-1",
+      "resolution_method": "CREATED_NEW",
+      "source_format": "XLSX",
+      "supplier": "S9",
+      "tax": null,
+      "type_code": null
+    }
+  ],
+  "invoices_sha256": "460124f1847d0d70f9e7eebb79f61417b5b57a42a0f3d7b975ff9374798932af",
+  "note": "Computed independently of the application (see the generator's docstring).",
+  "private_values_never_stored": [
+    "Masseria Cliente Fittizia S.r.l.",
+    "99999999999",
+    "amministrazione@fornitore-fittizio.example",
+    "+39 000 5550101",
+    "Via Inventata 12",
+    "Rif. cliente riservato",
+    "cliente-pec@example.com"
+  ],
+  "raw_ibans_never_stored": [
+    "IT60X0542811101000000123456",
+    "GB82WEST12345698765432",
+    "DE89370400440532013000"
+  ],
+  "reviews": [
+    {
+      "candidate": "S3",
+      "provisional": "S7",
+      "reason": "FUZZY_NAME_SIMILARITY",
+      "similarity": "0.9048",
+      "status": "PENDING"
+    }
+  ],
+  "sources": {
+    "A": "COSTS data source with the Italian CSV mapping (XML needs none)",
+    "B": "COSTS data source with the English XLSX mapping"
+  },
+  "steps": [
+    {
+      "after": {
+        "set_default": {
+          "category": "LAUNDRY",
+          "supplier": "S1"
+        }
+      },
+      "aliases_added": 0,
+      "documents": 6,
+      "file": "masseria_ninfa_cost_01_lavanderia_multi_body.xml",
+      "identifiers_added": 0,
+      "invoices_created": 6,
+      "lines_created": 18,
+      "reviews_created": 0,
+      "rows": 18,
+      "source": "A",
+      "step": 1,
+      "suppliers_created": 1,
+      "suppliers_matched": 0,
+      "warnings": {
+        "MULTIPLE_PAYMENT_DUE_DATES": 1
+      }
+    },
+    {
+      "aliases_added": 0,
+      "documents": 4,
+      "file": "masseria_ninfa_cost_02_energia.xml",
+      "identifiers_added": 0,
+      "invoices_created": 4,
+      "lines_created": 12,
+      "reviews_created": 0,
+      "rows": 12,
+      "source": "A",
+      "step": 2,
+      "suppliers_created": 1,
+      "suppliers_matched": 0,
+      "warnings": {}
+    },
+    {
+      "after": {
+        "set_default": {
+          "category": "FOOD",
+          "supplier": "S3"
+        }
+      },
+      "aliases_added": 0,
+      "documents": 3,
+      "file": "masseria_ninfa_cost_03_agrifood.xml",
+      "identifiers_added": 0,
+      "invoices_created": 3,
+      "lines_created": 6,
+      "reviews_created": 0,
+      "rows": 6,
+      "source": "A",
+      "step": 3,
+      "suppliers_created": 1,
+      "suppliers_matched": 0,
+      "warnings": {}
+    },
+    {
+      "aliases_added": 1,
+      "documents": 2,
+      "file": "masseria_ninfa_cost_04_lavanderia_other_spelling.xml",
+      "identifiers_added": 0,
+      "invoices_created": 2,
+      "lines_created": 4,
+      "reviews_created": 0,
+      "rows": 4,
+      "source": "A",
+      "step": 4,
+      "suppliers_created": 0,
+      "suppliers_matched": 1,
+      "warnings": {}
+    },
+    {
+      "aliases_added": 1,
+      "documents": 1,
+      "file": "masseria_ninfa_cost_05_lavanderia_iban_only.xml",
+      "identifiers_added": 0,
+      "invoices_created": 1,
+      "lines_created": 2,
+      "reviews_created": 0,
+      "rows": 2,
+      "source": "A",
+      "step": 5,
+      "suppliers_created": 0,
+      "suppliers_matched": 1,
+      "warnings": {}
+    },
+    {
+      "aliases_added": 0,
+      "documents": 8,
+      "file": "masseria_ninfa_cost_06_structured.csv",
+      "identifiers_added": 0,
+      "invoices_created": 8,
+      "lines_created": 13,
+      "reviews_created": 0,
+      "rows": 13,
+      "source": "A",
+      "step": 6,
+      "suppliers_created": 3,
+      "suppliers_matched": 0,
+      "warnings": {}
+    },
+    {
+      "aliases_added": 0,
+      "documents": 1,
+      "file": "masseria_ninfa_cost_07_agrifood_sud.xml",
+      "identifiers_added": 0,
+      "invoices_created": 1,
+      "lines_created": 2,
+      "reviews_created": 1,
+      "rows": 2,
+      "source": "A",
+      "step": 7,
+      "suppliers_created": 1,
+      "suppliers_matched": 0,
+      "warnings": {}
+    },
+    {
+      "aliases_added": 1,
+      "documents": 4,
+      "file": "masseria_ninfa_cost_08_xlsx_rows.csv",
+      "identifiers_added": 0,
+      "invoices_created": 4,
+      "lines_created": 5,
+      "reviews_created": 0,
+      "rows": 5,
+      "source": "B",
+      "step": 8,
+      "suppliers_created": 1,
+      "suppliers_matched": 3,
+      "warnings": {}
+    }
+  ],
+  "suppliers": [
+    {
+      "aliases": [
+        "l salentina lavanderie",
+        "lavanderia salentina di rossi srl",
+        "lavanderia salentina srl"
+      ],
+      "country": "IT",
+      "default_cost_category": "LAUNDRY",
+      "identifiers": [
+        [
+          "IBAN_SHA256",
+          "b84613f12f07e19880a16fd44defa4d9bfdf6eb180eb65fb12c4dbc633291ae6"
+        ],
+        [
+          "VAT_NUMBER",
+          "IT03111111111"
+        ]
+      ],
+      "is_verified": false,
+      "key": "S1",
+      "legal_name": "Lavanderia Salentina S.r.l.",
+      "normalized_name": "lavanderia salentina srl"
+    },
+    {
+      "aliases": [
+        "energia puglia spa"
+      ],
+      "country": "IT",
+      "default_cost_category": null,
+      "identifiers": [
+        [
+          "IBAN_SHA256",
+          "45c755c9e88ba16735daa1e465dde67bfcb209ea707ea9955ebb853683b8a248"
+        ],
+        [
+          "VAT_NUMBER",
+          "IT03222222222"
+        ]
+      ],
+      "is_verified": false,
+      "key": "S2",
+      "legal_name": "Energia Puglia S.p.A.",
+      "normalized_name": "energia puglia spa"
+    },
+    {
+      "aliases": [
+        "agrifood murgia srl"
+      ],
+      "country": "IT",
+      "default_cost_category": "FOOD",
+      "identifiers": [
+        [
+          "TAX_CODE",
+          "03333333333"
+        ],
+        [
+          "VAT_NUMBER",
+          "IT03333333333"
+        ]
+      ],
+      "is_verified": false,
+      "key": "S3",
+      "legal_name": "Agrifood Murgia S.r.l.",
+      "normalized_name": "agrifood murgia srl"
+    },
+    {
+      "aliases": [
+        "software salento srl"
+      ],
+      "country": "IT",
+      "default_cost_category": null,
+      "identifiers": [
+        [
+          "VAT_NUMBER",
+          "IT03444444444"
+        ]
+      ],
+      "is_verified": false,
+      "key": "S4",
+      "legal_name": "Software Salento S.r.l.",
+      "normalized_name": "software salento srl"
+    },
+    {
+      "aliases": [
+        "bianchi laura",
+        "laura bianchi"
+      ],
+      "country": null,
+      "default_cost_category": null,
+      "identifiers": [
+        [
+          "TAX_CODE",
+          "BNCLRA85M41H501Z"
+        ]
+      ],
+      "is_verified": false,
+      "key": "S5",
+      "legal_name": "Bianchi Laura",
+      "normalized_name": "bianchi laura"
+    },
+    {
+      "aliases": [
+        "trasporti rapidi snc"
+      ],
+      "country": "IT",
+      "default_cost_category": null,
+      "identifiers": [
+        [
+          "IBAN_SHA256",
+          "faf7e1c0107370ff6f5d03205da7d8ae41ba8e22b31e94b986a65210075d9a1d"
+        ],
+        [
+          "VAT_NUMBER",
+          "IT03555555555"
+        ]
+      ],
+      "is_verified": false,
+      "key": "S6",
+      "legal_name": "Trasporti Rapidi S.n.c.",
+      "normalized_name": "trasporti rapidi snc"
+    },
+    {
+      "aliases": [
+        "agrifood murgia sud srl"
+      ],
+      "country": "IT",
+      "default_cost_category": null,
+      "identifiers": [],
+      "is_verified": false,
+      "key": "S7",
+      "legal_name": "Agrifood Murgia Sud S.r.l.",
+      "normalized_name": "agrifood murgia sud srl"
+    },
+    {
+      "aliases": [
+        "nuovo fornitore ospitalita srl"
+      ],
+      "country": "IT",
+      "default_cost_category": null,
+      "identifiers": [
+        [
+          "VAT_NUMBER",
+          "IT03999999999"
+        ]
+      ],
+      "is_verified": false,
+      "key": "S9",
+      "legal_name": "Nuovo Fornitore Ospitalità S.r.l.",
+      "normalized_name": "nuovo fornitore ospitalita srl"
+    }
+  ],
+  "world": "MASSERIA NINFA DEMO — COST DATA V1"
+}
