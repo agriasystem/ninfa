@@ -41,6 +41,7 @@ class SnapshotHistoryRow:
     origin: SnapshotOrigin
     rooms_on_books: int
     uncertain_rooms: int
+    adr_on_books: Decimal | None
 
 
 class RoomInventoryRepository:
@@ -208,6 +209,7 @@ class BookingSnapshotRepository:
                     BookingSnapshot.origin,
                     BookingSnapshot.rooms_on_books,
                     BookingSnapshot.uncertain_rooms,
+                    BookingSnapshot.adr_on_books,
                 )
                 .join(
                     wanted,
@@ -223,6 +225,29 @@ class BookingSnapshotRepository:
             )
             found.extend(SnapshotHistoryRow(*row) for row in rows)
         return found
+
+    def list_by_ids(
+        self, data_source_id: UUID, snapshot_ids: Collection[UUID]
+    ) -> list[SnapshotHistoryRow]:
+        """The snapshots of ONE data source with these ids (one statement)."""
+        if not snapshot_ids:
+            return []
+        rows = self._session.execute(
+            select(
+                BookingSnapshot.id,
+                BookingSnapshot.snapshot_local_date,
+                BookingSnapshot.stay_date,
+                BookingSnapshot.origin,
+                BookingSnapshot.rooms_on_books,
+                BookingSnapshot.uncertain_rooms,
+                BookingSnapshot.adr_on_books,
+            ).where(
+                BookingSnapshot.workspace_id == self._tenant.workspace_id,
+                BookingSnapshot.data_source_id == data_source_id,
+                BookingSnapshot.id.in_(list(snapshot_ids)),
+            )
+        )
+        return [SnapshotHistoryRow(*row) for row in rows]
 
     def list_for_snapshot_date(
         self,

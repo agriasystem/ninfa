@@ -68,3 +68,45 @@ formula 40 + 21 + 0.25*85.71 = 82.43 -> capped by the 85 rule and then by the 65
 It is BOOKINGS -> SNAPSHOTS -> EXPECTED BASELINES only: no alert, impact, priority, recommendation or
 decision is derived from it. Guest names and phone numbers are invented and must never reach a
 snapshot or a baseline (a test checks it).
+
+## `revenue/` (Gate 5)
+
+| File | Purpose |
+| ---- | ------- |
+| `masseria_ninfa_bookings_revenue_v1.csv` | 138 synthetic bookings (fictional guests `Ospite Ricavi 0001...`, phones `+39 000 8000001...`, one-night stays) in their **final** state: dated cancellations, a no-show, rooms made 20, 10 and 3 days before arrival |
+| `masseria_ninfa_revenue_v1.expected.json` | the snapshots to materialise (140: 50 OBSERVED, 90 RECONSTRUCTED), the inventory, the days on which the observed stays are imported and observed, a checksum of the snapshot values, and for 7 targets the independently computed Expected baseline and the expected `REV_PICKUP_LOW` / `REV_OCCUPANCY_RISK` results |
+| `generate_masseria_revenue_expected.py` | writes both files with the **standard library only** (`csv`, `fractions`, `datetime`, `hashlib`, `json`), sharing no code with the application (exact fractions, its own pairing, statistics, confidence and thresholds); it reuses only the Gate 3 snapshot cell and the Gate 4 calendar helpers, both independent too, and includes the Gate 4 world's snapshots as candidate comparables |
+
+The golden world is the whole chain: the Gate 2/3/4 bookings and snapshots, then the revenue
+bookings. An OBSERVED snapshot reads the bookings **as they are at that instant**, so the observed
+stays are imported day by day (the test replays the timeline through the real import service),
+which gives observed curves a real pickup; reconstructed stays are imported once, in their final
+state. Seven targets of the week of Monday 2026-10-05, one per weekday, each seen 7 days before,
+each with six same-weekday comparables: **A** pickup `TRIGGERED` and occupancy `TRIGGERED` by the
+gap alone, exactly on the 10-point boundary (a comparable lost rooms after its anchor: negative
+remaining pickup; the wild final of the week before is not yet known); **B** 3 observed + 3
+reconstructed comparables, both `CLEAR`; **C** very dispersed history and an empty target, both
+`SUPPRESSED_LOW_CONFIDENCE` (ADR from the historical median, expected final occupancy 105 %, not
+clamped); **D** a NO_SHOW makes one final snapshot uncertain: occupancy `INSUFFICIENT_DATA`; **E**
+19 rooms of 20: pickup `NOT_APPLICABLE` (near sold out); **F** weekly cancellations: pickup
+`NOT_APPLICABLE` (expected pickup <= 0), occupancy `TRIGGERED` by 3 rooms of 60 (5 points); **G** no
+historical prior snapshots and no inventory: pickup `INSUFFICIENT_DATA`, occupancy `NOT_APPLICABLE`.
+Distractors exist and are never used: the same weekday out of season, a stay after the target, the
+right stay date at lead times 6 and 8, and the other six weekdays at the same lead time.
+
+Checked by hand (independently of the application and the generator's code paths), target **A**: the
+six historical pickups `10, 10, 11, 9, 10, 10` have median 10.00, so today's 7 rooms (15 - 8) are
+-30.00 % and 3.00 rooms short; the five remaining net pickups `2, 1, -2, 2, 3` have median 2.00 and
+the five finals `19, 19, 13, 19, 21` median 19.00, so 15 + 2 = 17 rooms against 19 is 2.00 rooms
+and 85.00 % against 95.00 % of 20 rooms = **10.00 points** (exactly on the threshold). Confidence: the
+baseline is 79.29 (six observed comparables `15, 17, 17, 18, 18, 18`), the pickup pattern 80.00 and
+the remaining pattern 70.42, so the final confidences are `MIN` = 79.29 and 70.42.
+
+The generator compares every threshold on **exact fractions** (a pickup of -19.995 % is displayed as
+-20.00 but is not -20 % or worse) and writes the decision values next to the two-decimal display
+ones as `*_exact` fractions (`"140/3"` for target F's forecast occupancy 46.67 %); the test checks
+the application's 50-digit values against them to better than 1e-40.
+
+It is BOOKINGS -> SNAPSHOTS -> EXPECTED BASELINES -> REVENUE EVALUATIONS only: nothing is stored as
+a decision. Guest names and phone numbers are invented and must never reach an evaluation (a test
+checks it).

@@ -106,6 +106,25 @@ class ExpectedRepository:
             .order_by(BookingExpectedComparable.recency_rank)
         ).all()
 
+    def list_comparables_for_baselines(
+        self, baseline_ids: Sequence[UUID]
+    ) -> dict[UUID, list[BookingExpectedComparable]]:
+        """The comparables of many baselines in ONE statement, each list in rank order."""
+        grouped: dict[UUID, list[BookingExpectedComparable]] = {}
+        if not baseline_ids:
+            return grouped
+        rows = self._session.scalars(
+            select(BookingExpectedComparable)
+            .where(
+                BookingExpectedComparable.workspace_id == self._tenant.workspace_id,
+                BookingExpectedComparable.baseline_id.in_(list(baseline_ids)),
+            )
+            .order_by(BookingExpectedComparable.baseline_id, BookingExpectedComparable.recency_rank)
+        )
+        for row in rows:
+            grouped.setdefault(row.baseline_id, []).append(row)
+        return grouped
+
     # --- writes -------------------------------------------------------------------------------
 
     def insert_baselines(self, items: Sequence[NewBaseline]) -> None:
