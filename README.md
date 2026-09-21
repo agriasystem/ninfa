@@ -2,12 +2,14 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 5 (Revenue Decision Detection V1: REV_PICKUP_LOW and REV_OCCUPANCY_RISK).** No
-> product feature exists yet: the technical base, the multi-tenant data core, the import of booking
-> files into canonical bookings, the daily snapshots derived from them (observed vs reconstructed),
-> the Expected baselines (a historical level with its confidence, not a forecast) and two revenue
-> detectors that return typed, non-persisted evaluations (no stored decision, alert, priority or
-> recommendation), on which the next gates are built.
+> **Status: Gate 6 (Invoice Ingestion & Supplier Resolution V1: FatturaPA XML and structured
+> CSV/XLSX).** No product feature exists yet: the technical base, the multi-tenant data core, the
+> import of booking files into canonical bookings, the daily snapshots derived from them (observed
+> vs reconstructed), the Expected baselines (a historical level with its confidence, not a
+> forecast), two revenue detectors that return typed, non-persisted evaluations and, since Gate 6,
+> a workspace-wide supplier registry with canonical invoices and lines (no PDF/OCR, no cost
+> indicator, no stored decision, alert, priority or recommendation), on which the next gates are
+> built.
 
 ## Layout
 
@@ -41,4 +43,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Booking snapshots v1](docs/architecture/booking-snapshots-v1.md) — room inventory, observed vs reconstructed snapshots, on-books metrics
 - [Expected engine v1](docs/architecture/expected-engine-v1.md) — historical comparable baselines, statistics, confidence, INSUFFICIENT_DATA
 - [Revenue decisions v1](docs/architecture/revenue-decisions-v1.md) — REV_PICKUP_LOW and REV_OCCUPANCY_RISK: curve pairs, five statuses, confidence, revenue gap proxy
+- [Cost ingestion v1](docs/architecture/cost-ingestion-v1.md) — supplier registry and resolution, FatturaPA XML and CSV/XLSX invoices, credit notes, categories, atomic import
 - [Architecture decision records](docs/architecture/adr/)

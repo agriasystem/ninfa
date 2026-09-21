@@ -79,6 +79,10 @@ class DataSource(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         UniqueConstraint(
             "workspace_id", "property_id", "id", name="uq_data_sources_workspace_id_property_id_id"
         ),
+        # Foreign-key target added by Gate 6 (migration 0007): supplier aliases name the data source
+        # they were first seen in, and a supplier is workspace-wide, so the pair (workspace, id) is
+        # enough. A constraint that only protects a foreign key: never a query path.
+        UniqueConstraint("workspace_id", "id", name="uq_data_sources_workspace_id_id"),
         CheckConstraint("btrim(name) <> ''", name="name_not_blank"),
         CheckConstraint(values_check("domain", DataSourceDomain), name="domain_valid"),
         CheckConstraint(values_check("source_type", DataSourceType), name="source_type_valid"),

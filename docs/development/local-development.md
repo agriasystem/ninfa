@@ -225,6 +225,59 @@ golden scenario lives in `tests/fixtures/revenue/`; its bookings and expected re
 regenerated, independently of the application, with `uv run --all-packages python
 tests/fixtures/revenue/generate_masseria_revenue_expected.py`. Gate 5 adds no dependency.
 
+## Invoice import (Gate 6)
+
+A Python service, with no public API, worker task, scheduler or new dependency: it is called with a
+tenant, a COSTS data source and the file bytes. **Supported: FatturaPA XML 1.2.x, structured CSV and
+structured XLSX. Not supported: PDF, scans (OCR) and signed `.p7m`** (refused with
+`INVOICE_UNSUPPORTED_FILE_TYPE`). Full guide: [cost-ingestion-v1.md](../architecture/cost-ingestion-v1.md).
+
+```python
+from app.core.tenant import TenantContext
+from app.modules.invoices.service import InvoiceImportService
+
+with get_sessionmaker()() as session:  # the service commits, and rolls back on failure
+    service = InvoiceImportService(session, TenantContext(workspace_id))
+
+    # FatturaPA XML: no mapping needed
+    result = service.import_file(costs_source_id, filename="fattura.xml", content=xml_bytes)
+
+    # a structured file: describe it, confirm the mapping once, then import
+    described = service.describe_file(costs_source_id, filename="costi.csv", content=csv_bytes)
+    service.save_mapping(
+        costs_source_id,
+        headers=described.headers,
+        column_mapping={
+            "supplier_name": {"column": "Fornitore"},
+            "invoice_number": {"column": "Numero"},
+            "invoice_date": {"column": "Data"},
+            "line_description": {"column": "Descrizione"},
+            "line_total": {"column": "Importo"},
+        },
+        format_options={
+            "date_formats": {"invoice_date": "%d/%m/%Y"},
+            "decimal_separator": ",",
+            "thousands_separator": ".",
+        },
+    )
+    result = service.import_file(costs_source_id, filename="costi.csv", content=csv_bytes)
+
+    print(result.status, result.error_code, result.invoices_created, result.suppliers_created)
+```
+
+Branch on `result.error_code` (for example `INVOICE_VALIDATION_FAILED`,
+`INVOICE_DOCUMENT_CONFLICT`, `SUPPLIER_IDENTITY_CONFLICT`), never on the message; the staged rows
+(`invoice_import_rows`) say which field of which line failed. Any problem creates **nothing** but the
+staging and a `FAILED` job; re-running a fixed file is safe and importing the same file twice creates
+nothing new. Suppliers are created by the import itself and are workspace-wide; a possible duplicate
+appears as a `PENDING` row in `supplier_resolution_reviews` (there is no merge yet).
+
+The golden scenario ("MASSERIA NINFA DEMO — COST DATA V1") and the synthetic fixtures live in
+`tests/fixtures/invoices/`; they are (re)written, together with the independently computed expected
+result, by `python tests/fixtures/invoices/generate_cost_fixtures.py` (standard library only). Gate 6
+adds no dependency (`openpyxl` has been there since Gate 2) and one migration,
+`0007_invoice_supplier_ingestion` (`npm run db:migrate`).
+
 ## Quality
 
 | Goal            | Command                                                        |

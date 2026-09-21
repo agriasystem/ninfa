@@ -1,0 +1,4 @@
+﻿Supplier,VAT,Invoice No,Invoice Date,Description,Line Total
+Rossi Food S.r.l.,01234567890,EN-1,2026-03-10,Kitchen supplies,120.00
+Rossi Food S.r.l.,01234567890,EN-1,2026-03-10,Delivery,20.00
+Bianchi Servizi S.n.c.,09876543210,EN-2,2026-03-11,Maintenance visit,200.00

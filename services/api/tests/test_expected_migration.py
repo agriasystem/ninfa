@@ -13,7 +13,7 @@ from sqlalchemy import Engine, inspect, text
 from tests.support import alembic_config
 
 GATE_3_HEAD = "0005_booking_snapshots_metrics"
-HEAD = "0006_expected_engine"
+HEAD = "0007_invoice_supplier_ingestion"
 GATE_4_TABLES = {"booking_expected_baselines", "booking_expected_comparables"}
 GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
 FUNCTION = "booking_expected_forbid_update"

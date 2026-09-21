@@ -22,3 +22,17 @@ def lock_data_source(session: Session, data_source_id: UUID) -> None:
         text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:key AS text), 0))"),
         {"key": str(data_source_id)},
     )
+
+
+def lock_supplier_registry(session: Session, workspace_id: UUID) -> None:
+    """Serialise, for ONE workspace, the writers of its supplier registry.
+
+    A supplier belongs to the workspace and is shared by all its data sources, so two invoice
+    imports of different data sources could otherwise both create the same new supplier. Held until
+    the current transaction ends; always taken AFTER the data-source lock (a fixed order, so two
+    imports can never deadlock on the pair).
+    """
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:key AS text), 0))"),
+        {"key": f"suppliers:{workspace_id}"},
+    )

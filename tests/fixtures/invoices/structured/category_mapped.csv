@@ -1,0 +1,4 @@
+Supplier,VAT,Invoice No,Invoice Date,Description,Line Total,Category
+Rossi Food S.r.l.,01234567890,CM-1,2026-03-10,Bed linen rental,80.00,Biancheria
+Rossi Food S.r.l.,01234567890,CM-1,2026-03-10,Delivery,10.00,Trasporto
+Rossi Food S.r.l.,01234567890,CM-1,2026-03-10,Odd item,5.00,OTHER
