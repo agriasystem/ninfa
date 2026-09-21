@@ -1,11 +1,13 @@
-# NINFA — Data model v1 (Gate 1)
+# NINFA — Data model v1 (Gates 1–3)
 
-The canonical multi-tenant core: who the users are, which workspaces (tenants) exist, who belongs
-to them, which properties they own, and the metadata skeleton of future imports. **No business
-data (bookings, invoices, suppliers, labor, decisions) exists yet.**
+The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
+belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
+canonical bookings (see "Gate 2 additions") and Gate 3 the room inventory and the daily booking
+snapshots (see "Gate 3 additions"). **No invoices, suppliers, labor or decisions exist yet.**
 
-Migration: `0003_canonical_data_model` (on top of `0001_baseline`, `0002_procrastinate_schema`).
-Code: `services/api/app/modules/{identity,tenancy,properties,ingestion}/`.
+Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2) and
+`0005_booking_snapshots_metrics` (Gate 3), on top of `0001_baseline`, `0002_procrastinate_schema`.
+Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots}/`.
 
 ## Entity relationships
 
@@ -252,9 +254,66 @@ columns of existing indexes, so no separate index exists for them.
 Delete policy: every new foreign key is `RESTRICT` (bookings, channels, mapping and staging are
 operational records; nothing is cascaded away).
 
+## Gate 3 additions (room inventory and booking snapshots)
+
+Migration `0005_booking_snapshots_metrics`. Full description:
+[booking-snapshots-v1.md](booking-snapshots-v1.md).
+
+```mermaid
+erDiagram
+    properties ||--o{ room_inventory_daily : "capacity per night"
+    properties ||--o{ booking_snapshots : has
+    data_sources ||--o{ booking_snapshots : "one source per snapshot"
+
+    room_inventory_daily {
+        uuid id PK
+        uuid workspace_id
+        uuid property_id
+        date stay_date "unique per property"
+        int rooms_available ">= 0, 0 = closed"
+        int rooms_out_of_order ">= 0"
+    }
+    booking_snapshots {
+        uuid id PK
+        uuid workspace_id
+        uuid property_id
+        uuid data_source_id
+        date snapshot_local_date "property-local day"
+        timestamptz as_of_at
+        date stay_date
+        text origin "OBSERVED or RECONSTRUCTED_APPROXIMATE"
+        int booking_count_on_books
+        int rooms_on_books
+        numeric allocated_room_revenue_on_books "16,2"
+        int rooms_available "copied, NULL if unknown"
+        numeric occupancy_on_books "NULL if no capacity"
+        numeric adr_on_books "NULL if no rooms"
+        int uncertain_booking_count
+        int uncertain_rooms
+        text calculation_version
+        text content_fingerprint
+    }
+```
+
+| Table | Tenant integrity (composite FKs, all RESTRICT) | Uniqueness |
+| ----- | ---------------------------------------------- | ---------- |
+| `room_inventory_daily` | `(workspace, property)` → `properties` | `(workspace, property, stay_date)` |
+| `booking_snapshots` | `(workspace, property)` → `properties`; `(workspace, property, data_source)` → `data_sources` | `(workspace, data_source, snapshot_local_date, stay_date)` — **no `origin`**: an observation and a reconstruction compete for one slot |
+
+`booking_snapshots` is immutable: no `updated_at` and a `BEFORE UPDATE` trigger that refuses every
+update (`DELETE` is not blocked: retention is a later gate). Extra `CHECK`s keep the metrics
+consistent (ADR defined ⇔ rooms on the books, occupancy defined ⇔ capacity known and positive, no
+uncertainty in an observation, a booking has at least one room). `rooms_total` was not added to
+`Property`. No change to Gate 1/2 tables.
+
+Indexes added: `ix_booking_snapshots_booking_curve` `(workspace, data_source, stay_date,
+snapshot_local_date)` for the booking curve of one stay night; the unique keys above double as lookup
+indexes (the snapshot key's column order also serves "all nights of one snapshot day", so no
+separate index exists for it). Delete policy: every new foreign key is `RESTRICT`.
+
 ## Not implemented yet
 
-Booking snapshots, room inventory, suppliers, invoices, labor, cost categories, metrics, baselines,
+Suppliers, invoices, labor, cost categories, metrics, baselines,
 decisions, decision memory; authentication and any tenant-facing API; file upload/storage and the
 asynchronous ingestion job; PostgreSQL row-level security (the schema is compatible: every
 tenant-owned table has a `workspace_id` column to write policies against).

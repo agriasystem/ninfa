@@ -1,0 +1,8 @@
+Codice Prenotazione;Data Prenotazione;Arrivo;Partenza;Stato;Camere;Ospiti;Importo Camera;Importo Totale;Canale;Commissione;Tipologia Camera;Data Cancellazione;Ospite;Telefono
+MN-0101;20/02/2026 09:00;03/04/2026;06/04/2026;Confermato;1;2;100,00;100,00;Diretto;;Camera Doppia;;Sofia Ambra;+39 000 0000101
+MN-0102;05/03/2026 15:30;10/04/2026;12/04/2026;Confermato;1;2;200,01;200,01;Booking.com;;Camera Doppia;;Matteo Corallo;+39 000 0000102
+MN-0103;10/03/2026 11:00;20/03/2026;23/03/2026;Checked In;2;3;1.000,00;1.000,00;Diretto;;Camera Familiare;;Chiara Smeraldo;+39 000 0000103
+MN-0104;25/02/2026 14:20;20/03/2026;22/03/2026;Checked Out;1;2;360,00;360,00;Airbnb;;Camera Doppia;;Enrico Cobalto;+39 000 0000104
+MN-0105;01/03/2026 10:00;28/03/2026;30/03/2026;No-Show;1;2;300,00;300,00;Diretto;;Camera Doppia;;Bianca Indaco;+39 000 0000105
+MN-0106;15/04/2026 09:00;13/06/2026;16/06/2026;Annullato;2;4;700,00;700,00;Expedia;;Camera Familiare;;Silvio Turchese;+39 000 0000106
+MN-0107;01/04/2026 12:00;28/04/2026;29/04/2026;Confermato;1;2;130,00;130,00;Diretto;;Camera Doppia;;Viola Ametista;+39 000 0000107
