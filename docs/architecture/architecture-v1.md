@@ -1,18 +1,19 @@
-# NINFA — Architecture v1 (Gates 0–6)
+# NINFA — Architecture v1 (Gates 0–7)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
 booking snapshots (Gate 3), the first Expected baselines (Gate 4), the first two revenue
-detectors (Gate 5) and the supplier registry with the invoice ingestion (Gate 6). No NINFA product
-feature is implemented: data goes in, is stored correctly, is turned into daily "on the books" facts,
-into a historical "expected level" and into typed, non-persisted revenue evaluations, and purchase
-invoices become canonical suppliers, invoices and lines; no alert, decision, priority,
-recommendation or cost indicator exists yet.
+detectors (Gate 5), the supplier registry with the invoice ingestion (Gate 6) and the first cost
+detector, the cost per occupied room (Gate 7). No NINFA product feature is implemented: data goes
+in, is stored correctly, is turned into daily "on the books" facts, into a historical "expected
+level" and into typed, non-persisted revenue and cost evaluations, and purchase invoices become
+canonical suppliers, invoices and lines; no alert, decision, priority or recommendation exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
 [revenue-decisions-v1.md](revenue-decisions-v1.md). Costs (suppliers and invoices):
-[cost-ingestion-v1.md](cost-ingestion-v1.md).
+[cost-ingestion-v1.md](cost-ingestion-v1.md). Cost per occupied room:
+[cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md).
 
 ## Components
 
@@ -45,8 +46,8 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2,
   `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3, `intelligence/expected`
   (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the first of the Decision
-  Engine stages) and `intelligence/revenue` since Gate 5 (no model: two detectors and their typed
-  evaluations), `suppliers` (Supplier, SupplierIdentifier, SupplierAlias, SupplierResolutionReview)
+  Engine stages), `intelligence/revenue` since Gate 5 and `intelligence/costs` since Gate 7 (no
+  model in either: their detectors and typed evaluations), `suppliers` (Supplier, SupplierIdentifier, SupplierAlias, SupplierResolutionReview)
   and `invoices` (Invoice, InvoiceLine, InvoiceMappingProfile, InvoiceImportRow) since Gate 6.
   Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
@@ -182,6 +183,29 @@ parse, validate and stage, then one transaction or nothing. **PDF, OCR and signe
 supported.** No cost baseline, cost per occupied room, anomaly, decision, API, worker task or
 scheduler was added. Details: [cost-ingestion-v1.md](cost-ingestion-v1.md), ADR 0012.
 
+## Cost CPOR anomaly detection (Gate 7)
+
+`CostDecisionService` evaluates ONE explicit detector, `COST_CPOR_ANOMALY` (rules
+`cost-cpor-anomaly-v1`): is the **cost per occupied room** of a cost category, in one currency, on a
+concluded calendar month, materially above comparable history? CPOR = the signed net category cost of
+the month (Gate 6 `line_total`, credit notes negative, attributed by invoice date:
+`INVOICE_DATE_ATTRIBUTION`) divided by the month's **occupied room nights**, the sum of
+`rooms_on_books` of the **lead-time-0** snapshots (Gate 3). That denominator is an **operating
+proxy**, not a certified occupancy: **a missing snapshot is not zero rooms** (the month is
+incomplete), an uncertain snapshot invalidates the month and reconstructed clean snapshots are
+admitted with a lower provenance. `OTHER` is not actionable and a month whose classified cost is
+below 70 % of the total is not judged. The expectation is the **median** of 5 to 12 comparable
+months of the same category and **exact currency** (strictly earlier, at most 36 months back, at most
+two months apart in the season, observed-first) with P25/P75/IQR by linear interpolation; the anomaly
+needs **all four** conditions (above expected, at least 20 % above, at or above `P75 + 1.5 x IQR`,
+gross gap of at least 100 currency units); the final confidence is the minimum of the baseline's and
+the target month's quality, gate 55. The result is an immutable, fingerprinted evaluation with one of
+five statuses and stable reason codes; the `cost_gap_proxy` is a gross proxy, never a loss or a
+saving. Nothing is persisted (`CostPeriodMetric` is a value, not a table), no currency is ever
+converted, and the service is read-only (no write, no lock, no clock, a fixed handful of statements).
+No table, migration, API, worker task, scheduler or dependency was added. Details:
+[cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md), ADR 0013.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -193,6 +217,7 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 Authentication/authorization and any tenant-facing API, file upload and object storage, the
 asynchronous ingestion job, labor ingestion, PDF/OCR/signed invoices, supplier merge and review
 resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue and import
-runs, other business models (labor, cost and labor baselines, cost per occupied room), the rest of the Decision Engine (persisted decisions, other
-detectors, priority, recommendation, pricing), decision memory, AI gateway / narrative / Ask NINFA, product UI,
+runs, other business models (labor, labor baselines), the rest of the Decision Engine (persisted
+decisions, other detectors such as supplier price anomalies, priority, recommendation, pricing),
+budgeting and accruals, currency conversion, decision memory, AI gateway / narrative / Ask NINFA, product UI,
 notifications, payments, analytics, deployment.

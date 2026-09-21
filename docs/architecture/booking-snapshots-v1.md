@@ -344,6 +344,17 @@ A pair is OBSERVED only if both snapshots are, and is discarded if either has `u
 The origin distinction is what keeps a pickup between an inference and a fact from being presented
 as a measurement. Gate 5 adds no column, table or migration to snapshots.
 
+## Consumers: Cost CPOR Anomaly Detection (Gate 7)
+
+The cost detector ([cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md)) uses ONE kind of snapshot as
+the denominator of the cost per occupied room: the **lead-time-0** snapshot of each stay night
+(`snapshot_local_date = stay_date`), read for a whole month by exact keys with
+`BookingSnapshotRepository.list_by_keys`. The sum of their `rooms_on_books` is an **operating proxy**
+of the occupied room nights, not a certified occupancy. It treats a **missing** snapshot as unknown
+(never as zero rooms, so the month is incomplete), refuses a day with `uncertain_rooms` and admits
+`RECONSTRUCTED_APPROXIMATE` snapshots (with no uncertainty) at a lower provenance than `OBSERVED` ones.
+Gate 7 adds no column, table or migration to snapshots.
+
 ## Known limits (intentional)
 
 - Reconstructions are approximations (current booking state, today's inventory).
@@ -353,5 +364,5 @@ as a measurement. Gate 5 adds no column, table or migration to snapshots.
 - No retention or deletion policy for snapshots yet.
 - `rooms_out_of_order` is stored, not used.
 - No pickup, curves interpretation, alerts or decisions are computed here: the Expected baselines
-  (Gate 4) and the revenue evaluations (Gate 5) read these snapshots; a persisted decision is a later
-  gate.
+  (Gate 4), the revenue evaluations (Gate 5) and the cost per occupied room (Gate 7) read these
+  snapshots; a persisted decision is a later gate.

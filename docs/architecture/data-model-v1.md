@@ -1,15 +1,15 @@
-# NINFA — Data model v1 (Gates 1–6)
+# NINFA — Data model v1 (Gates 1–7)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
 canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the daily booking
 snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions") and
-Gate 6 the supplier registry and the invoices (see "Gate 6 additions"). **No labor or decisions
-exist yet.**
+Gate 6 the supplier registry and the invoices (see "Gate 6 additions"); Gate 7 adds no schema (see
+"Gate 7: no schema change"). **No labor or decisions exist yet.**
 
 Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
 `0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4) and
-`0007_invoice_supplier_ingestion` (Gate 6), on top of `0001_baseline`, `0002_procrastinate_schema`.
+`0007_invoice_supplier_ingestion` (Gate 6, still the head after Gate 7), on top of `0001_baseline`, `0002_procrastinate_schema`.
 Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,
 intelligence/expected,suppliers,invoices}/`.
 
@@ -389,6 +389,15 @@ baselines and comparables and stores nothing: no table, column, index or migrati
 `0006_expected_engine` until Gate 6), and there is deliberately no `Decision`, `DecisionFact`,
 `DecisionEvent`, `DecisionOutcome` or `DecisionMemory` table yet (ADR 0011).
 
+## Gate 7: no schema change
+
+Cost CPOR Anomaly Detection ([cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md)) reads
+`invoice_lines` / `invoices` (signed `line_total`, category, classification confidence, invoice
+date) and the lead-time-0 rows of `booking_snapshots`, and stores nothing: no table, column, index
+or migration (the head stays `0007_invoice_supplier_ingestion`). `CostPeriodMetric` and the
+evaluation are values, not entities: there is no cost-metric, baseline or `Decision` table (ADR
+0013). The reads use the existing indexes and the Gate 3 unique key of `booking_snapshots`.
+
 ## Gate 6 additions (suppliers and invoices)
 
 Migration `0007_invoice_supplier_ingestion`. Full description:
@@ -483,7 +492,7 @@ unique keys double as lookup indexes. Delete policy: every new foreign key is `R
 
 ## Not implemented yet
 
-Labor, RevPAR metrics, cost and labor baselines, cost per occupied room,
+Labor, RevPAR metrics, labor baselines, persisted cost metrics,
 persisted decisions, other detectors, decision memory; authentication and any tenant-facing API; file upload/storage and the
 asynchronous ingestion job; PostgreSQL row-level security (the schema is compatible: every
 tenant-owned table has a `workspace_id` column to write policies against).
