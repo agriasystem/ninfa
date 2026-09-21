@@ -2,11 +2,12 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 4 (Expected Engine V1: historical comparable baselines).** No product feature
-> exists yet: the technical base, the multi-tenant data core, the import of booking files into
-> canonical bookings, the daily snapshots derived from them (observed vs reconstructed) and the
-> first Expected baselines (a historical level with its confidence, not a forecast), on which the
-> next gates are built.
+> **Status: Gate 5 (Revenue Decision Detection V1: REV_PICKUP_LOW and REV_OCCUPANCY_RISK).** No
+> product feature exists yet: the technical base, the multi-tenant data core, the import of booking
+> files into canonical bookings, the daily snapshots derived from them (observed vs reconstructed),
+> the Expected baselines (a historical level with its confidence, not a forecast) and two revenue
+> detectors that return typed, non-persisted evaluations (no stored decision, alert, priority or
+> recommendation), on which the next gates are built.
 
 ## Layout
 
@@ -39,4 +40,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Booking data v1](docs/architecture/booking-data-v1.md) — canonical booking, mapping memory, import pipeline, guarantees
 - [Booking snapshots v1](docs/architecture/booking-snapshots-v1.md) — room inventory, observed vs reconstructed snapshots, on-books metrics
 - [Expected engine v1](docs/architecture/expected-engine-v1.md) — historical comparable baselines, statistics, confidence, INSUFFICIENT_DATA
+- [Revenue decisions v1](docs/architecture/revenue-decisions-v1.md) — REV_PICKUP_LOW and REV_OCCUPANCY_RISK: curve pairs, five statuses, confidence, revenue gap proxy
 - [Architecture decision records](docs/architecture/adr/)

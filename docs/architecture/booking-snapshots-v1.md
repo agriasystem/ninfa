@@ -334,6 +334,16 @@ confidence, and never uses one with `uncertain_rooms > 0`. It needs exactly one 
 index). Migration `0006` adds one unique constraint to `booking_snapshots`,
 `(workspace_id, property_id, data_source_id, id, origin)`, used only as a foreign-key target.
 
+## Consumers: Revenue Decision Detection (Gate 5)
+
+The two revenue detectors ([revenue-decisions-v1.md](revenue-decisions-v1.md)) build **curve pairs**
+from these snapshots: two snapshots of the *same* stay date (an anchor and the one 7 snapshot days
+earlier, or the final one taken on the stay date), read by exact keys with
+`BookingSnapshotRepository.list_by_keys` and `list_by_ids` (both return the ADR on books as well).
+A pair is OBSERVED only if both snapshots are, and is discarded if either has `uncertain_rooms`.
+The origin distinction is what keeps a pickup between an inference and a fact from being presented
+as a measurement. Gate 5 adds no column, table or migration to snapshots.
+
 ## Known limits (intentional)
 
 - Reconstructions are approximations (current booking state, today's inventory).
@@ -342,5 +352,6 @@ index). Migration `0006` adds one unique constraint to `booking_snapshots`,
   recalculating history under new rules is a decision for a later gate.
 - No retention or deletion policy for snapshots yet.
 - `rooms_out_of_order` is stored, not used.
-- No pickup, curves interpretation, alerts or decisions (the Expected baselines of Gate 4 read these
-  snapshots; detection and decisions are later gates).
+- No pickup, curves interpretation, alerts or decisions are computed here: the Expected baselines
+  (Gate 4) and the revenue evaluations (Gate 5) read these snapshots; a persisted decision is a later
+  gate.

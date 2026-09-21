@@ -240,6 +240,18 @@ expected file was computed **independently of the application code**
 fractions; it also recomputes the snapshots), and includes every baseline, its comparables and a
 checksum of the snapshot grid. A, B and D were also checked by hand (see the fixtures README).
 
+## Consumers: Revenue Decision Detection (Gate 5)
+
+Gate 5 ([revenue-decisions-v1.md](revenue-decisions-v1.md)) reads the stored baselines and their
+comparables as read-only inputs and changes nothing here: the comparables of a baseline are the
+**anchors** of its curve pairs (Gate 5 does not repeat the weekday, season, horizon or lead-time
+selection), the baseline's `confidence_score` is one of the two inputs of the final confidence (the
+minimum of it and the curve-pattern confidence), and its status decides whether a detector can run
+(`INSUFFICIENT_DATA` becomes an `INSUFFICIENT_DATA` evaluation). The only addition is the read
+`ExpectedRepository.list_comparables_for_baselines` (the comparables of many baselines in one
+statement). **Expected stays a historical level, not a forecast**: the baseline gets no final or
+remaining column; the minimal projection of `REV_OCCUPANCY_RISK` lives only in an evaluation.
+
 ## Known limits (intentional)
 
 * **Capacity is not normalised**: the statistic is `rooms_on_books`. If the property's capacity

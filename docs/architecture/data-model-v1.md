@@ -380,10 +380,17 @@ Indexes added: `ix_booking_expected_baselines_snapshot_date` and `ix_booking_exp
 `(workspace, baseline)` prefix serves "the comparables of a baseline"). Candidate retrieval reuses the
 Gate 3 unique key. Delete policy: every new foreign key is `RESTRICT`.
 
+## Gate 5: no schema change
+
+Revenue Decision Detection ([revenue-decisions-v1.md](revenue-decisions-v1.md)) reads snapshots,
+baselines and comparables and stores nothing: no table, column, index or migration (the head is
+still `0006_expected_engine`), and there is deliberately no `Decision`, `DecisionFact`,
+`DecisionEvent`, `DecisionOutcome` or `DecisionMemory` table yet (ADR 0011).
+
 ## Not implemented yet
 
-Suppliers, invoices, labor, cost categories, RevPAR/pickup metrics, cost and labor baselines,
-detection, decisions, decision memory; authentication and any tenant-facing API; file upload/storage and the
+Suppliers, invoices, labor, cost categories, RevPAR metrics, cost and labor baselines,
+persisted decisions, other detectors, decision memory; authentication and any tenant-facing API; file upload/storage and the
 asynchronous ingestion job; PostgreSQL row-level security (the schema is compatible: every
 tenant-owned table has a `workspace_id` column to write policies against).
 

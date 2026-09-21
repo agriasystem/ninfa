@@ -1,13 +1,15 @@
-# NINFA — Architecture v1 (Gates 0–4)
+# NINFA — Architecture v1 (Gates 0–5)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
-booking snapshots (Gate 3) and the first Expected baselines (Gate 4). No NINFA product feature is
-implemented: data goes in, is stored correctly, is turned into daily "on the books" facts and
-into a historical "expected level"; no detection, alert or decision is computed from it yet.
+booking snapshots (Gate 3), the first Expected baselines (Gate 4) and the first two revenue
+detectors (Gate 5). No NINFA product feature is implemented: data goes in, is stored correctly, is
+turned into daily "on the books" facts, into a historical "expected level" and into typed,
+non-persisted revenue evaluations; no alert, decision, priority or recommendation exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
-[expected-engine-v1.md](expected-engine-v1.md).
+[expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
+[revenue-decisions-v1.md](revenue-decisions-v1.md).
 
 ## Components
 
@@ -36,13 +38,15 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Seven modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
+- Eight modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
   (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2,
-  `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3 and `intelligence/expected`
+  `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3, `intelligence/expected`
   (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the first of the Decision
-  Engine stages). Importing `app.models` registers every model.
+  Engine stages) and `intelligence/revenue` since Gate 5 (no model: two detectors and their typed
+  evaluations). Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
-  `snapshots/reconstruction.py`, `intelligence/expected/service.py`) are plain classes: they depend on a `Session` and a
+  `snapshots/reconstruction.py`, `intelligence/expected/service.py`,
+  `intelligence/revenue/service.py`) are plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
 - The directories for the future domains (`suppliers`, `invoices`, `labor`, `normalization`,
@@ -141,6 +145,22 @@ tenant-checked by composite foreign keys); runs share the per-data-source adviso
 one candidate query per batch. No API, worker task or scheduler was added. Details:
 [expected-engine-v1.md](expected-engine-v1.md), ADR 0010.
 
+## Revenue decision detection (Gate 5)
+
+`RevenueDecisionService` evaluates two explicit detectors on an OBSERVED snapshot and its Gate 4
+baseline: `REV_PICKUP_LOW` (the last 7 days brought fewer rooms than the same historical stay
+dates did over the same 7 days) and `REV_OCCUPANCY_RISK` (rooms on the books plus the usual
+remaining net pickup falls short of the usual final level). Both work on **curve pairs** (two
+snapshots of the same historical stay date, the anchor being a stored Gate 4 comparable), with
+median/P25/P75 statistics, a curve-pattern confidence and a final confidence that is the
+**minimum** of the baseline's and the pattern's. The result is an immutable, fingerprinted
+**evaluation** with one of five distinct statuses (`TRIGGERED`, `CLEAR`, `INSUFFICIENT_DATA`,
+`NOT_APPLICABLE`, `SUPPRESSED_LOW_CONFIDENCE`), stable reason codes and typed facts; a
+`revenue_gap_proxy` (rooms x a reference ADR) is a gross exposure proxy, never a loss. Nothing is
+persisted (there is no Decision table yet), the service is read-only (no write, no lock, no clock)
+and needs seven statements whatever the number of targets. No API, worker task, scheduler,
+migration or dependency was added. Details: [revenue-decisions-v1.md](revenue-decisions-v1.md), ADR 0011.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -150,8 +170,8 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 ## Not implemented yet (belongs to later gates)
 
 Authentication/authorization and any tenant-facing API, file upload and object storage, the
-asynchronous ingestion job, costs and labor ingestion, the Property Profile, RevPAR, pickup and the
-interpretation of booking curves, scheduling of snapshot and Expected runs, other business models
-(suppliers, invoices, labor, cost categories, cost and labor baselines), the Decision Engine (detection,
-impact, priority, recommendation), decision memory, AI gateway / narrative / Ask NINFA, product UI,
+asynchronous ingestion job, costs and labor ingestion, the Property Profile, RevPAR, scheduling of
+snapshot, Expected and revenue runs, other business models (suppliers, invoices, labor, cost
+categories, cost and labor baselines), the rest of the Decision Engine (persisted decisions, other
+detectors, priority, recommendation, pricing), decision memory, AI gateway / narrative / Ask NINFA, product UI,
 notifications, payments, analytics, deployment.

@@ -189,6 +189,42 @@ whose history changed meanwhile raises `EXPECTED_BASELINE_CONFLICT` (a corrected
 application, with `uv run --all-packages python
 tests/fixtures/expected/generate_masseria_expected_expected.py`. Gate 4 adds no dependency.
 
+## Revenue decisions (Gate 5)
+
+A read-only Python service, with no public API, worker task, scheduler, migration or new
+dependency. It needs an OBSERVED snapshot **and** its Expected baseline (see above), and history
+with the pairs of the same stay dates: without them the answer is `INSUFFICIENT_DATA`, never an
+invented number. It writes nothing and stores no decision; call it as often as you like.
+
+```python
+from datetime import date
+
+from app.modules.intelligence.revenue.service import RevenueDecisionService
+
+with get_sessionmaker()() as session:  # any session: the service never commits or rolls back
+    service = RevenueDecisionService(session, tenant)
+    signals = service.evaluate_revenue_signals(target_snapshot_id)  # one OBSERVED target
+    print(signals.pickup_low.status, signals.pickup_low.reason_codes)
+    print(signals.occupancy_risk.status, signals.occupancy_risk.revenue_gap_proxy)
+
+    # every OBSERVED target of one snapshot day and stay range, seven statements in total
+    for signals in service.evaluate_snapshot_date(
+        property_id=property_id, data_source_id=data_source_id,
+        snapshot_local_date=date(2026, 8, 1),
+        stay_date_start=date(2026, 8, 1), stay_date_end=date(2026, 9, 30),
+    ):
+        evaluation = signals.pickup_low
+        print(evaluation.stay_date, evaluation.status.value, evaluation.confidence_score)
+```
+
+`evaluate_pickup_low` and `evaluate_occupancy_risk` run one detector. An evaluation has one of five
+statuses (`TRIGGERED`, `CLEAR`, `INSUFFICIENT_DATA`, `NOT_APPLICABLE`, `SUPPRESSED_LOW_CONFIDENCE`),
+stable `reason_codes` and typed `facts`; `revenue_gap_proxy` is rooms x a reference ADR, a gross
+exposure proxy and **not** a loss. Run the Expected service first for the day's targets. The
+golden scenario lives in `tests/fixtures/revenue/`; its bookings and expected result are
+regenerated, independently of the application, with `uv run --all-packages python
+tests/fixtures/revenue/generate_masseria_revenue_expected.py`. Gate 5 adds no dependency.
+
 ## Quality
 
 | Goal            | Command                                                        |

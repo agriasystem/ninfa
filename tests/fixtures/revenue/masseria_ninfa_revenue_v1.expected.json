@@ -1,0 +1,1701 @@
+{
+  "description": "Golden revenue decision evaluations of MASSERIA NINFA DEMO: the Gate 2/3/4 bookings plus synthetic revenue bookings (masseria_ninfa_bookings_revenue_v1.csv). Computed independently of the application code (generate_masseria_revenue_expected.py, standard library only, exact fractions). BOOKINGS -> SNAPSHOTS -> EXPECTED BASELINES -> REVENUE EVALUATIONS: nothing else; no decision is stored.",
+  "property": {
+    "timezone": "Europe/Rome",
+    "currency": "EUR"
+  },
+  "reconstruction_clock": "2026-10-20T10:00:00+00:00",
+  "observation_clock_hour_utc": 21,
+  "rules_version": "revenue-decisions-v1",
+  "pattern_version": "revenue-curve-pattern-v1",
+  "inventory": {
+    "2026-10-05": 20,
+    "2026-10-06": 24,
+    "2026-10-07": 20,
+    "2026-10-08": 20,
+    "2026-10-09": 20,
+    "2026-10-10": 60
+  },
+  "observed_stays": [
+    "2026-08-24",
+    "2026-08-31",
+    "2026-09-07",
+    "2026-09-14",
+    "2026-09-15",
+    "2026-09-19",
+    "2026-09-21",
+    "2026-09-22",
+    "2026-09-26",
+    "2026-09-28",
+    "2026-09-29",
+    "2026-10-03",
+    "2026-10-05",
+    "2026-10-06",
+    "2026-10-07",
+    "2026-10-08",
+    "2026-10-09",
+    "2026-10-10",
+    "2026-10-11"
+  ],
+  "snapshots": [
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-01-19",
+      "stay_date": "2026-02-02"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-01-26",
+      "stay_date": "2026-02-02"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-02-02",
+      "stay_date": "2026-02-02"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-10",
+      "stay_date": "2026-08-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-11",
+      "stay_date": "2026-08-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-12",
+      "stay_date": "2026-08-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-13",
+      "stay_date": "2026-08-27"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-14",
+      "stay_date": "2026-08-28"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-15",
+      "stay_date": "2026-08-29"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-17",
+      "stay_date": "2026-08-24"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-17",
+      "stay_date": "2026-08-31"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-18",
+      "stay_date": "2026-08-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-18",
+      "stay_date": "2026-09-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-19",
+      "stay_date": "2026-08-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-19",
+      "stay_date": "2026-09-02"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-20",
+      "stay_date": "2026-08-27"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-20",
+      "stay_date": "2026-09-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-21",
+      "stay_date": "2026-08-28"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-21",
+      "stay_date": "2026-09-04"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-22",
+      "stay_date": "2026-08-29"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-22",
+      "stay_date": "2026-09-05"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-23",
+      "stay_date": "2026-08-30"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-24",
+      "stay_date": "2026-08-24"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-24",
+      "stay_date": "2026-08-31"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-24",
+      "stay_date": "2026-09-07"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-25",
+      "stay_date": "2026-08-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-25",
+      "stay_date": "2026-09-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-25",
+      "stay_date": "2026-09-08"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-26",
+      "stay_date": "2026-08-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-26",
+      "stay_date": "2026-09-02"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-26",
+      "stay_date": "2026-09-09"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-27",
+      "stay_date": "2026-08-27"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-27",
+      "stay_date": "2026-09-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-27",
+      "stay_date": "2026-09-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-28",
+      "stay_date": "2026-08-28"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-28",
+      "stay_date": "2026-09-04"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-28",
+      "stay_date": "2026-09-11"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-29",
+      "stay_date": "2026-08-29"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-29",
+      "stay_date": "2026-09-05"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-29",
+      "stay_date": "2026-09-12"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-30",
+      "stay_date": "2026-08-30"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-08-30",
+      "stay_date": "2026-09-06"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-31",
+      "stay_date": "2026-08-31"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-31",
+      "stay_date": "2026-09-07"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-31",
+      "stay_date": "2026-09-14"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-01",
+      "stay_date": "2026-09-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-01",
+      "stay_date": "2026-09-08"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-01",
+      "stay_date": "2026-09-15"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-02",
+      "stay_date": "2026-09-02"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-02",
+      "stay_date": "2026-09-09"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-02",
+      "stay_date": "2026-09-16"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-03",
+      "stay_date": "2026-09-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-03",
+      "stay_date": "2026-09-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-03",
+      "stay_date": "2026-09-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-04",
+      "stay_date": "2026-09-04"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-04",
+      "stay_date": "2026-09-11"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-04",
+      "stay_date": "2026-09-18"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-05",
+      "stay_date": "2026-09-05"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-05",
+      "stay_date": "2026-09-12"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-05",
+      "stay_date": "2026-09-19"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-06",
+      "stay_date": "2026-09-06"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-06",
+      "stay_date": "2026-09-13"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-07",
+      "stay_date": "2026-09-07"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-07",
+      "stay_date": "2026-09-14"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-07",
+      "stay_date": "2026-09-21"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-08",
+      "stay_date": "2026-09-08"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-08",
+      "stay_date": "2026-09-15"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-08",
+      "stay_date": "2026-09-22"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-09",
+      "stay_date": "2026-09-09"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-09",
+      "stay_date": "2026-09-16"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-09",
+      "stay_date": "2026-09-23"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-10",
+      "stay_date": "2026-09-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-10",
+      "stay_date": "2026-09-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-10",
+      "stay_date": "2026-09-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-11",
+      "stay_date": "2026-09-11"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-11",
+      "stay_date": "2026-09-18"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-11",
+      "stay_date": "2026-09-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-12",
+      "stay_date": "2026-09-12"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-12",
+      "stay_date": "2026-09-19"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-12",
+      "stay_date": "2026-09-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-13",
+      "stay_date": "2026-09-13"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-13",
+      "stay_date": "2026-09-20"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-13",
+      "stay_date": "2026-09-21"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-14",
+      "stay_date": "2026-09-14"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-14",
+      "stay_date": "2026-09-21"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-14",
+      "stay_date": "2026-09-28"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-15",
+      "stay_date": "2026-09-15"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-15",
+      "stay_date": "2026-09-21"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-15",
+      "stay_date": "2026-09-22"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-15",
+      "stay_date": "2026-09-29"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-16",
+      "stay_date": "2026-09-16"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-16",
+      "stay_date": "2026-09-23"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-16",
+      "stay_date": "2026-09-30"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-17",
+      "stay_date": "2026-09-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-17",
+      "stay_date": "2026-09-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-17",
+      "stay_date": "2026-10-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-18",
+      "stay_date": "2026-09-18"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-18",
+      "stay_date": "2026-09-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-18",
+      "stay_date": "2026-10-02"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-19",
+      "stay_date": "2026-09-19"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-19",
+      "stay_date": "2026-09-26"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-19",
+      "stay_date": "2026-10-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-20",
+      "stay_date": "2026-09-20"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-20",
+      "stay_date": "2026-09-27"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-21",
+      "stay_date": "2026-09-21"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-21",
+      "stay_date": "2026-09-28"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-21",
+      "stay_date": "2026-10-05"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-22",
+      "stay_date": "2026-09-22"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-22",
+      "stay_date": "2026-09-29"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-22",
+      "stay_date": "2026-10-06"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-23",
+      "stay_date": "2026-09-23"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-23",
+      "stay_date": "2026-09-30"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-23",
+      "stay_date": "2026-10-07"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-24",
+      "stay_date": "2026-09-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-24",
+      "stay_date": "2026-10-01"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-24",
+      "stay_date": "2026-10-08"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-25",
+      "stay_date": "2026-09-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-25",
+      "stay_date": "2026-10-02"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-25",
+      "stay_date": "2026-10-09"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-26",
+      "stay_date": "2026-09-26"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-26",
+      "stay_date": "2026-10-03"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-26",
+      "stay_date": "2026-10-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-27",
+      "stay_date": "2026-09-27"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-27",
+      "stay_date": "2026-10-04"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-27",
+      "stay_date": "2026-10-11"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-28",
+      "stay_date": "2026-09-28"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-28",
+      "stay_date": "2026-10-05"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-29",
+      "stay_date": "2026-09-29"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-29",
+      "stay_date": "2026-10-06"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-09-30",
+      "stay_date": "2026-09-30"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-09-30",
+      "stay_date": "2026-10-07"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-10-01",
+      "stay_date": "2026-10-01"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-10-01",
+      "stay_date": "2026-10-08"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-10-02",
+      "stay_date": "2026-10-02"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-10-02",
+      "stay_date": "2026-10-09"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-10-03",
+      "stay_date": "2026-10-03"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-10-03",
+      "stay_date": "2026-10-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-10-04",
+      "stay_date": "2026-10-04"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-10-04",
+      "stay_date": "2026-10-11"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-10-05",
+      "stay_date": "2026-10-12"
+    }
+  ],
+  "counts": {
+    "revenue_bookings": 138,
+    "snapshots": 140,
+    "observed_snapshots": 50,
+    "reconstructed_snapshots": 90
+  },
+  "snapshot_grid_sha256": "563a9178531a445947064414d955f07bf8bee4d5907aae4cc28ba80e7e4131b7",
+  "targets": [
+    {
+      "name": "A",
+      "note": "observed history; pickup TRIGGERED; occupancy TRIGGERED by the 10-point gap alone (exactly on the boundary); one comparable lost rooms after the anchor",
+      "stay_date": "2026-10-05",
+      "snapshot_date": "2026-09-28",
+      "lead_time_days": 7,
+      "rooms_available": 20,
+      "baseline": {
+        "sample_size": 6,
+        "observed_sample_size": 6,
+        "reconstructed_sample_size": 0,
+        "rejected_uncertain_count": 0,
+        "comparables": [
+          {
+            "rank": 1,
+            "stay_date": "2026-09-28",
+            "snapshot_date": "2026-09-21",
+            "origin": "OBSERVED",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 2,
+            "stay_date": "2026-09-21",
+            "snapshot_date": "2026-09-14",
+            "origin": "OBSERVED",
+            "rooms_on_books": 17
+          },
+          {
+            "rank": 3,
+            "stay_date": "2026-09-14",
+            "snapshot_date": "2026-09-07",
+            "origin": "OBSERVED",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 4,
+            "stay_date": "2026-09-07",
+            "snapshot_date": "2026-08-31",
+            "origin": "OBSERVED",
+            "rooms_on_books": 15
+          },
+          {
+            "rank": 5,
+            "stay_date": "2026-08-31",
+            "snapshot_date": "2026-08-24",
+            "origin": "OBSERVED",
+            "rooms_on_books": 17
+          },
+          {
+            "rank": 6,
+            "stay_date": "2026-08-24",
+            "snapshot_date": "2026-08-17",
+            "origin": "OBSERVED",
+            "rooms_on_books": 18
+          }
+        ],
+        "status": "READY",
+        "expected": "17.50",
+        "lower": "17.00",
+        "upper": "18.00",
+        "iqr": "1.00",
+        "confidence": "79.29"
+      },
+      "reference_adr": "129.33",
+      "reference_adr_source": "CURRENT_ON_BOOKS_ADR",
+      "pickup": {
+        "decision_type": "REV_PICKUP_LOW",
+        "confidence": "79.29",
+        "proxy": "387.99",
+        "remaining_capacity": 5,
+        "status": "TRIGGERED",
+        "reasons": [
+          "TRIGGER_PICKUP_SHORTFALL"
+        ],
+        "actual_pickup": 7,
+        "expected_pickup": "10.00",
+        "delta_rooms": "-3.00",
+        "missing_rooms": "3.00",
+        "pattern": {
+          "pair_count": 6,
+          "observed_pair_count": 6,
+          "approximate_pair_count": 0,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 0,
+          "median": "10.00",
+          "p25": "10.00",
+          "p75": "10.00",
+          "iqr": "0.00",
+          "pattern_confidence": "80.00",
+          "stay_dates": [
+            "2026-09-28",
+            "2026-09-21",
+            "2026-09-14",
+            "2026-09-07",
+            "2026-08-31",
+            "2026-08-24"
+          ]
+        },
+        "delta_percent": "-30.00",
+        "delta_percent_exact": "-30/1"
+      },
+      "occupancy": {
+        "decision_type": "REV_OCCUPANCY_RISK",
+        "confidence": "70.42",
+        "proxy": "258.66",
+        "status": "TRIGGERED",
+        "reasons": [
+          "TRIGGER_OCCUPANCY_GAP"
+        ],
+        "expected_remaining_net_pickup": "2.00",
+        "raw_forecast_rooms": "17.00",
+        "forecast_rooms": "17.00",
+        "expected_final_rooms": "19.00",
+        "forecast_occupancy": "85.00",
+        "forecast_occupancy_exact": "85/1",
+        "expected_final_occupancy": "95.00",
+        "expected_final_occupancy_exact": "95/1",
+        "occupancy_gap_pp": "10.00",
+        "occupancy_gap_pp_exact": "10/1",
+        "room_shortfall": "2.00",
+        "pattern": {
+          "pair_count": 5,
+          "observed_pair_count": 5,
+          "approximate_pair_count": 0,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 1,
+          "median": "2.00",
+          "p25": "1.00",
+          "p75": "2.00",
+          "iqr": "1.00",
+          "pattern_confidence": "70.42",
+          "stay_dates": [
+            "2026-09-21",
+            "2026-09-14",
+            "2026-09-07",
+            "2026-08-31",
+            "2026-08-24"
+          ]
+        }
+      },
+      "target_adr": "129.33",
+      "target_rooms": 15,
+      "prior_rooms": 8
+    },
+    {
+      "name": "B",
+      "note": "3 observed + 3 reconstructed comparables: mixed provenance; pickup and occupancy CLEAR",
+      "stay_date": "2026-10-06",
+      "snapshot_date": "2026-09-29",
+      "lead_time_days": 7,
+      "rooms_available": 24,
+      "baseline": {
+        "sample_size": 6,
+        "observed_sample_size": 3,
+        "reconstructed_sample_size": 3,
+        "rejected_uncertain_count": 0,
+        "comparables": [
+          {
+            "rank": 1,
+            "stay_date": "2026-09-29",
+            "snapshot_date": "2026-09-22",
+            "origin": "OBSERVED",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 2,
+            "stay_date": "2026-09-22",
+            "snapshot_date": "2026-09-15",
+            "origin": "OBSERVED",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 3,
+            "stay_date": "2026-09-15",
+            "snapshot_date": "2026-09-08",
+            "origin": "OBSERVED",
+            "rooms_on_books": 17
+          },
+          {
+            "rank": 4,
+            "stay_date": "2026-09-08",
+            "snapshot_date": "2026-09-01",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 5,
+            "stay_date": "2026-09-01",
+            "snapshot_date": "2026-08-25",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 6,
+            "stay_date": "2026-08-25",
+            "snapshot_date": "2026-08-18",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 18
+          }
+        ],
+        "status": "READY",
+        "expected": "18.00",
+        "lower": "18.00",
+        "upper": "18.00",
+        "iqr": "0.00",
+        "confidence": "73.00"
+      },
+      "reference_adr": "130.00",
+      "reference_adr_source": "CURRENT_ON_BOOKS_ADR",
+      "pickup": {
+        "decision_type": "REV_PICKUP_LOW",
+        "confidence": "71.96",
+        "proxy": null,
+        "remaining_capacity": 6,
+        "status": "CLEAR",
+        "reasons": [
+          "CLEAR_WITHIN_EXPECTED_RANGE"
+        ],
+        "actual_pickup": 9,
+        "expected_pickup": "9.00",
+        "delta_rooms": "0.00",
+        "missing_rooms": "0.00",
+        "pattern": {
+          "pair_count": 6,
+          "observed_pair_count": 3,
+          "approximate_pair_count": 3,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 0,
+          "median": "9.00",
+          "p25": "9.00",
+          "p75": "9.75",
+          "iqr": "0.75",
+          "pattern_confidence": "71.96",
+          "stay_dates": [
+            "2026-09-29",
+            "2026-09-22",
+            "2026-09-15",
+            "2026-09-08",
+            "2026-09-01",
+            "2026-08-25"
+          ]
+        },
+        "delta_percent": "0.00",
+        "delta_percent_exact": "0/1"
+      },
+      "occupancy": {
+        "decision_type": "REV_OCCUPANCY_RISK",
+        "confidence": "68.27",
+        "proxy": null,
+        "status": "CLEAR",
+        "reasons": [
+          "CLEAR_WITHIN_EXPECTED_RANGE"
+        ],
+        "expected_remaining_net_pickup": "3.00",
+        "raw_forecast_rooms": "21.00",
+        "forecast_rooms": "21.00",
+        "expected_final_rooms": "21.00",
+        "forecast_occupancy": "87.50",
+        "forecast_occupancy_exact": "175/2",
+        "expected_final_occupancy": "87.50",
+        "expected_final_occupancy_exact": "175/2",
+        "occupancy_gap_pp": "0.00",
+        "occupancy_gap_pp_exact": "0/1",
+        "room_shortfall": "0.00",
+        "pattern": {
+          "pair_count": 5,
+          "observed_pair_count": 2,
+          "approximate_pair_count": 3,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 1,
+          "median": "3.00",
+          "p25": "3.00",
+          "p75": "3.00",
+          "iqr": "0.00",
+          "pattern_confidence": "68.27",
+          "stay_dates": [
+            "2026-09-22",
+            "2026-09-15",
+            "2026-09-08",
+            "2026-09-01",
+            "2026-08-25"
+          ]
+        }
+      },
+      "target_adr": "130.00",
+      "target_rooms": 18,
+      "prior_rooms": 9
+    },
+    {
+      "name": "C",
+      "note": "very dispersed reconstructed history, empty target: both SUPPRESSED_LOW_CONFIDENCE",
+      "stay_date": "2026-10-07",
+      "snapshot_date": "2026-09-30",
+      "lead_time_days": 7,
+      "rooms_available": 20,
+      "baseline": {
+        "sample_size": 6,
+        "observed_sample_size": 0,
+        "reconstructed_sample_size": 6,
+        "rejected_uncertain_count": 0,
+        "comparables": [
+          {
+            "rank": 1,
+            "stay_date": "2026-09-30",
+            "snapshot_date": "2026-09-23",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 2
+          },
+          {
+            "rank": 2,
+            "stay_date": "2026-09-23",
+            "snapshot_date": "2026-09-16",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 3,
+            "stay_date": "2026-09-16",
+            "snapshot_date": "2026-09-09",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 4
+          },
+          {
+            "rank": 4,
+            "stay_date": "2026-09-09",
+            "snapshot_date": "2026-09-02",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 5,
+            "stay_date": "2026-09-02",
+            "snapshot_date": "2026-08-26",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 3
+          },
+          {
+            "rank": 6,
+            "stay_date": "2026-08-26",
+            "snapshot_date": "2026-08-19",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 22
+          }
+        ],
+        "status": "READY",
+        "expected": "11.00",
+        "lower": "3.25",
+        "upper": "18.00",
+        "iqr": "14.75",
+        "confidence": "49.24"
+      },
+      "reference_adr": "136.39",
+      "reference_adr_source": "HISTORICAL_COMPARABLE_MEDIAN_ADR",
+      "pickup": {
+        "decision_type": "REV_PICKUP_LOW",
+        "confidence": "47.91",
+        "proxy": "1295.71",
+        "remaining_capacity": 20,
+        "status": "SUPPRESSED_LOW_CONFIDENCE",
+        "reasons": [
+          "LOW_CONFIDENCE"
+        ],
+        "actual_pickup": 0,
+        "expected_pickup": "9.50",
+        "delta_rooms": "-9.50",
+        "missing_rooms": "9.50",
+        "pattern": {
+          "pair_count": 6,
+          "observed_pair_count": 0,
+          "approximate_pair_count": 6,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 0,
+          "median": "9.50",
+          "p25": "2.25",
+          "p75": "16.00",
+          "iqr": "13.75",
+          "pattern_confidence": "47.91",
+          "stay_dates": [
+            "2026-09-30",
+            "2026-09-23",
+            "2026-09-16",
+            "2026-09-09",
+            "2026-09-02",
+            "2026-08-26"
+          ]
+        },
+        "delta_percent": "-100.00",
+        "delta_percent_exact": "-100/1"
+      },
+      "occupancy": {
+        "decision_type": "REV_OCCUPANCY_RISK",
+        "confidence": "49.24",
+        "proxy": "2455.02",
+        "status": "SUPPRESSED_LOW_CONFIDENCE",
+        "reasons": [
+          "LOW_CONFIDENCE"
+        ],
+        "expected_remaining_net_pickup": "3.00",
+        "raw_forecast_rooms": "3.00",
+        "forecast_rooms": "3.00",
+        "expected_final_rooms": "21.00",
+        "forecast_occupancy": "15.00",
+        "forecast_occupancy_exact": "15/1",
+        "expected_final_occupancy": "105.00",
+        "expected_final_occupancy_exact": "105/1",
+        "occupancy_gap_pp": "90.00",
+        "occupancy_gap_pp_exact": "90/1",
+        "room_shortfall": "18.00",
+        "pattern": {
+          "pair_count": 5,
+          "observed_pair_count": 0,
+          "approximate_pair_count": 5,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 1,
+          "median": "3.00",
+          "p25": "2.00",
+          "p75": "4.00",
+          "iqr": "2.00",
+          "pattern_confidence": "54.33",
+          "stay_dates": [
+            "2026-09-23",
+            "2026-09-16",
+            "2026-09-09",
+            "2026-09-02",
+            "2026-08-26"
+          ]
+        }
+      },
+      "target_adr": null,
+      "target_rooms": 0,
+      "prior_rooms": 0
+    },
+    {
+      "name": "D",
+      "note": "a NO_SHOW makes one final snapshot uncertain: occupancy INSUFFICIENT_DATA",
+      "stay_date": "2026-10-08",
+      "snapshot_date": "2026-10-01",
+      "lead_time_days": 7,
+      "rooms_available": 20,
+      "baseline": {
+        "sample_size": 6,
+        "observed_sample_size": 0,
+        "reconstructed_sample_size": 6,
+        "rejected_uncertain_count": 0,
+        "comparables": [
+          {
+            "rank": 1,
+            "stay_date": "2026-10-01",
+            "snapshot_date": "2026-09-24",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 2,
+            "stay_date": "2026-09-24",
+            "snapshot_date": "2026-09-17",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 17
+          },
+          {
+            "rank": 3,
+            "stay_date": "2026-09-17",
+            "snapshot_date": "2026-09-10",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 17
+          },
+          {
+            "rank": 4,
+            "stay_date": "2026-09-10",
+            "snapshot_date": "2026-09-03",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 5,
+            "stay_date": "2026-09-03",
+            "snapshot_date": "2026-08-27",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 6,
+            "stay_date": "2026-08-27",
+            "snapshot_date": "2026-08-20",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          }
+        ],
+        "status": "READY",
+        "expected": "16.00",
+        "lower": "16.00",
+        "upper": "16.75",
+        "iqr": "0.75",
+        "confidence": "65.00"
+      },
+      "reference_adr": "130.00",
+      "reference_adr_source": "CURRENT_ON_BOOKS_ADR",
+      "pickup": {
+        "decision_type": "REV_PICKUP_LOW",
+        "confidence": "64.83",
+        "proxy": null,
+        "remaining_capacity": 4,
+        "status": "CLEAR",
+        "reasons": [
+          "CLEAR_WITHIN_EXPECTED_RANGE"
+        ],
+        "actual_pickup": 8,
+        "expected_pickup": "8.00",
+        "delta_rooms": "0.00",
+        "missing_rooms": "0.00",
+        "pattern": {
+          "pair_count": 6,
+          "observed_pair_count": 0,
+          "approximate_pair_count": 6,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 0,
+          "median": "8.00",
+          "p25": "8.00",
+          "p75": "8.75",
+          "iqr": "0.75",
+          "pattern_confidence": "64.83",
+          "stay_dates": [
+            "2026-10-01",
+            "2026-09-24",
+            "2026-09-17",
+            "2026-09-10",
+            "2026-09-03",
+            "2026-08-27"
+          ]
+        },
+        "delta_percent": "0.00",
+        "delta_percent_exact": "0/1"
+      },
+      "occupancy": {
+        "decision_type": "REV_OCCUPANCY_RISK",
+        "confidence": "0.00",
+        "proxy": null,
+        "status": "INSUFFICIENT_DATA",
+        "reasons": [
+          "PAIR_SAMPLE_INSUFFICIENT"
+        ],
+        "pattern": {
+          "pair_count": 4,
+          "observed_pair_count": 0,
+          "approximate_pair_count": 4,
+          "rejected_uncertain_count": 1,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 1,
+          "median": null
+        }
+      },
+      "target_adr": "130.00",
+      "target_rooms": 16,
+      "prior_rooms": 8
+    },
+    {
+      "name": "E",
+      "note": "19 rooms of 20: pickup NOT_APPLICABLE near sold out; occupancy CLEAR",
+      "stay_date": "2026-10-09",
+      "snapshot_date": "2026-10-02",
+      "lead_time_days": 7,
+      "rooms_available": 20,
+      "baseline": {
+        "sample_size": 6,
+        "observed_sample_size": 0,
+        "reconstructed_sample_size": 6,
+        "rejected_uncertain_count": 0,
+        "comparables": [
+          {
+            "rank": 1,
+            "stay_date": "2026-10-02",
+            "snapshot_date": "2026-09-25",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 19
+          },
+          {
+            "rank": 2,
+            "stay_date": "2026-09-25",
+            "snapshot_date": "2026-09-18",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 19
+          },
+          {
+            "rank": 3,
+            "stay_date": "2026-09-18",
+            "snapshot_date": "2026-09-11",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 18
+          },
+          {
+            "rank": 4,
+            "stay_date": "2026-09-11",
+            "snapshot_date": "2026-09-04",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 19
+          },
+          {
+            "rank": 5,
+            "stay_date": "2026-09-04",
+            "snapshot_date": "2026-08-28",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 19
+          },
+          {
+            "rank": 6,
+            "stay_date": "2026-08-28",
+            "snapshot_date": "2026-08-21",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 19
+          }
+        ],
+        "status": "READY",
+        "expected": "19.00",
+        "lower": "19.00",
+        "upper": "19.00",
+        "iqr": "0.00",
+        "confidence": "65.00"
+      },
+      "reference_adr": "127.37",
+      "reference_adr_source": "CURRENT_ON_BOOKS_ADR",
+      "pickup": {
+        "decision_type": "REV_PICKUP_LOW",
+        "confidence": "0.00",
+        "proxy": null,
+        "remaining_capacity": 1,
+        "status": "NOT_APPLICABLE",
+        "reasons": [
+          "PICKUP_NEAR_SOLD_OUT"
+        ]
+      },
+      "occupancy": {
+        "decision_type": "REV_OCCUPANCY_RISK",
+        "confidence": "62.67",
+        "proxy": null,
+        "status": "CLEAR",
+        "reasons": [
+          "CLEAR_WITHIN_EXPECTED_RANGE"
+        ],
+        "expected_remaining_net_pickup": "1.00",
+        "raw_forecast_rooms": "20.00",
+        "forecast_rooms": "20.00",
+        "expected_final_rooms": "20.00",
+        "forecast_occupancy": "100.00",
+        "forecast_occupancy_exact": "100/1",
+        "expected_final_occupancy": "100.00",
+        "expected_final_occupancy_exact": "100/1",
+        "occupancy_gap_pp": "0.00",
+        "occupancy_gap_pp_exact": "0/1",
+        "room_shortfall": "0.00",
+        "pattern": {
+          "pair_count": 5,
+          "observed_pair_count": 0,
+          "approximate_pair_count": 5,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 1,
+          "median": "1.00",
+          "p25": "1.00",
+          "p75": "1.00",
+          "iqr": "0.00",
+          "pattern_confidence": "62.67",
+          "stay_dates": [
+            "2026-09-25",
+            "2026-09-18",
+            "2026-09-11",
+            "2026-09-04",
+            "2026-08-28"
+          ]
+        }
+      },
+      "target_adr": "127.37",
+      "target_rooms": 19,
+      "prior_rooms": 12
+    },
+    {
+      "name": "F",
+      "note": "history that loses rooms in the week: pickup NOT_APPLICABLE; occupancy by rooms alone",
+      "stay_date": "2026-10-10",
+      "snapshot_date": "2026-10-03",
+      "lead_time_days": 7,
+      "rooms_available": 60,
+      "baseline": {
+        "sample_size": 6,
+        "observed_sample_size": 3,
+        "reconstructed_sample_size": 3,
+        "rejected_uncertain_count": 0,
+        "comparables": [
+          {
+            "rank": 1,
+            "stay_date": "2026-10-03",
+            "snapshot_date": "2026-09-26",
+            "origin": "OBSERVED",
+            "rooms_on_books": 22
+          },
+          {
+            "rank": 2,
+            "stay_date": "2026-09-26",
+            "snapshot_date": "2026-09-19",
+            "origin": "OBSERVED",
+            "rooms_on_books": 23
+          },
+          {
+            "rank": 3,
+            "stay_date": "2026-09-19",
+            "snapshot_date": "2026-09-12",
+            "origin": "OBSERVED",
+            "rooms_on_books": 22
+          },
+          {
+            "rank": 4,
+            "stay_date": "2026-09-12",
+            "snapshot_date": "2026-09-05",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 22
+          },
+          {
+            "rank": 5,
+            "stay_date": "2026-09-05",
+            "snapshot_date": "2026-08-29",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 25
+          },
+          {
+            "rank": 6,
+            "stay_date": "2026-08-29",
+            "snapshot_date": "2026-08-22",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 23
+          }
+        ],
+        "status": "READY",
+        "expected": "22.50",
+        "lower": "22.00",
+        "upper": "23.00",
+        "iqr": "1.00",
+        "confidence": "72.44"
+      },
+      "reference_adr": "120.00",
+      "reference_adr_source": "CURRENT_ON_BOOKS_ADR",
+      "pickup": {
+        "decision_type": "REV_PICKUP_LOW",
+        "confidence": "54.25",
+        "proxy": null,
+        "remaining_capacity": 40,
+        "status": "NOT_APPLICABLE",
+        "reasons": [
+          "PICKUP_EXPECTATION_NON_POSITIVE"
+        ],
+        "actual_pickup": -1,
+        "expected_pickup": "-1.00",
+        "delta_rooms": "0.00",
+        "missing_rooms": "0.00",
+        "pattern": {
+          "pair_count": 6,
+          "observed_pair_count": 3,
+          "approximate_pair_count": 3,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 0,
+          "median": "-1.00",
+          "p25": "-1.75",
+          "p75": "-0.25",
+          "iqr": "1.50",
+          "pattern_confidence": "54.25",
+          "stay_dates": [
+            "2026-10-03",
+            "2026-09-26",
+            "2026-09-19",
+            "2026-09-12",
+            "2026-09-05",
+            "2026-08-29"
+          ]
+        }
+      },
+      "occupancy": {
+        "decision_type": "REV_OCCUPANCY_RISK",
+        "confidence": "68.27",
+        "proxy": "360.00",
+        "status": "TRIGGERED",
+        "reasons": [
+          "TRIGGER_ROOM_SHORTFALL"
+        ],
+        "expected_remaining_net_pickup": "8.00",
+        "raw_forecast_rooms": "28.00",
+        "forecast_rooms": "28.00",
+        "expected_final_rooms": "31.00",
+        "forecast_occupancy": "46.67",
+        "forecast_occupancy_exact": "140/3",
+        "expected_final_occupancy": "51.67",
+        "expected_final_occupancy_exact": "155/3",
+        "occupancy_gap_pp": "5.00",
+        "occupancy_gap_pp_exact": "5/1",
+        "room_shortfall": "3.00",
+        "pattern": {
+          "pair_count": 5,
+          "observed_pair_count": 2,
+          "approximate_pair_count": 3,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 0,
+          "excluded_future_count": 1,
+          "median": "8.00",
+          "p25": "8.00",
+          "p75": "8.00",
+          "iqr": "0.00",
+          "pattern_confidence": "68.27",
+          "stay_dates": [
+            "2026-09-26",
+            "2026-09-19",
+            "2026-09-12",
+            "2026-09-05",
+            "2026-08-29"
+          ]
+        }
+      },
+      "target_adr": "120.00",
+      "target_rooms": 20,
+      "prior_rooms": 21
+    },
+    {
+      "name": "G",
+      "note": "no historical prior snapshot, no inventory: pickup INSUFFICIENT_DATA, occupancy N/A (its 6 comparables are joined by 4 Sundays of the Gate 4 world)",
+      "stay_date": "2026-10-11",
+      "snapshot_date": "2026-10-04",
+      "lead_time_days": 7,
+      "rooms_available": null,
+      "baseline": {
+        "sample_size": 10,
+        "observed_sample_size": 0,
+        "reconstructed_sample_size": 10,
+        "rejected_uncertain_count": 0,
+        "comparables": [
+          {
+            "rank": 1,
+            "stay_date": "2026-10-04",
+            "snapshot_date": "2026-09-27",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 2,
+            "stay_date": "2026-09-27",
+            "snapshot_date": "2026-09-20",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 3,
+            "stay_date": "2026-09-20",
+            "snapshot_date": "2026-09-13",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 4,
+            "stay_date": "2026-09-13",
+            "snapshot_date": "2026-09-06",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 5,
+            "stay_date": "2026-09-06",
+            "snapshot_date": "2026-08-30",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 6,
+            "stay_date": "2026-08-30",
+            "snapshot_date": "2026-08-23",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 16
+          },
+          {
+            "rank": 7,
+            "stay_date": "2025-09-21",
+            "snapshot_date": "2025-09-14",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 5
+          },
+          {
+            "rank": 8,
+            "stay_date": "2025-09-14",
+            "snapshot_date": "2025-09-07",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 19
+          },
+          {
+            "rank": 9,
+            "stay_date": "2025-09-07",
+            "snapshot_date": "2025-08-31",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 8
+          },
+          {
+            "rank": 10,
+            "stay_date": "2025-08-31",
+            "snapshot_date": "2025-08-24",
+            "origin": "RECONSTRUCTED_APPROXIMATE",
+            "rooms_on_books": 23
+          }
+        ],
+        "status": "READY",
+        "expected": "16.00",
+        "lower": "16.00",
+        "upper": "16.00",
+        "iqr": "0.00",
+        "confidence": "65.00"
+      },
+      "reference_adr": "130.00",
+      "reference_adr_source": "CURRENT_ON_BOOKS_ADR",
+      "pickup": {
+        "decision_type": "REV_PICKUP_LOW",
+        "confidence": "0.00",
+        "proxy": null,
+        "remaining_capacity": null,
+        "status": "INSUFFICIENT_DATA",
+        "reasons": [
+          "PAIR_SAMPLE_INSUFFICIENT"
+        ],
+        "pattern": {
+          "pair_count": 0,
+          "observed_pair_count": 0,
+          "approximate_pair_count": 0,
+          "rejected_uncertain_count": 0,
+          "missing_endpoint_count": 10,
+          "excluded_future_count": 0,
+          "median": null
+        }
+      },
+      "occupancy": {
+        "decision_type": "REV_OCCUPANCY_RISK",
+        "confidence": "0.00",
+        "proxy": null,
+        "status": "NOT_APPLICABLE",
+        "reasons": [
+          "OCCUPANCY_INVENTORY_UNKNOWN"
+        ]
+      },
+      "target_adr": "130.00",
+      "target_rooms": 16,
+      "prior_rooms": 8
+    }
+  ]
+}

@@ -281,6 +281,7 @@ def test_baselines_are_never_updated_by_the_repository(
         "existing_for_targets",
         "list_for_snapshot_date",
         "list_comparables",
+        "list_comparables_for_baselines",  # Gate 5: a read, the comparables of many baselines
         "insert_baselines",
         "insert_comparables",
     }
