@@ -5,14 +5,14 @@ the service owns the transaction. No pickup, velocity, trend, expected value or 
 computed here: the curve access returns stored facts, in order, and nothing else.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import Table, func, select
+from sqlalchemy import Date, Table, and_, column, func, select, values
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -28,6 +28,19 @@ _INSERT_BLOCK = 2000  # rows per executemany call
 
 # (snapshot_local_date, stay_date): the logical key of a snapshot inside one data source.
 SnapshotKey = tuple[date, date]
+_KEYS_PER_QUERY = 5000  # (date, date) pairs per VALUES join: 10 000 bind parameters
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotHistoryRow:
+    """The stored facts of a snapshot that a historical comparison needs (nothing else)."""
+
+    snapshot_id: UUID
+    snapshot_local_date: date
+    stay_date: date
+    origin: SnapshotOrigin
+    rooms_on_books: int
+    uncertain_rooms: int
 
 
 class RoomInventoryRepository:
@@ -164,6 +177,53 @@ class BookingSnapshotRepository:
             )
         )
 
+    def get_by_id(self, snapshot_id: UUID) -> BookingSnapshot | None:
+        return self._session.scalar(
+            select(BookingSnapshot).where(
+                BookingSnapshot.workspace_id == self._tenant.workspace_id,
+                BookingSnapshot.id == snapshot_id,
+            )
+        )
+
+    def list_by_keys(
+        self, data_source_id: UUID, keys: Collection[SnapshotKey]
+    ) -> list[SnapshotHistoryRow]:
+        """The snapshots of ONE data source at exactly these (snapshot day, stay date) keys.
+
+        One statement per block of keys (a join with a VALUES list, served by the unique key's
+        index): the way a historical comparison fetches a few dozen exact snapshots instead of
+        scanning the history or asking once per date.
+        """
+        ordered = sorted(keys)
+        found: list[SnapshotHistoryRow] = []
+        for start in range(0, len(ordered), _KEYS_PER_QUERY):
+            wanted = values(
+                column("snapshot_local_date", Date), column("stay_date", Date), name="wanted"
+            ).data(ordered[start : start + _KEYS_PER_QUERY])
+            rows = self._session.execute(
+                select(
+                    BookingSnapshot.id,
+                    BookingSnapshot.snapshot_local_date,
+                    BookingSnapshot.stay_date,
+                    BookingSnapshot.origin,
+                    BookingSnapshot.rooms_on_books,
+                    BookingSnapshot.uncertain_rooms,
+                )
+                .join(
+                    wanted,
+                    and_(
+                        BookingSnapshot.snapshot_local_date == wanted.c.snapshot_local_date,
+                        BookingSnapshot.stay_date == wanted.c.stay_date,
+                    ),
+                )
+                .where(
+                    BookingSnapshot.workspace_id == self._tenant.workspace_id,
+                    BookingSnapshot.data_source_id == data_source_id,
+                )
+            )
+            found.extend(SnapshotHistoryRow(*row) for row in rows)
+        return found
+
     def list_for_snapshot_date(
         self,
         data_source_id: UUID,
@@ -171,6 +231,7 @@ class BookingSnapshotRepository:
         *,
         stay_date_from: date | None = None,
         stay_date_to: date | None = None,
+        origin: SnapshotOrigin | None = None,
     ) -> Sequence[BookingSnapshot]:
         """All the stay nights of one snapshot day, oldest stay night first."""
         query = select(BookingSnapshot).where(
@@ -178,6 +239,8 @@ class BookingSnapshotRepository:
             BookingSnapshot.data_source_id == data_source_id,
             BookingSnapshot.snapshot_local_date == snapshot_local_date,
         )
+        if origin is not None:
+            query = query.where(BookingSnapshot.origin == origin)
         if stay_date_from is not None:
             query = query.where(BookingSnapshot.stay_date >= stay_date_from)
         if stay_date_to is not None:

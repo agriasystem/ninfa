@@ -1,0 +1,1514 @@
+{
+  "description": "Golden Expected baselines of MASSERIA NINFA DEMO: the Gate 2/3 bookings plus a synthetic history (masseria_ninfa_bookings_history_v1.csv). Computed independently of the application code (generate_masseria_expected_expected.py, standard library only, exact fractions). BOOKINGS -> SNAPSHOTS -> EXPECTED BASELINES: nothing else.",
+  "property": {
+    "timezone": "Europe/Rome",
+    "currency": "EUR"
+  },
+  "observation_start": "2026-04-01",
+  "reconstruction_clock": "2026-09-01T10:00:00+00:00",
+  "method": "MEDIAN_SAME_DOW_SEASONAL_WINDOW",
+  "calculation_version": "booking-expected-v1",
+  "snapshots": [
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-03",
+      "stay_date": "2024-05-23"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-10",
+      "stay_date": "2024-05-30"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-16",
+      "stay_date": "2024-04-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-17",
+      "stay_date": "2024-06-06"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-23",
+      "stay_date": "2024-05-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-24",
+      "stay_date": "2024-06-13"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-27",
+      "stay_date": "2024-05-11"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-04-30",
+      "stay_date": "2024-05-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-01",
+      "stay_date": "2024-06-20"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-04",
+      "stay_date": "2024-05-18"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-07",
+      "stay_date": "2024-05-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-08",
+      "stay_date": "2024-06-27"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-11",
+      "stay_date": "2024-05-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-14",
+      "stay_date": "2024-05-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-18",
+      "stay_date": "2024-06-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-21",
+      "stay_date": "2024-05-31"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-05-25",
+      "stay_date": "2024-06-08"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-06-01",
+      "stay_date": "2024-06-15"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-07-27",
+      "stay_date": "2024-08-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-03",
+      "stay_date": "2024-08-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-10",
+      "stay_date": "2024-08-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-11",
+      "stay_date": "2024-08-18"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-17",
+      "stay_date": "2024-08-31"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-18",
+      "stay_date": "2024-08-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-24",
+      "stay_date": "2024-09-07"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-25",
+      "stay_date": "2024-09-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-08-31",
+      "stay_date": "2024-09-14"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-09-01",
+      "stay_date": "2024-09-08"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-09-07",
+      "stay_date": "2024-09-21"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-09-08",
+      "stay_date": "2024-09-15"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2024-09-15",
+      "stay_date": "2024-09-22"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-02-19",
+      "stay_date": "2025-04-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-02-26",
+      "stay_date": "2025-04-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-04",
+      "stay_date": "2025-03-14"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-05",
+      "stay_date": "2025-04-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-11",
+      "stay_date": "2025-03-21"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-12",
+      "stay_date": "2025-05-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-15",
+      "stay_date": "2025-03-29"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-18",
+      "stay_date": "2025-03-28"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-19",
+      "stay_date": "2025-05-08"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-22",
+      "stay_date": "2025-04-05"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-25",
+      "stay_date": "2025-04-04"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-26",
+      "stay_date": "2025-05-15"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-03-29",
+      "stay_date": "2025-04-12"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-01",
+      "stay_date": "2025-04-11"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-02",
+      "stay_date": "2025-05-22"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-05",
+      "stay_date": "2025-04-19"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-08",
+      "stay_date": "2025-04-18"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-09",
+      "stay_date": "2025-05-29"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-12",
+      "stay_date": "2025-04-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-15",
+      "stay_date": "2025-04-25"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-16",
+      "stay_date": "2025-06-05"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-19",
+      "stay_date": "2025-05-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-22",
+      "stay_date": "2025-05-02"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-23",
+      "stay_date": "2025-06-12"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-26",
+      "stay_date": "2025-05-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-29",
+      "stay_date": "2025-05-09"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-04-30",
+      "stay_date": "2025-06-19"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-03",
+      "stay_date": "2025-05-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-06",
+      "stay_date": "2025-05-16"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-07",
+      "stay_date": "2025-06-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-10",
+      "stay_date": "2025-05-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-13",
+      "stay_date": "2025-05-23"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-17",
+      "stay_date": "2025-05-31"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-20",
+      "stay_date": "2025-05-30"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-24",
+      "stay_date": "2025-06-07"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-05-31",
+      "stay_date": "2025-06-14"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-06-21",
+      "stay_date": "2025-07-05"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-06-28",
+      "stay_date": "2025-07-12"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-06-29",
+      "stay_date": "2025-07-06"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-05",
+      "stay_date": "2025-07-19"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-06",
+      "stay_date": "2025-07-13"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-12",
+      "stay_date": "2025-07-26"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-13",
+      "stay_date": "2025-07-20"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-18",
+      "stay_date": "2025-08-01"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-19",
+      "stay_date": "2025-08-02"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-20",
+      "stay_date": "2025-07-27"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-25",
+      "stay_date": "2025-08-08"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-26",
+      "stay_date": "2025-08-09"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-07-27",
+      "stay_date": "2025-08-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-01",
+      "stay_date": "2025-08-15"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-02",
+      "stay_date": "2025-08-16"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-03",
+      "stay_date": "2025-08-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-09",
+      "stay_date": "2025-08-23"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-10",
+      "stay_date": "2025-08-17"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-16",
+      "stay_date": "2025-08-30"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-17",
+      "stay_date": "2025-08-24"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-23",
+      "stay_date": "2025-09-06"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-24",
+      "stay_date": "2025-08-31"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-30",
+      "stay_date": "2025-09-13"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-08-31",
+      "stay_date": "2025-09-07"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-09-06",
+      "stay_date": "2025-09-20"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-09-07",
+      "stay_date": "2025-09-14"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-09-14",
+      "stay_date": "2025-09-21"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-11-01",
+      "stay_date": "2025-11-15"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-11-29",
+      "stay_date": "2025-12-13"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2025-12-27",
+      "stay_date": "2026-01-10"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-01-31",
+      "stay_date": "2026-02-14"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-02-18",
+      "stay_date": "2026-04-09"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-02-25",
+      "stay_date": "2026-04-16"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-03",
+      "stay_date": "2026-03-13"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-04",
+      "stay_date": "2026-04-23"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-10",
+      "stay_date": "2026-03-20"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-11",
+      "stay_date": "2026-04-30"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-14",
+      "stay_date": "2026-03-28"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-17",
+      "stay_date": "2026-03-27"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-18",
+      "stay_date": "2026-05-07"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-21",
+      "stay_date": "2026-04-04"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-24",
+      "stay_date": "2026-04-03"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-25",
+      "stay_date": "2026-05-14"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-28",
+      "stay_date": "2026-04-11"
+    },
+    {
+      "kind": "RECONSTRUCTED",
+      "snapshot_date": "2026-03-31",
+      "stay_date": "2026-04-10"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-04-01",
+      "stay_date": "2026-05-21"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-04-04",
+      "stay_date": "2026-04-18"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-04-07",
+      "stay_date": "2026-04-17"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-04-11",
+      "stay_date": "2026-04-25"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-04-14",
+      "stay_date": "2026-04-24"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-04-18",
+      "stay_date": "2026-05-02"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-04-25",
+      "stay_date": "2026-05-09"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-05-19",
+      "stay_date": "2026-06-09"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-05-26",
+      "stay_date": "2026-06-16"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-02",
+      "stay_date": "2026-06-23"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-09",
+      "stay_date": "2026-06-30"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-16",
+      "stay_date": "2026-07-07"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-19",
+      "stay_date": "2026-07-04"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-20",
+      "stay_date": "2026-07-04"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-21",
+      "stay_date": "2026-07-04"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-26",
+      "stay_date": "2026-07-11"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-27",
+      "stay_date": "2026-07-11"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-28",
+      "stay_date": "2026-07-05"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-06-28",
+      "stay_date": "2026-07-11"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-03",
+      "stay_date": "2026-07-18"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-04",
+      "stay_date": "2026-07-18"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-05",
+      "stay_date": "2026-07-12"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-05",
+      "stay_date": "2026-07-18"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-10",
+      "stay_date": "2026-07-24"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-10",
+      "stay_date": "2026-07-25"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-11",
+      "stay_date": "2026-07-25"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-12",
+      "stay_date": "2026-07-19"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-12",
+      "stay_date": "2026-07-25"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-17",
+      "stay_date": "2026-07-31"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-17",
+      "stay_date": "2026-08-01"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-18",
+      "stay_date": "2026-08-01"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-19",
+      "stay_date": "2026-07-26"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-19",
+      "stay_date": "2026-08-01"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-24",
+      "stay_date": "2026-08-07"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-24",
+      "stay_date": "2026-08-08"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-25",
+      "stay_date": "2026-08-08"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-26",
+      "stay_date": "2026-08-02"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-07-26",
+      "stay_date": "2026-08-08"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-01",
+      "stay_date": "2026-08-15"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-02",
+      "stay_date": "2026-08-09"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-08",
+      "stay_date": "2026-08-22"
+    },
+    {
+      "kind": "OBSERVED",
+      "snapshot_date": "2026-08-09",
+      "stay_date": "2026-08-16"
+    }
+  ],
+  "counts": {
+    "history_bookings": 252,
+    "snapshots": 154,
+    "observed_snapshots": 42,
+    "reconstructed_snapshots": 112
+  },
+  "snapshot_grid_sha256": "80b34750b64b9de2ef6977f12ebfe9e9779ccbdc4b450bb9ebdd50707c243840",
+  "targets": [
+    {
+      "name": "A",
+      "note": "observed only (6 observed comparables, reconstructions ignored), low dispersion",
+      "snapshot_date": "2026-08-01",
+      "stay_date": "2026-08-15",
+      "lead_time_days": 14,
+      "sample_size": 6,
+      "observed_sample_size": 6,
+      "reconstructed_sample_size": 0,
+      "rejected_uncertain_count": 0,
+      "comparables": [
+        {
+          "rank": 1,
+          "stay_date": "2026-08-08",
+          "snapshot_date": "2026-07-25",
+          "origin": "OBSERVED",
+          "rooms_on_books": 11
+        },
+        {
+          "rank": 2,
+          "stay_date": "2026-08-01",
+          "snapshot_date": "2026-07-18",
+          "origin": "OBSERVED",
+          "rooms_on_books": 12
+        },
+        {
+          "rank": 3,
+          "stay_date": "2026-07-25",
+          "snapshot_date": "2026-07-11",
+          "origin": "OBSERVED",
+          "rooms_on_books": 11
+        },
+        {
+          "rank": 4,
+          "stay_date": "2026-07-18",
+          "snapshot_date": "2026-07-04",
+          "origin": "OBSERVED",
+          "rooms_on_books": 13
+        },
+        {
+          "rank": 5,
+          "stay_date": "2026-07-11",
+          "snapshot_date": "2026-06-27",
+          "origin": "OBSERVED",
+          "rooms_on_books": 13
+        },
+        {
+          "rank": 6,
+          "stay_date": "2026-07-04",
+          "snapshot_date": "2026-06-20",
+          "origin": "OBSERVED",
+          "rooms_on_books": 13
+        }
+      ],
+      "status": "READY",
+      "expected": "12.50",
+      "lower": "11.25",
+      "upper": "13.00",
+      "iqr": "1.75",
+      "confidence_score": "78.25",
+      "confidence_band": "MEDIUM"
+    },
+    {
+      "name": "B",
+      "note": "observed only (6 observed comparables), high dispersion: a LOW confidence baseline",
+      "snapshot_date": "2026-08-09",
+      "stay_date": "2026-08-16",
+      "lead_time_days": 7,
+      "sample_size": 6,
+      "observed_sample_size": 6,
+      "reconstructed_sample_size": 0,
+      "rejected_uncertain_count": 0,
+      "comparables": [
+        {
+          "rank": 1,
+          "stay_date": "2026-08-09",
+          "snapshot_date": "2026-08-02",
+          "origin": "OBSERVED",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 2,
+          "stay_date": "2026-08-02",
+          "snapshot_date": "2026-07-26",
+          "origin": "OBSERVED",
+          "rooms_on_books": 26
+        },
+        {
+          "rank": 3,
+          "stay_date": "2026-07-26",
+          "snapshot_date": "2026-07-19",
+          "origin": "OBSERVED",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 4,
+          "stay_date": "2026-07-19",
+          "snapshot_date": "2026-07-12",
+          "origin": "OBSERVED",
+          "rooms_on_books": 31
+        },
+        {
+          "rank": 5,
+          "stay_date": "2026-07-12",
+          "snapshot_date": "2026-07-05",
+          "origin": "OBSERVED",
+          "rooms_on_books": 2
+        },
+        {
+          "rank": 6,
+          "stay_date": "2026-07-05",
+          "snapshot_date": "2026-06-28",
+          "origin": "OBSERVED",
+          "rooms_on_books": 24
+        }
+      ],
+      "status": "READY",
+      "expected": "13.00",
+      "lower": "1.25",
+      "upper": "25.50",
+      "iqr": "24.25",
+      "confidence_score": "56.68",
+      "confidence_band": "LOW"
+    },
+    {
+      "name": "C",
+      "note": "3 observed + clean reconstructions; 2 uncertain reconstructions rejected",
+      "snapshot_date": "2026-04-25",
+      "stay_date": "2026-05-09",
+      "lead_time_days": 14,
+      "sample_size": 22,
+      "observed_sample_size": 3,
+      "reconstructed_sample_size": 19,
+      "rejected_uncertain_count": 2,
+      "comparables": [
+        {
+          "rank": 1,
+          "stay_date": "2026-05-02",
+          "snapshot_date": "2026-04-18",
+          "origin": "OBSERVED",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 2,
+          "stay_date": "2026-04-25",
+          "snapshot_date": "2026-04-11",
+          "origin": "OBSERVED",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 3,
+          "stay_date": "2026-04-18",
+          "snapshot_date": "2026-04-04",
+          "origin": "OBSERVED",
+          "rooms_on_books": 5
+        },
+        {
+          "rank": 4,
+          "stay_date": "2026-04-11",
+          "snapshot_date": "2026-03-28",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 5,
+          "stay_date": "2026-04-04",
+          "snapshot_date": "2026-03-21",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 11
+        },
+        {
+          "rank": 6,
+          "stay_date": "2025-06-14",
+          "snapshot_date": "2025-05-31",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 7,
+          "stay_date": "2025-06-07",
+          "snapshot_date": "2025-05-24",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 8,
+          "stay_date": "2025-05-31",
+          "snapshot_date": "2025-05-17",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 9,
+          "stay_date": "2025-05-24",
+          "snapshot_date": "2025-05-10",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 10,
+          "stay_date": "2025-05-17",
+          "snapshot_date": "2025-05-03",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 5
+        },
+        {
+          "rank": 11,
+          "stay_date": "2025-05-10",
+          "snapshot_date": "2025-04-26",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 12,
+          "stay_date": "2025-04-26",
+          "snapshot_date": "2025-04-12",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 5
+        },
+        {
+          "rank": 13,
+          "stay_date": "2025-04-19",
+          "snapshot_date": "2025-04-05",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 9
+        },
+        {
+          "rank": 14,
+          "stay_date": "2025-04-12",
+          "snapshot_date": "2025-03-29",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 15,
+          "stay_date": "2025-04-05",
+          "snapshot_date": "2025-03-22",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 16,
+          "stay_date": "2025-03-29",
+          "snapshot_date": "2025-03-15",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 5
+        },
+        {
+          "rank": 17,
+          "stay_date": "2024-06-15",
+          "snapshot_date": "2024-06-01",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 18,
+          "stay_date": "2024-06-08",
+          "snapshot_date": "2024-05-25",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 19,
+          "stay_date": "2024-06-01",
+          "snapshot_date": "2024-05-18",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 20,
+          "stay_date": "2024-05-25",
+          "snapshot_date": "2024-05-11",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 5
+        },
+        {
+          "rank": 21,
+          "stay_date": "2024-05-18",
+          "snapshot_date": "2024-05-04",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 22,
+          "stay_date": "2024-05-11",
+          "snapshot_date": "2024-04-27",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        }
+      ],
+      "status": "READY",
+      "expected": "6.50",
+      "lower": "6.00",
+      "upper": "7.00",
+      "iqr": "1.00",
+      "confidence_score": "85.00",
+      "confidence_band": "HIGH"
+    },
+    {
+      "name": "D",
+      "note": "only 4 comparables exist: INSUFFICIENT_DATA, no number",
+      "snapshot_date": "2026-06-16",
+      "stay_date": "2026-07-07",
+      "lead_time_days": 21,
+      "sample_size": 4,
+      "observed_sample_size": 4,
+      "reconstructed_sample_size": 0,
+      "rejected_uncertain_count": 0,
+      "comparables": [
+        {
+          "rank": 1,
+          "stay_date": "2026-06-30",
+          "snapshot_date": "2026-06-09",
+          "origin": "OBSERVED",
+          "rooms_on_books": 5
+        },
+        {
+          "rank": 2,
+          "stay_date": "2026-06-23",
+          "snapshot_date": "2026-06-02",
+          "origin": "OBSERVED",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 3,
+          "stay_date": "2026-06-16",
+          "snapshot_date": "2026-05-26",
+          "origin": "OBSERVED",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 4,
+          "stay_date": "2026-06-09",
+          "snapshot_date": "2026-05-19",
+          "origin": "OBSERVED",
+          "rooms_on_books": 5
+        }
+      ],
+      "status": "INSUFFICIENT_DATA",
+      "expected": null,
+      "lower": null,
+      "upper": null,
+      "iqr": null,
+      "confidence_score": "0.00",
+      "confidence_band": null
+    },
+    {
+      "name": "E",
+      "note": "24 comparables of which 12 have zero rooms (they count): the median is 0.50",
+      "snapshot_date": "2026-04-14",
+      "stay_date": "2026-04-24",
+      "lead_time_days": 10,
+      "sample_size": 24,
+      "observed_sample_size": 1,
+      "reconstructed_sample_size": 23,
+      "rejected_uncertain_count": 0,
+      "comparables": [
+        {
+          "rank": 1,
+          "stay_date": "2026-04-17",
+          "snapshot_date": "2026-04-07",
+          "origin": "OBSERVED",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 2,
+          "stay_date": "2026-04-10",
+          "snapshot_date": "2026-03-31",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 3,
+          "stay_date": "2026-04-03",
+          "snapshot_date": "2026-03-24",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 3
+        },
+        {
+          "rank": 4,
+          "stay_date": "2026-03-27",
+          "snapshot_date": "2026-03-17",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 5,
+          "stay_date": "2026-03-20",
+          "snapshot_date": "2026-03-10",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 6,
+          "stay_date": "2026-03-13",
+          "snapshot_date": "2026-03-03",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 7,
+          "stay_date": "2025-05-30",
+          "snapshot_date": "2025-05-20",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 8,
+          "stay_date": "2025-05-23",
+          "snapshot_date": "2025-05-13",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 9,
+          "stay_date": "2025-05-16",
+          "snapshot_date": "2025-05-06",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 10,
+          "stay_date": "2025-05-09",
+          "snapshot_date": "2025-04-29",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 11,
+          "stay_date": "2025-05-02",
+          "snapshot_date": "2025-04-22",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 12,
+          "stay_date": "2025-04-25",
+          "snapshot_date": "2025-04-15",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 13,
+          "stay_date": "2025-04-18",
+          "snapshot_date": "2025-04-08",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 2
+        },
+        {
+          "rank": 14,
+          "stay_date": "2025-04-11",
+          "snapshot_date": "2025-04-01",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 15,
+          "stay_date": "2025-04-04",
+          "snapshot_date": "2025-03-25",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 16,
+          "stay_date": "2025-03-28",
+          "snapshot_date": "2025-03-18",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 17,
+          "stay_date": "2025-03-21",
+          "snapshot_date": "2025-03-11",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 18,
+          "stay_date": "2025-03-14",
+          "snapshot_date": "2025-03-04",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 19,
+          "stay_date": "2024-05-31",
+          "snapshot_date": "2024-05-21",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 20,
+          "stay_date": "2024-05-24",
+          "snapshot_date": "2024-05-14",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 2
+        },
+        {
+          "rank": 21,
+          "stay_date": "2024-05-17",
+          "snapshot_date": "2024-05-07",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 22,
+          "stay_date": "2024-05-10",
+          "snapshot_date": "2024-04-30",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 1
+        },
+        {
+          "rank": 23,
+          "stay_date": "2024-05-03",
+          "snapshot_date": "2024-04-23",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        },
+        {
+          "rank": 24,
+          "stay_date": "2024-04-26",
+          "snapshot_date": "2024-04-16",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 0
+        }
+      ],
+      "status": "READY",
+      "expected": "0.50",
+      "lower": "0.00",
+      "upper": "1.00",
+      "iqr": "1.00",
+      "confidence_score": "74.08",
+      "confidence_band": "MEDIUM"
+    },
+    {
+      "name": "F",
+      "note": "reconstructed only: confidence capped at 65",
+      "snapshot_date": "2026-04-01",
+      "stay_date": "2026-05-21",
+      "lead_time_days": 50,
+      "sample_size": 24,
+      "observed_sample_size": 0,
+      "reconstructed_sample_size": 24,
+      "rejected_uncertain_count": 0,
+      "comparables": [
+        {
+          "rank": 1,
+          "stay_date": "2026-05-14",
+          "snapshot_date": "2026-03-25",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 2,
+          "stay_date": "2026-05-07",
+          "snapshot_date": "2026-03-18",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 3,
+          "stay_date": "2026-04-30",
+          "snapshot_date": "2026-03-11",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 9
+        },
+        {
+          "rank": 4,
+          "stay_date": "2026-04-23",
+          "snapshot_date": "2026-03-04",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 5,
+          "stay_date": "2026-04-16",
+          "snapshot_date": "2026-02-25",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 6,
+          "stay_date": "2026-04-09",
+          "snapshot_date": "2026-02-18",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 7,
+          "stay_date": "2025-06-26",
+          "snapshot_date": "2025-05-07",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 8,
+          "stay_date": "2025-06-19",
+          "snapshot_date": "2025-04-30",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 9,
+          "stay_date": "2025-06-12",
+          "snapshot_date": "2025-04-23",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 10,
+          "stay_date": "2025-06-05",
+          "snapshot_date": "2025-04-16",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 11,
+          "stay_date": "2025-05-29",
+          "snapshot_date": "2025-04-09",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 12,
+          "stay_date": "2025-05-22",
+          "snapshot_date": "2025-04-02",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 13,
+          "stay_date": "2025-05-15",
+          "snapshot_date": "2025-03-26",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 14,
+          "stay_date": "2025-05-08",
+          "snapshot_date": "2025-03-19",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 15,
+          "stay_date": "2025-05-01",
+          "snapshot_date": "2025-03-12",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 16,
+          "stay_date": "2025-04-24",
+          "snapshot_date": "2025-03-05",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 17,
+          "stay_date": "2025-04-17",
+          "snapshot_date": "2025-02-26",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 18,
+          "stay_date": "2025-04-10",
+          "snapshot_date": "2025-02-19",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 19,
+          "stay_date": "2024-06-27",
+          "snapshot_date": "2024-05-08",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 20,
+          "stay_date": "2024-06-20",
+          "snapshot_date": "2024-05-01",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 21,
+          "stay_date": "2024-06-13",
+          "snapshot_date": "2024-04-24",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 6
+        },
+        {
+          "rank": 22,
+          "stay_date": "2024-06-06",
+          "snapshot_date": "2024-04-17",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        },
+        {
+          "rank": 23,
+          "stay_date": "2024-05-30",
+          "snapshot_date": "2024-04-10",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 8
+        },
+        {
+          "rank": 24,
+          "stay_date": "2024-05-23",
+          "snapshot_date": "2024-04-03",
+          "origin": "RECONSTRUCTED_APPROXIMATE",
+          "rooms_on_books": 7
+        }
+      ],
+      "status": "READY",
+      "expected": "7.00",
+      "lower": "6.00",
+      "upper": "8.00",
+      "iqr": "2.00",
+      "confidence_score": "65.00",
+      "confidence_band": "MEDIUM"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 """Migration 0005 on real PostgreSQL: 0004 <-> 0005, base -> head, indexes, untouched data.
 
 Metadata/migration agreement and constraint-name parity for the Gate 3 tables are asserted by
-test_data_model_migration.py (its table sets include them).
+test_data_model_migration.py (its table sets include them). The database is at the current head
+(0006, Gate 4) while these tests run: 0005 is the migration under test, 0006 sits on top.
 """
 
 import uuid
@@ -15,7 +16,8 @@ from sqlalchemy.orm import Session
 from tests.support import alembic_config
 
 GATE_2_HEAD = "0004_booking_ingestion"
-HEAD = "0005_booking_snapshots_metrics"
+GATE_3_HEAD = "0005_booking_snapshots_metrics"
+HEAD = "0006_expected_engine"
 GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_3_FUNCTION = "booking_snapshots_forbid_update"
@@ -70,6 +72,8 @@ def test_head_is_the_snapshot_migration_with_its_tables_function_and_trigger(
     assert trigger_names(db_engine) == {
         "trg_bookings_identity_immutable",
         "trg_booking_snapshots_immutable",
+        "trg_booking_expected_baselines_immutable",  # Gate 4, on top
+        "trg_booking_expected_comparables_immutable",
     }
 
 
@@ -92,11 +96,12 @@ def test_0004_to_0005_to_0004_to_0005_recreates_an_identical_schema(
     config = alembic_config(test_database_url)
     before = columns_of(db_engine)
 
-    command.downgrade(config, GATE_2_HEAD)  # 0005 -> 0004
-    command.upgrade(config, HEAD)  # 0004 -> 0005
+    command.downgrade(config, GATE_2_HEAD)  # 0006 and 0005 -> 0004
+    command.upgrade(config, GATE_3_HEAD)  # 0004 -> 0005
+    assert revision(db_engine) == GATE_3_HEAD
     assert columns_of(db_engine) == before
     command.downgrade(config, GATE_2_HEAD)  # and once more: it is repeatable
-    command.upgrade(config, HEAD)
+    command.upgrade(config, "head")
 
     assert revision(db_engine) == HEAD
     assert columns_of(db_engine) == before
@@ -201,7 +206,7 @@ def index_columns(engine: Engine, table: str) -> dict[str, list[str]]:
         return {row[0]: list(row[1]) for row in rows}
 
 
-def test_snapshot_indexes_are_exactly_the_key_and_the_curve(
+def test_snapshot_indexes_are_the_key_the_curve_and_the_gate_4_fk_target(
     at_head: None, db_engine: Engine
 ) -> None:
     columns = index_columns(db_engine, "booking_snapshots")
@@ -221,6 +226,14 @@ def test_snapshot_indexes_are_exactly_the_key_and_the_curve(
             "data_source_id",
             "stay_date",
             "snapshot_local_date",
+        ],
+        # added by 0006, a foreign-key target only (never a query path)
+        "uq_booking_snapshots_source_id_origin": [
+            "workspace_id",
+            "property_id",
+            "data_source_id",
+            "id",
+            "origin",
         ],
     }
     assert index_columns(db_engine, "room_inventory_daily") == {

@@ -17,7 +17,7 @@ from app.modules.tenancy.models import Workspace
 from tests.support import alembic_config
 
 GATE_1_HEAD = "0003_canonical_data_model"
-HEAD = "0005_booking_snapshots_metrics"
+HEAD = "0006_expected_engine"
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_1_TABLES = {
     "users",

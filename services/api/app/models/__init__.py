@@ -23,6 +23,10 @@ from app.modules.ingestion.models import (
     ImportJob,
     ImportJobStatus,
 )
+from app.modules.intelligence.expected.models import (
+    BookingExpectedBaseline,
+    BookingExpectedComparable,
+)
 from app.modules.properties.models import Property
 from app.modules.snapshots.models import BookingSnapshot, RoomInventoryDaily, SnapshotOrigin
 from app.modules.tenancy.models import MembershipRole, Workspace, WorkspaceMembership
@@ -30,6 +34,8 @@ from app.modules.tenancy.models import MembershipRole, Workspace, WorkspaceMembe
 __all__ = [
     "Booking",
     "BookingChannel",
+    "BookingExpectedBaseline",
+    "BookingExpectedComparable",
     "BookingImportRow",
     "BookingMappingProfile",
     "BookingSnapshot",

@@ -151,6 +151,17 @@ class BookingSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             "stay_date",
             name="uq_booking_snapshots_data_source_snapshot_date_stay_date",
         ),
+        # Foreign-key target for Gate 4 (redundant with the primary key): a row that references
+        # a snapshot of its own workspace/property/data source AND of a given origin, so that an
+        # Expected baseline can only target an OBSERVED snapshot of its own source.
+        UniqueConstraint(
+            "workspace_id",
+            "property_id",
+            "data_source_id",
+            "id",
+            "origin",
+            name="uq_booking_snapshots_source_id_origin",
+        ),
         # The booking curve of one stay night: its snapshots ordered by snapshot day.
         Index(
             "ix_booking_snapshots_booking_curve",

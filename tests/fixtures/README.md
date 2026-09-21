@@ -38,3 +38,33 @@ derived from it.
 It is BOOKINGS + INVENTORY -> SNAPSHOTS only: no expected value, alert, impact, priority,
 recommendation or decision is derived from it. Guest names and phone numbers in the CSVs are
 invented (`+39 000 0000101`...) and must never reach a snapshot (a test checks it).
+
+## `expected/` (Gate 4)
+
+| File | Purpose |
+| ---- | ------- |
+| `masseria_ninfa_bookings_history_v1.csv` | 252 synthetic history bookings (fictional guests `Ospite Storico 0001...`, phones `+39 000 9000001...`, one-night stays) that extend the Gate 2/3 golden world so that the Expected Engine has comparables |
+| `masseria_ninfa_expected_v1.expected.json` | the snapshots to materialise (154: 42 OBSERVED since the fictional "observation start" 2026-04-01, 112 RECONSTRUCTED), a checksum of their independently computed values, and the 6 expected baselines with every comparable used |
+| `generate_masseria_expected_expected.py` | writes both files with the **standard library only** (`csv`, `fractions`, `datetime`, `hashlib`, `json`), sharing no code with the application (exact fractions instead of `Decimal`, its own calendar and statistics); it reuses only the Gate 3 generator's brute-force snapshot cell, which is independent too |
+
+Six targets, each on its own weekday so that no stay date is shared: **A** Sat 2026-08-15 at 14 days
+(observed only, low dispersion, plus distractors of every kind: wrong lead time 13 and 15, same weekday
+out of season, same season wrong weekday, a stay after the target seen after its snapshot day, a stay
+older than 730 days); **B** Sun 2026-08-16 at 7 days (observed only, high dispersion, `LOW`
+confidence); **C** Sat 2026-05-09 at 14 days (3 observed + 19 clean reconstructions; 2 uncertain
+reconstructions rejected; capped at 85); **D** Tue 2026-07-07 at 21 days (only 4 comparables exist:
+`INSUFFICIENT_DATA`); **E** Fri 2026-04-24 at 10 days (24 comparables, **12 of them with zero rooms**; fractional
+median 0.50); **F** Thu 2026-05-21 at 50 days (reconstructed only: capped at 65).
+
+Checked by hand (independently of both the application and the generator's code paths): **A** sample
+`11, 11, 12, 13, 13, 13` -> median (12+13)/2 = 12.50; P25 at position 1.25 = 11 + 0.25*(12-11) = 11.25;
+P75 at position 3.75 = 13; IQR 1.75; confidence 0.40*50 + 0.35*100 + 0.25*(100 - 50*1.75/12.5 = 93)
+= 20 + 35 + 23.25 = **78.25** (MEDIUM). **B** sample `0, 1, 2, 24, 26, 31` -> median (2+24)/2 = 13.00;
+P25 = 1 + 0.25*(2-1) = 1.25; P75 = 24 + 0.75*(26-24) = 25.50; IQR 24.25; stability 100 - 50*24.25/13 = 6.73;
+confidence 20 + 35 + 1.68 = **56.68** (LOW). **F** 24 reconstructed comparables, median 7.00, IQR 2:
+formula 40 + 21 + 0.25*85.71 = 82.43 -> capped by the 85 rule and then by the 65 rule = **65.00**.
+**D** has 4 comparables: no number at all.
+
+It is BOOKINGS -> SNAPSHOTS -> EXPECTED BASELINES only: no alert, impact, priority, recommendation or
+decision is derived from it. Guest names and phone numbers are invented and must never reach a
+snapshot or a baseline (a test checks it).
