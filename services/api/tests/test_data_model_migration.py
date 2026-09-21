@@ -1,4 +1,4 @@
-"""Migration 0003 on real PostgreSQL: its lifecycle, and its agreement with the ORM models."""
+"""The migrations on real PostgreSQL: their lifecycle, and their agreement with the ORM models."""
 
 from collections.abc import Iterator
 
@@ -14,7 +14,8 @@ from app.db.base import Base
 from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
-HEAD = "0004_booking_ingestion"
+HEAD = "0005_booking_snapshots_metrics"
+GATE_2_HEAD = "0004_booking_ingestion"
 GATE_1_HEAD = "0003_canonical_data_model"
 GATE_0_HEAD = "0002_procrastinate_schema"
 GATE_1_TABLES = {
@@ -27,7 +28,8 @@ GATE_1_TABLES = {
     "import_files",
 }
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
-MODEL_TABLES = GATE_1_TABLES | GATE_2_TABLES
+GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
+MODEL_TABLES = GATE_1_TABLES | GATE_2_TABLES | GATE_3_TABLES
 GATE_0_TABLES = {
     "alembic_version",
     "procrastinate_jobs",
@@ -35,13 +37,17 @@ GATE_0_TABLES = {
     "procrastinate_periodic_defers",
     "procrastinate_workers",
 }
-TENANT_OWNED_TABLES = {
-    "workspace_memberships",
-    "properties",
-    "data_sources",
-    "import_jobs",
-    "import_files",
-} | GATE_2_TABLES
+TENANT_OWNED_TABLES = (
+    {
+        "workspace_memberships",
+        "properties",
+        "data_sources",
+        "import_jobs",
+        "import_files",
+    }
+    | GATE_2_TABLES
+    | GATE_3_TABLES
+)
 
 
 def table_names(engine: Engine) -> set[str]:
@@ -72,13 +78,14 @@ def at_head(db_engine: Engine, test_database_url: str) -> Iterator[None]:
 # --- revision history ------------------------------------------------------------------------
 
 
-def test_gate_0_migrations_are_untouched_and_gate_1_sits_on_top(test_database_url: str) -> None:
+def test_gate_0_1_2_migrations_are_untouched_and_gate_3_sits_on_top(test_database_url: str) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
     assert scripts.get_heads() == [HEAD]
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
     assert revisions == {
-        HEAD: GATE_1_HEAD,
+        HEAD: GATE_2_HEAD,
+        GATE_2_HEAD: GATE_1_HEAD,
         GATE_1_HEAD: GATE_0_HEAD,
         GATE_0_HEAD: "0001_baseline",
         "0001_baseline": None,
@@ -88,14 +95,14 @@ def test_gate_0_migrations_are_untouched_and_gate_1_sits_on_top(test_database_ur
 # --- upgrade / downgrade / re-upgrade --------------------------------------------------------
 
 
-def test_upgrade_creates_the_gate_1_and_gate_2_schema_next_to_gate_0(
+def test_upgrade_creates_the_gate_1_2_3_schema_next_to_gate_0(
     db_engine: Engine, at_head: None
 ) -> None:
     assert table_names(db_engine) == GATE_0_TABLES | MODEL_TABLES
     assert current_revision(db_engine) == HEAD
 
 
-def test_downgrade_removes_only_gate_1(
+def test_downgrade_to_gate_0_removes_the_model_tables(
     db_engine: Engine, test_database_url: str, at_head: None
 ) -> None:
     command.downgrade(alembic_config(test_database_url), GATE_0_HEAD)
@@ -218,7 +225,7 @@ def test_delete_policy_only_memberships_cascade(db_engine: Engine, at_head: None
         "fk_workspace_memberships_user_id_users",
     }
     assert {rule for name, rule in rules.items() if "membership" not in name} == {"RESTRICT"}
-    assert len(rules) == 13  # 6 from Gate 1 + 7 from Gate 2; a new FK must be classified here
+    assert len(rules) == 16  # 6 Gate 1 + 7 Gate 2 + 3 Gate 3; a new FK must be classified here
 
 
 def test_every_tenant_owned_table_has_a_not_null_workspace_id(

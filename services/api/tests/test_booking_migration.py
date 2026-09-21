@@ -1,7 +1,8 @@
 """Migration 0004 on real PostgreSQL: 0003 <-> 0004, base -> head, and what it must not disturb.
 
 Metadata/migration agreement and constraint-name parity for the Gate 2 tables are asserted by
-test_data_model_migration.py (its table sets include them).
+test_data_model_migration.py (its table sets include them). The database is at the current head
+(0005, Gate 3) while these tests run, so "head" here means "0004 is applied, and 0005 on top".
 """
 
 import uuid
@@ -16,7 +17,7 @@ from app.modules.tenancy.models import Workspace
 from tests.support import alembic_config
 
 GATE_1_HEAD = "0003_canonical_data_model"
-HEAD = "0004_booking_ingestion"
+HEAD = "0005_booking_snapshots_metrics"
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_1_TABLES = {
     "users",
@@ -70,7 +71,7 @@ def function_exists(engine: Engine) -> bool:
     )
 
 
-def test_head_is_the_booking_ingestion_migration(at_head: None, db_engine: Engine) -> None:
+def test_the_booking_ingestion_schema_is_part_of_head(at_head: None, db_engine: Engine) -> None:
     assert revision(db_engine) == HEAD
     assert tables(db_engine) >= GATE_2_TABLES
     assert extra_uniques(db_engine) == EXTRA_UNIQUES
@@ -82,14 +83,14 @@ def test_upgrade_from_0003_downgrade_to_0003_and_upgrade_again(
 ) -> None:
     config = alembic_config(test_database_url)
 
-    command.downgrade(config, GATE_1_HEAD)  # 0004 -> 0003
+    command.downgrade(config, GATE_1_HEAD)  # 0005 and 0004 go away
     assert revision(db_engine) == GATE_1_HEAD
     assert tables(db_engine) & GATE_2_TABLES == set()
     assert tables(db_engine) >= GATE_1_TABLES  # Gate 1 is untouched
     assert extra_uniques(db_engine) == set()
     assert not function_exists(db_engine)
 
-    command.upgrade(config, "head")  # 0003 -> 0004
+    command.upgrade(config, "head")  # 0003 -> head
     assert revision(db_engine) == HEAD
     assert tables(db_engine) >= GATE_2_TABLES
     assert extra_uniques(db_engine) == EXTRA_UNIQUES

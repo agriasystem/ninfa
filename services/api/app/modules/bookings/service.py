@@ -24,11 +24,11 @@ from typing import Any
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
+from app.db.locks import lock_data_source
 from app.modules.bookings.errors import BookingErrorCode, BookingImportError, RowIssue
 from app.modules.bookings.mapping import (
     DATE_FIELDS,
@@ -493,10 +493,7 @@ class BookingImportService:
         try:
             # One canonicalisation per data source at a time: a concurrent import of the same
             # source waits, then sees these bookings and treats them as known.
-            self._session.execute(
-                text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:key AS text), 0))"),
-                {"key": str(ids.data_source)},
-            )
+            lock_data_source(self._session, ids.data_source)
             staged = self._rows.list_for_job(ids.job, status=ImportRowStatus.VALID)
             bookings = [
                 NormalizedBooking.from_payload(row.normalized_payload or {}) for row in staged

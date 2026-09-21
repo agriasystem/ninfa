@@ -111,6 +111,46 @@ fixtures for tests live in `tests/fixtures/bookings/` (see its README); `openpyx
 dependency added by Gate 2) reads the workbooks. The database tests need the test database, as
 for every backend test.
 
+## Booking snapshots (Gate 3)
+
+Also a Python service, with no public API, worker task or scheduler yet. With an imported
+`BOOKINGS` source (see above), optionally declare the room capacity, then observe:
+
+```python
+from datetime import date
+
+from app.modules.snapshots.observed import ObservedSnapshotService
+from app.modules.snapshots.reconstruction import BookingSnapshotReconstructionService
+from app.modules.snapshots.repository import BookingSnapshotRepository, RoomInventoryRepository
+
+tenant = TenantContext(workspace_id)
+with get_sessionmaker()() as session:
+    RoomInventoryRepository(session, tenant).set_for_date(
+        property_id, date(2026, 7, 1), rooms_available=12
+    )
+    session.commit()
+
+with get_sessionmaker()() as session:  # a session with no uncommitted work
+    observed = ObservedSnapshotService(session, tenant).take_snapshot(
+        property_id=property_id, data_source_id=data_source_id,
+        stay_date_start=date(2026, 7, 1), stay_date_end=date(2026, 7, 31))
+    print(observed.created, observed.unchanged)  # a different content -> BOOKING_SNAPSHOT_CONFLICT
+
+with get_sessionmaker()() as session:
+    curve = BookingSnapshotRepository(session, tenant).list_curve_for_stay_date(
+        data_source_id, date(2026, 7, 14))
+```
+
+`BookingSnapshotReconstructionService(...).reconstruct(...)` infers **completed earlier days**; its
+rows are `RECONSTRUCTED_APPROXIMATE` and never replace an observation (read
+[booking-snapshots-v1.md](../architecture/booking-snapshots-v1.md) before using them). Observing is
+meant to run once per property-local day; running it again the same day is a no-op unless the
+bookings or the inventory changed, which raises `BOOKING_SNAPSHOT_CONFLICT`. Migration `0005` adds
+the two tables; `npm run db:migrate` applies it. The golden scenario lives in
+`tests/fixtures/snapshots/`; its expected file is regenerated, independently of the application, with
+`uv run --all-packages python tests/fixtures/snapshots/generate_masseria_snapshots_expected.py`.
+Gate 3 adds no dependency.
+
 ## Quality
 
 | Goal            | Command                                                        |

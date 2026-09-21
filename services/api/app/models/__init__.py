@@ -24,6 +24,7 @@ from app.modules.ingestion.models import (
     ImportJobStatus,
 )
 from app.modules.properties.models import Property
+from app.modules.snapshots.models import BookingSnapshot, RoomInventoryDaily, SnapshotOrigin
 from app.modules.tenancy.models import MembershipRole, Workspace, WorkspaceMembership
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "BookingChannel",
     "BookingImportRow",
     "BookingMappingProfile",
+    "BookingSnapshot",
     "BookingStatus",
     "ChannelType",
     "DataSource",
@@ -42,6 +44,8 @@ __all__ = [
     "ImportRowStatus",
     "MembershipRole",
     "Property",
+    "RoomInventoryDaily",
+    "SnapshotOrigin",
     "User",
     "Workspace",
     "WorkspaceMembership",

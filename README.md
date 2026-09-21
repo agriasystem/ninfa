@@ -2,9 +2,10 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 2 (booking ingestion and canonical booking model).** No product feature exists
-> yet: the technical base, the multi-tenant data core and the import of booking files into canonical
-> bookings, on which the next gates are built.
+> **Status: Gate 3 (booking snapshots, room inventory and daily on-books metrics).** No product
+> feature exists yet: the technical base, the multi-tenant data core, the import of booking files into
+> canonical bookings and the daily snapshots derived from them (observed vs reconstructed), on which
+> the next gates are built.
 
 ## Layout
 
@@ -35,4 +36,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Architecture v1](docs/architecture/architecture-v1.md) — responsibilities, principles, what is *not* built yet
 - [Data model v1](docs/architecture/data-model-v1.md) — entities, tenant integrity, delete policy, indexes
 - [Booking data v1](docs/architecture/booking-data-v1.md) — canonical booking, mapping memory, import pipeline, guarantees
+- [Booking snapshots v1](docs/architecture/booking-snapshots-v1.md) — room inventory, observed vs reconstructed snapshots, on-books metrics
 - [Architecture decision records](docs/architecture/adr/)

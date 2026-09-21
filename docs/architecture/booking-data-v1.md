@@ -2,7 +2,9 @@
 
 How a customer's booking file becomes canonical bookings: the model, the mapping memory, the
 import pipeline and the guarantees around it. **No metrics, snapshots, occupancy, pickup,
-forecasting or decisions are computed here**: those start in later gates.
+forecasting or decisions are computed here**: snapshots and daily on-books metrics are derived from
+the canonical bookings by Gate 3 ([booking-snapshots-v1.md](booking-snapshots-v1.md)); the rest
+starts in later gates.
 
 Guiding principle: **the customer does not edit their Excel for NINFA**. NINFA reads the file as
 it is, once, with a mapping the customer confirms; it never invents data it does not have.
@@ -286,9 +288,20 @@ if not result.succeeded: ...   # branch on result.error_code
 
 Pass a session with no uncommitted work: the service commits (and may roll back) it.
 
+## How later gates read these bookings
+
+The canonical booking keeps the **current** state only (no change history). Gate 3 derives the
+daily on-books snapshots from it and depends on three properties of this model: a booking occupies
+the nights `check_in <= D < check_out`; `room_revenue` is the revenue of the **whole stay**;
+`cancelled_at` may be missing for a `CANCELLED` booking (which is why a reconstruction of an
+earlier day can only count such a booking as *uncertain*). The canonical write and the snapshot
+services share the per-data-source advisory lock (`app/db/locks.py`), so a snapshot never sees half
+of an import.
+
 ## Not in this gate
 
-Booking snapshots, daily metrics, occupancy/ADR/RevPAR, pickup, booking curves, forecasting,
+Booking snapshots, daily metrics, occupancy/ADR/RevPAR, pickup, booking curves, forecasting
+(snapshots and on-books metrics arrived in Gate 3; the rest is still later),
 Expected/Detection/Impact/Priority/Recommendation engines, decisions; a public API and
 authentication; the asynchronous worker job (no persistent file storage exists yet: the service takes
 the bytes, so a worker can call it once uploads do); costs and labor ingestion; FX conversion;
