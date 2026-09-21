@@ -151,6 +151,44 @@ the two tables; `npm run db:migrate` applies it. The golden scenario lives in
 `uv run --all-packages python tests/fixtures/snapshots/generate_masseria_snapshots_expected.py`.
 Gate 3 adds no dependency.
 
+## Expected baselines (Gate 4)
+
+Also a Python service, with no public API, worker task or scheduler yet. It needs OBSERVED snapshots
+(see above) and, to get more than `INSUFFICIENT_DATA`, history: at least 5 comparable snapshots at the
+same lead time, weekday and season (observed, or clean reconstructions).
+
+```python
+from datetime import date
+
+from app.modules.intelligence.expected.repository import ExpectedRepository
+from app.modules.intelligence.expected.service import BookingExpectedService
+
+with get_sessionmaker()() as session:  # a session with no uncommitted work
+    service = BookingExpectedService(session, tenant)
+    # every OBSERVED snapshot of one snapshot day and stay range, in one transaction
+    result = service.calculate_for_snapshot_date(
+        property_id=property_id, data_source_id=data_source_id,
+        snapshot_local_date=date(2026, 8, 1),
+        stay_date_start=date(2026, 8, 1), stay_date_end=date(2026, 9, 30))
+    print(result.created, result.unchanged, result.ready, result.insufficient)
+
+with get_sessionmaker()() as session:
+    repository = ExpectedRepository(session, tenant)
+    for baseline in repository.list_for_snapshot_date(data_source_id, date(2026, 8, 1)):
+        print(baseline.target_stay_date, baseline.status, baseline.expected_rooms_on_books,
+              baseline.confidence_band)
+        comparables = repository.list_comparables(baseline.id)  # why NINFA expected it
+```
+
+`calculate_for_target(property_id=, data_source_id=, target_snapshot_id=)` does the same for one
+snapshot. Run it right after the day's observation: a baseline is immutable, so re-running a target
+whose history changed meanwhile raises `EXPECTED_BASELINE_CONFLICT` (a corrected history needs a new
+`calculation_version`). Migration `0006` adds the two tables (and one unique key to
+`booking_snapshots`); `npm run db:migrate` applies it. The golden scenario lives in
+`tests/fixtures/expected/`; its history file and expected result are regenerated, independently of the
+application, with `uv run --all-packages python
+tests/fixtures/expected/generate_masseria_expected_expected.py`. Gate 4 adds no dependency.
+
 ## Quality
 
 | Goal            | Command                                                        |

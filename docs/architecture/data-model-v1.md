@@ -1,13 +1,15 @@
-# NINFA — Data model v1 (Gates 1–3)
+# NINFA — Data model v1 (Gates 1–4)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
-canonical bookings (see "Gate 2 additions") and Gate 3 the room inventory and the daily booking
-snapshots (see "Gate 3 additions"). **No invoices, suppliers, labor or decisions exist yet.**
+canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the daily booking
+snapshots (see "Gate 3 additions") and Gate 4 the Expected baselines (see "Gate 4 additions").
+**No invoices, suppliers, labor or decisions exist yet.**
 
-Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2) and
-`0005_booking_snapshots_metrics` (Gate 3), on top of `0001_baseline`, `0002_procrastinate_schema`.
-Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots}/`.
+Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
+`0005_booking_snapshots_metrics` (Gate 3) and `0006_expected_engine` (Gate 4), on top of
+`0001_baseline`, `0002_procrastinate_schema`. Code:
+`services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,intelligence/expected}/`.
 
 ## Entity relationships
 
@@ -311,10 +313,77 @@ snapshot_local_date)` for the booking curve of one stay night; the unique keys a
 indexes (the snapshot key's column order also serves "all nights of one snapshot day", so no
 separate index exists for it). Delete policy: every new foreign key is `RESTRICT`.
 
+## Gate 4 additions (Expected baselines)
+
+Migration `0006_expected_engine`. Full description: [expected-engine-v1.md](expected-engine-v1.md).
+
+```mermaid
+erDiagram
+    booking_snapshots ||--o{ booking_expected_baselines : "OBSERVED target"
+    booking_expected_baselines ||--o{ booking_expected_comparables : "explained by"
+    booking_snapshots ||--o{ booking_expected_comparables : "history used"
+    properties ||--o{ booking_expected_baselines : has
+    data_sources ||--o{ booking_expected_baselines : "one source"
+
+    booking_expected_baselines {
+        uuid id PK
+        uuid workspace_id
+        uuid property_id
+        uuid data_source_id
+        uuid target_snapshot_id "OBSERVED snapshot"
+        text target_origin "always OBSERVED"
+        date target_snapshot_local_date
+        date target_stay_date
+        int lead_time_days ">= 0"
+        text status "READY | INSUFFICIENT_DATA"
+        numeric expected_rooms_on_books "12,2 NULL if insufficient"
+        numeric expected_lower "P25"
+        numeric expected_upper "P75"
+        numeric iqr
+        int sample_size
+        int observed_sample_size
+        int reconstructed_sample_size
+        int rejected_uncertain_count
+        numeric confidence_score "5,2; 0 if insufficient"
+        text confidence_band "HIGH MEDIUM LOW or NULL"
+        text method
+        text calculation_version
+        text comparable_fingerprint
+    }
+    booking_expected_comparables {
+        uuid id PK
+        uuid baseline_id
+        uuid snapshot_id
+        text origin "= the snapshot's"
+        int rooms_on_books "copy"
+        int recency_rank "1 = most recent"
+    }
+```
+
+| Table | Tenant integrity (composite FKs, all RESTRICT) | Uniqueness |
+| ----- | ---------------------------------------------- | ---------- |
+| `booking_expected_baselines` | `(workspace, property)` → `properties`; `(workspace, property, data_source)` → `data_sources`; `(workspace, property, data_source, target_snapshot, target_origin)` → `booking_snapshots` | `(workspace, target_snapshot, calculation_version)`; `(workspace, property, data_source, id)` as FK target |
+| `booking_expected_comparables` | `(workspace, property, data_source, baseline)` → baselines; `(workspace, property, data_source, snapshot, origin)` → `booking_snapshots` | `(workspace, baseline, snapshot)`; `(workspace, baseline, recency_rank)` |
+
+Change to a Gate 3 table (an addition only): `booking_snapshots` gets
+`UNIQUE (workspace_id, property_id, data_source_id, id, origin)`, a foreign-key target (redundant with
+the primary key). Because `target_origin` is CHECKed to `'OBSERVED'`, the database refuses a
+reconstruction as a baseline target. Both new tables are immutable (no `updated_at`, a `BEFORE UPDATE`
+trigger; `DELETE` is not blocked, retention is a later gate). `CHECK`s keep a baseline coherent:
+`READY` requires every statistic, a band and `sample_size >= 5`; `INSUFFICIENT_DATA` requires them all
+absent, `confidence_score = 0` and `sample_size < 5`; `lead_time_days` equals the difference of the two
+dates; `sample_size` is the sum of the two provenance counts; `iqr = upper - lower` and the range
+brackets the median.
+
+Indexes added: `ix_booking_expected_baselines_snapshot_date` and `ix_booking_expected_baselines_stay_date`
+(both `(workspace, data_source, date)`); the unique keys double as lookup indexes (the comparables'
+`(workspace, baseline)` prefix serves "the comparables of a baseline"). Candidate retrieval reuses the
+Gate 3 unique key. Delete policy: every new foreign key is `RESTRICT`.
+
 ## Not implemented yet
 
-Suppliers, invoices, labor, cost categories, metrics, baselines,
-decisions, decision memory; authentication and any tenant-facing API; file upload/storage and the
+Suppliers, invoices, labor, cost categories, RevPAR/pickup metrics, cost and labor baselines,
+detection, decisions, decision memory; authentication and any tenant-facing API; file upload/storage and the
 asynchronous ingestion job; PostgreSQL row-level security (the schema is compatible: every
 tenant-owned table has a `workspace_id` column to write policies against).
 

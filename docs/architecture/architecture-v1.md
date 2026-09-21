@@ -1,12 +1,13 @@
-# NINFA — Architecture v1 (Gates 0–3)
+# NINFA — Architecture v1 (Gates 0–4)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
-booking ingestion with the canonical booking model (Gate 2) and the room inventory with the daily
-booking snapshots (Gate 3). No NINFA product feature is implemented: data goes in, is stored
-correctly and is turned into daily "on the books" facts; no expectation, detection or decision is
-computed from it yet.
+booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
+booking snapshots (Gate 3) and the first Expected baselines (Gate 4). No NINFA product feature is
+implemented: data goes in, is stored correctly, is turned into daily "on the books" facts and
+into a historical "expected level"; no detection, alert or decision is computed from it yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
-Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md).
+Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
+[expected-engine-v1.md](expected-engine-v1.md).
 
 ## Components
 
@@ -20,7 +21,7 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
 | `apps/web`          | Technical shell: shows whether the API is reachable. No product UI.         |
-| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core, the booking import service, the snapshot services. |
+| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core, the booking import service, the snapshot and Expected services. |
 | `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists (the booking import is not a job yet: there is no file storage). |
 | PostgreSQL          | The single datastore: the multi-tenant core, the bookings and the job queue. |
 | `packages/contracts`| A few hand-written TypeScript types mirroring the backend (health, errors). |
@@ -35,17 +36,19 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Six modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
-  (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2
-  and `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3. Importing `app.models`
-  registers every model.
+- Seven modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
+  (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2,
+  `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3 and `intelligence/expected`
+  (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the first of the Decision
+  Engine stages). Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
-  `snapshots/reconstruction.py`) are plain classes: they depend on a `Session` and a
+  `snapshots/reconstruction.py`, `intelligence/expected/service.py`) are plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
 - The directories for the future domains (`suppliers`, `invoices`, `labor`, `normalization`,
-  `data_quality`, `intelligence/*`, `decisions`, `decision_memory`, `ai/*`) are empty package
-  markers so the structure is settled before those domains land.
+  `data_quality`, `intelligence/{detection,impact,priority,recommendation}`, `decisions`,
+  `decision_memory`, `ai/*`) are empty package markers so the structure is settled before those
+  domains land.
 - Splitting a module into a service is a possible future step, never a starting point.
 
 ## API conventions
@@ -122,6 +125,22 @@ inventory is `NULL`, never a guess. Runs are one transaction under the same per-
 advisory lock as the import (`app/db/locks.py`). No API, worker task or scheduler was added.
 Details: [booking-snapshots-v1.md](booking-snapshots-v1.md), ADR 0009.
 
+## Expected Engine (Gate 4)
+
+`BookingExpectedService` turns an OBSERVED snapshot into an immutable **Expected baseline**: the
+median rooms on books of the historical comparables (same data source, **same lead time**, same
+weekday, +-42 day season, at most 730 days back, strictly before the target: no temporal
+leakage), with the historical P25-P75 range, the IQR, the sample provenance and a versioned
+**baseline confidence** (0-100, with caps and bands). OBSERVED comparables come first; clean
+reconstructions only complete a small observed sample and are penalised; a reconstruction with
+uncertainty never enters the numbers. With fewer than 5 comparables the result is
+`INSUFFICIENT_DATA` and **no number is produced**. **Expected is not a forecast**: it says how
+much was typically on the books, not how a stay will end, and it computes no pickup, alert or
+decision. Baselines and the comparables actually used are stored (immutable, fingerprinted,
+tenant-checked by composite foreign keys); runs share the per-data-source advisory lock and use
+one candidate query per batch. No API, worker task or scheduler was added. Details:
+[expected-engine-v1.md](expected-engine-v1.md), ADR 0010.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -132,7 +151,7 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 
 Authentication/authorization and any tenant-facing API, file upload and object storage, the
 asynchronous ingestion job, costs and labor ingestion, the Property Profile, RevPAR, pickup and the
-interpretation of booking curves, scheduling of snapshot runs, other business models
-(suppliers, invoices, labor, cost categories, baselines), the Decision Engine (expected, detection,
+interpretation of booking curves, scheduling of snapshot and Expected runs, other business models
+(suppliers, invoices, labor, cost categories, cost and labor baselines), the Decision Engine (detection,
 impact, priority, recommendation), decision memory, AI gateway / narrative / Ask NINFA, product UI,
 notifications, payments, analytics, deployment.

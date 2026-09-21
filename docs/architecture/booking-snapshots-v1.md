@@ -322,6 +322,18 @@ of 207 days × 124 nights. The expected result was computed **independently of t
 (`generate_masseria_snapshots_expected.py`, standard library only), with 39 hand-checkable probes and
 a checksum of the whole grid. It goes from BOOKINGS + INVENTORY to SNAPSHOTS and nothing further.
 
+## Consumers: the Expected Engine (Gate 4)
+
+The Expected Engine ([expected-engine-v1.md](expected-engine-v1.md)) reads these snapshots and is
+why the origin distinction matters: an Expected baseline must start from an **OBSERVED** target
+(the database refuses a reconstruction as a target), prefers OBSERVED comparables, uses a
+RECONSTRUCTED_APPROXIMATE one only to complete a small observed sample, penalises it in the
+confidence, and never uses one with `uncertain_rooms > 0`. It needs exactly one snapshot per
+(stay date, lead time) in a data source, which the unique key guarantees, and it reads them by exact
+`(snapshot day, stay date)` keys through `BookingSnapshotRepository.list_by_keys` (the unique key's
+index). Migration `0006` adds one unique constraint to `booking_snapshots`,
+`(workspace_id, property_id, data_source_id, id, origin)`, used only as a foreign-key target.
+
 ## Known limits (intentional)
 
 - Reconstructions are approximations (current booking state, today's inventory).
@@ -330,4 +342,5 @@ a checksum of the whole grid. It goes from BOOKINGS + INVENTORY to SNAPSHOTS and
   recalculating history under new rules is a decision for a later gate.
 - No retention or deletion policy for snapshots yet.
 - `rooms_out_of_order` is stored, not used.
-- No pickup, curves interpretation, expected values, alerts or decisions (Gate 4+).
+- No pickup, curves interpretation, alerts or decisions (the Expected baselines of Gate 4 read these
+  snapshots; detection and decisions are later gates).
