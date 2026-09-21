@@ -363,5 +363,8 @@ per kind (per 1,000 rows).
   is the gross amount when present.
 - Cost categories are a closed V1 list and the phrase dictionary is deliberately small: a line the
   rules do not recognise is `OTHER` with confidence 0, not a guess.
-- No cost baseline, cost per occupied room, anomaly detection, price trend, supplier inflation or
-  decision: Gate 7 and later.
+- No supplier price trend, supplier inflation or decision. Gate 7 is the first consumer of the
+  canonical lines: `COST_CPOR_ANOMALY` (rules `cost-cpor-anomaly-v1`,
+  [cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md)) reads the signed `line_total`, the category and
+  its classification confidence by **invoice date**, across data sources, and changes nothing here:
+  no column, table or migration. `OTHER` lines are what its classification coverage measures.

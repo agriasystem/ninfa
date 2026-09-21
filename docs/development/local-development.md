@@ -278,6 +278,51 @@ result, by `python tests/fixtures/invoices/generate_cost_fixtures.py` (standard 
 adds no dependency (`openpyxl` has been there since Gate 2) and one migration,
 `0007_invoice_supplier_ingestion` (`npm run db:migrate`).
 
+## Cost CPOR anomaly (Gate 7)
+
+A read-only Python service, with no public API, worker task, scheduler, migration or new dependency.
+It needs the canonical invoices of Gate 6 **and** lead-time-0 booking snapshots of a BOOKINGS data
+source (Gate 3): without either the answer is `INSUFFICIENT_DATA` or `NOT_APPLICABLE`, never an
+invented number. The booking data source is always passed explicitly, the target month is always
+passed in (the service reads no clock), and it writes nothing and stores no decision. Full guide:
+[cost-cpor-anomaly-v1.md](../architecture/cost-cpor-anomaly-v1.md).
+
+```python
+from app.core.tenant import TenantContext
+from app.modules.intelligence.costs.service import CostDecisionService
+from app.modules.invoices.cost_categories import CostCategory
+
+with get_sessionmaker()() as session:  # any session: the service never commits or rolls back
+    service = CostDecisionService(session, TenantContext(workspace_id))
+
+    metric = service.build_period_metric(
+        property_id=property_id, booking_data_source_id=bookings_source_id,
+        year=2026, month=8, cost_category=CostCategory.LAUNDRY, currency="EUR",
+    )
+    print(metric.status.value, metric.occupied_room_nights, metric.cpor_display)
+
+    evaluation = service.evaluate_cpor_anomaly(
+        property_id=property_id, booking_data_source_id=bookings_source_id,
+        year=2026, month=8, cost_category=CostCategory.LAUNDRY, currency="EUR",
+    )
+    print(evaluation.status.value, evaluation.reason_codes, evaluation.cost_gap_proxy_display)
+
+    # every operating category of one month and currency: the history is read once
+    for evaluation in service.evaluate_month(
+        property_id=property_id, booking_data_source_id=bookings_source_id,
+        year=2026, month=8, currency="EUR",
+    ):
+        print(evaluation.cost_category.value, evaluation.status.value, evaluation.confidence_score)
+```
+
+An evaluation has one of five statuses (`TRIGGERED`, `CLEAR`, `INSUFFICIENT_DATA`,
+`NOT_APPLICABLE`, `SUPPRESSED_LOW_CONFIDENCE`), stable `reason_codes` and typed facts; `cost_gap_proxy_exact`
+(and its `_display` value) is a gross proxy and **not** a loss or a saving. Ask only for concluded calendar months, one currency
+at a time (NINFA never converts currencies). The golden scenario lives in `tests/fixtures/costs/`;
+its bookings, invoices and expected result are regenerated, independently of the application, with
+`uv run --all-packages python tests/fixtures/costs/generate_masseria_cost_intelligence_expected.py`.
+Gate 7 adds no dependency and no migration (the head stays `0007_invoice_supplier_ingestion`).
+
 ## Quality
 
 | Goal            | Command                                                        |

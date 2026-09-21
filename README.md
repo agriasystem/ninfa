@@ -2,14 +2,14 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 6 (Invoice Ingestion & Supplier Resolution V1: FatturaPA XML and structured
-> CSV/XLSX).** No product feature exists yet: the technical base, the multi-tenant data core, the
+> **Status: Gate 7 (Cost CPOR Anomaly Detection V1: `COST_CPOR_ANOMALY`, rules
+> `cost-cpor-anomaly-v1`).** No product feature exists yet: the technical base, the multi-tenant data core, the
 > import of booking files into canonical bookings, the daily snapshots derived from them (observed
 > vs reconstructed), the Expected baselines (a historical level with its confidence, not a
-> forecast), two revenue detectors that return typed, non-persisted evaluations and, since Gate 6,
-> a workspace-wide supplier registry with canonical invoices and lines (no PDF/OCR, no cost
-> indicator, no stored decision, alert, priority or recommendation), on which the next gates are
-> built.
+> forecast), two revenue detectors that return typed, non-persisted evaluations, since Gate 6 a
+> workspace-wide supplier registry with canonical invoices and lines (no PDF/OCR) and, since Gate 7,
+> one cost detector (cost per occupied room, an operating proxy, one currency at a time, no stored
+> decision, alert, priority or recommendation), on which the next gates are built.
 
 ## Layout
 
@@ -44,4 +44,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Expected engine v1](docs/architecture/expected-engine-v1.md) — historical comparable baselines, statistics, confidence, INSUFFICIENT_DATA
 - [Revenue decisions v1](docs/architecture/revenue-decisions-v1.md) — REV_PICKUP_LOW and REV_OCCUPANCY_RISK: curve pairs, five statuses, confidence, revenue gap proxy
 - [Cost ingestion v1](docs/architecture/cost-ingestion-v1.md) — supplier registry and resolution, FatturaPA XML and CSV/XLSX invoices, credit notes, categories, atomic import
+- [Cost CPOR anomaly v1](docs/architecture/cost-cpor-anomaly-v1.md) — COST_CPOR_ANOMALY: cost per occupied room, lead-time-0 denominator, comparable months, median/IQR, confidence, cost gap proxy
 - [Architecture decision records](docs/architecture/adr/)

@@ -145,3 +145,40 @@ It is FILES -> STAGING -> SUPPLIER RESOLUTION -> INVOICES -> LINES -> CATEGORIES
 occupied room, expected cost, anomaly or decision is derived from it. The supplier's e-mail, phone
 and street, the recipient, the customer reference column of the CSV and every raw IBAN must never
 reach any table (a test scans all of them); the SHA-256 of each account must.
+
+## `costs/` (Gate 7)
+
+The golden world of the cost intelligence ("MASSERIA NINFA DEMO — COST DATA V1", extended). Everything
+here is written by `generate_masseria_cost_intelligence_expected.py` (**standard library only**:
+`csv`, `fractions`, `calendar`, `datetime`, `json`), which shares no code with the application: not
+the month arithmetic, the occupancy denominator, the cost aggregation, the comparable selection, the
+statistics, the confidence or the rule. The only thing it borrows is the FatturaPA / CSV *file
+writers* of the Gate 6 generator, to write the invoice files the Gate 6 import service reads. Every
+company, guest and phone is invented (`Ospite Costi 0001`, `+39 000 7000001`). Run it with
+`python tests/fixtures/costs/generate_masseria_cost_intelligence_expected.py`; it is deterministic,
+and a test fails if a committed byte differs from what it writes.
+
+| File | Purpose |
+| ---- | ------- |
+| `masseria_ninfa_cost_bookings_v1.csv` | 492 synthetic one-night bookings (Italian headers, `;`): the rooms of each day are set by design, one booking is cancelled **without** a date (an uncertain snapshot) |
+| `invoices/*.xml` | seven FatturaPA files: laundry (EUR and USD), utilities, cleaning, maintenance, OTA commissions (invoices and credit notes) and an uncategorised supplier |
+| `invoices/software.csv` | a structured CSV for a **second** COSTS data source with an explicit `Categoria` column |
+| `masseria_ninfa_cost_intelligence_v1.expected.json` | the occupancy of every month and, for 14 cases, the whole canonical evaluation: metric, comparables, statistics, confidence, thresholds, status and reasons |
+
+The world is the whole chain, replayed through the real services: the bookings are imported by the
+Gate 2 import service; 12 months (2024-05..10, 2025-05..10) are **reconstructed** by the Gate 3
+reconstruction service and 5 months (2026-05..08 and the closed 2026-10) are **observed** day by day
+by the Gate 3 observed service (one day, 2026-05-17, is never observed: there is no snapshot, not a
+zero one); the invoices are imported by the Gate 6 service. Cases: **A** LAUNDRY 2026-08 `TRIGGERED`
+(CPOR 6.00 against an expected 3.25, fence 3.75, gap 1119.25, 10 comparables); **B** LAUNDRY 2026-07
+`CLEAR` (a credit note lowers the net cost, an invoice dated 31 July stays in July); **C** UTILITIES
+`CLEAR` (a high delta under the robust fence); **D** SOFTWARE `CLEAR` (gap below 100); **E** CLEANING
+`SUPPRESSED_LOW_CONFIDENCE` (a weak baseline); **F** MAINTENANCE `INSUFFICIENT_DATA` (fewer than 5
+comparables); **G** LAUNDRY 2026-06 `INSUFFICIENT_DATA` (classification coverage below 70 %); **H**
+OTHER `NOT_APPLICABLE`; **I** LAUNDRY 2026-05 `INSUFFICIENT_DATA` (a day nobody observed); **J**
+2026-10 `NOT_APPLICABLE` (zero occupied room nights); **K** OTA_COMMISSIONS `NOT_APPLICABLE` (credit
+notes: a negative expected CPOR); **O** LAUNDRY in USD `INSUFFICIENT_DATA` (EUR and USD are never
+mixed); **P** and **Q** `NOT_APPLICABLE` (nothing invoiced in that category / currency). Cases **M**
+(clean reconstructed months enter the baseline) and **N** (2025-09, with an uncertain snapshot, never
+does) are read inside case A. It stops at the evaluation: no decision, priority or recommendation is
+derived from it.
