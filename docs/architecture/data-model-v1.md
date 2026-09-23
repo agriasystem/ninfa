@@ -1,17 +1,19 @@
-# NINFA — Data model v1 (Gates 1–7)
+# NINFA — Data model v1 (Gates 1–8)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
 canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the daily booking
-snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions") and
-Gate 6 the supplier registry and the invoices (see "Gate 6 additions"); Gate 7 adds no schema (see
-"Gate 7: no schema change"). **No labor or decisions exist yet.**
+snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions"),
+Gate 6 the supplier registry and the invoices (see "Gate 6 additions") and Gate 8 the canonical
+labor snapshots/entries and their mapping/staging (see "Gate 8 additions"); Gate 7 adds no schema
+(see "Gate 7: no schema change"). **No decisions exist yet.**
 
 Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
-`0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4) and
-`0007_invoice_supplier_ingestion` (Gate 6, still the head after Gate 7), on top of `0001_baseline`, `0002_procrastinate_schema`.
+`0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4),
+`0007_invoice_supplier_ingestion` (Gate 6, Gate 7 added none) and `0008_labor_ingestion`
+(Gate 8, still the head), on top of `0001_baseline`, `0002_procrastinate_schema`.
 Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,
-intelligence/expected,suppliers,invoices}/`.
+intelligence/expected,suppliers,invoices,labor}/`.
 
 ## Entity relationships
 
@@ -490,12 +492,71 @@ Indexes added (only those with a job): `ix_suppliers_workspace_id_normalized_nam
 `ix_invoice_lines_workspace_id_cost_category`, `ix_invoice_import_rows_workspace_id_import_job_id`; the
 unique keys double as lookup indexes. Delete policy: every new foreign key is `RESTRICT`.
 
+## Gate 8 additions
+
+See [labor-ingestion-v1.md](labor-ingestion-v1.md) and [ADR 0014](adr/0014-labor-ingestion-and-overstaffing-v1.md).
+
+```mermaid
+erDiagram
+    properties ||--o{ data_sources : "has (LABOR)"
+    data_sources ||--o{ labor_snapshots : "produces"
+    data_sources ||--o| labor_mapping_profiles : "one mapping"
+    labor_snapshots ||--o{ labor_entries : "canonicalises to"
+    import_files ||--o{ labor_import_rows : "staged as"
+
+    labor_snapshots {
+        uuid id PK
+        uuid workspace_id
+        uuid property_id
+        uuid data_source_id
+        date snapshot_local_date "identity, given explicitly"
+        text source_fingerprint
+    }
+    labor_entries {
+        uuid id PK
+        uuid workspace_id
+        uuid labor_snapshot_id
+        date work_date
+        text role_raw "free-text SHIFT label, never a person"
+        text labor_category "closed list"
+        int planned_minutes "nullable, never a float hour"
+        int actual_minutes "nullable, never substituted for planned"
+        numeric planned_cost "14,2, optional"
+        numeric actual_cost "14,2, optional"
+        text currency "required when a cost is present"
+        text classification_method
+        numeric classification_confidence "5,2"
+    }
+```
+
+| Table | Tenant integrity (composite FKs, all RESTRICT) | Uniqueness |
+| ----- | ---------------------------------------------- | ---------- |
+| `labor_snapshots` | `(workspace, property)` → `properties`; `(workspace, property, data_source)` → `data_sources`; `(workspace, property, data_source, job)` → `import_jobs`; `(workspace, job, file)` → `import_files` | `(workspace, data_source, snapshot_local_date)`; `(workspace, id)` as FK target |
+| `labor_entries` | `(workspace, labor_snapshot)` → `labor_snapshots` | `(workspace, labor_snapshot, source_row_number)` |
+| `labor_mapping_profiles` | `(workspace, property, data_source)` → `data_sources` | `(workspace, data_source)` |
+| `labor_import_rows` | `(workspace, job, file)` → `import_files` | `(workspace, file, source_row_number)` |
+
+`labor_snapshots` and `labor_entries` are immutable (no `updated_at`, a `BEFORE UPDATE` trigger
+that refuses every update, `labor_forbid_update()`; `DELETE` is not blocked, retention is a later
+gate). `CHECK`s keep the rows coherent: at least one of `planned_minutes`/`actual_minutes` is
+present, both non-negative; a cost, if present, requires a currency; a classification is
+`UNCLASSIFIED` if and only if its confidence is 0 (and then `OTHER`); a staging row is `INVALID`
+if and only if it has errors. `labor_category` and `classification_method` are `VARCHAR` with a
+named `CHECK`, never PostgreSQL enums, the same convention as every other closed list in the
+schema. Money is `NUMERIC(14,2)`, the same scale as the Gate 6 invoice amounts; no employee
+identity column exists anywhere in these four tables (see ADR 0014).
+
+Indexes added: `ix_labor_snapshots_property_source_date`,
+`ix_labor_entries_workspace_id_snapshot_id`, `ix_labor_entries_workspace_id_work_date_category`,
+`ix_labor_entries_snapshot_work_date_category`, `ix_labor_import_rows_workspace_id_import_job_id`;
+the unique keys double as lookup indexes.
+
 ## Not implemented yet
 
-Labor, RevPAR metrics, labor baselines, persisted cost metrics,
-persisted decisions, other detectors, decision memory; authentication and any tenant-facing API; file upload/storage and the
-asynchronous ingestion job; PostgreSQL row-level security (the schema is compatible: every
-tenant-owned table has a `workspace_id` column to write policies against).
+RevPAR metrics, persisted decisions, other detectors, decision memory; authentication and any
+tenant-facing API; file upload/storage and the asynchronous ingestion job; PostgreSQL row-level
+security (the schema is compatible: every tenant-owned table has a `workspace_id` column to write
+policies against).
 
 ## Adding a tenant-owned entity (checklist for later gates)
 

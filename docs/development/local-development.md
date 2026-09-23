@@ -323,6 +323,58 @@ its bookings, invoices and expected result are regenerated, independently of the
 `uv run --all-packages python tests/fixtures/costs/generate_masseria_cost_intelligence_expected.py`.
 Gate 7 adds no dependency and no migration (the head stays `0007_invoice_supplier_ingestion`).
 
+## Labor ingestion and overstaffing (Gate 8)
+
+Adds no dependency and one migration, `0008_labor_ingestion` (`npm run db:migrate`, now head).
+Import a structured labor file (a confirmed mapping profile is required first, via
+`save_mapping()`), then evaluate one category on one target booking snapshot; the demand forecast
+reuses Gate 5's own machinery, so no booking data source is passed to the detector explicitly — it
+is derived from the target. Full guide: [labor-ingestion-v1.md](../architecture/labor-ingestion-v1.md),
+[labor-overstaffing-v1.md](../architecture/labor-overstaffing-v1.md).
+
+```python
+from datetime import date
+
+from app.core.tenant import TenantContext
+from app.modules.labor.roles import LaborCategory
+from app.modules.labor.service import LaborImportService
+from app.modules.intelligence.labor.service import LaborDecisionService
+
+with get_sessionmaker()() as session:
+    import_service = LaborImportService(session, TenantContext(workspace_id))
+    import_service.save_mapping(
+        labor_data_source_id,
+        headers=["work_date", "role", "planned_hours", "actual_hours"],
+        column_mapping={
+            "work_date": {"column": "work_date"},
+            "role": {"column": "role"},
+            "planned_hours": {"column": "planned_hours"},
+            "actual_hours": {"column": "actual_hours"},
+        },
+    )
+    result = import_service.import_file(
+        labor_data_source_id,
+        filename="roster-week36.csv",
+        content=csv_bytes,
+        snapshot_local_date=date(2026, 9, 1),  # always explicit: no date.today()
+    )
+    print(result.status.value, result.labor_snapshot_id, result.entries_created)
+
+    decision_service = LaborDecisionService(session, TenantContext(workspace_id))
+    evaluation = decision_service.evaluate_overstaffing(
+        target_booking_snapshot_id=target_snapshot_id,
+        labor_data_source_id=labor_data_source_id,
+        labor_category=LaborCategory.HOUSEKEEPING,
+    )
+    print(evaluation.status.value, evaluation.reason_codes, evaluation.excess_hours_exact)
+```
+
+An evaluation has one of five statuses, stable `reason_codes` and typed facts;
+`labor_cost_gap_proxy_exact` (optional) is a gross proxy and **never** a saving, and never part of
+the trigger. Hours are stored as integer minutes; a fractional minute in the source is rejected,
+never rounded. No employee name, id, email, phone, tax code, address or leave reason is ever
+persisted (an unmapped column never reaches staging).
+
 ## Quality
 
 | Goal            | Command                                                        |

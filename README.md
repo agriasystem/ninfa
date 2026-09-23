@@ -2,14 +2,16 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 7 (Cost CPOR Anomaly Detection V1: `COST_CPOR_ANOMALY`, rules
-> `cost-cpor-anomaly-v1`).** No product feature exists yet: the technical base, the multi-tenant data core, the
+> **Status: Gate 8 (Labor Ingestion and Overstaffing Detection V1: `LABOR_OVERSTAFFING`, rules
+> `labor-overstaffing-v1`).** No product feature exists yet: the technical base, the multi-tenant data core, the
 > import of booking files into canonical bookings, the daily snapshots derived from them (observed
 > vs reconstructed), the Expected baselines (a historical level with its confidence, not a
 > forecast), two revenue detectors that return typed, non-persisted evaluations, since Gate 6 a
-> workspace-wide supplier registry with canonical invoices and lines (no PDF/OCR) and, since Gate 7,
+> workspace-wide supplier registry with canonical invoices and lines (no PDF/OCR), since Gate 7
 > one cost detector (cost per occupied room, an operating proxy, one currency at a time, no stored
-> decision, alert, priority or recommendation), on which the next gates are built.
+> decision, alert, priority or recommendation) and, since Gate 8, canonical labor entries (minutes,
+> never an employee identity) with one staffing detector reusing Gate 5's own demand forecast, on
+> which the next gates are built.
 
 ## Layout
 

@@ -14,7 +14,8 @@ from app.db.base import Base
 from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
-HEAD = "0007_invoice_supplier_ingestion"
+HEAD = "0008_labor_ingestion"
+GATE_6_HEAD = "0007_invoice_supplier_ingestion"
 GATE_4_HEAD = "0006_expected_engine"
 GATE_3_HEAD = "0005_booking_snapshots_metrics"
 GATE_2_HEAD = "0004_booking_ingestion"
@@ -42,7 +43,17 @@ GATE_6_TABLES = {
     "invoice_mapping_profiles",
     "invoice_import_rows",
 }
-MODEL_TABLES = GATE_1_TABLES | GATE_2_TABLES | GATE_3_TABLES | GATE_4_TABLES | GATE_6_TABLES
+# Gate 5 and Gate 7 are read-only detectors: they add no table, so the revision chain skips
+# straight from Gate 6 (0007) to Gate 8 (0008).
+GATE_8_TABLES = {
+    "labor_snapshots",
+    "labor_entries",
+    "labor_mapping_profiles",
+    "labor_import_rows",
+}
+MODEL_TABLES = (
+    GATE_1_TABLES | GATE_2_TABLES | GATE_3_TABLES | GATE_4_TABLES | GATE_6_TABLES | GATE_8_TABLES
+)
 GATE_0_TABLES = {
     "alembic_version",
     "procrastinate_jobs",
@@ -62,6 +73,7 @@ TENANT_OWNED_TABLES = (
     | GATE_3_TABLES
     | GATE_4_TABLES
     | GATE_6_TABLES
+    | GATE_8_TABLES
 )
 
 
@@ -93,7 +105,7 @@ def at_head(db_engine: Engine, test_database_url: str) -> Iterator[None]:
 # --- revision history ------------------------------------------------------------------------
 
 
-def test_gate_0_to_4_migrations_are_untouched_and_gate_6_sits_on_top(
+def test_gate_0_to_6_migrations_are_untouched_and_gate_8_sits_on_top(
     test_database_url: str,
 ) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
@@ -101,7 +113,8 @@ def test_gate_0_to_4_migrations_are_untouched_and_gate_6_sits_on_top(
     assert scripts.get_heads() == [HEAD]
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
     assert revisions == {
-        HEAD: GATE_4_HEAD,
+        HEAD: GATE_6_HEAD,
+        GATE_6_HEAD: GATE_4_HEAD,
         GATE_4_HEAD: GATE_3_HEAD,
         GATE_3_HEAD: GATE_2_HEAD,
         GATE_2_HEAD: GATE_1_HEAD,
@@ -114,7 +127,7 @@ def test_gate_0_to_4_migrations_are_untouched_and_gate_6_sits_on_top(
 # --- upgrade / downgrade / re-upgrade --------------------------------------------------------
 
 
-def test_upgrade_creates_the_gate_1_to_6_schema_next_to_gate_0(
+def test_upgrade_creates_the_gate_1_to_8_schema_next_to_gate_0(
     db_engine: Engine, at_head: None
 ) -> None:
     assert table_names(db_engine) == GATE_0_TABLES | MODEL_TABLES
@@ -244,8 +257,8 @@ def test_delete_policy_only_memberships_cascade(db_engine: Engine, at_head: None
         "fk_workspace_memberships_user_id_users",
     }
     assert {rule for name, rule in rules.items() if "membership" not in name} == {"RESTRICT"}
-    # 6 Gate 1 + 7 Gate 2 + 3 Gate 3 + 5 Gate 4 + 14 Gate 6; classify a new FK here
-    assert len(rules) == 35
+    # 6 Gate 1 + 7 Gate 2 + 3 Gate 3 + 5 Gate 4 + 14 Gate 6 + 7 Gate 8; classify a new FK here
+    assert len(rules) == 42
 
 
 def test_every_tenant_owned_table_has_a_not_null_workspace_id(
