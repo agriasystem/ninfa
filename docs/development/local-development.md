@@ -406,6 +406,40 @@ of the property in memory, on every call, from `channel_type`/`is_verified` (whe
 small exact dictionary, never a fuzzy match — an unmapped or ambiguous channel name stays
 `UNKNOWN` rather than being guessed.
 
+## Priority ranking (Gate 10)
+
+Adds no dependency and no migration (the head stays `0008_labor_ingestion`). Rank whatever the
+five detectors above already called `TRIGGERED`: `PriorityService` needs no database session and
+no `TenantContext` at all — it is a pure function of the evaluations you already computed. Full
+guide: [priority-engine-v1.md](../architecture/priority-engine-v1.md).
+
+```python
+from datetime import date
+
+from app.modules.intelligence.priority.service import PriorityService
+from app.modules.intelligence.priority.types import PriorityContext
+
+context = PriorityContext(
+    workspace_id=workspace_id,
+    property_id=property_id,
+    as_of_local_date=date(2026, 9, 5),  # always explicit: no date.today()
+)
+# evaluations: any mix of RevenueDecisionEvaluation / OtaDependencyEvaluation /
+# CostDecisionEvaluation / LaborDecisionEvaluation, of ANY status, already computed above.
+result = PriorityService().rank(context, evaluations)
+for ranked in result.ranked_candidates:  # every candidate, never truncated to a top N
+    candidate = ranked.candidate
+    print(ranked.rank, candidate.decision_type.value, candidate.priority_score_display)
+print(result.candidate_count, result.excluded_suppressed_count)
+```
+
+Only `TRIGGERED` evaluations become a `PriorityCandidate`; every other status (including
+`SUPPRESSED_LOW_CONFIDENCE`) is excluded and counted, never scored, never "resuscitated". Impact
+is a 0-100 normalized severity, **never** euro or another currency; any economic proxy
+(`revenue_gap_proxy`, `cost_gap_proxy_exact`, ...) rides along as evidence only and never affects
+`priority_score_exact`. An empty `ranked_candidates` tuple is a legitimate result (nothing was
+TRIGGERED), not an error.
+
 ## Quality
 
 | Goal            | Command                                                        |
