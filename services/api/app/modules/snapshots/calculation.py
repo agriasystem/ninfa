@@ -12,7 +12,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Context, Decimal
 from uuid import UUID
 
 from app.modules.bookings.models import BookingStatus
@@ -29,11 +29,17 @@ OBSERVED_STATUSES: frozenset[BookingStatus] = frozenset(
 )
 
 _CENTS = Decimal(100)
+# A dedicated context for the one multiplication/rescale below: money amounts need at most a
+# couple of dozen significant digits, but `Decimal.__mul__`/`.scaleb()` still consult *some*
+# context for their own result, so the AMBIENT, process-wide one (which nothing here controls)
+# must never be it - exactly the reasoning of `intelligence.revenue.precision.CALCULATION_
+# CONTEXT`, kept local here since this module sits below every intelligence module that reuses it.
+_MONEY_CONTEXT = Context(prec=50, rounding=ROUND_HALF_EVEN)
 
 
 def to_cents(amount: Decimal) -> int:
     """Whole cents of a money amount; refuses sub-cent precision instead of rounding it."""
-    cents = amount * _CENTS
+    cents = _MONEY_CONTEXT.multiply(amount, _CENTS)
     if cents != cents.to_integral_value():
         raise ValueError("amount has sub-cent precision")
     return int(cents)
@@ -41,7 +47,7 @@ def to_cents(amount: Decimal) -> int:
 
 def from_cents(cents: int) -> Decimal:
     """Money value (two decimals) of whole cents."""
-    return Decimal(cents).scaleb(-2)
+    return Decimal(cents).scaleb(-2, context=_MONEY_CONTEXT)
 
 
 def stay_nights(check_in: date, check_out: date) -> int:

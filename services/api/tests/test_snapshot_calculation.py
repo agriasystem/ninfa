@@ -206,6 +206,28 @@ def test_sub_cent_amounts_are_refused_not_rounded() -> None:
     assert to_cents(Decimal("10.50")) == 1050 and to_cents(Decimal("10.5")) == 1050
 
 
+def test_to_cents_and_from_cents_are_immune_to_the_ambient_decimal_context() -> None:
+    """Regression for a latent bug: `to_cents`/`from_cents` must never consult the process-wide,
+    caller-controlled `decimal` context. Before the fix both used a bare `amount * _CENTS` /
+    `Decimal(cents).scaleb(-2)`, which silently deferred to whatever context happened to be active.
+    Under the real default context (prec=28) this never showed, because a money amount never has
+    that many significant digits - the same reason no persisted snapshot was ever affected - but a
+    narrowed ambient context (prec=2, still reachable from any thread since it is process-wide)
+    silently truncated the result instead of raising: `Decimal("123.45") * Decimal(100)` became
+    `Decimal("1.2E+4")` (12000, not 12345), and it slipped past the sub-cent guard because 12000 is
+    already integral. `to_cents`/`from_cents` must give the same, correct result regardless.
+    """
+    from decimal import ROUND_HALF_UP, Context, localcontext
+
+    amount = Decimal("123.45")
+    with localcontext(Context(prec=2, rounding=ROUND_HALF_UP)):
+        assert to_cents(amount) == 12_345
+        assert from_cents(12_345) == Decimal("123.45")
+    # and unaffected by the default context too: the fix changes nothing under real conditions.
+    assert to_cents(amount) == 12_345
+    assert from_cents(12_345) == Decimal("123.45")
+
+
 def test_money_is_decimal_and_no_float_is_used_in_the_snapshot_code() -> None:
     assert isinstance(from_cents(1234), Decimal) and str(from_cents(1234)) == "12.34"
     package_dir = Path(snapshots_package.__file__).parent

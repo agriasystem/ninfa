@@ -1,14 +1,15 @@
-# NINFA — Architecture v1 (Gates 0–8)
+# NINFA — Architecture v1 (Gates 0–9)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
 booking snapshots (Gate 3), the first Expected baselines (Gate 4), the first two revenue
 detectors (Gate 5), the supplier registry with the invoice ingestion (Gate 6), the first cost
-detector, the cost per occupied room (Gate 7), and the canonical labor model with its first
-staffing detector (Gate 8). No NINFA product feature is implemented: data goes in, is stored
-correctly, is turned into daily "on the books" facts, into a historical "expected level" and into
-typed, non-persisted revenue, cost and labor evaluations, and purchase invoices become canonical
-suppliers, invoices and lines; no alert, decision, priority or recommendation exists yet.
+detector, the cost per occupied room (Gate 7), the canonical labor model with its first staffing
+detector (Gate 8), and the fifth and last MVP detector, OTA distribution dependency (Gate 9). No
+NINFA product feature is implemented: data goes in, is stored correctly, is turned into daily "on
+the books" facts, into a historical "expected level" and into typed, non-persisted revenue, cost,
+labor and distribution evaluations, and purchase invoices become canonical suppliers, invoices and
+lines; no alert, decision, priority or recommendation exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -16,7 +17,8 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [cost-ingestion-v1.md](cost-ingestion-v1.md). Cost per occupied room:
 [cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md). Labor ingestion:
 [labor-ingestion-v1.md](labor-ingestion-v1.md). Labor overstaffing:
-[labor-overstaffing-v1.md](labor-overstaffing-v1.md).
+[labor-overstaffing-v1.md](labor-overstaffing-v1.md). OTA dependency:
+[ota-dependency-v1.md](ota-dependency-v1.md).
 
 ## Components
 
@@ -45,22 +47,24 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Eleven modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
+- Twelve modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
   (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2,
   `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3, `intelligence/expected`
   (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the first of the Decision
   Engine stages), `intelligence/revenue` since Gate 5, `intelligence/costs` since Gate 7 (no
   model in either: their detectors and typed evaluations), `suppliers` (Supplier, SupplierIdentifier, SupplierAlias, SupplierResolutionReview),
-  `invoices` (Invoice, InvoiceLine, InvoiceMappingProfile, InvoiceImportRow) since Gate 6, and
+  `invoices` (Invoice, InvoiceLine, InvoiceMappingProfile, InvoiceImportRow) since Gate 6,
   `labor` (LaborSnapshot, LaborEntry, LaborMappingProfile, LaborImportRow) with
   `intelligence/labor` and `intelligence/demand` (no model in either: the demand-forecast
-  primitive shared with `intelligence/revenue`, and the LABOR_OVERSTAFFING detector) since Gate 8.
-  Importing `app.models` registers every model.
+  primitive shared with `intelligence/revenue`, and the LABOR_OVERSTAFFING detector) since Gate 8,
+  and `intelligence/distribution` since Gate 9 (no model: the REV_OTA_DEPENDENCY detector reads
+  Gate 2's `BookingChannel`/`Booking` and Gate 3's `BookingSnapshot` directly and writes none of
+  them). Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
   `snapshots/reconstruction.py`, `intelligence/expected/service.py`,
   `intelligence/revenue/service.py`, `invoices/service.py`, `suppliers/resolution.py`,
-  `labor/service.py`, `intelligence/demand/service.py`, `intelligence/labor/service.py`) are
-  plain classes: they depend on a `Session` and a
+  `labor/service.py`, `intelligence/demand/service.py`, `intelligence/labor/service.py`,
+  `intelligence/distribution/service.py`) are plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
 - The directories for the still-future domains (`normalization`,
@@ -237,6 +241,27 @@ codes, judging an AGGREGATE level of hours, never a person. Nothing beyond the f
 labor tables is persisted, no worker task, scheduler, API or dependency was added. Details:
 [labor-ingestion-v1.md](labor-ingestion-v1.md), [labor-overstaffing-v1.md](labor-overstaffing-v1.md), ADR 0014.
 
+## OTA dependency detection (Gate 9)
+
+`OtaDependencyService` evaluates the fifth and last MVP detector, `REV_OTA_DEPENDENCY` (rules
+`ota-dependency-v1`): of a property's *next 30 days* of room-night business, how much is already
+concentrated on OTA channels, and is that concentration structurally high or rising sharply above
+comparable history? It classifies every `BookingChannel` of the property in memory (Gate 2's own
+`channel_type`/`is_verified` when verified, else a small exact dictionary, else `UNKNOWN`; never a
+write, never a fuzzy match), reconstructs the certain channel mix of the target's 30-night window
+**as of** the given date by reusing Gate 3's own temporal certainty rule (made public, unmodified),
+and reconciles it day by day against the already-stored `BookingSnapshot`. Historical comparable
+30-day periods follow the same weekday/season/horizon rule as Gate 4 (reused, not duplicated) and
+the same observed-first sampling as Gates 4/5/7/8. The trigger is STRUCTURAL (actual OTA share
+>= 70%, independent of history) OR RISING (>= 55%, at least 15 points above the historical median,
+at or above the robust upper fence); the final confidence is the minimum of the baseline's and the
+target window's own quality, gate 55. An optional gross OTA revenue **exposure** (never a
+commission saving) may be exposed when it resolves cleanly. The result is an immutable,
+fingerprinted evaluation measuring CONCENTRATION of the distribution mix, never channel
+PERFORMANCE (no conversion, CAC, ROAS, cancellation rate or rate-parity anywhere in it). Nothing is
+persisted, no table, migration, API, worker task or dependency was added. Details:
+[ota-dependency-v1.md](ota-dependency-v1.md), ADR 0015.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -247,9 +272,12 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 
 Authentication/authorization and any tenant-facing API, file upload and object storage, the
 asynchronous ingestion job, PDF/OCR/signed invoices, an HR system, payroll, shift scheduling or a
-workforce optimizer, supplier merge and review resolution, the Property Profile, RevPAR,
-scheduling of snapshot, Expected, revenue, cost and labor import/evaluation runs, persisted labor
-or cost baselines (both are non-persistent values, recomputed on demand), the rest of the Decision
+workforce optimizer, a channel manager, a booking engine, commission accounting, channel
+profitability/conversion/CAC/ROAS, rate parity, marketing attribution, supplier merge and review
+resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue, cost, labor
+and distribution import/evaluation runs, persisted labor, cost or distribution baselines (all are
+non-persistent values, recomputed on demand), a customer-facing channel-classification setup
+workflow (Gate 9's classifier stays entirely in-memory and read-only), the rest of the Decision
 Engine (persisted decisions, other detectors such as supplier price anomalies, priority,
 recommendation, pricing), budgeting and accruals, currency conversion, decision memory, AI
 gateway / narrative / Ask NINFA, product UI, notifications, payments, analytics, deployment.

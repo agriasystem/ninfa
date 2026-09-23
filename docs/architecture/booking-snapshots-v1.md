@@ -187,6 +187,17 @@ Other rules:
   and `uncertain_rooms > 0`.
 - The result at a cutoff does not depend on which other days are requested in the same run.
 
+### Reused by Gate 9
+
+The two pure functions behind the table above — the on-the-books window per booking and the
+stay-night overlap — are now **public**: `booking_certainty_window` and `stay_night_overlap` in
+`services/api/app/modules/snapshots/aggregate.py` (the previous private names, `_windows` and
+`_overlap`, remain as aliases; nothing here changed). Gate 9's OTA dependency detector calls them
+directly, through `intelligence/distribution/temporal.py`, to reconstruct a property's historical
+channel mix under the exact same certainty rule as this reconstruction — never a second, divergent
+implementation of "on the books at cutoff `C`". Gate 3's own test suite was re-run unchanged before
+and after the rename to confirm zero semantic change.
+
 ### Daylight saving time
 
 The boundary is *defined*, not guessed: it is the earliest instant whose local date is `D`.
