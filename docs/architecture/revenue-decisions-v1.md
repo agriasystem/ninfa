@@ -300,4 +300,11 @@ same lead time.
   promoted.
 * The reference ADR is the current on-books ADR of a partially sold night; it can differ from the
   rate the missing rooms would fetch. The proxy is an order of magnitude, not a forecast of revenue.
+
+## Downstream
+
+Gate 9's OTA dependency detector does not read this gate: it reuses Gate 3's snapshot semantics
+directly (see [booking-snapshots-v1.md](booking-snapshots-v1.md#reused-by-gate-9)) and Gate 4's
+seasonal-distance helper for its own historical comparables. Nothing here — curve pairs, five
+statuses, confidence, the revenue gap proxy — changed for Gate 9; this document is unaffected.
 * Nothing is stored, so there is no history of evaluations and no deduplication yet.

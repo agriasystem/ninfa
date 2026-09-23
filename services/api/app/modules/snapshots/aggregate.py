@@ -26,13 +26,20 @@ from app.modules.snapshots.calculation import (
 )
 
 
-def _overlap(stay: StayRecord, first: date, last: date) -> range:
-    """Indexes (0-based nights of the stay) that fall inside [first, last]."""
+def stay_night_overlap(stay: StayRecord, first: date, last: date) -> range:
+    """Indexes (0-based nights of the stay) that fall inside [first, last].
+
+    Public and reused as-is by `intelligence.distribution` (Gate 9): the SAME overlap rule, not a
+    second implementation of it.
+    """
     start = max(stay.check_in, first)
     end = min(stay.check_out - timedelta(days=1), last)
     if end < start:
         return range(0)
     return range((start - stay.check_in).days, (end - stay.check_in).days + 1)
+
+
+_overlap = stay_night_overlap
 
 
 def aggregate_observed(
@@ -134,13 +141,21 @@ def aggregate_reconstruction(
     return result
 
 
-def _windows(
+def booking_certainty_window(
     stay: StayRecord,
     snapshot_dates: Sequence[date],
     cutoffs: Sequence[datetime],
     booked: int,
 ) -> tuple[tuple[int, int], tuple[int, int]]:
-    """(certain, uncertain) windows of snapshot-day indexes `[from, to)` of one booking."""
+    """(certain, uncertain) windows of snapshot-day indexes `[from, to)` of one booking.
+
+    THE Gate 3 temporal-inclusion rule (`booked_at`, `cancelled_at`, CANCELLED/NO_SHOW
+    uncertainty): public and reused as-is, never reimplemented, by `intelligence.distribution`
+    (Gate 9's OTA dependency channel-mix reconstruction). `booked` is the index of the first
+    cutoff strictly after `stay.booked_at` (`bisect_right(cutoffs, stay.booked_at)`), computed by
+    the caller once per booking so a multi-cutoff run (this module) and a single-cutoff run
+    (Gate 9) share the exact same function.
+    """
     count = len(cutoffs)
     empty = (0, 0)
     if stay.status in OBSERVED_STATUSES:
@@ -154,3 +169,6 @@ def _windows(
         known_from = max(booked, bisect_left(snapshot_dates, stay.check_in))
         return (booked, known_from), (known_from, count)
     raise ValueError(f"unhandled booking status {stay.status!r}")
+
+
+_windows = booking_certainty_window

@@ -1,19 +1,21 @@
-# NINFA — Data model v1 (Gates 1–8)
+# NINFA — Data model v1 (Gates 1–9)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
 canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the daily booking
 snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions"),
 Gate 6 the supplier registry and the invoices (see "Gate 6 additions") and Gate 8 the canonical
-labor snapshots/entries and their mapping/staging (see "Gate 8 additions"); Gate 7 adds no schema
-(see "Gate 7: no schema change"). **No decisions exist yet.**
+labor snapshots/entries and their mapping/staging (see "Gate 8 additions"); Gate 7 and Gate 9 add
+no schema (see "Gate 7: no schema change" and "Gate 9: no schema change"). **No decisions exist
+yet.**
 
 Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
 `0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4),
 `0007_invoice_supplier_ingestion` (Gate 6, Gate 7 added none) and `0008_labor_ingestion`
-(Gate 8, still the head), on top of `0001_baseline`, `0002_procrastinate_schema`.
+(Gate 8, still the head after Gate 9, which added none either), on top of `0001_baseline`,
+`0002_procrastinate_schema`.
 Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,
-intelligence/expected,suppliers,invoices,labor}/`.
+intelligence/expected,suppliers,invoices,labor,intelligence/distribution}/`.
 
 ## Entity relationships
 
@@ -550,6 +552,19 @@ Indexes added: `ix_labor_snapshots_property_source_date`,
 `ix_labor_entries_workspace_id_snapshot_id`, `ix_labor_entries_workspace_id_work_date_category`,
 `ix_labor_entries_snapshot_work_date_category`, `ix_labor_import_rows_workspace_id_import_job_id`;
 the unique keys double as lookup indexes.
+
+## Gate 9: no schema change
+
+OTA Dependency Detection ([ota-dependency-v1.md](ota-dependency-v1.md)) reads `bookings`,
+`booking_channels` (Gate 2) and `booking_snapshots` (Gate 3) and stores nothing: no table, column,
+index or migration (the head stays `0008_labor_ingestion`). The channel classifier is a pure,
+in-memory function over `BookingChannel.channel_type`/`.is_verified` and `.normalized_name`; it
+never writes a classification back. `ComparablePeriodFact`/`ChannelMixWindow`/`TargetFacts` and
+the evaluation itself are values, not entities: there is no channel-mix, comparable-period or
+`Decision` table (ADR 0015). Two existing Gate 3 functions
+(`app.modules.snapshots.aggregate.booking_certainty_window`/`.stay_night_overlap`) were made
+public (unmodified) so this gate could reuse them instead of duplicating the temporal rule; this
+is a code-visibility change only, not a schema change.
 
 ## Not implemented yet
 

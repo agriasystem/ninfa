@@ -375,6 +375,37 @@ the trigger. Hours are stored as integer minutes; a fractional minute in the sou
 never rounded. No employee name, id, email, phone, tax code, address or leave reason is ever
 persisted (an unmapped column never reaches staging).
 
+## OTA dependency (Gate 9)
+
+Adds no dependency and no migration (the head stays `0008_labor_ingestion`). Evaluate a property's
+next-30-day OTA dependency directly on its own booking data: no separate import step, since it
+reads the canonical `Booking`/`BookingChannel`/`BookingSnapshot` rows Gate 2/3 already produced.
+`as_of_local_date` is always explicit. Full guide:
+[ota-dependency-v1.md](../architecture/ota-dependency-v1.md).
+
+```python
+from datetime import date
+
+from app.core.tenant import TenantContext
+from app.modules.intelligence.distribution.service import OtaDependencyService
+
+with get_sessionmaker()() as session:
+    service = OtaDependencyService(session, TenantContext(workspace_id))
+    evaluation = service.evaluate(
+        property_id=property_id,
+        booking_data_source_id=booking_data_source_id,
+        as_of_local_date=date(2026, 9, 5),  # always explicit: no date.today()
+    )
+    print(evaluation.status.value, evaluation.reason_codes, evaluation.ota_share_display)
+```
+
+An evaluation has one of five statuses, stable `reason_codes` and typed facts;
+`ota_revenue_share_exact` (optional) is a gross exposure and **never** a saving, and never part of
+the trigger. The channel classifier never writes to `BookingChannel`: it classifies every channel
+of the property in memory, on every call, from `channel_type`/`is_verified` (when confirmed) or a
+small exact dictionary, never a fuzzy match — an unmapped or ambiguous channel name stays
+`UNKNOWN` rather than being guessed.
+
 ## Quality
 
 | Goal            | Command                                                        |
