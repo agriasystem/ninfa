@@ -1,15 +1,18 @@
-# NINFA — Architecture v1 (Gates 0–9)
+# NINFA — Architecture v1 (Gates 0–10)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
 booking snapshots (Gate 3), the first Expected baselines (Gate 4), the first two revenue
 detectors (Gate 5), the supplier registry with the invoice ingestion (Gate 6), the first cost
 detector, the cost per occupied room (Gate 7), the canonical labor model with its first staffing
-detector (Gate 8), and the fifth and last MVP detector, OTA distribution dependency (Gate 9). No
-NINFA product feature is implemented: data goes in, is stored correctly, is turned into daily "on
-the books" facts, into a historical "expected level" and into typed, non-persisted revenue, cost,
-labor and distribution evaluations, and purchase invoices become canonical suppliers, invoices and
-lines; no alert, decision, priority or recommendation exists yet.
+detector (Gate 8), the fifth and last MVP detector, OTA distribution dependency (Gate 9), and the
+Priority Engine (Gate 10), which ranks whatever the five detectors already called TRIGGERED — it
+decides nothing a detector did not already decide. No NINFA product feature is implemented: data
+goes in, is stored correctly, is turned into daily "on the books" facts, into a historical
+"expected level" and into typed, non-persisted revenue, cost, labor and distribution evaluations,
+purchase invoices become canonical suppliers, invoices and lines, and TRIGGERED evaluations become
+typed, non-persisted, ranked priority candidates; no alert, persisted decision or recommendation
+exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -18,7 +21,8 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md). Labor ingestion:
 [labor-ingestion-v1.md](labor-ingestion-v1.md). Labor overstaffing:
 [labor-overstaffing-v1.md](labor-overstaffing-v1.md). OTA dependency:
-[ota-dependency-v1.md](ota-dependency-v1.md).
+[ota-dependency-v1.md](ota-dependency-v1.md). Priority Engine:
+[priority-engine-v1.md](priority-engine-v1.md).
 
 ## Components
 
@@ -57,9 +61,10 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   `labor` (LaborSnapshot, LaborEntry, LaborMappingProfile, LaborImportRow) with
   `intelligence/labor` and `intelligence/demand` (no model in either: the demand-forecast
   primitive shared with `intelligence/revenue`, and the LABOR_OVERSTAFFING detector) since Gate 8,
-  and `intelligence/distribution` since Gate 9 (no model: the REV_OTA_DEPENDENCY detector reads
+  `intelligence/distribution` since Gate 9 (no model: the REV_OTA_DEPENDENCY detector reads
   Gate 2's `BookingChannel`/`Booking` and Gate 3's `BookingSnapshot` directly and writes none of
-  them). Importing `app.models` registers every model.
+  them), and `intelligence/priority` since Gate 10 (no model: it reads the four detector modules'
+  own evaluation types and writes nothing). Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
   `snapshots/reconstruction.py`, `intelligence/expected/service.py`,
   `intelligence/revenue/service.py`, `invoices/service.py`, `suppliers/resolution.py`,
@@ -67,10 +72,13 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   `intelligence/distribution/service.py`) are plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
+  `intelligence/priority/service.py` is a step further still: `PriorityService` depends on
+  **neither** a `Session` nor a `TenantContext` — it is a pure function of already-computed
+  evaluations, so it can be tested with no database at all.
 - The directories for the still-future domains (`normalization`,
-  `data_quality`, `intelligence/{detection,impact,priority,recommendation}`, `decisions`,
+  `data_quality`, `intelligence/{detection,impact,recommendation}`, `decisions`,
   `decision_memory`, `ai/*`) are empty package markers so the structure is settled before those
-  domains land.
+  domains land. `intelligence/priority` is no longer one of them: Gate 10 filled it in.
 - Splitting a module into a service is a possible future step, never a starting point.
 
 ## API conventions
@@ -262,6 +270,29 @@ PERFORMANCE (no conversion, CAC, ROAS, cancellation rate or rate-parity anywhere
 persisted, no table, migration, API, worker task or dependency was added. Details:
 [ota-dependency-v1.md](ota-dependency-v1.md), ADR 0015.
 
+## Priority Engine (Gate 10)
+
+`PriorityService.rank(context, evaluations)` turns whatever the five MVP detectors already called
+`TRIGGERED` into a deterministically ranked list of `PriorityCandidate`s: it never re-decides
+whether a detector is right, never touches a detector's own threshold, confidence or fingerprint,
+and never queries a repository, a detector or the database (it takes no `Session` and no
+`TenantContext` at all — a pure function of already-computed evaluations). Every other status
+(`CLEAR`, `INSUFFICIENT_DATA`, `NOT_APPLICABLE`, `SUPPRESSED_LOW_CONFIDENCE`) is excluded and
+counted, never scored. Five explicit adapters (one per detector, no generic rules framework)
+normalize each TRIGGERED signal into an Impact Score (0-100 NORMALIZED OPERATIONAL SEVERITY, never
+a currency amount), an Urgency Score (detector-aware: forward-dated, OTA's fixed structural/rising
+policy, or cost's retrospective bands), the detector's OWN confidence reused exactly, and a fixed
+V1 Actionability policy; `priority_score = 0.40 x impact + 0.25 x urgency + 0.20 x confidence +
+0.15 x actionability`, computed and ranked on the full-precision `Decimal` value, never the
+two-decimal display one. The ranking is deterministic (an 8-key tie-break, unique ranks, input
+order irrelevant) and fingerprinted (both per candidate and for the whole result), duplicates are
+deduplicated and logically conflicting evaluations are rejected, and economic proxies
+(`revenue_gap_proxy`, `cost_gap_proxy_exact`, `labor_cost_gap_proxy_exact`, an optional OTA
+revenue exposure) travel through as evidence only, in their own currency, never scored and never
+compared across currencies. No table, migration, API endpoint, worker task or dependency was
+added; the head stays `0008_labor_ingestion`. Details:
+[priority-engine-v1.md](priority-engine-v1.md), ADR 0016.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -274,10 +305,11 @@ Authentication/authorization and any tenant-facing API, file upload and object s
 asynchronous ingestion job, PDF/OCR/signed invoices, an HR system, payroll, shift scheduling or a
 workforce optimizer, a channel manager, a booking engine, commission accounting, channel
 profitability/conversion/CAC/ROAS, rate parity, marketing attribution, supplier merge and review
-resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue, cost, labor
-and distribution import/evaluation runs, persisted labor, cost or distribution baselines (all are
+resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue, cost, labor,
+distribution and priority-ranking runs, persisted labor, cost or distribution baselines (all are
 non-persistent values, recomputed on demand), a customer-facing channel-classification setup
-workflow (Gate 9's classifier stays entirely in-memory and read-only), the rest of the Decision
-Engine (persisted decisions, other detectors such as supplier price anomalies, priority,
-recommendation, pricing), budgeting and accruals, currency conversion, decision memory, AI
-gateway / narrative / Ask NINFA, product UI, notifications, payments, analytics, deployment.
+workflow (Gate 9's classifier stays entirely in-memory and read-only), a sixth detector (e.g.
+supplier price anomalies), the rest of the Decision Engine (persisted decisions, lifecycle,
+deduplication across days, recommendation, pricing, a Priority/Decision business API, a UI),
+budgeting and accruals, currency conversion, decision memory, AI gateway / narrative / Ask NINFA,
+notifications, payments, analytics, deployment.
