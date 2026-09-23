@@ -137,6 +137,11 @@ KNOWN_TABLES = {
     "invoice_lines",
     "invoice_mapping_profiles",
     "invoice_import_rows",
+    # Gate 8 (labor ingestion), unrelated to cost intelligence but present in the same schema.
+    "labor_snapshots",
+    "labor_entries",
+    "labor_mapping_profiles",
+    "labor_import_rows",
 }
 WRITER_ATTRIBUTES = {
     "commit",
@@ -227,9 +232,11 @@ def test_the_schema_gained_no_table() -> None:
 
 def test_there_is_no_migration_for_gate_7() -> None:
     script = ScriptDirectory.from_config(alembic_config("postgresql+psycopg://unused/unused"))
-    assert script.get_heads() == ["0007_invoice_supplier_ingestion"]
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
-    assert len(revisions) == 7  # 0001 .. 0007: Gate 7 added none
+    # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008.
+    assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
+    assert script.get_heads() == ["0008_labor_ingestion"]
+    assert len(revisions) == 8  # 0001 .. 0008: Gate 7 added none
 
 
 # --- read-only, no clock, no float ---------------------------------------------------------------

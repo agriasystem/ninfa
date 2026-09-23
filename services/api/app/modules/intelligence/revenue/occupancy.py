@@ -36,6 +36,7 @@ sold out, baseline, pair sample, then the thresholds.
 from dataclasses import replace
 from decimal import Decimal
 
+from app.modules.intelligence.demand.forecast import forecast_rooms_from_pickup
 from app.modules.intelligence.expected.calculator import ExpectedStatus
 from app.modules.intelligence.revenue.confidence import final_confidence
 from app.modules.intelligence.revenue.fingerprint import build_evaluation
@@ -172,7 +173,8 @@ def evaluate_occupancy(
     confidence = final_confidence(target.baseline_confidence, pattern.confidence.score)
     expected_remaining = pattern.statistics.expected
     raw_forecast = Decimal(target.rooms_on_books) + expected_remaining
-    forecast_rooms = max(Decimal(0), raw_forecast)  # the only floor: overbooking is preserved
+    # Shared with LABOR_OVERSTAFFING (Gate 8): same formula, same floor, no upper clamp.
+    forecast_rooms = forecast_rooms_from_pickup(target.rooms_on_books, expected_remaining)
     expected_final_rooms = other_rooms_median(selection.pairs)
     capacity = Decimal(rooms_available)
     forecast_occupancy_exact = percent_of(forecast_rooms, capacity)

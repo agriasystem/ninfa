@@ -216,10 +216,12 @@ def test_the_schema_gained_no_decision_table() -> None:
 def test_there_is_no_migration_for_gate_5() -> None:
     """Gate 5 added none: Gate 4's 0006 is directly followed by Gate 6's 0007."""
     script = ScriptDirectory.from_config(alembic_config("postgresql+psycopg://unused/unused"))
-    assert script.get_heads() == ["0007_invoice_supplier_ingestion"]
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
     assert revisions["0007_invoice_supplier_ingestion"] == "0006_expected_engine"
-    assert len(revisions) == 7
+    # Gate 7 also added none: Gate 6's 0007 is directly followed by Gate 8's 0008.
+    assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
+    assert script.get_heads() == ["0008_labor_ingestion"]
+    assert len(revisions) == 8
 
 
 # --- read-only, no clock, no float ------------------------------------------------------------

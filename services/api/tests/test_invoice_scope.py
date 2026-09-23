@@ -167,7 +167,8 @@ def test_the_schema_gained_no_decision_cost_baseline_or_anomaly_table() -> None:
         "invoice_import_rows",
     }
     assert gate_6 <= set(Base.metadata.tables)
-    assert not [t for t in Base.metadata.tables if t.startswith(("cost_", "labor_", "decision"))]
+    # "labor_" is no longer forbidden: Gate 8 legitimately owns that prefix (labor ingestion).
+    assert not [t for t in Base.metadata.tables if t.startswith(("cost_", "decision"))]
 
 
 def test_there_is_no_supplier_merge_and_no_way_to_move_an_invoice_between_suppliers() -> None:

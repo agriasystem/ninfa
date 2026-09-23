@@ -1,19 +1,22 @@
-# NINFA — Architecture v1 (Gates 0–7)
+# NINFA — Architecture v1 (Gates 0–8)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
 booking snapshots (Gate 3), the first Expected baselines (Gate 4), the first two revenue
-detectors (Gate 5), the supplier registry with the invoice ingestion (Gate 6) and the first cost
-detector, the cost per occupied room (Gate 7). No NINFA product feature is implemented: data goes
-in, is stored correctly, is turned into daily "on the books" facts, into a historical "expected
-level" and into typed, non-persisted revenue and cost evaluations, and purchase invoices become
-canonical suppliers, invoices and lines; no alert, decision, priority or recommendation exists yet.
+detectors (Gate 5), the supplier registry with the invoice ingestion (Gate 6), the first cost
+detector, the cost per occupied room (Gate 7), and the canonical labor model with its first
+staffing detector (Gate 8). No NINFA product feature is implemented: data goes in, is stored
+correctly, is turned into daily "on the books" facts, into a historical "expected level" and into
+typed, non-persisted revenue, cost and labor evaluations, and purchase invoices become canonical
+suppliers, invoices and lines; no alert, decision, priority or recommendation exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
 [revenue-decisions-v1.md](revenue-decisions-v1.md). Costs (suppliers and invoices):
 [cost-ingestion-v1.md](cost-ingestion-v1.md). Cost per occupied room:
-[cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md).
+[cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md). Labor ingestion:
+[labor-ingestion-v1.md](labor-ingestion-v1.md). Labor overstaffing:
+[labor-overstaffing-v1.md](labor-overstaffing-v1.md).
 
 ## Components
 
@@ -42,20 +45,25 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Ten modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
+- Eleven modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
   (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2,
   `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3, `intelligence/expected`
   (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the first of the Decision
-  Engine stages), `intelligence/revenue` since Gate 5 and `intelligence/costs` since Gate 7 (no
-  model in either: their detectors and typed evaluations), `suppliers` (Supplier, SupplierIdentifier, SupplierAlias, SupplierResolutionReview)
-  and `invoices` (Invoice, InvoiceLine, InvoiceMappingProfile, InvoiceImportRow) since Gate 6.
+  Engine stages), `intelligence/revenue` since Gate 5, `intelligence/costs` since Gate 7 (no
+  model in either: their detectors and typed evaluations), `suppliers` (Supplier, SupplierIdentifier, SupplierAlias, SupplierResolutionReview),
+  `invoices` (Invoice, InvoiceLine, InvoiceMappingProfile, InvoiceImportRow) since Gate 6, and
+  `labor` (LaborSnapshot, LaborEntry, LaborMappingProfile, LaborImportRow) with
+  `intelligence/labor` and `intelligence/demand` (no model in either: the demand-forecast
+  primitive shared with `intelligence/revenue`, and the LABOR_OVERSTAFFING detector) since Gate 8.
   Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
   `snapshots/reconstruction.py`, `intelligence/expected/service.py`,
-  `intelligence/revenue/service.py`, `invoices/service.py`, `suppliers/resolution.py`) are plain classes: they depend on a `Session` and a
+  `intelligence/revenue/service.py`, `invoices/service.py`, `suppliers/resolution.py`,
+  `labor/service.py`, `intelligence/demand/service.py`, `intelligence/labor/service.py`) are
+  plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
-- The directories for the future domains (`labor`, `normalization`,
+- The directories for the still-future domains (`normalization`,
   `data_quality`, `intelligence/{detection,impact,priority,recommendation}`, `decisions`,
   `decision_memory`, `ai/*`) are empty package markers so the structure is settled before those
   domains land.
@@ -206,6 +214,29 @@ converted, and the service is read-only (no write, no lock, no clock, a fixed ha
 No table, migration, API, worker task, scheduler or dependency was added. Details:
 [cost-cpor-anomaly-v1.md](cost-cpor-anomaly-v1.md), ADR 0013.
 
+## Labor ingestion and overstaffing detection (Gate 8)
+
+`LaborImportService` turns structured CSV/XLSX labor exports (planned/actual minutes by category,
+no employee identity anywhere) into an immutable `LaborSnapshot`/`LaborEntry` pair, the Gate 6
+pipeline shape and the Gate 6 deterministic-classification pattern, reused rather than duplicated.
+Hours are stored as exact integer **minutes**, never a float, and a fractional minute is rejected,
+never rounded. `LaborDecisionService` evaluates ONE explicit detector, `LABOR_OVERSTAFFING` (rules
+`labor-overstaffing-v1`): for the room demand a target day is actually expected to see, are a
+category's **scheduled hours** materially above what comparable demand days historically needed?
+The demand forecast is `REV_OCCUPANCY_RISK`'s own formula and pairing (Gate 5), extracted into
+`intelligence.demand` and reused unchanged, never rebuilt. A comparable day needs the same
+weekday, a seasonal distance of at most 42 days (the Gate 4 algorithm, reused), a clean
+lead-time-0 occupancy within tolerance of the target's forecast, and a complete **ACTUAL-FIRST**
+labor basis; the expectation is the median of the comparables' TOTAL hours (never a per-room
+ratio); the anomaly needs **all four** conditions (above expected, at least 20% above, at least
+4 hours above, at or above `P75 + 1.5 x IQR`); the final confidence is the minimum of the
+baseline's, the demand forecast's and the target day's quality, gate 55. An optional
+`labor_cost_gap_proxy` is a gross exposure figure, never a saving, and never part of the trigger.
+The result is an immutable, fingerprinted evaluation with one of five statuses and stable reason
+codes, judging an AGGREGATE level of hours, never a person. Nothing beyond the four canonical
+labor tables is persisted, no worker task, scheduler, API or dependency was added. Details:
+[labor-ingestion-v1.md](labor-ingestion-v1.md), [labor-overstaffing-v1.md](labor-overstaffing-v1.md), ADR 0014.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -215,9 +246,10 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 ## Not implemented yet (belongs to later gates)
 
 Authentication/authorization and any tenant-facing API, file upload and object storage, the
-asynchronous ingestion job, labor ingestion, PDF/OCR/signed invoices, supplier merge and review
-resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue and import
-runs, other business models (labor, labor baselines), the rest of the Decision Engine (persisted
-decisions, other detectors such as supplier price anomalies, priority, recommendation, pricing),
-budgeting and accruals, currency conversion, decision memory, AI gateway / narrative / Ask NINFA, product UI,
-notifications, payments, analytics, deployment.
+asynchronous ingestion job, PDF/OCR/signed invoices, an HR system, payroll, shift scheduling or a
+workforce optimizer, supplier merge and review resolution, the Property Profile, RevPAR,
+scheduling of snapshot, Expected, revenue, cost and labor import/evaluation runs, persisted labor
+or cost baselines (both are non-persistent values, recomputed on demand), the rest of the Decision
+Engine (persisted decisions, other detectors such as supplier price anomalies, priority,
+recommendation, pricing), budgeting and accruals, currency conversion, decision memory, AI
+gateway / narrative / Ask NINFA, product UI, notifications, payments, analytics, deployment.

@@ -33,6 +33,13 @@ from app.modules.invoices.models import (
     InvoiceLine,
     InvoiceMappingProfile,
 )
+from app.modules.labor.models import (
+    LaborEntry,
+    LaborImportRow,
+    LaborMappingProfile,
+    LaborSnapshot,
+)
+from app.modules.labor.roles import LaborCategory, LaborClassificationMethod
 from app.modules.properties.models import Property
 from app.modules.snapshots.models import BookingSnapshot, RoomInventoryDaily, SnapshotOrigin
 from app.modules.suppliers.models import (
@@ -64,6 +71,12 @@ __all__ = [
     "InvoiceImportRow",
     "InvoiceLine",
     "InvoiceMappingProfile",
+    "LaborCategory",
+    "LaborClassificationMethod",
+    "LaborEntry",
+    "LaborImportRow",
+    "LaborMappingProfile",
+    "LaborSnapshot",
     "MembershipRole",
     "Property",
     "RoomInventoryDaily",
