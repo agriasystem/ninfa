@@ -475,6 +475,47 @@ An exact replay (same workspace/property/as-of/logical input) is idempotent: it 
 existing `DecisionRun` and writes nothing new. There is no business API, UI, recommendation or AI
 here: `DecisionMemoryService` is an internal read-side class, not an endpoint.
 
+## Decision API (Gate 12)
+
+Adds no dependency and no migration: a READ-ONLY HTTP layer over Gate 11's own Decision Memory.
+Full guide: [decision-api-v1.md](../architecture/decision-api-v1.md), ADR 0018.
+
+```
+GET /api/v1/properties/{property_id}/decision-feed?as_of=YYYY-MM-DD
+GET /api/v1/properties/{property_id}/decisions[?status=&decision_type=&limit=&cursor=]
+GET /api/v1/properties/{property_id}/decisions/{decision_id}
+GET /api/v1/properties/{property_id}/decisions/{decision_id}/history[?limit=&cursor=]
+```
+
+**There is still no real login system**, so every one of these answers `401
+AUTHENTICATION_REQUIRED` when called directly (`curl`, `/docs`) in ANY environment, including
+local development - `app.core.auth.get_current_principal`'s production body is unconditional on
+purpose (see ADR 0018, "why auth is fail-closed"). This is expected, not a bug to work around
+locally: there is nothing to configure that would make a bare `curl` succeed, because no
+credential of any kind exists yet for it to present.
+
+To exercise a route with a real, authorized caller - in a test, a one-off script, or a REPL -
+override the dependency the same way `tests/conftest.py`'s own `authenticated_as` fixture does,
+never with a header:
+
+```python
+from uuid import uuid4
+from app.core.auth import AuthenticatedPrincipal, get_current_principal
+from app.db.session import get_session
+from app.main import create_app
+
+app = create_app()
+app.dependency_overrides[get_current_principal] = lambda: AuthenticatedPrincipal(user_id=uuid4())
+app.dependency_overrides[get_session] = lambda: session  # an open Session with a real
+                                                          # WorkspaceMembership row for that user
+```
+
+`resolve_property_scope` still resolves the tenant from the real `Property`/`WorkspaceMembership`
+rows in whatever session you provide - overriding the principal only answers "who is calling", not
+"what may they reach". Every score/proxy is an exact-Decimal **string** in the JSON response, never
+a float - see [decision-api-v1.md](../architecture/decision-api-v1.md), "Decimal, dates, UUIDs,
+enums".
+
 ## Quality
 
 | Goal            | Command                                                        |

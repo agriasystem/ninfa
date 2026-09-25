@@ -1,4 +1,4 @@
-# NINFA — Architecture v1 (Gates 0–11)
+# NINFA — Architecture v1 (Gates 0–12)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
@@ -7,14 +7,17 @@ detectors (Gate 5), the supplier registry with the invoice ingestion (Gate 6), t
 detector, the cost per occupied room (Gate 7), the canonical labor model with its first staffing
 detector (Gate 8), the fifth and last MVP detector, OTA distribution dependency (Gate 9), the
 Priority Engine (Gate 10), which ranks whatever the five detectors already called TRIGGERED — it
-decides nothing a detector did not already decide — and Decision Persistence, Lifecycle and Memory
+decides nothing a detector did not already decide —, Decision Persistence, Lifecycle and Memory
 (Gate 11), which turns a ranked, non-persistent signal into a persistent Decision identity with an
-OPEN/RESOLVED lifecycle and an immutable observation history. Still no product feature beyond that:
-data goes in, is stored correctly, is turned into daily "on the books" facts, into a historical
-"expected level" and into typed revenue, cost, labor and distribution evaluations, purchase
-invoices become canonical suppliers, invoices and lines, TRIGGERED evaluations become typed, ranked
-priority candidates, and those candidates become persistent Decisions with a lifecycle and a
-memory; no recommendation, business API or UI exists yet.
+OPEN/RESOLVED lifecycle and an immutable observation history, and the Decision API (Gate 12), the
+first business-facing HTTP surface: four READ-ONLY endpoints over that memory, behind a
+fail-closed authorization boundary. Still no product feature beyond reading that memory: data goes
+in, is stored correctly, is turned into daily "on the books" facts, into a historical "expected
+level" and into typed revenue, cost, labor and distribution evaluations, purchase invoices become
+canonical suppliers, invoices and lines, TRIGGERED evaluations become typed, ranked priority
+candidates, those candidates become persistent Decisions with a lifecycle and a memory, and that
+memory can now be read over HTTP by an authorized workspace member; no recommendation, write
+endpoint, real login system or UI exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -25,7 +28,8 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [labor-overstaffing-v1.md](labor-overstaffing-v1.md). OTA dependency:
 [ota-dependency-v1.md](ota-dependency-v1.md). Priority Engine:
 [priority-engine-v1.md](priority-engine-v1.md). Decision Layer:
-[decision-layer-v1.md](decision-layer-v1.md).
+[decision-layer-v1.md](decision-layer-v1.md). Decision API:
+[decision-api-v1.md](decision-api-v1.md).
 
 ## Components
 
@@ -39,7 +43,7 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
 | `apps/web`          | Technical shell: shows whether the API is reachable. No product UI.         |
-| `services/api`      | HTTP API under `/api/v1/` (health only), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
+| `services/api`      | HTTP API under `/api/v1/` (health, and since Gate 12 the read-only Decision API), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
 | `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists (the booking import is not a job yet: there is no file storage). |
 | PostgreSQL          | The single datastore: the multi-tenant core, the bookings, the suppliers and invoices, and the job queue. |
 | `packages/contracts`| A few hand-written TypeScript types mirroring the backend (health, errors). |
@@ -94,9 +98,14 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 ## API conventions
 
 - Versioned prefix `/api/v1/`. Health: `GET /api/v1/health` → `{status, service, version}`.
-- **No business endpoint is exposed.** Tenant-facing APIs will be published together with the
-  authentication/authorization layer; exposing CRUD earlier (or faking the tenant with a header)
-  would suggest a security model that does not exist yet.
+- **Since Gate 12, the first business endpoints are exposed: the read-only Decision API**
+  (`/api/v1/properties/{property_id}/decision-feed`, `/decisions`, `/decisions/{decision_id}`,
+  `/decisions/{decision_id}/history` - see [decision-api-v1.md](decision-api-v1.md)). Every one is
+  `GET`-only, behind the fail-closed authorization boundary below - no CRUD, no faked tenant
+  header. `app/api/v1/decisions/` holds this gate's own `router.py`, `deps.py` (auth/tenant
+  resolution), `schemas.py` (response DTOs), `serializers.py` (ORM row -> DTO, whitelisted) and
+  `cursor.py` (opaque keyset pagination) - the same `api/` (HTTP) → `modules/` (business logic)
+  layering as every other gate, just the first time `api/` has more than `health.py` in it.
 - One error shape for every non-2xx response:
   `{"error": {"code", "message", "details", "request_id"}}`. Validation errors never echo the
   submitted values. Unhandled exceptions return a generic `internal_error`.
@@ -115,7 +124,12 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   `DEBUG=true` or a wildcard CORS origin, and interactive docs are disabled.
 - CORS is an explicit allow-list (`CORS_ORIGINS`); empty means no cross-origin access.
 - The application connects with a dedicated non-superuser role (`ninfa_app`).
-- **Authentication and authorization are not implemented.** They arrive in a dedicated gate.
+- **A real authentication provider is still not implemented.** Since Gate 12,
+  `app.core.auth.get_current_principal` is the one seam a future gate fills in (session cookie,
+  JWT, OAuth/OIDC - not decided here); until then it fails closed with 401 on every request, in
+  production. Authorization (which workspace/property an authenticated caller may reach) IS
+  implemented, V1-scoped: active `WorkspaceMembership` → every property of that workspace (see
+  [decision-api-v1.md](decision-api-v1.md), "Authorization boundary").
 
 ## Multi-tenancy
 
@@ -326,6 +340,21 @@ unit) and protects concurrent syncs of the same workspace/property with the same
 `0009_decision_layer` (three tables: `decision_runs`, `decisions`, `decision_observations`); no new
 dependency. Details: [decision-layer-v1.md](decision-layer-v1.md), ADR 0017.
 
+## Decision API (Gate 12)
+
+Four `GET` endpoints over Gate 11's own Decision Memory, and NOTHING else: `decision-feed`
+(the latest run's TRIGGERED items for one property/as-of, typed `NOT_PROCESSED` /
+`ACTION_REQUIRED` / `DATA_QUALITY_LIMITED` / `NO_ACTION_REQUIRED`), `decisions` (cursor-paginated
+lifecycle list), `decisions/{id}` (detail) and `decisions/{id}/history` (newest-first). A
+fail-closed `AuthenticatedPrincipal` dependency (`app.core.auth.get_current_principal`, 401 until
+a future gate wires a real provider) and a server-side tenant-derivation dependency
+(`resolve_property_scope`: `property_id` path → its workspace → `WorkspaceMembership` check →
+`TenantContext` - never a client-supplied workspace id or header) guard every route. No write
+endpoint, no `DecisionService.sync()` over HTTP, no `PriorityService`/detector call from a
+request, no `identity_payload` passthrough (four explicit `target` DTOs instead), every exact
+`Decimal` as a canonical string. Zero migration, zero new dependency. Details:
+[decision-api-v1.md](decision-api-v1.md), ADR 0018.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -334,7 +363,8 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 
 ## Not implemented yet (belongs to later gates)
 
-Authentication/authorization and any tenant-facing API, file upload and object storage, the
+A real authentication provider (session/JWT/OAuth - Gate 12 only ships the fail-closed seam), a
+`PropertyAccess` primitive finer than workspace membership, file upload and object storage, the
 asynchronous ingestion job, PDF/OCR/signed invoices, an HR system, payroll, shift scheduling or a
 workforce optimizer, a channel manager, a booking engine, commission accounting, channel
 profitability/conversion/CAC/ROAS, rate parity, marketing attribution, supplier merge and review
@@ -343,6 +373,7 @@ distribution, priority-ranking and Decision Layer sync runs, persisted labor, co
 baselines (all are non-persistent values, recomputed on demand), a customer-facing
 channel-classification setup workflow (Gate 9's classifier stays entirely in-memory and
 read-only), a sixth detector (e.g. supplier price anomalies), a Decision resolution policy beyond
-explicit CLEAR, backtesting/replaying historical as-of dates, the rest of the Decision Engine
-(recommendation, pricing, a Decision business API, a UI), budgeting and accruals, currency
-conversion, AI gateway / narrative / Ask NINFA, notifications, payments, analytics, deployment.
+explicit CLEAR, backtesting/replaying historical as-of dates, any Decision WRITE endpoint
+(acknowledge/dismiss/snooze/assign/resolve/reopen), a Decision recommendation, pricing or a UI,
+budgeting and accruals, currency conversion, AI gateway / narrative / Ask NINFA, notifications,
+payments, analytics, deployment.

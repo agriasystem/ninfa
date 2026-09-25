@@ -15,6 +15,11 @@ select = ["E", "F", "I", "B", "UP", "SIM", "N", "ASYNC"]
 [tool.ruff.lint.isort]
 known-first-party = ["app", "worker"]
 
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's own dependency-injection idiom (`Depends(...)`/`Path(...)`/`Query(...)` as a parameter
+# default): B008 exists to catch mutable-default footguns, not this pattern.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Path", "fastapi.Query"]
+
 [tool.mypy]
 python_version = "3.13"
 strict = true
