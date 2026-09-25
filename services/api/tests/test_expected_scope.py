@@ -90,9 +90,12 @@ def test_no_forecast_pickup_alert_decision_or_ai_vocabulary_in_the_code(path: Pa
 
 
 def test_the_schema_has_no_forecast_pickup_alert_or_decision_table() -> None:
+    # "decision" is excluded on purpose: Gate 11 legitimately adds `decisions`/`decision_runs`/
+    # `decision_observations` elsewhere - the invariant this test still protects is that the
+    # EXPECTED ENGINE ITSELF never grows a forecast/pickup/alert/priority/impact table.
     names = " ".join(sorted(Base.metadata.tables))
 
-    for word in ("forecast", "pickup", "alert", "decision", "recommendation", "priority", "impact"):
+    for word in ("forecast", "pickup", "alert", "recommendation", "priority", "impact"):
         assert word not in names, word
     assert {t for t in Base.metadata.tables if "expected" in t} == {
         "booking_expected_baselines",

@@ -14,6 +14,7 @@ from app.modules.bookings.models import (
     ChannelType,
     ImportRowStatus,
 )
+from app.modules.decisions.models import Decision, DecisionObservation, DecisionRun
 from app.modules.identity.models import User
 from app.modules.ingestion.models import (
     DataSource,
@@ -63,6 +64,9 @@ __all__ = [
     "DataSource",
     "DataSourceDomain",
     "DataSourceType",
+    "Decision",
+    "DecisionObservation",
+    "DecisionRun",
     "ImportFile",
     "ImportJob",
     "ImportJobStatus",

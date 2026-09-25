@@ -197,9 +197,12 @@ def test_no_pricing_recommendation_priority_ai_or_generic_engine_vocabulary(path
 
 
 def test_no_persisted_decision_model_exists_anywhere() -> None:
+    """Scoped to Gate 5's OWN package: Gate 11 legitimately introduces a real, separate
+    `Decision` persistence model elsewhere (`app.modules.decisions`) - this test's actual
+    invariant is that REVENUE ITSELF never grows one, not that the whole app never does."""
     classes = {
         node.name
-        for path in APP_DIR.rglob("*.py")
+        for path in PACKAGE_DIR.glob("*.py")
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
         if isinstance(node, ast.ClassDef)
     }
@@ -207,9 +210,13 @@ def test_no_persisted_decision_model_exists_anywhere() -> None:
 
 
 def test_the_schema_gained_no_decision_table() -> None:
-    names = " ".join(sorted(Base.metadata.tables))
+    # "decision" is excluded here on purpose: Gate 11 legitimately adds `decisions`/
+    # `decision_runs`/`decision_observations` elsewhere; this test's own invariant (no table
+    # bearing REVENUE's or an "evaluation" name) is the assertion right below.
     for word in FORBIDDEN_TABLE_WORDS:
-        assert word not in names, word
+        if word == "decision":
+            continue
+        assert word not in " ".join(sorted(Base.metadata.tables)), word
     assert {t for t in Base.metadata.tables if "revenue" in t or "evaluation" in t} == set()
 
 
@@ -218,10 +225,11 @@ def test_there_is_no_migration_for_gate_5() -> None:
     script = ScriptDirectory.from_config(alembic_config("postgresql+psycopg://unused/unused"))
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
     assert revisions["0007_invoice_supplier_ingestion"] == "0006_expected_engine"
-    # Gate 7 also added none: Gate 6's 0007 is directly followed by Gate 8's 0008.
+    # Gate 7 also added none: Gate 6's 0007 is directly followed by Gate 8's 0008. Gate 11's own
+    # 0009 (decision persistence) is the real chain head, unrelated to revenue detection.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0008_labor_ingestion"]
-    assert len(revisions) == 8
+    assert script.get_heads() == ["0009_decision_layer"]
+    assert len(revisions) == 9
 
 
 # --- read-only, no clock, no float ------------------------------------------------------------

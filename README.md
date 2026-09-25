@@ -2,22 +2,24 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 10 (Priority Engine V1, rules `priority-engine-v1`), ranking whatever the five
-> MVP detectors already called TRIGGERED.** No product feature exists yet: the technical base,
-> the multi-tenant data core, the import of booking files into canonical bookings, the daily
-> snapshots derived from them (observed vs reconstructed), the Expected baselines (a historical
-> level with its confidence, not a forecast), two revenue detectors that return typed,
-> non-persisted evaluations, since Gate 6 a workspace-wide supplier registry with canonical
-> invoices and lines (no PDF/OCR), since Gate 7 one cost detector (cost per occupied room, an
-> operating proxy, one currency at a time, no stored decision, alert, priority or recommendation),
-> since Gate 8 canonical labor entries (minutes, never an employee identity) with one staffing
-> detector reusing Gate 5's own demand forecast, since Gate 9 a read-only, in-memory channel
-> classifier and a fifth detector measuring how concentrated a property's next 30 days of
-> room-night business already is on OTA channels (never channel performance, never a commission
-> model), and since Gate 10 a pure, database-free engine that normalizes every TRIGGERED signal
-> into a common 0-100 severity/urgency/confidence/actionability score and ranks them
-> deterministically (never re-deciding a detector, never comparing economic proxies across
-> currencies, never persisting anything), on which the Decision layer will be built.
+> **Status: Gate 11 (Decision Persistence, Lifecycle and Memory V1, `decision-layer-v1`), turning
+> the Priority Engine's ranked signals into a persistent Decision identity with an OPEN/RESOLVED
+> lifecycle and an immutable observation history.** No product feature exists yet beyond that: the
+> technical base, the multi-tenant data core, the import of booking files into canonical bookings,
+> the daily snapshots derived from them (observed vs reconstructed), the Expected baselines (a
+> historical level with its confidence, not a forecast), two revenue detectors that return typed
+> evaluations, since Gate 6 a workspace-wide supplier registry with canonical invoices and lines
+> (no PDF/OCR), since Gate 7 one cost detector (cost per occupied room, an operating proxy, one
+> currency at a time), since Gate 8 canonical labor entries (minutes, never an employee identity)
+> with one staffing detector reusing Gate 5's own demand forecast, since Gate 9 a read-only,
+> in-memory channel classifier and a fifth detector measuring OTA concentration, since Gate 10 a
+> pure, database-free engine that ranks every TRIGGERED signal deterministically, and since Gate 11
+> a persistence layer that recognises the SAME operational problem across many days of
+> observations (never a new Decision just because the as-of date, priority score or rank changed),
+> resolves it only on an explicit CLEAR (never on absence, INSUFFICIENT_DATA, SUPPRESSED_LOW_
+> CONFIDENCE or NOT_APPLICABLE), reopens the same Decision id on a later TRIGGERED, and keeps every
+> day's Observation immutable - still no recommendation, AI, business API, UI, notification or
+> scheduler.
 
 ## Layout
 
@@ -57,4 +59,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Labor overstaffing v1](docs/architecture/labor-overstaffing-v1.md) — LABOR_OVERSTAFFING: demand forecast reuse, ACTUAL-FIRST comparables, median/IQR, confidence, cost gap proxy
 - [OTA dependency v1](docs/architecture/ota-dependency-v1.md) — REV_OTA_DEPENDENCY: 30-day forward window, conservative channel classification, temporal reuse, structural vs rising dependency, confidence
 - [Priority Engine v1](docs/architecture/priority-engine-v1.md) — cross-domain ranking of TRIGGERED signals: normalized severity, detector-aware urgency, confidence reuse, fixed actionability, exact-Decimal scoring, deterministic tie-break
+- [Decision Layer v1](docs/architecture/decision-layer-v1.md) — persistent Decision identity, cross-day deduplication, OPEN/RESOLVED lifecycle, explicit CLEAR resolution, reopening, immutable observation history, Decision Memory
 - [Architecture decision records](docs/architecture/adr/)

@@ -142,6 +142,10 @@ KNOWN_TABLES = {
     "labor_entries",
     "labor_mapping_profiles",
     "labor_import_rows",
+    # Gate 11 (decision persistence/lifecycle/memory), likewise unrelated to cost intelligence.
+    "decision_runs",
+    "decisions",
+    "decision_observations",
 }
 WRITER_ATTRIBUTES = {
     "commit",
@@ -198,9 +202,12 @@ def test_no_forbidden_vocabulary_in_the_cost_code(path: Path) -> None:
 
 
 def test_no_persisted_decision_model_or_generic_engine_exists_anywhere() -> None:
+    """Scoped to Gate 7's OWN package: Gate 11 legitimately introduces a real, separate
+    `Decision` persistence model elsewhere (`app.modules.decisions`) - this test's actual
+    invariant is that COST ITSELF never grows one, not that the whole app never does."""
     classes = {
         node.name
-        for path in APP_DIR.rglob("*.py")
+        for path in PACKAGE_DIR.glob("*.py")
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
         if isinstance(node, ast.ClassDef)
     }
@@ -233,10 +240,11 @@ def test_the_schema_gained_no_table() -> None:
 def test_there_is_no_migration_for_gate_7() -> None:
     script = ScriptDirectory.from_config(alembic_config("postgresql+psycopg://unused/unused"))
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
-    # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008.
+    # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008. Gate 11's
+    # own 0009 (decision persistence) is the real chain head, unrelated to cost intelligence.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0008_labor_ingestion"]
-    assert len(revisions) == 8  # 0001 .. 0008: Gate 7 added none
+    assert script.get_heads() == ["0009_decision_layer"]
+    assert len(revisions) == 9  # 0001 .. 0009: Gate 7 added none
 
 
 # --- read-only, no clock, no float ---------------------------------------------------------------

@@ -1,21 +1,23 @@
-# NINFA — Data model v1 (Gates 1–10)
+# NINFA — Data model v1 (Gates 1–11)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
 canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the daily booking
 snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions"),
-Gate 6 the supplier registry and the invoices (see "Gate 6 additions") and Gate 8 the canonical
-labor snapshots/entries and their mapping/staging (see "Gate 8 additions"); Gate 7, Gate 9 and
-Gate 10 add no schema (see "Gate 7: no schema change", "Gate 9: no schema change" and "Gate 10: no
-schema change"). **No decisions and no priority are persisted anywhere yet.**
+Gate 6 the supplier registry and the invoices (see "Gate 6 additions"), Gate 8 the canonical
+labor snapshots/entries and their mapping/staging (see "Gate 8 additions") and Gate 11 the
+persistent Decision layer (see "Gate 11 additions"); Gate 7, Gate 9 and Gate 10 add no schema (see
+"Gate 7: no schema change", "Gate 9: no schema change" and "Gate 10: no schema change"). **No
+priority is persisted anywhere: only a Decision's identity and lifecycle are, since Gate 11.**
 
 Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
 `0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4),
-`0007_invoice_supplier_ingestion` (Gate 6, Gate 7 added none) and `0008_labor_ingestion`
-(Gate 8, still the head after Gate 9 and Gate 10, neither of which added one), on top of
-`0001_baseline`, `0002_procrastinate_schema`.
+`0007_invoice_supplier_ingestion` (Gate 6, Gate 7 added none), `0008_labor_ingestion`
+(Gate 8, Gate 9 and Gate 10 added none on top of it) and `0009_decision_layer` (Gate 11, the
+current head), on top of `0001_baseline`, `0002_procrastinate_schema`.
 Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,
-intelligence/expected,suppliers,invoices,labor,intelligence/distribution,intelligence/priority}/`.
+intelligence/expected,suppliers,invoices,labor,intelligence/distribution,intelligence/priority,
+decisions,decision_memory}/`.
 
 ## Entity relationships
 
@@ -572,14 +574,100 @@ The Priority Engine ([priority-engine-v1.md](priority-engine-v1.md)) reads only 
 detector modules' own evaluation objects (`RevenueDecisionEvaluation`,
 `OtaDependencyEvaluation`, `CostDecisionEvaluation`, `LaborDecisionEvaluation`) — already
 in-memory Python values by the time it runs — and stores nothing: no table, column, index or
-migration (the head stays `0008_labor_ingestion`). `PriorityCandidate` and
-`PriorityRankingResult` are values, not entities: there is no priority, ranking or `Decision`
-table (ADR 0016). `PriorityService` does not even take a `Session` or a `TenantContext`, so it
-has no database access to describe here at all.
+migration of its own (Gate 11 later adds `0009_decision_layer`, unrelated to the ranking formula).
+`PriorityCandidate` and `PriorityRankingResult` are values, not entities: there is no priority or
+ranking table (ADR 0016). `PriorityService` does not even take a `Session` or a `TenantContext`, so
+it has no database access to describe here at all.
+
+## Gate 11 additions (decision persistence, lifecycle and memory)
+
+Migration `0009_decision_layer`. Full description: [decision-layer-v1.md](decision-layer-v1.md);
+decisions: ADR 0017.
+
+```mermaid
+erDiagram
+    properties ||--o{ decision_runs : has
+    properties ||--o{ decisions : has
+    decisions ||--o{ decision_observations : "remembered by"
+    decision_runs ||--o{ decision_observations : produced
+
+    decision_runs {
+        uuid id PK
+        bigint run_sequence "DB-generated, strictly increasing"
+        uuid workspace_id
+        uuid property_id
+        date as_of_local_date
+        text input_fingerprint "64 hex"
+        text priority_ranking_fingerprint "64 hex"
+        int evaluation_count
+        int triggered_count
+        int duplicate_input_count
+    }
+    decisions {
+        uuid id PK
+        uuid workspace_id
+        uuid property_id
+        text decision_type "the 5 MVP decision types"
+        text identity_key "64 hex, decision-identity-v1"
+        jsonb identity_payload
+        text status "OPEN or RESOLVED"
+        date first_seen_local_date
+        date last_seen_local_date "last TRIGGERED"
+        date last_evaluated_local_date
+        date resolved_local_date "NULL unless RESOLVED"
+        int episode_count
+        int triggered_observation_count
+    }
+    decision_observations {
+        uuid id PK
+        uuid decision_id FK
+        uuid decision_run_id FK
+        date as_of_local_date
+        text source_status "the detector's own 5 statuses"
+        text lifecycle_transition "OPENED OBSERVED RESOLVED REOPENED NO_STATE_CHANGE"
+        text source_evaluation_fingerprint "64 hex"
+        int priority_rank "NULL unless TRIGGERED"
+        numeric priority_score "NULL unless TRIGGERED, unconstrained precision"
+        jsonb facts_payload
+        jsonb evidence_payload
+        text observation_fingerprint "64 hex"
+    }
+```
+
+| Table | Tenant integrity (composite FKs, all RESTRICT) | Uniqueness |
+| ----- | ---------------------------------------------- | ---------- |
+| `decision_runs` | `(workspace, property)` → `properties` | `(workspace, property, as_of_local_date, input_fingerprint)`; `(workspace, id)` as FK target; `(run_sequence)` |
+| `decisions` | `(workspace, property)` → `properties` | `(workspace, property, decision_type, identity_key)`; `(workspace, id)` as FK target |
+| `decision_observations` | `(workspace, decision)` → `decisions`; `(workspace, decision_run)` → `decision_runs`; `(workspace, property)` → `properties` | `(workspace, decision, decision_run)` |
+
+`decision_runs` and `decision_observations` are immutable (no `updated_at`, a `BEFORE UPDATE`
+trigger, `decisions_forbid_update()`; `DELETE` is not blocked, retention is a later gate).
+`decisions` is the one MUTABLE row of this gate: `status`/dates/counters are updated in place by
+the lifecycle rules; its identity columns (`decision_type`, `identity_version`, `identity_key`,
+`identity_payload`) never change after creation, by convention (no code path updates them), not by
+a trigger. `CHECK`s keep a Decision coherent: `OPEN` requires `resolved_local_date IS NULL`,
+`RESOLVED` requires it set; `first_seen <= last_seen <= last_evaluated`;
+`episode_count`/`triggered_observation_count >= 1`; `identity_key`/`observation_fingerprint`/
+`source_evaluation_fingerprint`/`priority_candidate_fingerprint` are 64 lowercase hex characters.
+An Observation's five priority fields (`priority_candidate_fingerprint`, `priority_rank`,
+`impact_score`, `urgency_score`, `actionability_score`, `priority_score`) are ALL present when
+`source_status = TRIGGERED` and ALL `NULL` otherwise — one `CHECK`, enforced both ways.
+`impact_score`/`urgency_score`/`actionability_score`/`priority_score` are unconstrained `NUMERIC`
+(no fixed precision/scale): Gate 10's own 50-significant-digit context can produce a
+non-terminating ratio, and a fixed scale would silently truncate the exact value the fingerprint
+hashes; `confidence_score` stays `NUMERIC(5,2)` like every other confidence column in this schema
+(every detector's own confidence is already exactly two decimals).
+
+Indexes added: `ix_decisions_workspace_id_property_id_status`,
+`ix_decisions_workspace_id_property_id_decision_type`,
+`ix_decision_observations_decision_id_as_of_local_date` (the memory-order read path),
+`ix_decision_observations_decision_run_id`; the unique keys above double as lookup indexes. Delete
+policy: every new foreign key is `RESTRICT`.
 
 ## Not implemented yet
 
-RevPAR metrics, persisted decisions, other detectors, decision memory; authentication and any
+RevPAR metrics, other detectors, a Decision resolution policy beyond explicit CLEAR, backtesting
+or replaying a historical as-of date, a Decision business API, a UI; authentication and any
 tenant-facing API; file upload/storage and the asynchronous ingestion job; PostgreSQL row-level
 security (the schema is compatible: every tenant-owned table has a `workspace_id` column to write
 policies against).

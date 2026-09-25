@@ -377,8 +377,9 @@ persisted (an unmapped column never reaches staging).
 
 ## OTA dependency (Gate 9)
 
-Adds no dependency and no migration (the head stays `0008_labor_ingestion`). Evaluate a property's
-next-30-day OTA dependency directly on its own booking data: no separate import step, since it
+Adds no dependency and no migration of its own (Gate 11 later adds `0009_decision_layer`, unrelated
+to OTA dependency detection). Evaluate a property's next-30-day OTA dependency directly on its own
+booking data: no separate import step, since it
 reads the canonical `Booking`/`BookingChannel`/`BookingSnapshot` rows Gate 2/3 already produced.
 `as_of_local_date` is always explicit. Full guide:
 [ota-dependency-v1.md](../architecture/ota-dependency-v1.md).
@@ -408,8 +409,9 @@ small exact dictionary, never a fuzzy match — an unmapped or ambiguous channel
 
 ## Priority ranking (Gate 10)
 
-Adds no dependency and no migration (the head stays `0008_labor_ingestion`). Rank whatever the
-five detectors above already called `TRIGGERED`: `PriorityService` needs no database session and
+Adds no dependency and no migration of its own (Gate 11 later adds `0009_decision_layer`, unrelated
+to priority ranking). Rank whatever the five detectors above already called `TRIGGERED`:
+`PriorityService` needs no database session and
 no `TenantContext` at all — it is a pure function of the evaluations you already computed. Full
 guide: [priority-engine-v1.md](../architecture/priority-engine-v1.md).
 
@@ -439,6 +441,39 @@ is a 0-100 normalized severity, **never** euro or another currency; any economic
 (`revenue_gap_proxy`, `cost_gap_proxy_exact`, ...) rides along as evidence only and never affects
 `priority_score_exact`. An empty `ranked_candidates` tuple is a legitimate result (nothing was
 TRIGGERED), not an error.
+
+## Decision persistence, lifecycle and memory (Gate 11)
+
+Adds no dependency and one migration, `0009_decision_layer` (`npm run db:migrate`, now head).
+Turns a `PriorityContext`/`PriorityRankingResult`/source-evaluations triple into persistent
+`Decision`s with an OPEN/RESOLVED lifecycle and an immutable `DecisionObservation` history. Full
+guide: [decision-layer-v1.md](../architecture/decision-layer-v1.md).
+
+```python
+from app.core.tenant import TenantContext
+from app.modules.decisions.service import DecisionService
+from app.modules.decision_memory.service import DecisionMemoryService
+
+with get_sessionmaker()() as session:
+    tenant = TenantContext(workspace_id)
+    # context, ranking_result and evaluations: the SAME PriorityContext/PriorityRankingResult and
+    # source evaluations you already built for PriorityService.rank() above.
+    result = DecisionService(session, tenant).sync(context, ranking_result, evaluations)
+    print(result.created_decision_count, result.observed_open_count, result.resolved_count)
+
+    memory = DecisionMemoryService(session, tenant)
+    for decision in memory.list_open_decisions(property_id):
+        print(decision.decision_type.value, decision.status.value, decision.episode_count)
+```
+
+`sync()` never re-derives a detector's own status and never recomputes a Priority score: both are
+read once and persisted exactly as they arrived. A Decision's identity is a CROSS-DAY concept
+(never the source's own target key, which carries a snapshot id or a rolling window boundary that
+changes every morning); only an explicit `CLEAR` resolves it, never absence, `INSUFFICIENT_DATA`,
+`SUPPRESSED_LOW_CONFIDENCE` or `NOT_APPLICABLE`; a later `TRIGGERED` reopens the SAME Decision id.
+An exact replay (same workspace/property/as-of/logical input) is idempotent: it returns the
+existing `DecisionRun` and writes nothing new. There is no business API, UI, recommendation or AI
+here: `DecisionMemoryService` is an internal read-side class, not an endpoint.
 
 ## Quality
 
