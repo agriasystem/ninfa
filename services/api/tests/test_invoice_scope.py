@@ -143,9 +143,14 @@ def test_no_forbidden_vocabulary_in_the_gate_6_code(path: Path) -> None:
 
 
 def test_no_forbidden_class_exists_anywhere() -> None:
+    """Scoped to Gate 6's OWN packages (invoices/suppliers): Gate 11 legitimately introduces a
+    real, separate `Decision` persistence model elsewhere (`app.modules.decisions`) - this test's
+    actual invariant is that COST INGESTION ITSELF never grows one, not that the whole app
+    never does."""
     classes = {
         node.name
-        for path in APP_DIR.rglob("*.py")
+        for package_dir in (INVOICES_DIR, SUPPLIERS_DIR)
+        for path in package_dir.glob("*.py")
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
         if isinstance(node, ast.ClassDef)
     }
@@ -153,8 +158,13 @@ def test_no_forbidden_class_exists_anywhere() -> None:
 
 
 def test_the_schema_gained_no_decision_cost_baseline_or_anomaly_table() -> None:
+    # "decision" is excluded on purpose: Gate 11 legitimately adds `decisions`/`decision_runs`/
+    # `decision_observations` elsewhere - the invariant this test still protects is that COST
+    # INGESTION ITSELF never grows a cost-baseline/anomaly/priority table.
     names = " ".join(sorted(Base.metadata.tables))
     for word in FORBIDDEN_TABLE_WORDS:
+        if word == "decision":
+            continue
         assert word not in names, word
     gate_6 = {
         "suppliers",
@@ -168,7 +178,10 @@ def test_the_schema_gained_no_decision_cost_baseline_or_anomaly_table() -> None:
     }
     assert gate_6 <= set(Base.metadata.tables)
     # "labor_" is no longer forbidden: Gate 8 legitimately owns that prefix (labor ingestion).
-    assert not [t for t in Base.metadata.tables if t.startswith(("cost_", "decision"))]
+    # "decision" is no longer forbidden either: Gate 11 legitimately owns it (decision
+    # persistence/lifecycle/memory) - the invariant left to check is that COST INGESTION itself
+    # never grows a "cost_" table.
+    assert not [t for t in Base.metadata.tables if t.startswith("cost_")]
 
 
 def test_there_is_no_supplier_merge_and_no_way_to_move_an_invoice_between_suppliers() -> None:

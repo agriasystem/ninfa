@@ -1,18 +1,20 @@
-# NINFA — Architecture v1 (Gates 0–10)
+# NINFA — Architecture v1 (Gates 0–11)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
 booking snapshots (Gate 3), the first Expected baselines (Gate 4), the first two revenue
 detectors (Gate 5), the supplier registry with the invoice ingestion (Gate 6), the first cost
 detector, the cost per occupied room (Gate 7), the canonical labor model with its first staffing
-detector (Gate 8), the fifth and last MVP detector, OTA distribution dependency (Gate 9), and the
+detector (Gate 8), the fifth and last MVP detector, OTA distribution dependency (Gate 9), the
 Priority Engine (Gate 10), which ranks whatever the five detectors already called TRIGGERED — it
-decides nothing a detector did not already decide. No NINFA product feature is implemented: data
-goes in, is stored correctly, is turned into daily "on the books" facts, into a historical
-"expected level" and into typed, non-persisted revenue, cost, labor and distribution evaluations,
-purchase invoices become canonical suppliers, invoices and lines, and TRIGGERED evaluations become
-typed, non-persisted, ranked priority candidates; no alert, persisted decision or recommendation
-exists yet.
+decides nothing a detector did not already decide — and Decision Persistence, Lifecycle and Memory
+(Gate 11), which turns a ranked, non-persistent signal into a persistent Decision identity with an
+OPEN/RESOLVED lifecycle and an immutable observation history. Still no product feature beyond that:
+data goes in, is stored correctly, is turned into daily "on the books" facts, into a historical
+"expected level" and into typed revenue, cost, labor and distribution evaluations, purchase
+invoices become canonical suppliers, invoices and lines, TRIGGERED evaluations become typed, ranked
+priority candidates, and those candidates become persistent Decisions with a lifecycle and a
+memory; no recommendation, business API or UI exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -22,7 +24,8 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [labor-ingestion-v1.md](labor-ingestion-v1.md). Labor overstaffing:
 [labor-overstaffing-v1.md](labor-overstaffing-v1.md). OTA dependency:
 [ota-dependency-v1.md](ota-dependency-v1.md). Priority Engine:
-[priority-engine-v1.md](priority-engine-v1.md).
+[priority-engine-v1.md](priority-engine-v1.md). Decision Layer:
+[decision-layer-v1.md](decision-layer-v1.md).
 
 ## Components
 
@@ -51,34 +54,41 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Twelve modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership), `properties`
-  (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings` since Gate 2,
-  `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3, `intelligence/expected`
-  (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the first of the Decision
-  Engine stages), `intelligence/revenue` since Gate 5, `intelligence/costs` since Gate 7 (no
-  model in either: their detectors and typed evaluations), `suppliers` (Supplier, SupplierIdentifier, SupplierAlias, SupplierResolutionReview),
+- Fourteen modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership),
+  `properties` (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings`
+  since Gate 2, `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3,
+  `intelligence/expected` (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the
+  first of the Decision Engine stages), `intelligence/revenue` since Gate 5, `intelligence/costs`
+  since Gate 7 (no model in either: their detectors and typed evaluations), `suppliers` (Supplier,
+  SupplierIdentifier, SupplierAlias, SupplierResolutionReview),
   `invoices` (Invoice, InvoiceLine, InvoiceMappingProfile, InvoiceImportRow) since Gate 6,
   `labor` (LaborSnapshot, LaborEntry, LaborMappingProfile, LaborImportRow) with
   `intelligence/labor` and `intelligence/demand` (no model in either: the demand-forecast
   primitive shared with `intelligence/revenue`, and the LABOR_OVERSTAFFING detector) since Gate 8,
   `intelligence/distribution` since Gate 9 (no model: the REV_OTA_DEPENDENCY detector reads
   Gate 2's `BookingChannel`/`Booking` and Gate 3's `BookingSnapshot` directly and writes none of
-  them), and `intelligence/priority` since Gate 10 (no model: it reads the four detector modules'
-  own evaluation types and writes nothing). Importing `app.models` registers every model.
+  them), `intelligence/priority` since Gate 10 (no model: it reads the four detector modules'
+  own evaluation types and writes nothing), and `decisions` (DecisionRun, Decision,
+  DecisionObservation) with `decision_memory` (no model: an internal read side over `decisions`'
+  own repository) since Gate 11. Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
   `snapshots/reconstruction.py`, `intelligence/expected/service.py`,
   `intelligence/revenue/service.py`, `invoices/service.py`, `suppliers/resolution.py`,
   `labor/service.py`, `intelligence/demand/service.py`, `intelligence/labor/service.py`,
-  `intelligence/distribution/service.py`) are plain classes: they depend on a `Session` and a
+  `intelligence/distribution/service.py`, `decisions/service.py`, `decision_memory/service.py`)
+  are plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
   `intelligence/priority/service.py` is a step further still: `PriorityService` depends on
   **neither** a `Session` nor a `TenantContext` — it is a pure function of already-computed
-  evaluations, so it can be tested with no database at all.
+  evaluations, so it can be tested with no database at all. `decisions/service.py` is, since Gate
+  11, the first WRITE-capable service outside ingestion/canonicalisation: `DecisionService.sync()`
+  owns its own transaction (validate, lock, load, apply the lifecycle, insert, commit/rollback as
+  one unit), the same posture `LaborImportService`/`InvoiceImportService` already established.
 - The directories for the still-future domains (`normalization`,
-  `data_quality`, `intelligence/{detection,impact,recommendation}`, `decisions`,
-  `decision_memory`, `ai/*`) are empty package markers so the structure is settled before those
-  domains land. `intelligence/priority` is no longer one of them: Gate 10 filled it in.
+  `data_quality`, `intelligence/{detection,impact,recommendation}`, `ai/*`) are empty package
+  markers so the structure is settled before those domains land. `intelligence/priority` and
+  `decisions`/`decision_memory` are no longer among them: Gate 10 and Gate 11 filled them in.
 - Splitting a module into a service is a possible future step, never a starting point.
 
 ## API conventions
@@ -290,8 +300,31 @@ deduplicated and logically conflicting evaluations are rejected, and economic pr
 (`revenue_gap_proxy`, `cost_gap_proxy_exact`, `labor_cost_gap_proxy_exact`, an optional OTA
 revenue exposure) travel through as evidence only, in their own currency, never scored and never
 compared across currencies. No table, migration, API endpoint, worker task or dependency was
-added; the head stays `0008_labor_ingestion`. Details:
-[priority-engine-v1.md](priority-engine-v1.md), ADR 0016.
+added by this gate itself (Gate 11 later adds `0009_decision_layer`, unrelated to the ranking
+formula). Details: [priority-engine-v1.md](priority-engine-v1.md), ADR 0016.
+
+## Decision Persistence, Lifecycle and Memory (Gate 11)
+
+`DecisionService.sync(context, ranking_result, evaluations)` turns a `PriorityContext`/
+`PriorityRankingResult`/source-evaluations triple (Gate 10's own output, unmodified) into
+persistent `Decision`s: a cross-day identity (`decision-identity-v1`, deliberately NOT Gate 10's
+own `source_target_key`, which carries a snapshot id or a rolling window that changes every
+morning), an `OPEN`/`RESOLVED` lifecycle (eight explicit rules; only an explicit `CLEAR` resolves —
+never absence, `INSUFFICIENT_DATA`, `SUPPRESSED_LOW_CONFIDENCE` or `NOT_APPLICABLE`; a later
+`TRIGGERED` reopens the SAME Decision id), and an immutable `DecisionObservation` history (one row
+per Decision per `DecisionRun`, carrying the exact Priority snapshot of that day when TRIGGERED,
+explicit per-detector facts/evidence payloads, never a blind serialization of the whole
+evaluation). A `DecisionRun` is append-only and makes an exact replay of the same
+workspace/property/as-of/logical input idempotent (zero new rows) while allowing the same as-of
+date with a genuinely different dataset to become a new run. `DecisionService.sync()` is the first
+WRITE-capable service outside ingestion: it owns its transaction (validate, advisory-lock, load
+existing Decisions set-based, apply the lifecycle, insert, commit or roll back as one atomic
+unit) and protects concurrent syncs of the same workspace/property with the same
+`pg_advisory_xact_lock` pattern `lock_data_source`/`lock_supplier_registry` already use.
+`DecisionMemoryService` is the internal read side (`list_open_decisions`, `get_decision`,
+`get_history`, `find_by_identity`): no business API, no UI. One migration,
+`0009_decision_layer` (three tables: `decision_runs`, `decisions`, `decision_observations`); no new
+dependency. Details: [decision-layer-v1.md](decision-layer-v1.md), ADR 0017.
 
 ## Background processing
 
@@ -306,10 +339,10 @@ asynchronous ingestion job, PDF/OCR/signed invoices, an HR system, payroll, shif
 workforce optimizer, a channel manager, a booking engine, commission accounting, channel
 profitability/conversion/CAC/ROAS, rate parity, marketing attribution, supplier merge and review
 resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue, cost, labor,
-distribution and priority-ranking runs, persisted labor, cost or distribution baselines (all are
-non-persistent values, recomputed on demand), a customer-facing channel-classification setup
-workflow (Gate 9's classifier stays entirely in-memory and read-only), a sixth detector (e.g.
-supplier price anomalies), the rest of the Decision Engine (persisted decisions, lifecycle,
-deduplication across days, recommendation, pricing, a Priority/Decision business API, a UI),
-budgeting and accruals, currency conversion, decision memory, AI gateway / narrative / Ask NINFA,
-notifications, payments, analytics, deployment.
+distribution, priority-ranking and Decision Layer sync runs, persisted labor, cost or distribution
+baselines (all are non-persistent values, recomputed on demand), a customer-facing
+channel-classification setup workflow (Gate 9's classifier stays entirely in-memory and
+read-only), a sixth detector (e.g. supplier price anomalies), a Decision resolution policy beyond
+explicit CLEAR, backtesting/replaying historical as-of dates, the rest of the Decision Engine
+(recommendation, pricing, a Decision business API, a UI), budgeting and accruals, currency
+conversion, AI gateway / narrative / Ask NINFA, notifications, payments, analytics, deployment.

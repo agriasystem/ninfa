@@ -557,8 +557,11 @@ def test_evaluating_the_whole_world_writes_nothing(golden: Golden) -> None:
 
 
 def test_no_decision_priority_or_cost_metric_table_exists() -> None:
+    # "decision" is excluded on purpose: Gate 11 legitimately adds `decisions`/`decision_runs`/
+    # `decision_observations` elsewhere - the invariant this test still protects is that COST
+    # ITSELF never grows a priority/cost-metric/baseline table of its own.
     names = " ".join(sorted(Base.metadata.tables))
-    for word in ("decision", "priority", "recommendation", "cpor", "cost_metric", "baseline_cost"):
+    for word in ("priority", "recommendation", "cpor", "cost_metric", "baseline_cost"):
         assert word not in names, word
 
 

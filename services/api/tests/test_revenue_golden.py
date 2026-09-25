@@ -671,7 +671,8 @@ def test_the_evaluation_phase_writes_nothing(db_session: Session, factory: Booki
     assert {
         b.id: b.comparable_fingerprint for b in db_session.scalars(select(BookingExpectedBaseline))
     } == fingerprints_before
-    assert not [name for name in tables if "decision" in name]
+    # Gate 11 legitimately owns `decisions`/`decision_runs`/`decision_observations` elsewhere;
+    # the row-count comparison above already proves THIS evaluation wrote to none of them.
 
 
 def test_a_second_evaluation_is_identical_and_the_batch_agrees_with_the_single_calls(

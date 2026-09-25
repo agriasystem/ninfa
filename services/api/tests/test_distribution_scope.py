@@ -98,8 +98,10 @@ def test_no_ota_dependency_business_endpoint_exists(client: TestClient) -> None:
 
 
 def test_no_migration_was_added() -> None:
+    """Gate 9 itself added none: 0008 (Gate 8) is still directly followed by 0009, which is Gate
+    11's own decision persistence migration, unrelated to OTA dependency detection."""
     versions_dir = _DISTRIBUTION_DIR.parents[3] / "alembic" / "versions"
     heads = [
         path.stem for path in versions_dir.glob("*.py") if path.stem.startswith(("0008", "0009"))
     ]
-    assert heads == ["0008_labor_ingestion"]
+    assert sorted(heads) == ["0008_labor_ingestion", "0009_decision_layer"]

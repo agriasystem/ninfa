@@ -17,7 +17,7 @@ from tests.support import alembic_config
 
 GATE_2_HEAD = "0004_booking_ingestion"
 GATE_3_HEAD = "0005_booking_snapshots_metrics"
-HEAD = "0008_labor_ingestion"
+HEAD = "0009_decision_layer"  # the current global chain head (Gate 11); Gate 3's own is GATE_3_HEAD
 GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_3_FUNCTION = "booking_snapshots_forbid_update"
@@ -78,6 +78,8 @@ def test_head_is_the_snapshot_migration_with_its_tables_function_and_trigger(
         "trg_invoice_lines_immutable",
         "trg_labor_snapshots_immutable",  # Gate 8, on top
         "trg_labor_entries_immutable",
+        "trg_decision_runs_immutable",  # Gate 11, on top
+        "trg_decision_observations_immutable",
     }
 
 

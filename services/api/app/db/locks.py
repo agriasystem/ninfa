@@ -24,6 +24,20 @@ def lock_data_source(session: Session, data_source_id: UUID) -> None:
     )
 
 
+def lock_decision_layer(session: Session, workspace_id: UUID, property_id: UUID) -> None:
+    """Serialise, for ONE workspace/property, concurrent Decision Layer syncs.
+
+    Held until the current transaction ends. Two processes syncing the same property at once must
+    never both decide "no Decision exists for this identity yet" and each create one: this lock
+    makes their lifecycle mutations line up behind each other. The unique key on
+    `(workspace_id, property_id, decision_type, identity_key)` remains the last line of defence.
+    """
+    session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:key AS text), 0))"),
+        {"key": f"decisions:{workspace_id}:{property_id}"},
+    )
+
+
 def lock_supplier_registry(session: Session, workspace_id: UUID) -> None:
     """Serialise, for ONE workspace, the writers of its supplier registry.
 

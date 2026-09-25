@@ -215,10 +215,12 @@ def test_no_employee_or_payroll_model_exists() -> None:
         assert forbidden not in names
 
 
-def test_no_decision_or_priority_table_exists() -> None:
+def test_no_priority_table_exists() -> None:
+    # "decision" is deliberately not checked here any more: Gate 11 legitimately adds
+    # `decisions`/`decision_runs`/`decision_observations` elsewhere - the invariant this test
+    # still protects is that LABOR INGESTION ITSELF never grows a priority table of its own.
     import app.models  # noqa: F401
     from app.db.base import Base
 
     table_names = " ".join(Base.metadata.tables).lower()
-    for forbidden in ("decision", "priority"):
-        assert forbidden not in table_names
+    assert "priority" not in table_names
