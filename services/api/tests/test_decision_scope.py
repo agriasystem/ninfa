@@ -91,10 +91,16 @@ def test_no_fastapi_router_anywhere_in_the_decision_modules() -> None:
                 raise AssertionError(f"{name} references APIRouter")
 
 
-def test_the_only_public_endpoint_is_still_the_health_check(client: TestClient) -> None:
+def test_no_public_endpoint_beyond_the_health_check_at_gate_11(client: TestClient) -> None:
+    """True AS OF GATE 11 (this module's own scope): no business endpoint exists yet. Gate 12
+    (Decision API V1, see `test_decision_api_scope.py`) deliberately supersedes this - a "decision"
+    path is then expected, not forbidden. Kept here, narrowed to what Gate 11 itself is still
+    responsible for: no PRIORITY/CANDIDATE path exists, and no write path was ever added by this
+    gate (see `test_no_recommendation_class_or_generated_action_text_function`'s own sibling
+    checks above for the write-side, framework-import-side of this same boundary)."""
     paths = list(client.get("/openapi.json").json()["paths"])
-    assert paths == ["/api/v1/health"]
-    for word in ("decision", "priority", "candidate"):
+    assert "/api/v1/health" in paths
+    for word in ("priority", "candidate"):
         assert not [p for p in paths if word in p]
 
 

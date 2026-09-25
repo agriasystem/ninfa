@@ -329,9 +329,11 @@ def test_only_the_canonical_invoice_tables_and_lead_time_zero_snapshots_are_read
 
 
 def test_the_only_public_endpoint_is_still_the_health_check(client: TestClient) -> None:
+    # Gate 12 added the read-only Decision API: "decision" is now an EXPECTED substring of
+    # the path list, unrelated to this gate - checked instead in test_decision_api_scope.py.
     paths = list(client.get("/openapi.json").json()["paths"])
-    assert paths == ["/api/v1/health"]
-    for word in ("cost", "cpor", "anomaly", "occupan", "decision", "evaluation"):
+    assert "/api/v1/health" in paths
+    for word in ("cost", "cpor", "anomaly", "occupan", "evaluation"):
         assert not [p for p in paths if word in p]
 
 

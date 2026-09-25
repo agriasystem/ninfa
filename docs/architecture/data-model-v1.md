@@ -1,4 +1,4 @@
-# NINFA — Data model v1 (Gates 1–11)
+# NINFA — Data model v1 (Gates 1–12)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
@@ -6,18 +6,22 @@ canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the d
 snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions"),
 Gate 6 the supplier registry and the invoices (see "Gate 6 additions"), Gate 8 the canonical
 labor snapshots/entries and their mapping/staging (see "Gate 8 additions") and Gate 11 the
-persistent Decision layer (see "Gate 11 additions"); Gate 7, Gate 9 and Gate 10 add no schema (see
-"Gate 7: no schema change", "Gate 9: no schema change" and "Gate 10: no schema change"). **No
-priority is persisted anywhere: only a Decision's identity and lifecycle are, since Gate 11.**
+persistent Decision layer (see "Gate 11 additions"); Gate 7, Gate 9, Gate 10 and Gate 12 add no
+schema (see "Gate 7: no schema change", "Gate 9: no schema change" and "Gate 10: no schema
+change" - Gate 12 is a pure HTTP read layer over Gate 11's own tables, so it needs none either).
+**No priority is persisted anywhere: only a Decision's identity and lifecycle are, since Gate 11.**
 
 Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
 `0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4),
 `0007_invoice_supplier_ingestion` (Gate 6, Gate 7 added none), `0008_labor_ingestion`
-(Gate 8, Gate 9 and Gate 10 added none on top of it) and `0009_decision_layer` (Gate 11, the
-current head), on top of `0001_baseline`, `0002_procrastinate_schema`.
+(Gate 8, Gate 9 and Gate 10 added none on top of it) and `0009_decision_layer` (Gate 11, still the
+current head - Gate 12 added none on top of it either), on top of `0001_baseline`,
+`0002_procrastinate_schema`.
 Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,
 intelligence/expected,suppliers,invoices,labor,intelligence/distribution,intelligence/priority,
-decisions,decision_memory}/`.
+decisions,decision_memory}/` (the data/business-logic layer; Gate 12's own HTTP read layer lives in
+`services/api/app/api/v1/decisions/` and touches no table directly - it goes through
+`decision_memory`/`decisions`' own repository, like every other reader).
 
 ## Entity relationships
 
@@ -667,10 +671,12 @@ policy: every new foreign key is `RESTRICT`.
 ## Not implemented yet
 
 RevPAR metrics, other detectors, a Decision resolution policy beyond explicit CLEAR, backtesting
-or replaying a historical as-of date, a Decision business API, a UI; authentication and any
-tenant-facing API; file upload/storage and the asynchronous ingestion job; PostgreSQL row-level
-security (the schema is compatible: every tenant-owned table has a `workspace_id` column to write
-policies against).
+or replaying a historical as-of date, any Decision WRITE endpoint, a Decision recommendation or a
+UI; a real authentication provider (Gate 12 ships only the fail-closed seam,
+`app.core.auth.get_current_principal`) and a `PropertyAccess` primitive finer than workspace
+membership; file upload/storage and the asynchronous ingestion job; PostgreSQL row-level security
+(the schema is compatible: every tenant-owned table has a `workspace_id` column to write policies
+against).
 
 ## Adding a tenant-owned entity (checklist for later gates)
 

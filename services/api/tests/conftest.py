@@ -1,13 +1,16 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from uuid import UUID
 
 import pytest
 from alembic import command
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from app.core.auth import AuthenticatedPrincipal, get_current_principal
 from app.core.config import Settings, get_settings
-from app.db.session import create_db_engine
+from app.db.session import create_db_engine, get_session
 from app.main import create_app
 from tests.support import BookingFactory, Rejects, Tenant, alembic_config, make_rejects
 
@@ -18,10 +21,41 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def client(settings: Settings) -> Iterator[TestClient]:
+def app(settings: Settings) -> FastAPI:
+    return create_app(settings)
+
+
+@pytest.fixture
+def client(app: FastAPI) -> Iterator[TestClient]:
     # raise_server_exceptions=False lets us assert on the 500 error envelope.
-    with TestClient(create_app(settings), raise_server_exceptions=False) as test_client:
+    with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
+
+
+@pytest.fixture
+def api_client(app: FastAPI, db_session: Session) -> Iterator[TestClient]:
+    """A `TestClient` wired to the SAME rolled-back `db_session` transaction as `factory`: data a
+    test builds with `factory` is visible to its own HTTP calls, and nothing an HTTP call writes
+    outlives the test. Unauthenticated by default (no override of `get_current_principal` - real
+    routes still answer 401); pair with `authenticated_as` to add a real test principal via
+    `app.dependency_overrides`, never a spoofable header.
+    """
+    app.dependency_overrides[get_session] = lambda: db_session
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
+    app.dependency_overrides.pop(get_session, None)
+
+
+@pytest.fixture
+def authenticated_as(app: FastAPI) -> Callable[[UUID], None]:
+    """`authenticated_as(user.id)`: overrides `get_current_principal` for THIS test's `app`
+    instance with a real `AuthenticatedPrincipal` - the FastAPI dependency override the Gate 12
+    review asked tests to use, never `X-User-Id` or any other spoofable header."""
+
+    def _set(user_id: UUID) -> None:
+        app.dependency_overrides[get_current_principal] = lambda: AuthenticatedPrincipal(user_id)
+
+    return _set
 
 
 # --- database ---------------------------------------------------------------------------------
