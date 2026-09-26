@@ -18,10 +18,16 @@ Nothing here writes. `DecisionService.sync()` (Gate 11's own write path) is neve
 HTTP, never called by a route, and no route opens a mutating transaction, calls `PriorityService`,
 or calls a detector. See "Read-only guarantees" below.
 
+**Update (Gate 16):** the Decision Detail response (`GET /decisions/{decision_id}`) additionally
+carries a `recommendation` field - a deterministic, non-AI derivation over the SAME Decision +
+latest Observation this endpoint already returns, computed fresh on every request, with no new
+route and no new query parameter. See [recommendation-engine-v1.md](recommendation-engine-v1.md)
+and ADR 0022. Every other endpoint, and every other field of this one, is unchanged.
+
 Explicitly NOT in scope (unchanged since Gate 11, now enforced by `test_decision_api_scope.py`
-too): manual Decision creation, acknowledge/dismiss/snooze/resolve/reopen, assignment,
-recommendations, generated prose, AI, notifications, a scheduler, a frontend, detector execution,
-Priority execution.
+too): manual Decision creation, acknowledge/dismiss/snooze/resolve/reopen, assignment, generated
+prose, AI, notifications, a scheduler, a frontend, detector execution, Priority execution, and any
+write/execute/approve/apply endpoint for the Gate 16 recommendation itself.
 
 ## Authorization boundary
 
@@ -152,6 +158,10 @@ DTO). `decision_api_version` (`decision-api-v1`) is included for forward audit. 
 does not exist, or exists in a different property/workspace than the one resolved from the path:
 `DECISION_NOT_FOUND` (404) either way.
 
+**Update (Gate 16):** also includes `recommendation` - see
+[recommendation-engine-v1.md](recommendation-engine-v1.md) for its full shape; unrelated to, and
+never a substitute for, the Observation's own facts/evidence/priority above.
+
 ## Decision history
 
 Cursor-paginated (`decision-history-cursor-v1`), default/max limit identical to the list endpoint.
@@ -239,6 +249,9 @@ list) and asserts it stays a small, N-independent constant - never linear.
 
 ## Limitations (intentional, documented debt)
 
+- **Extended by Gate 16**: the Decision Detail response now additionally carries a deterministic,
+  non-AI `recommendation` - see [recommendation-engine-v1.md](recommendation-engine-v1.md). No
+  route on this page changed to get it.
 - **Resolved by Gate 13**: a real authentication provider is now wired (first-party email +
   password, opaque server-side session - see [auth-session-v1.md](auth-session-v1.md)). No route
   on this page changed to get it, exactly as this document originally predicted.

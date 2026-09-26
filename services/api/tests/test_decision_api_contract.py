@@ -14,6 +14,8 @@ from app.api.v1.decisions.schemas import (
     DecisionHistoryResponse,
     DecisionListResponse,
     FeedItemResponse,
+    RecommendationResponse,
+    RecommendedActionResponse,
 )
 
 
@@ -70,7 +72,33 @@ def test_detail_response_contract() -> None:
         "triggered_observation_count",
         "target",
         "latest_observation",
+        "recommendation",  # Gate 16, additive
         "decision_api_version",
+    }
+
+
+def test_recommendation_response_contract() -> None:
+    """Gate 16: the additive `recommendation` field's own shape - deliberately narrower than the
+    engine's internal `RecommendationResult` (no observation id, no evaluation fingerprint, no
+    reason codes - see `recommendation_of()`'s own docstring)."""
+    assert _fields(RecommendationResponse) == {
+        "status",
+        "version",
+        "fingerprint",
+        "primary_action",
+        "supporting_checks",
+        "confidence",
+        "requires_human_review",
+    }
+    assert _fields(RecommendedActionResponse) == {
+        "action_code",
+        "title_key",
+        "description_key",
+        "category",
+        "scope",
+        "supporting_facts",
+        "risk_notes",
+        "requires_human_review",
     }
 
 
