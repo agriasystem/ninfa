@@ -1,4 +1,4 @@
-# NINFA — Architecture v1 (Gates 0–13)
+# NINFA — Architecture v1 (Gates 0–14)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
@@ -11,15 +11,19 @@ decides nothing a detector did not already decide —, Decision Persistence, Lif
 (Gate 11), which turns a ranked, non-persistent signal into a persistent Decision identity with an
 OPEN/RESOLVED lifecycle and an immutable observation history, the Decision API (Gate 12), the
 first business-facing HTTP surface: four READ-ONLY endpoints over that memory, behind a
-fail-closed authorization boundary, and Authentication & Session (Gate 13), which fills that
+fail-closed authorization boundary, Authentication & Session (Gate 13), which fills that
 boundary in for real: first-party email+password login, Argon2id, an opaque server-side session
-behind an `HttpOnly` cookie. Still no product feature beyond reading that memory: data goes
-in, is stored correctly, is turned into daily "on the books" facts, into a historical "expected
-level" and into typed revenue, cost, labor and distribution evaluations, purchase invoices become
-canonical suppliers, invoices and lines, TRIGGERED evaluations become typed, ranked priority
-candidates, those candidates become persistent Decisions with a lifecycle and a memory, and that
-memory can now be read over HTTP by a real, authenticated, authorized workspace member; no
-recommendation, write endpoint, signup, password reset, MFA, OAuth/SSO or UI exists yet.
+behind an `HttpOnly` cookie, and Oggi UI (Gate 14), the first real, visible product surface: an
+authenticated shell, real login/logout, property selection and a single Home that renders exactly
+the Decision Feed's own four states, at most five decision cards, zero graphs, zero
+recommendations, backend ranking preserved exactly. Data goes in, is stored correctly, is turned
+into daily "on the books" facts, into a historical "expected level" and into typed revenue, cost,
+labor and distribution evaluations, purchase invoices become canonical suppliers, invoices and
+lines, TRIGGERED evaluations become typed, ranked priority candidates, those candidates become
+persistent Decisions with a lifecycle and a memory, that memory is read over HTTP by a real,
+authenticated, authorized workspace member, and a real user can now log in and see exactly that;
+no recommendation, write endpoint, Decision Detail page, signup, password reset, MFA, OAuth/SSO
+or AI-generated content exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -32,7 +36,7 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [priority-engine-v1.md](priority-engine-v1.md). Decision Layer:
 [decision-layer-v1.md](decision-layer-v1.md). Decision API:
 [decision-api-v1.md](decision-api-v1.md). Authentication & Session:
-[auth-session-v1.md](auth-session-v1.md).
+[auth-session-v1.md](auth-session-v1.md). Oggi UI: [oggi-ui-v1.md](oggi-ui-v1.md).
 
 ## Components
 
@@ -45,11 +49,11 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
-| `apps/web`          | Technical shell: shows whether the API is reachable. No product UI.         |
-| `services/api`      | HTTP API under `/api/v1/` (health, and since Gate 12 the read-only Decision API), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
+| `apps/web`          | Since Gate 14, the real product surface: authenticated shell, login, property selection, the "Oggi" Decision Home. No Decision Detail page, no AI, no charts. |
+| `services/api`      | HTTP API under `/api/v1/` (health, since Gate 12 the read-only Decision API, since Gate 13 auth/session), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
 | `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists (the booking import is not a job yet: there is no file storage). |
 | PostgreSQL          | The single datastore: the multi-tenant core, the bookings, the suppliers and invoices, and the job queue. |
-| `packages/contracts`| A few hand-written TypeScript types mirroring the backend (health, errors). |
+| `packages/contracts`| Hand-written TypeScript types mirroring the backend (health, error envelope, since Gate 13 the auth session context, since Gate 12 the decision feed). |
 
 The worker imports the API package (`app.core.config`, `app.core.logging`): one backend codebase,
 one uv workspace, two entrypoints. Both share the same environment file and database.
@@ -120,6 +124,10 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   cookie contract (`SESSION_COOKIE_NAME`, `set_session_cookie`/`clear_session_cookie`) and the
   now-real `get_current_principal` every other authenticated route (Decision API included)
   depends on, unchanged since Gate 12.
+- **Since Gate 14, `PropertyAccess` (the Session Context's own property shape) additionally
+  carries `timezone`** - the Property's real, non-nullable IANA zone (Gate 1), so a client can
+  compute "today" in the property's own timezone. Additive, no migration, no other field changed;
+  see [oggi-ui-v1.md](oggi-ui-v1.md), "Property timezone".
 - One error shape for every non-2xx response:
   `{"error": {"code", "message", "details", "request_id"}}`. Validation errors never echo the
   submitted values. Unhandled exceptions return a generic `internal_error`.
@@ -136,7 +144,11 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   (gitignored). `.env.example` is the template. Nothing sensitive is hardcoded or committed.
 - `APP_ENV` = `development | test | production`. In production the API refuses to start with
   `DEBUG=true` or a wildcard CORS origin, and interactive docs are disabled.
-- CORS is an explicit allow-list (`CORS_ORIGINS`); empty means no cross-origin access.
+- CORS is an explicit allow-list (`CORS_ORIGINS`); empty means no cross-origin access. Since
+  Gate 14, `allow_credentials=True` as well (the session cookie only crosses the web/API origin
+  boundary in local dev if the browser is told the response may be read with credentials);
+  `allow_origins` is never `"*"` (enforced in production, and Starlette itself never emits a
+  literal `"*"` alongside credentials), so this never combines a wildcard with credentials.
 - The application connects with a dedicated non-superuser role (`ninfa_app`).
 - **Since Gate 13, `app.core.auth.get_current_principal` is a real, first-party resolver**: an
   `HttpOnly`, `SameSite=Lax` session cookie (`ninfa_session`) -> `SHA-256` -> an `AuthSession` row
@@ -388,6 +400,32 @@ always failing. Credential provisioning is CLI-only (`python -m app.cli.auth set
 (`0010_auth_session`), one new dependency (`argon2-cffi`). Details:
 [auth-session-v1.md](auth-session-v1.md), ADR 0019.
 
+## Oggi UI (Gate 14)
+
+`apps/web` stops being a technical shell: an authenticated app, built entirely on Gate 12/13's
+existing contracts. `lib/session/session-context.tsx` (`SessionProvider`/`useSession`) is the one
+piece of shared client state - it calls `GET /auth/session` once on mount (the auth bootstrap),
+never shows authenticated content before that answers, and adopts a login response directly
+rather than re-fetching. `components/app-shell.tsx` (wordmark, property selector, account,
+logout), `components/auth-gate.tsx` (loading -> authenticated | redirect-to-login) and
+`components/login-form.tsx` (email/password, one generic error, no double submit) are the whole
+authenticated frame; `components/oggi-screen.tsx` resolves which property is selected
+(`lib/session/properties.ts`: 0 -> empty state, 1 -> auto-selected, >1 -> a native `<select>`,
+never a free-text id) and `components/today-screen.tsx` requests
+`GET /api/v1/properties/{id}/decision-feed?as_of=<property-local-today>` -
+`lib/date/property-date.ts` computes that date from `Intl.DateTimeFormat`/`formatToParts` in the
+Property's own IANA zone, never UTC, never the browser's. `components/feed-state-view.tsx` renders
+the four `FeedState` values as four distinct branches ("Tutto sotto controllo" only for
+`NO_ACTION_REQUIRED`); `components/decision-list.tsx` presents at most 5 of the (already
+`priority_rank ASC`-ordered) triggered items, a presentation-only slice, never a backend change;
+`lib/decisions/card-view-models.ts` is an explicit, per-`decision_type` adapter over Gate 12's own
+facts whitelist - problem + evidence, never a recommendation, never raw JSON, never a chart.
+`lib/api/client.ts` centralises every HTTP call (`credentials: "include"`, `cache: "no-store"`,
+the Gate 12/13 error envelope parsed into a stable `{code, message}`); no `fetch()` exists
+anywhere else. No global state library, no UI kit, no new runtime dependency; Gate 14's only new
+devDependencies are `jsdom`/`@testing-library/react`/`@testing-library/user-event` (component
+tests only). Zero migration. Details: [oggi-ui-v1.md](oggi-ui-v1.md), ADR 0020.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -409,6 +447,8 @@ baselines (all are non-persistent values, recomputed on demand), a customer-faci
 channel-classification setup workflow (Gate 9's classifier stays entirely in-memory and
 read-only), a sixth detector (e.g. supplier price anomalies), a Decision resolution policy beyond
 explicit CLEAR, backtesting/replaying historical as-of dates, any Decision WRITE endpoint
-(acknowledge/dismiss/snooze/assign/resolve/reopen), a Decision recommendation, pricing or a UI,
+(acknowledge/dismiss/snooze/assign/resolve/reopen), a Decision recommendation or pricing engine,
 budgeting and accruals, currency conversion, AI gateway / narrative / Ask NINFA, notifications,
-payments, analytics, deployment.
+payments, analytics, deployment, a Decision Detail/History page, any chart or graph, a real
+i18n framework (Gate 14's copy is centralised but hardcoded to Italian), a browser-automation/E2E
+test suite, and a frozen NINFA logo asset (the shell uses a plain typographic wordmark).

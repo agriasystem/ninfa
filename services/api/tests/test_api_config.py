@@ -90,3 +90,22 @@ def test_cors_allows_only_configured_origin() -> None:
 
     assert allowed.headers["access-control-allow-origin"] == "https://web.example"
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_cors_allows_credentials_for_the_configured_origin_only() -> None:
+    """Gate 14: the session cookie only crosses origins if the browser is told the response may
+    be read WITH credentials. Starlette's `CORSMiddleware` sends `Access-Control-Allow-Credentials`
+    on every response once configured (see its own `simple_headers`) - that header alone grants
+    nothing: a browser only honours it together with an `Access-Control-Allow-Origin` that matches
+    the request's own Origin, which - per `test_cors_allows_only_configured_origin` above - is
+    ONLY ever echoed back for the configured origin. A denied origin therefore still cannot read
+    the response, regardless of the credentials header's presence.
+    """
+    settings = make_settings(cors_origins=["https://web.example"])
+    client = TestClient(create_app(settings))
+
+    allowed = client.get("/api/v1/health", headers={"Origin": "https://web.example"})
+
+    assert allowed.headers["access-control-allow-credentials"] == "true"
+    assert allowed.headers["access-control-allow-origin"] == "https://web.example"
+    assert allowed.headers["access-control-allow-origin"] != "*"  # never a literal wildcard

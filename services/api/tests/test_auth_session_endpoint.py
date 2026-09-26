@@ -83,6 +83,23 @@ def test_accessible_workspaces_and_properties_are_correct(
     [prop] = workspace["properties"]
     assert prop["id"] == str(tenant.property.id)
     assert prop["slug"] == tenant.property.slug
+    assert prop["timezone"] == tenant.property.timezone  # Gate 14: property-local "today"
+
+
+def test_property_timezone_reflects_a_non_default_real_value(
+    api_client: TestClient, factory: BookingFactory, db_session: Session
+) -> None:
+    """Proves `timezone` is read from the real row, never hardcoded to the model's own default."""
+    tenant = factory.tenant()
+    tenant.property.timezone = "America/New_York"
+    db_session.flush()
+    user = provision_user_with_password(factory, db_session)
+    factory.membership(tenant.workspace, user)
+    _login(api_client, user.email)
+
+    body = api_client.get(SESSION_PATH).json()
+    [prop] = body["workspaces"][0]["properties"]
+    assert prop["timezone"] == "America/New_York"
 
 
 def test_cross_workspace_memberships_all_appear(
