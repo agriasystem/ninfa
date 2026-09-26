@@ -59,6 +59,7 @@ describe("buildDecisionCardData", () => {
       facts: {
         stay_date: "2026-10-01",
         kind: "PICKUP",
+        window_days: 7,
         actual_pickup: 3,
         expected_pickup: "7.50",
         delta_rooms: "-4.50",
@@ -70,6 +71,7 @@ describe("buildDecisionCardData", () => {
     expect(data.card).toEqual({
       kind: "PICKUP",
       stayDate: "2026-10-01",
+      windowDays: 7,
       actualPickup: 3,
       expectedPickup: "7.50",
       deltaRooms: "-4.50",
@@ -145,6 +147,7 @@ describe("buildDecisionCardData", () => {
         actual_cpor_exact: "12.40",
         expected_cpor_exact: "9.00",
         delta_cpor_exact: "3.40",
+        delta_percent_exact: "37.78",
       },
       economic_proxy: { label: "cost_gap_proxy", amount: "482.30", currency: "EUR" },
     });
@@ -155,6 +158,7 @@ describe("buildDecisionCardData", () => {
       costCategory: "FOOD_AND_BEVERAGE",
       periodStart: "2026-09-01",
       currency: "EUR",
+      deltaPercent: "37.78",
       actualCpor: "12.40",
       expectedCpor: "9.00",
       deltaCpor: "3.40",

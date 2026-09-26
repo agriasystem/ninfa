@@ -36,39 +36,47 @@ function item(rank: number, decisionId: string): FeedItemResponse {
 describe("DecisionList", () => {
   it("renders every item when there are 5 or fewer", () => {
     const items = [item(1, "d1"), item(2, "d2"), item(3, "d3")];
-    render(<DecisionList items={items} />);
+    render(<DecisionList items={items} propertyId="prop-1" />);
 
     expect(screen.getAllByText("Pickup sotto le attese")).toHaveLength(3);
   });
 
   it("renders at most 5 cards when the API returns 8 candidates", () => {
     const items = Array.from({ length: 8 }, (_, index) => item(index + 1, `d${index + 1}`));
-    render(<DecisionList items={items} />);
+    render(<DecisionList items={items} propertyId="prop-1" />);
 
     expect(screen.getAllByText("Pickup sotto le attese")).toHaveLength(5);
   });
 
   it("shows a discreet '+N altre decisioni' indication when there are more than 5", () => {
     const items = Array.from({ length: 8 }, (_, index) => item(index + 1, `d${index + 1}`));
-    render(<DecisionList items={items} />);
+    render(<DecisionList items={items} propertyId="prop-1" />);
 
     expect(screen.getByText("+ 3 altre decisioni")).not.toBeNull();
   });
 
   it("shows no '+N altre decisioni' when there are 5 or fewer", () => {
     const items = [item(1, "d1")];
-    render(<DecisionList items={items} />);
+    render(<DecisionList items={items} propertyId="prop-1" />);
 
     expect(screen.queryByText(/altre decisioni/)).toBeNull();
   });
 
   it("preserves the backend's own order (priority_rank ASC) - never re-sorts by anything else", () => {
     const items = [item(1, "first"), item(2, "second"), item(3, "third")];
-    const { container } = render(<DecisionList items={items} />);
+    const { container } = render(<DecisionList items={items} propertyId="prop-1" />);
 
     const ranks = Array.from(container.querySelectorAll(".decision-card__rank")).map(
       (element) => element.textContent,
     );
     expect(ranks).toEqual(["#1", "#2", "#3"]);
+  });
+
+  it("makes every card a real link to its Decision Detail page, with property + decision ids", () => {
+    const items = [item(1, "dec-abc")];
+    render(<DecisionList items={items} propertyId="prop-1" />);
+
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("href")).toBe("/oggi/decisioni/dec-abc?property=prop-1");
   });
 });

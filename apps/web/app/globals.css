@@ -485,3 +485,252 @@ select {
 .detail {
   color: var(--color-text-secondary);
 }
+
+/* --- decision card as a link (Gate 15) ------------------------------------------------------ */
+
+.decision-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-md);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.decision-card-link:hover .decision-card {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-elevated);
+}
+
+.decision-card-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* --- decision detail (Gate 15) -------------------------------------------------------------- */
+
+.decision-detail {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.decision-detail__back {
+  margin-bottom: var(--space-6);
+}
+
+.decision-detail__back a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-size: 0.9375rem;
+}
+
+.decision-detail__back a:hover {
+  color: var(--color-accent);
+}
+
+.decision-detail__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.decision-detail__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.decision-detail__title {
+  font-size: 1.625rem;
+}
+
+.decision-detail__target {
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+}
+
+.decision-detail__status {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+}
+
+.decision-detail__current-state,
+.decision-detail__current-observation,
+.decision-detail__evidence {
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.decision-detail__current-state p,
+.decision-detail__episodes {
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  margin: var(--space-1) 0;
+}
+
+.decision-detail__event {
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+
+.decision-detail__priority {
+  color: var(--color-accent);
+  font-size: 0.875rem;
+  margin: 0 0 var(--space-3);
+}
+
+.decision-detail__why h2,
+.decision-detail__evidence h2 {
+  font-size: 1.0625rem;
+  margin-bottom: var(--space-2);
+}
+
+.decision-detail__why p {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.decision-detail__evidence-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-6);
+  margin: 0 0 var(--space-4);
+}
+
+.decision-detail__evidence-list dt {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.decision-detail__evidence-list dd {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.decision-detail__evidence-list div:has(> dd:only-child) {
+  grid-column: 1 / -1;
+}
+
+.decision-detail__proxy {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.decision-detail__not-found,
+.decision-detail__error {
+  padding: var(--space-8) var(--space-6);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.decision-detail__not-found h1 {
+  font-size: 1.25rem;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.decision-detail__skeleton,
+.decision-timeline__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.decision-detail__skeleton-line {
+  height: 64px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--color-surface) 25%, var(--color-background) 37%, var(--color-surface) 63%);
+  background-size: 400% 100%;
+  animation: today-screen-skeleton-shimmer 1.6s ease-in-out infinite;
+  border: 1px solid var(--color-border);
+}
+
+/* --- decision timeline (Gate 15) ------------------------------------------------------------ */
+
+.decision-timeline {
+  margin-top: var(--space-8);
+}
+
+.decision-timeline__heading {
+  font-size: 1.25rem;
+  margin-bottom: var(--space-4);
+}
+
+.decision-timeline__empty {
+  color: var(--color-text-secondary);
+}
+
+.decision-timeline__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 2px solid var(--color-border);
+}
+
+.decision-timeline__item {
+  position: relative;
+  padding: 0 0 var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.decision-timeline__item::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.decision-timeline__date {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.decision-timeline__event {
+  font-weight: 600;
+}
+
+.decision-timeline__fact,
+.decision-timeline__rank {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.decision-timeline__error {
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+  font-size: 0.875rem;
+}
+
+.decision-timeline button {
+  margin-top: var(--space-2);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+@media (max-width: 480px) {
+  .decision-detail__evidence-list {
+    grid-template-columns: 1fr;
+  }
+
+  .decision-detail__current-state,
+  .decision-detail__current-observation,
+  .decision-detail__evidence {
+    padding: var(--space-4);
+  }
+}

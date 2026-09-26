@@ -1,4 +1,10 @@
-import type { DecisionFeedResponse, FeedItemResponse } from "@ninfa/contracts";
+import type {
+  DecisionDetailResponse,
+  DecisionFeedResponse,
+  DecisionHistoryResponse,
+  FeedItemResponse,
+  ObservationDetail,
+} from "@ninfa/contracts";
 
 /**
  * Golden Oggi UI fixtures (Gate 14): hand-authored `DecisionFeedResponse` payloads, built the
@@ -334,3 +340,227 @@ export const GOLDEN_ACTION_REQUIRED_EIGHT_ITEMS: DecisionFeedResponse = baseFeed
     extraTriggeredItem(8, "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa8"),
   ],
 });
+
+// --- Decision Detail V1 golden scenarios (Gate 15) ------------------------------------------
+//
+// Built from the SAME feed-item fixtures above (target/facts are decision-level, not feed-
+// specific), reshaped into the real Decision Detail/History contract
+// (`app/api/v1/decisions/schemas.py::DecisionDetailResponse`/`ObservationDetail`) - never
+// derived from the frontend adapters under test.
+
+function observationFromFeedItem(
+  item: FeedItemResponse,
+  overrides: Partial<ObservationDetail> = {},
+): ObservationDetail {
+  return {
+    observation_id: `obs-${item.decision_id}`,
+    as_of_local_date: item.last_seen_local_date,
+    source_status: item.source_status,
+    lifecycle_transition: item.transition,
+    source_evaluation_fingerprint: `fp-${item.decision_id}`,
+    source_target_key: `key-${item.decision_id}`,
+    reason_codes: item.reason_codes,
+    confidence_score: item.priority?.confidence_score ?? "0.80",
+    priority: item.priority,
+    facts: item.facts,
+    evidence: item.evidence,
+    economic_proxy: item.economic_proxy,
+    memory_version: "decision-memory-v1",
+    ...overrides,
+  };
+}
+
+function detailFromFeedItem(
+  item: FeedItemResponse,
+  overrides: Partial<DecisionDetailResponse> = {},
+): DecisionDetailResponse {
+  return {
+    decision_id: item.decision_id,
+    decision_type: item.decision_type,
+    status: item.lifecycle_status,
+    first_seen_local_date: item.first_seen_local_date,
+    last_seen_local_date: item.last_seen_local_date,
+    last_evaluated_local_date: item.last_seen_local_date,
+    resolved_local_date: null,
+    episode_count: item.episode_count,
+    triggered_observation_count: 1,
+    target: item.target,
+    latest_observation: observationFromFeedItem(item),
+    decision_api_version: "decision-api-v1",
+    ...overrides,
+  };
+}
+
+/** A. OPEN, latest observation TRIGGERED with a real priority rank - history newest-first,
+ * OBSERVED (the repeat trigger) before the original OPENED. */
+export const GOLDEN_DETAIL_OPEN_TRIGGERED: DecisionDetailResponse = detailFromFeedItem(
+  GOLDEN_PICKUP_ITEM,
+  { first_seen_local_date: "2026-09-18", episode_count: 1 },
+);
+
+export const GOLDEN_HISTORY_OPEN_TRIGGERED: DecisionHistoryResponse = {
+  items: [
+    observationFromFeedItem(GOLDEN_PICKUP_ITEM, {
+      observation_id: "obs-pickup-observed",
+      as_of_local_date: "2026-09-26",
+      lifecycle_transition: "OBSERVED",
+    }),
+    observationFromFeedItem(GOLDEN_PICKUP_ITEM, {
+      observation_id: "obs-pickup-opened",
+      as_of_local_date: "2026-09-18",
+      lifecycle_transition: "OPENED",
+    }),
+  ],
+  next_cursor: null,
+};
+
+/** B. RESOLVED: the latest observation is CLEAR (no priority at all), a real resolved date, and
+ * the timeline includes the RESOLVED transition. */
+export const GOLDEN_DETAIL_RESOLVED: DecisionDetailResponse = detailFromFeedItem(GOLDEN_OCCUPANCY_ITEM, {
+  status: "RESOLVED",
+  first_seen_local_date: "2026-09-10",
+  resolved_local_date: "2026-09-24",
+  episode_count: 1,
+  latest_observation: observationFromFeedItem(GOLDEN_OCCUPANCY_ITEM, {
+    observation_id: "obs-occupancy-resolved",
+    as_of_local_date: "2026-09-24",
+    source_status: "CLEAR",
+    lifecycle_transition: "RESOLVED",
+    priority: null,
+    economic_proxy: null,
+  }),
+});
+
+export const GOLDEN_HISTORY_RESOLVED: DecisionHistoryResponse = {
+  items: [
+    observationFromFeedItem(GOLDEN_OCCUPANCY_ITEM, {
+      observation_id: "obs-occupancy-resolved",
+      as_of_local_date: "2026-09-24",
+      source_status: "CLEAR",
+      lifecycle_transition: "RESOLVED",
+      priority: null,
+      economic_proxy: null,
+    }),
+    observationFromFeedItem(GOLDEN_OCCUPANCY_ITEM, {
+      observation_id: "obs-occupancy-opened",
+      as_of_local_date: "2026-09-10",
+      lifecycle_transition: "OPENED",
+    }),
+  ],
+  next_cursor: null,
+};
+
+/** C. REOPENED: the SAME logical decision, episode_count > 1, a full OPENED -> OBSERVED ->
+ * RESOLVED -> REOPENED history. */
+export const GOLDEN_DETAIL_REOPENED: DecisionDetailResponse = detailFromFeedItem(GOLDEN_OTA_ITEM, {
+  status: "OPEN",
+  first_seen_local_date: "2026-08-01",
+  resolved_local_date: null,
+  episode_count: 2,
+  latest_observation: observationFromFeedItem(GOLDEN_OTA_ITEM, {
+    observation_id: "obs-ota-reopened",
+    as_of_local_date: "2026-09-26",
+    lifecycle_transition: "REOPENED",
+  }),
+});
+
+export const GOLDEN_HISTORY_REOPENED: DecisionHistoryResponse = {
+  items: [
+    observationFromFeedItem(GOLDEN_OTA_ITEM, {
+      observation_id: "obs-ota-reopened",
+      as_of_local_date: "2026-09-26",
+      lifecycle_transition: "REOPENED",
+    }),
+    observationFromFeedItem(GOLDEN_OTA_ITEM, {
+      observation_id: "obs-ota-resolved",
+      as_of_local_date: "2026-09-10",
+      source_status: "CLEAR",
+      lifecycle_transition: "RESOLVED",
+      priority: null,
+      economic_proxy: null,
+    }),
+    observationFromFeedItem(GOLDEN_OTA_ITEM, {
+      observation_id: "obs-ota-observed",
+      as_of_local_date: "2026-08-15",
+      lifecycle_transition: "OBSERVED",
+    }),
+    observationFromFeedItem(GOLDEN_OTA_ITEM, {
+      observation_id: "obs-ota-opened",
+      as_of_local_date: "2026-08-01",
+      lifecycle_transition: "OPENED",
+    }),
+  ],
+  next_cursor: null,
+};
+
+/** D. The latest observation is INSUFFICIENT_DATA: the Decision stays OPEN, has no priority,
+ * and the copy must never imply the problem was resolved. */
+export const GOLDEN_DETAIL_INSUFFICIENT_LATEST: DecisionDetailResponse = detailFromFeedItem(
+  GOLDEN_COST_ITEM,
+  {
+    status: "OPEN",
+    first_seen_local_date: "2026-09-01",
+    resolved_local_date: null,
+    episode_count: 1,
+    latest_observation: observationFromFeedItem(GOLDEN_COST_ITEM, {
+      observation_id: "obs-cost-insufficient",
+      as_of_local_date: "2026-09-26",
+      source_status: "INSUFFICIENT_DATA",
+      lifecycle_transition: "NO_STATE_CHANGE",
+      priority: null,
+      economic_proxy: null,
+    }),
+  },
+);
+
+export const GOLDEN_HISTORY_INSUFFICIENT_LATEST: DecisionHistoryResponse = {
+  items: [
+    observationFromFeedItem(GOLDEN_COST_ITEM, {
+      observation_id: "obs-cost-insufficient",
+      as_of_local_date: "2026-09-26",
+      source_status: "INSUFFICIENT_DATA",
+      lifecycle_transition: "NO_STATE_CHANGE",
+      priority: null,
+      economic_proxy: null,
+    }),
+    observationFromFeedItem(GOLDEN_COST_ITEM, {
+      observation_id: "obs-cost-opened",
+      as_of_local_date: "2026-09-01",
+      lifecycle_transition: "OPENED",
+    }),
+  ],
+  next_cursor: null,
+};
+
+/** E. History pagination: more observations exist than the first page returns - the second page
+ * appends strictly older entries, never replacing the first. */
+export const GOLDEN_DETAIL_FOR_PAGINATION: DecisionDetailResponse = detailFromFeedItem(GOLDEN_LABOR_ITEM, {
+  first_seen_local_date: "2026-07-01",
+  episode_count: 1,
+});
+
+export const GOLDEN_HISTORY_PAGE_1: DecisionHistoryResponse = {
+  items: [
+    observationFromFeedItem(GOLDEN_LABOR_ITEM, {
+      observation_id: "obs-labor-p1-a",
+      as_of_local_date: "2026-09-26",
+    }),
+    observationFromFeedItem(GOLDEN_LABOR_ITEM, {
+      observation_id: "obs-labor-p1-b",
+      as_of_local_date: "2026-09-19",
+      lifecycle_transition: "OBSERVED",
+    }),
+  ],
+  next_cursor: "opaque-cursor-page-2",
+};
+
+export const GOLDEN_HISTORY_PAGE_2: DecisionHistoryResponse = {
+  items: [
+    observationFromFeedItem(GOLDEN_LABOR_ITEM, {
+      observation_id: "obs-labor-p2-a",
+      as_of_local_date: "2026-07-01",
+      lifecycle_transition: "OPENED",
+    }),
+  ],
+  next_cursor: null,
+};

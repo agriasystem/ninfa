@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { DecisionCardData, DecisionCardViewModel } from "@/lib/decisions/card-view-models";
 import { formatCount, formatDecimal, formatHours, formatMoney, formatPercent } from "@/lib/decisions/format";
 import { copy } from "@/lib/copy";
@@ -170,12 +172,17 @@ function FactsFor({ card }: { card: DecisionCardViewModel }) {
 
 export interface DecisionCardProps {
   data: DecisionCardData;
+  /** When given, the whole card becomes a real, keyboard-accessible link to its Decision Detail
+   * page - never a `div onClick`. Omitted entirely where a card should not be navigable (there
+   * is no such case in Gate 14/15's own UI: a card only ever exists for a real, triggered
+   * decision). */
+  href?: string;
 }
 
 /** Problem + evidence, never a recommendation: no "Abbassa il prezzo", no "Riduci il personale" -
  * the exact five facts adapters above are the ONLY thing this card knows how to render. */
-export function DecisionCard({ data }: DecisionCardProps) {
-  return (
+export function DecisionCard({ data, href }: DecisionCardProps) {
+  const content = (
     <article className="decision-card">
       <header className="decision-card__header">
         <span className="decision-card__rank" aria-label={`${copy.today.rankLabel} ${data.rank}`}>
@@ -199,5 +206,14 @@ export function DecisionCard({ data }: DecisionCardProps) {
         ) : null}
       </footer>
     </article>
+  );
+
+  if (href === undefined) {
+    return content;
+  }
+  return (
+    <Link href={href} className="decision-card-link">
+      {content}
+    </Link>
   );
 }

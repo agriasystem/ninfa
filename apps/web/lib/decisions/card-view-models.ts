@@ -1,6 +1,7 @@
 import type {
   CostDecisionTarget,
   DecisionFacts,
+  DecisionTarget,
   EconomicProxy,
   FeedItemResponse,
   LaborDecisionTarget,
@@ -19,12 +20,14 @@ import { decisionTypeTitles } from "@/lib/copy";
  * ever parses one back into a number for a decision (no ranking, no thresholding).
  */
 
-function textOf(facts: DecisionFacts, key: string): string | null {
+/** Exported for reuse by `lib/decisions/evidence-rows.ts` (Gate 15), which reads the SAME
+ * `evidence` record shape, never a duplicate reader. */
+export function textOf(facts: DecisionFacts, key: string): string | null {
   const value = facts[key];
   return typeof value === "string" ? value : null;
 }
 
-function numberOf(facts: DecisionFacts, key: string): number | null {
+export function numberOf(facts: DecisionFacts, key: string): number | null {
   const value = facts[key];
   return typeof value === "number" ? value : null;
 }
@@ -37,6 +40,7 @@ function boolOf(facts: DecisionFacts, key: string): boolean | null {
 export interface PickupCardViewModel {
   kind: "PICKUP";
   stayDate: string;
+  windowDays: number | null;
   actualPickup: number | null;
   expectedPickup: string | null;
   deltaRooms: string | null;
@@ -70,6 +74,7 @@ export interface CostCardViewModel {
   actualCpor: string | null;
   expectedCpor: string | null;
   deltaCpor: string | null;
+  deltaPercent: string | null;
 }
 
 export interface LaborCardViewModel {
@@ -101,6 +106,7 @@ function pickupCard(target: RevenueDecisionTarget, facts: DecisionFacts): Pickup
   return {
     kind: "PICKUP",
     stayDate: target.stay_date,
+    windowDays: numberOf(facts, "window_days"),
     actualPickup: numberOf(facts, "actual_pickup"),
     expectedPickup: textOf(facts, "expected_pickup"),
     deltaRooms: textOf(facts, "delta_rooms"),
@@ -140,6 +146,7 @@ function costCard(target: CostDecisionTarget, facts: DecisionFacts): CostCardVie
     actualCpor: textOf(facts, "actual_cpor_exact"),
     expectedCpor: textOf(facts, "expected_cpor_exact"),
     deltaCpor: textOf(facts, "delta_cpor_exact"),
+    deltaPercent: textOf(facts, "delta_percent_exact"),
   };
 }
 
@@ -154,8 +161,17 @@ function laborCard(target: LaborDecisionTarget, facts: DecisionFacts): LaborCard
   };
 }
 
-function cardViewModelOf(item: FeedItemResponse): DecisionCardViewModel {
-  const { target, facts } = item;
+/**
+ * The shared dispatcher: a `target` + `facts` pair (whatever they came from - a feed item, a
+ * Decision Detail's `latest_observation`, or one historical `ObservationDetail` - target is
+ * always the DECISION's own, facts belong to the specific observation) -> a typed view model.
+ * Gate 15's detail/history adapters call this directly instead of duplicating the per-type
+ * mapping functions above.
+ */
+export function cardViewModelFromTargetAndFacts(
+  target: DecisionTarget,
+  facts: DecisionFacts,
+): DecisionCardViewModel {
   switch (target.type) {
     case "REV_PICKUP_LOW":
       return pickupCard(target, facts);
@@ -170,7 +186,13 @@ function cardViewModelOf(item: FeedItemResponse): DecisionCardViewModel {
   }
 }
 
-function confidencePercentOf(confidenceScore: string): number | null {
+function cardViewModelOf(item: FeedItemResponse): DecisionCardViewModel {
+  return cardViewModelFromTargetAndFacts(item.target, item.facts);
+}
+
+/** Exported for reuse by `lib/decisions/evidence-rows.ts` (Gate 15): the SAME confidence-to-
+ * percent conversion used here, never a second implementation. */
+export function confidencePercentOf(confidenceScore: string): number | null {
   const value = Number.parseFloat(confidenceScore);
   return Number.isFinite(value) ? Math.round(value * 100) : null;
 }

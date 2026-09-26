@@ -21,7 +21,15 @@ function base(overrides: Partial<DecisionCardData>): DecisionCardData {
     title: "Pickup sotto le attese",
     confidencePercent: 82,
     economicProxy: null,
-    card: { kind: "PICKUP", stayDate: "2026-10-01", actualPickup: 3, expectedPickup: "7.50", deltaRooms: "-4.50", missingRooms: "4.50" },
+    card: {
+      kind: "PICKUP",
+      stayDate: "2026-10-01",
+      windowDays: 7,
+      actualPickup: 3,
+      expectedPickup: "7.50",
+      deltaRooms: "-4.50",
+      missingRooms: "4.50",
+    },
     ...overrides,
   };
 }
@@ -96,6 +104,7 @@ describe("DecisionCard", () => {
         actualCpor: "12.40",
         expectedCpor: "9.00",
         deltaCpor: "3.40",
+        deltaPercent: "37.78",
       },
       economicProxy: { label: "cost_gap_proxy", amount: "482.30", currency: "EUR" },
     });
@@ -157,5 +166,20 @@ describe("DecisionCard", () => {
     const { container } = render(<DecisionCard data={base({ confidencePercent: null })} />);
 
     expect(container.textContent).not.toContain("Affidabilità");
+  });
+
+  it("renders as a real, keyboard-focusable link when href is given - never a div onClick", () => {
+    render(<DecisionCard data={base({})} href="/oggi/decisioni/dec-1?property=prop-1" />);
+
+    const link = screen.getByRole("link");
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("/oggi/decisioni/dec-1?property=prop-1");
+    expect(link.tabIndex).not.toBe(-1);
+  });
+
+  it("renders as plain (non-interactive) content when no href is given", () => {
+    render(<DecisionCard data={base({})} />);
+
+    expect(screen.queryByRole("link")).toBeNull();
   });
 });

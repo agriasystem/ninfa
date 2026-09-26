@@ -119,7 +119,9 @@ The API already returns every triggered candidate, ordered `priority_rank ASC`
 (`DecisionRepository.feed_rows()`, Gate 12). `components/decision-list.tsx` does exactly one
 thing beyond rendering: `items.slice(0, 5)` - a presentation limit, never a backend change, never
 a re-sort, never a re-filter. When more than 5 candidates exist, a single discreet line ("+ N
-altre decisioni") is shown, with no link to a page that does not exist yet.
+altre decisioni") is shown, with no link to a further list page (that still does not exist) - only
+the 5 visible cards are individually navigable, each to its own Decision Detail page (Gate 15, see
+[decision-detail-ui-v1.md](decision-detail-ui-v1.md)).
 
 ## Decision cards, five types
 
@@ -227,7 +229,8 @@ an icon-free but distinct visual treatment).
 
 ## Limitations (intentional, documented debt)
 
-- No Decision Detail page, no Ask NINFA, no AI-generated text, no recommendation engine.
+- No Ask NINFA, no AI-generated text, no recommendation engine (a Decision Detail page exists as
+  of Gate 15 - see [decision-detail-ui-v1.md](decision-detail-ui-v1.md)).
 - No signup, password reset, OAuth or MFA (unchanged from Gate 13).
 - No i18n framework - copy is centralised (`lib/copy.ts`) but hardcoded to Italian.
 - No dedicated E2E/browser-automation suite (Playwright or similar) - visual acceptance at the

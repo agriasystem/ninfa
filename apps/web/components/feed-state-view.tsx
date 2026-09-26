@@ -56,7 +56,7 @@ export function FeedStateView({ feed }: FeedStateViewProps) {
     case "ACTION_REQUIRED":
       return (
         <section className="feed-state feed-state--action-required" data-feed-state="ACTION_REQUIRED">
-          <DecisionList items={feed.items} />
+          <DecisionList items={feed.items} propertyId={feed.property_id} />
         </section>
       );
   }
