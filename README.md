@@ -2,24 +2,25 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 12 (Decision API V1, `decision-api-v1`), a READ-ONLY HTTP surface over the
-> Decision Layer, behind a fail-closed authorization boundary.** Still no product feature beyond
-> that: the technical base, the multi-tenant data core, the import of booking files into canonical
-> bookings, the daily snapshots derived from them (observed vs reconstructed), the Expected
-> baselines (a historical level with its confidence, not a forecast), two revenue detectors that
-> return typed evaluations, since Gate 6 a workspace-wide supplier registry with canonical invoices
-> and lines (no PDF/OCR), since Gate 7 one cost detector (cost per occupied room, an operating
-> proxy, one currency at a time), since Gate 8 canonical labor entries (minutes, never an employee
-> identity) with one staffing detector reusing Gate 5's own demand forecast, since Gate 9 a
-> read-only, in-memory channel classifier and a fifth detector measuring OTA concentration, since
-> Gate 10 a pure, database-free engine that ranks every TRIGGERED signal deterministically, since
-> Gate 11 a persistence layer that recognises the SAME operational problem across many days of
-> observations (never a new Decision just because the as-of date, priority score or rank changed),
-> resolves it only on an explicit CLEAR, reopens the same Decision id on a later TRIGGERED, and
-> keeps every day's Observation immutable, and since Gate 12 four `GET` endpoints (feed, list,
-> detail, history) that read exactly that memory - server-derived tenant scope, no spoofable
-> header, cursor pagination, exact Decimal as a string, no priority recalculation, no detector
-> execution, and still no recommendation, AI, write endpoint, notification or scheduler.
+> **Status: Gate 13 (Authentication & Session V1, `auth-session-v1`), first-party email+password
+> login with an opaque, server-side session - the fail-closed seam Gate 12 left is now genuinely
+> resolvable.** Still no product feature beyond that: the technical base, the multi-tenant data
+> core, the import of booking files into canonical bookings, the daily snapshots derived from them
+> (observed vs reconstructed), the Expected baselines (a historical level with its confidence, not
+> a forecast), two revenue detectors that return typed evaluations, since Gate 6 a workspace-wide
+> supplier registry with canonical invoices and lines (no PDF/OCR), since Gate 7 one cost detector
+> (cost per occupied room, an operating proxy, one currency at a time), since Gate 8 canonical
+> labor entries (minutes, never an employee identity) with one staffing detector reusing Gate 5's
+> own demand forecast, since Gate 9 a read-only, in-memory channel classifier and a fifth detector
+> measuring OTA concentration, since Gate 10 a pure, database-free engine that ranks every
+> TRIGGERED signal deterministically, since Gate 11 a persistence layer that recognises the SAME
+> operational problem across many days of observations, resolves it only on an explicit CLEAR,
+> reopens the same Decision id on a later TRIGGERED, and keeps every day's Observation immutable,
+> since Gate 12 four `GET` endpoints (feed, list, detail, history) that read exactly that memory
+> behind a server-derived tenant scope, and since Gate 13 real login/logout/session-context
+> endpoints (Argon2id, HttpOnly opaque session cookie, 5-failures/15-minute lockout, no JWT, no
+> sliding expiry) that make Gate 12's own `get_current_principal` genuinely resolvable - no
+> spoofable header, no OAuth/SSO/MFA yet, no signup, no password reset, still no UI.
 
 ## Layout
 
@@ -61,4 +62,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Priority Engine v1](docs/architecture/priority-engine-v1.md) — cross-domain ranking of TRIGGERED signals: normalized severity, detector-aware urgency, confidence reuse, fixed actionability, exact-Decimal scoring, deterministic tie-break
 - [Decision Layer v1](docs/architecture/decision-layer-v1.md) — persistent Decision identity, cross-day deduplication, OPEN/RESOLVED lifecycle, explicit CLEAR resolution, reopening, immutable observation history, Decision Memory
 - [Decision API v1](docs/architecture/decision-api-v1.md) — read-only feed/list/detail/history over the Decision Layer, fail-closed auth, server-derived tenant, cursor pagination, exact Decimal as string
+- [Authentication & Session v1](docs/architecture/auth-session-v1.md) — email+password login, Argon2id, opaque server-side session, HttpOnly cookie, lockout, credential provisioning CLI
 - [Architecture decision records](docs/architecture/adr/)

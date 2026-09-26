@@ -16,6 +16,9 @@ dependencies = [
     "tzdata>=2025.2",
     # Reads .xlsx booking exports (streaming read-only mode). The only new dependency of Gate 2.
     "openpyxl>=3.1.5,<3.2",
+    # Argon2id password hashing (Gate 13). No existing dependency provides it; this is the
+    # mature, maintained CFFI binding the OWASP/Argon2 reference implementation ships.
+    "argon2-cffi>=25.1,<26",
 ]
 
 [dependency-groups]

@@ -1,4 +1,4 @@
-# NINFA — Architecture v1 (Gates 0–12)
+# NINFA — Architecture v1 (Gates 0–13)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
@@ -9,15 +9,17 @@ detector (Gate 8), the fifth and last MVP detector, OTA distribution dependency 
 Priority Engine (Gate 10), which ranks whatever the five detectors already called TRIGGERED — it
 decides nothing a detector did not already decide —, Decision Persistence, Lifecycle and Memory
 (Gate 11), which turns a ranked, non-persistent signal into a persistent Decision identity with an
-OPEN/RESOLVED lifecycle and an immutable observation history, and the Decision API (Gate 12), the
+OPEN/RESOLVED lifecycle and an immutable observation history, the Decision API (Gate 12), the
 first business-facing HTTP surface: four READ-ONLY endpoints over that memory, behind a
-fail-closed authorization boundary. Still no product feature beyond reading that memory: data goes
+fail-closed authorization boundary, and Authentication & Session (Gate 13), which fills that
+boundary in for real: first-party email+password login, Argon2id, an opaque server-side session
+behind an `HttpOnly` cookie. Still no product feature beyond reading that memory: data goes
 in, is stored correctly, is turned into daily "on the books" facts, into a historical "expected
 level" and into typed revenue, cost, labor and distribution evaluations, purchase invoices become
 canonical suppliers, invoices and lines, TRIGGERED evaluations become typed, ranked priority
 candidates, those candidates become persistent Decisions with a lifecycle and a memory, and that
-memory can now be read over HTTP by an authorized workspace member; no recommendation, write
-endpoint, real login system or UI exists yet.
+memory can now be read over HTTP by a real, authenticated, authorized workspace member; no
+recommendation, write endpoint, signup, password reset, MFA, OAuth/SSO or UI exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -29,7 +31,8 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [ota-dependency-v1.md](ota-dependency-v1.md). Priority Engine:
 [priority-engine-v1.md](priority-engine-v1.md). Decision Layer:
 [decision-layer-v1.md](decision-layer-v1.md). Decision API:
-[decision-api-v1.md](decision-api-v1.md).
+[decision-api-v1.md](decision-api-v1.md). Authentication & Session:
+[auth-session-v1.md](auth-session-v1.md).
 
 ## Components
 
@@ -58,7 +61,7 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Fourteen modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership),
+- Fifteen modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership),
   `properties` (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings`
   since Gate 2, `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3,
   `intelligence/expected` (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the
@@ -72,14 +75,18 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   `intelligence/distribution` since Gate 9 (no model: the REV_OTA_DEPENDENCY detector reads
   Gate 2's `BookingChannel`/`Booking` and Gate 3's `BookingSnapshot` directly and writes none of
   them), `intelligence/priority` since Gate 10 (no model: it reads the four detector modules'
-  own evaluation types and writes nothing), and `decisions` (DecisionRun, Decision,
+  own evaluation types and writes nothing), `decisions` (DecisionRun, Decision,
   DecisionObservation) with `decision_memory` (no model: an internal read side over `decisions`'
-  own repository) since Gate 11. Importing `app.models` registers every model.
+  own repository) since Gate 11, and `auth` (UserCredential, AuthSession) since Gate 13 - kept
+  separate from `identity` (User): a User's identity and its authenticator(s) are two different
+  lifecycles, and `identity` is imported by nearly every other module while `auth` should not
+  need to be. Importing `app.models` registers every model.
 - Application services (`bookings/service.py`, `snapshots/observed.py`,
   `snapshots/reconstruction.py`, `intelligence/expected/service.py`,
   `intelligence/revenue/service.py`, `invoices/service.py`, `suppliers/resolution.py`,
   `labor/service.py`, `intelligence/demand/service.py`, `intelligence/labor/service.py`,
-  `intelligence/distribution/service.py`, `decisions/service.py`, `decision_memory/service.py`)
+  `intelligence/distribution/service.py`, `decisions/service.py`, `decision_memory/service.py`,
+  `auth/service.py`)
   are plain classes: they depend on a `Session` and a
   `TenantContext`, never on FastAPI (a test enforces it), so a future worker or authenticated
   endpoint can call them as they are. Framework-free exceptions live in `app/core/exceptions.py`.
@@ -89,6 +96,9 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   11, the first WRITE-capable service outside ingestion/canonicalisation: `DecisionService.sync()`
   owns its own transaction (validate, lock, load, apply the lifecycle, insert, commit/rollback as
   one unit), the same posture `LaborImportService`/`InvoiceImportService` already established.
+  `auth/service.py`'s `AuthService` is the ONE exception to "depends on a `TenantContext`" - a
+  `User`/credential/session is never tenant-scoped (a `User` can belong to several workspaces),
+  so it depends only on a `Session` and an injectable clock (`app.core.clock.Clock`).
 - The directories for the still-future domains (`normalization`,
   `data_quality`, `intelligence/{detection,impact,recommendation}`, `ai/*`) are empty package
   markers so the structure is settled before those domains land. `intelligence/priority` and
@@ -98,14 +108,18 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 ## API conventions
 
 - Versioned prefix `/api/v1/`. Health: `GET /api/v1/health` → `{status, service, version}`.
-- **Since Gate 12, the first business endpoints are exposed: the read-only Decision API**
-  (`/api/v1/properties/{property_id}/decision-feed`, `/decisions`, `/decisions/{decision_id}`,
-  `/decisions/{decision_id}/history` - see [decision-api-v1.md](decision-api-v1.md)). Every one is
-  `GET`-only, behind the fail-closed authorization boundary below - no CRUD, no faked tenant
-  header. `app/api/v1/decisions/` holds this gate's own `router.py`, `deps.py` (auth/tenant
-  resolution), `schemas.py` (response DTOs), `serializers.py` (ORM row -> DTO, whitelisted) and
-  `cursor.py` (opaque keyset pagination) - the same `api/` (HTTP) → `modules/` (business logic)
-  layering as every other gate, just the first time `api/` has more than `health.py` in it.
+- **Since Gate 12, the read-only Decision API** (`/api/v1/properties/{property_id}/decision-feed`,
+  `/decisions`, `/decisions/{decision_id}`, `/decisions/{decision_id}/history` - see
+  [decision-api-v1.md](decision-api-v1.md)). Every one is `GET`-only, behind the authorization
+  boundary below - no CRUD, no faked tenant header. `app/api/v1/decisions/` holds this gate's own
+  `router.py`, `deps.py` (tenant resolution), `schemas.py` (response DTOs), `serializers.py` (ORM
+  row -> DTO, whitelisted) and `cursor.py` (opaque keyset pagination).
+- **Since Gate 13, real authentication:** `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`,
+  `GET /api/v1/auth/session` (see [auth-session-v1.md](auth-session-v1.md)). `app/api/v1/auth/`
+  mirrors the same `router.py`/`schemas.py`/`deps.py` layering; `app/core/auth.py` holds the
+  cookie contract (`SESSION_COOKIE_NAME`, `set_session_cookie`/`clear_session_cookie`) and the
+  now-real `get_current_principal` every other authenticated route (Decision API included)
+  depends on, unchanged since Gate 12.
 - One error shape for every non-2xx response:
   `{"error": {"code", "message", "details", "request_id"}}`. Validation errors never echo the
   submitted values. Unhandled exceptions return a generic `internal_error`.
@@ -124,12 +138,13 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   `DEBUG=true` or a wildcard CORS origin, and interactive docs are disabled.
 - CORS is an explicit allow-list (`CORS_ORIGINS`); empty means no cross-origin access.
 - The application connects with a dedicated non-superuser role (`ninfa_app`).
-- **A real authentication provider is still not implemented.** Since Gate 12,
-  `app.core.auth.get_current_principal` is the one seam a future gate fills in (session cookie,
-  JWT, OAuth/OIDC - not decided here); until then it fails closed with 401 on every request, in
-  production. Authorization (which workspace/property an authenticated caller may reach) IS
-  implemented, V1-scoped: active `WorkspaceMembership` → every property of that workspace (see
-  [decision-api-v1.md](decision-api-v1.md), "Authorization boundary").
+- **Since Gate 13, `app.core.auth.get_current_principal` is a real, first-party resolver**: an
+  `HttpOnly`, `SameSite=Lax` session cookie (`ninfa_session`) -> `SHA-256` -> an `AuthSession` row
+  -> a `User`. No JWT, no OAuth/OIDC yet - see [auth-session-v1.md](auth-session-v1.md), ADR 0019.
+  `Settings.session_cookie_secure` defaults to `True` (HTTPS-only) and production REFUSES to start
+  with it `False`. Authorization (which workspace/property an authenticated caller may reach) is
+  unchanged since Gate 12, V1-scoped: active `WorkspaceMembership` → every property of that
+  workspace (see [decision-api-v1.md](decision-api-v1.md), "Authorization boundary").
 
 ## Multi-tenancy
 
@@ -345,15 +360,33 @@ dependency. Details: [decision-layer-v1.md](decision-layer-v1.md), ADR 0017.
 Four `GET` endpoints over Gate 11's own Decision Memory, and NOTHING else: `decision-feed`
 (the latest run's TRIGGERED items for one property/as-of, typed `NOT_PROCESSED` /
 `ACTION_REQUIRED` / `DATA_QUALITY_LIMITED` / `NO_ACTION_REQUIRED`), `decisions` (cursor-paginated
-lifecycle list), `decisions/{id}` (detail) and `decisions/{id}/history` (newest-first). A
-fail-closed `AuthenticatedPrincipal` dependency (`app.core.auth.get_current_principal`, 401 until
-a future gate wires a real provider) and a server-side tenant-derivation dependency
+lifecycle list), `decisions/{id}` (detail) and `decisions/{id}/history` (newest-first). An
+`AuthenticatedPrincipal` dependency (`app.core.auth.get_current_principal`, fail-closed in Gate 12,
+genuinely resolvable since Gate 13) and a server-side tenant-derivation dependency
 (`resolve_property_scope`: `property_id` path → its workspace → `WorkspaceMembership` check →
 `TenantContext` - never a client-supplied workspace id or header) guard every route. No write
 endpoint, no `DecisionService.sync()` over HTTP, no `PriorityService`/detector call from a
 request, no `identity_payload` passthrough (four explicit `target` DTOs instead), every exact
 `Decimal` as a canonical string. Zero migration, zero new dependency. Details:
 [decision-api-v1.md](decision-api-v1.md), ADR 0018.
+
+## Authentication & Session (Gate 13)
+
+Fills in Gate 12's own fail-closed seam for real: `POST /auth/login` (email + password, Argon2id
+via `argon2-cffi`, generic `INVALID_CREDENTIALS` on any failure, 5-failures/15-minute lockout per
+credential), `POST /auth/logout` (revokes the session the cookie names, always clears the cookie,
+`204`), `GET /auth/session` (the same `SessionContextResponse` a successful login returns: user,
+session expiry, every accessible workspace and its properties - Gate 12's own membership policy,
+reused). Two new tables, both keyed off the global `User`, neither tenant-scoped:
+`user_credentials` (one Argon2id hash per user, a failure counter and lock timestamp) and
+`auth_sessions` (append-mostly: a `SHA-256` token hash, an absolute 7-day `expires_at` that never
+slides, a `revoked_at` set once by logout or by a password rotation - never the raw token itself).
+`app.core.auth.get_current_principal` - the SAME function Gate 12's Decision API already depends
+on, unmodified - now resolves a real `HttpOnly`/`SameSite=Lax` cookie through that path instead of
+always failing. Credential provisioning is CLI-only (`python -m app.cli.auth set-password`,
+`getpass`-read, 14-128 characters, no public signup/reset endpoint). One migration
+(`0010_auth_session`), one new dependency (`argon2-cffi`). Details:
+[auth-session-v1.md](auth-session-v1.md), ADR 0019.
 
 ## Background processing
 
@@ -363,7 +396,9 @@ PostgreSQL. No Redis or broker in V1. See ADR 0005. On Windows, psycopg's async 
 
 ## Not implemented yet (belongs to later gates)
 
-A real authentication provider (session/JWT/OAuth - Gate 12 only ships the fail-closed seam), a
+Public signup, password reset/forgot-password, email verification, MFA, passkeys, OAuth/SSO, a
+service/machine-to-machine token system, per-IP/perimeter rate limiting, a session-cleanup
+maintenance job, a CSRF policy (needed before the first business-mutating endpoint, not before), a
 `PropertyAccess` primitive finer than workspace membership, file upload and object storage, the
 asynchronous ingestion job, PDF/OCR/signed invoices, an HR system, payroll, shift scheduling or a
 workforce optimizer, a channel manager, a booking engine, commission accounting, channel

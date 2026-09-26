@@ -24,6 +24,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
         openapi_url=None if settings.is_production else "/openapi.json",
     )
+    # The THIS-APP settings instance (not necessarily the same object `get_settings()` would
+    # return - tests build an app from an overridden `Settings`, e.g. `session_cookie_secure`):
+    # `app.core.config.get_request_settings` reads it back for anything that must honour what
+    # THIS app was actually configured with, not the process-wide cached settings.
+    app.state.settings = settings
 
     # Middleware added last is outermost: RequestId must wrap CORS so every response carries the ID.
     if settings.cors_origins:

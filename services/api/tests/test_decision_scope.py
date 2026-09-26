@@ -172,6 +172,8 @@ def test_no_new_runtime_dependency_was_added() -> None:
         "psycopg",
         "tzdata",
         "openpyxl",
+        # argon2-cffi: added by Gate 13 (password hashing), unrelated to the decision layer.
+        "argon2-cffi",
     }
     unexpected = dependencies - known
     assert unexpected == set(), f"unexpected new dependency: {unexpected}"

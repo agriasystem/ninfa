@@ -21,8 +21,7 @@ from app.api.v1.decisions.router import (
 from app.api.v1.health import health
 from app.core.auth import get_current_principal
 
-_EXPECTED_PATHS = {
-    "/api/v1/health",
+_DECISION_PATHS = {
     "/api/v1/properties/{property_id}/decision-feed",
     "/api/v1/properties/{property_id}/decisions",
     "/api/v1/properties/{property_id}/decisions/{decision_id}",
@@ -30,9 +29,15 @@ _EXPECTED_PATHS = {
 }
 
 
-def test_openapi_exposes_exactly_health_and_the_four_decision_routes(client: TestClient) -> None:
+def test_openapi_still_exposes_the_four_decision_routes(client: TestClient) -> None:
+    """The EXACT full-surface guard (health + auth + decisions, nothing else) now lives in
+    `test_auth_scope.py`, which supersedes this one now that Gate 13 legitimately adds three
+    `/auth/*` routes - this file keeps the narrower, still-true claim that is actually its own
+    scope: the four decision routes are still exactly these four, still present."""
     schema = client.get("/openapi.json").json()
-    assert set(schema["paths"]) == _EXPECTED_PATHS
+    paths = set(schema["paths"])
+    assert paths >= _DECISION_PATHS
+    assert {p for p in paths if p.startswith("/api/v1/properties/")} == _DECISION_PATHS
 
 
 def test_health_route_methods_are_unchanged_from_its_own_real_contract(client: TestClient) -> None:
@@ -45,7 +50,7 @@ def test_health_route_methods_are_unchanged_from_its_own_real_contract(client: T
 def test_every_decision_route_is_get_only(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
     for path, methods in schema["paths"].items():
-        if path == "/api/v1/health":
+        if not path.startswith("/api/v1/properties/"):
             continue
         assert set(methods) == {"get"}, path
         for forbidden in ("post", "put", "patch", "delete"):

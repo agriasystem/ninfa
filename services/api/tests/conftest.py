@@ -17,7 +17,17 @@ from tests.support import BookingFactory, Rejects, Tenant, alembic_config, make_
 
 @pytest.fixture
 def settings() -> Settings:
-    return get_settings()
+    """The real settings, with ONE test-only override: `session_cookie_secure=False`.
+
+    `TestClient` talks to `http://testserver` (plain HTTP, by construction - there is no TLS in
+    an in-process test). A `Secure` cookie is never resent by ANY spec-compliant HTTP client
+    (including this one) over a plain-HTTP connection, so a cookie-based test would silently see
+    every request after the first arrive with no cookie at all. This is exactly the "explicit
+    local HTTP development" override ADR 0019 describes - applied here for the same reason, not a
+    weakening of the real (still `Secure=True`) default `test_auth_login.py::
+    test_default_prefers_secure_true` itself verifies.
+    """
+    return get_settings().model_copy(update={"session_cookie_secure": False})
 
 
 @pytest.fixture
