@@ -487,16 +487,13 @@ GET /api/v1/properties/{property_id}/decisions/{decision_id}
 GET /api/v1/properties/{property_id}/decisions/{decision_id}/history[?limit=&cursor=]
 ```
 
-**There is still no real login system**, so every one of these answers `401
-AUTHENTICATION_REQUIRED` when called directly (`curl`, `/docs`) in ANY environment, including
-local development - `app.core.auth.get_current_principal`'s production body is unconditional on
-purpose (see ADR 0018, "why auth is fail-closed"). This is expected, not a bug to work around
-locally: there is nothing to configure that would make a bare `curl` succeed, because no
-credential of any kind exists yet for it to present.
+**Update (Gate 13): there IS now a real login system** - see "Authentication and session (Gate
+13)" below for the actual way to authenticate a `curl`/browser call. The note that used to be here
+described Gate 12's own fail-closed seam, before Gate 13 filled it in; it no longer applies.
 
-To exercise a route with a real, authorized caller - in a test, a one-off script, or a REPL -
-override the dependency the same way `tests/conftest.py`'s own `authenticated_as` fixture does,
-never with a header:
+To exercise a route with a real, authorized caller WITHOUT going through a real login - in a
+test, a one-off script, or a REPL - you can still override the dependency the same way
+`tests/conftest.py`'s own `authenticated_as` fixture does, never with a header:
 
 ```python
 from uuid import uuid4
@@ -515,6 +512,75 @@ rows in whatever session you provide - overriding the principal only answers "wh
 "what may they reach". Every score/proxy is an exact-Decimal **string** in the JSON response, never
 a float - see [decision-api-v1.md](../architecture/decision-api-v1.md), "Decimal, dates, UUIDs,
 enums".
+
+## Authentication and session (Gate 13)
+
+Adds one dependency (`argon2-cffi`) and one migration, `0010_auth_session` (`npm run db:migrate`,
+now head). First-party email + password login with an opaque, `HttpOnly`-cookie session. Full
+guide: [auth-session-v1.md](../architecture/auth-session-v1.md), ADR 0019.
+
+```
+POST /api/v1/auth/login    {"email": "...", "password": "..."}
+POST /api/v1/auth/logout
+GET  /api/v1/auth/session
+```
+
+### Creating a development user and setting its password
+
+There is no signup endpoint. A `User` row must already exist (created however earlier gates
+create one - e.g. through a REPL/one-off script using `UserRepository`, or already present from a
+previous local session) before you can give it a password:
+
+```bash
+cd services/api
+uv run python -m app.cli.auth set-password --email you@example.com
+```
+
+This prompts for the new password TWICE (`getpass` - never echoed, never a shell argument, never
+in your shell history) and rejects anything shorter than 14 or longer than 128 characters. It
+fails if the email names no existing `User` - it never creates one, nor a `Workspace` or
+`WorkspaceMembership` (you still need those for `/auth/session` to show any accessible property).
+Running it again on the same email ROTATES the password and revokes every session that user
+currently has - expected, not a bug, if you are wondering why a browser tab logged in as that user
+suddenly needs to log in again.
+
+**Never document a real password in a commit, a ticket, or here.** Use a throwaway local-only
+value.
+
+### Cookie `Secure` flag over plain HTTP
+
+`Settings.session_cookie_secure` defaults to `True` (HTTPS-only), and production REFUSES to start
+with it `False`. A plain-HTTP local dev server (no TLS) needs it explicitly disabled to see the
+cookie survive a round trip in a browser or `curl`:
+
+```bash
+# .env, local development only - never set this in a deployed environment
+SESSION_COOKIE_SECURE=false
+```
+
+(The backend's own test suite sets this per-test, in `tests/conftest.py`'s `settings` fixture,
+for the exact same reason: `TestClient` also talks over plain `http://testserver`.)
+
+### Trying the whole flow with `curl`
+
+```bash
+# 1. login - save the Set-Cookie
+curl -i -c cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com", "password": "<your local password>"}'
+
+# 2. session context, using the saved cookie
+curl -b cookies.txt http://127.0.0.1:8000/api/v1/auth/session
+
+# 3. a real Decision API call, same cookie (see decision-api-v1.md for the property id)
+curl -b cookies.txt "http://127.0.0.1:8000/api/v1/properties/<property_id>/decision-feed?as_of=2026-01-01"
+
+# 4. logout
+curl -i -b cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/logout
+
+# 5. the same cookie now answers 401
+curl -b cookies.txt http://127.0.0.1:8000/api/v1/auth/session
+```
 
 ## Quality
 

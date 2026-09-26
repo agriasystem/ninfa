@@ -3,6 +3,11 @@
 
 Metadata/migration agreement and constraint-name parity for the Gate 11 tables are asserted by
 `test_data_model_migration.py` (its table sets include them).
+
+Gate 13 added `0010_auth_session` on top of `0009_decision_layer`: "IS 0009 the global head"
+questions now belong to `test_auth_migration.py` (which owns the real current head); this file
+keeps only what is still actually about GATE 11's own schema - that it round-trips cleanly and
+survives being reached via `base -> ... -> head` regardless of what sits on top of it.
 """
 
 from collections.abc import Iterator
@@ -20,7 +25,9 @@ from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
 GATE_8_HEAD = "0008_labor_ingestion"
-HEAD = "0009_decision_layer"
+GATE_11_REVISION = "0009_decision_layer"
+# Gate 13 added 0010_auth_session on top; owned/asserted by test_auth_migration.py.
+CURRENT_GLOBAL_HEAD = "0010_auth_session"
 GATE_11_TABLES = {"decision_runs", "decisions", "decision_observations"}
 FUNCTION = "decisions_forbid_update"
 TRIGGERS = {"trg_decision_runs_immutable", "trg_decision_observations_immutable"}
@@ -70,8 +77,10 @@ def columns_of(engine: Engine) -> dict[str, list[tuple[str, str, bool]]]:
 # --- 138-140: 0008 <-> 0009 round trip -----------------------------------------------------------
 
 
-def test_head_is_the_decision_layer_migration(at_head: None, db_engine: Engine) -> None:
-    assert revision(db_engine) == HEAD
+def test_gate_11_objects_are_present_at_the_real_current_head(
+    at_head: None, db_engine: Engine
+) -> None:
+    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert tables(db_engine) >= GATE_11_TABLES
     assert function_exists(db_engine)
     assert triggers_of(db_engine) == TRIGGERS
@@ -100,13 +109,13 @@ def test_0008_to_0009_to_0008_to_0009_recreates_an_identical_schema(
     before = columns_of(db_engine)
 
     command.downgrade(config, GATE_8_HEAD)  # 0009 -> 0008
-    command.upgrade(config, HEAD)  # 0008 -> 0009
+    command.upgrade(config, GATE_11_REVISION)  # 0008 -> 0009
     assert columns_of(db_engine) == before
 
     command.downgrade(config, GATE_8_HEAD)  # once more: it is repeatable
-    command.upgrade(config, "head")
+    command.upgrade(config, "head")  # back to the real current head (0010, post Gate 13)
 
-    assert revision(db_engine) == HEAD
+    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert columns_of(db_engine) == before
     assert function_exists(db_engine)
     assert triggers_of(db_engine) == TRIGGERS
@@ -124,20 +133,15 @@ def test_a_fresh_database_goes_from_base_to_head(
     assert tables(db_engine) == {"alembic_version"}
 
     command.upgrade(config, "head")
-    assert revision(db_engine) == HEAD
+    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert tables(db_engine) >= GATE_11_TABLES
 
 
 # --- 142-144: alembic current / heads / check -----------------------------------------------------
-
-
-def test_alembic_current_is_0009(at_head: None, db_engine: Engine) -> None:
-    assert revision(db_engine) == HEAD
-
-
-def test_alembic_has_exactly_one_head(test_database_url: str) -> None:
-    scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
-    assert scripts.get_heads() == [HEAD]
+#
+# "alembic current is the one true head" is now owned by test_auth_migration.py, which asserts it
+# against the real current head (0010_auth_session); duplicating it here under a stale name would
+# only reassert a fact about the global chain, not about Gate 11's own schema.
 
 
 def test_alembic_check_reports_no_pending_model_changes(
@@ -160,7 +164,7 @@ def test_migrations_0001_to_0008_are_untouched_and_0009_sits_on_top(
 ) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
-    assert revisions[HEAD] == GATE_8_HEAD
+    assert revisions[GATE_11_REVISION] == GATE_8_HEAD
     assert revisions[GATE_8_HEAD] == "0007_invoice_supplier_ingestion"
     assert revisions["0007_invoice_supplier_ingestion"] == "0006_expected_engine"
     assert revisions["0006_expected_engine"] == "0005_booking_snapshots_metrics"

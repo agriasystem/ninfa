@@ -25,19 +25,29 @@ Priority execution.
 
 ## Authorization boundary
 
-No real authentication provider exists yet anywhere in this repository (`app.modules.identity`'s
-own `User` model stores no credential - see its docstring). Gate 12 therefore ships a **fail-closed
-authorization boundary**, not a real login system:
+**Update (Gate 13):** `app.core.auth.get_current_principal` is no longer fail-closed - Gate 13
+(`auth-session-v1`, see [auth-session-v1.md](auth-session-v1.md) and ADR 0019) replaced its body
+with a real resolver (`HttpOnly` session cookie -> `SHA-256` -> `AuthSession` -> `User`), and it
+was the ONLY change: every route on this page still depends on exactly the same function, imported
+from exactly the same place. The paragraphs below describe Gate 12's ORIGINAL fail-closed seam,
+kept for history; the shape it left behind is exactly what Gate 13 filled in.
+
+At Gate 12 time, no real authentication provider existed anywhere in this repository
+(`app.modules.identity`'s own `User` model stored no credential - see its docstring). Gate 12
+therefore shipped a **fail-closed authorization boundary**, not a real login system:
 
 - `app.core.auth.AuthenticatedPrincipal` - a typed `{user_id}` shape every route depends on.
 - `app.core.auth.get_current_principal` - the FastAPI dependency every route resolves it from. Its
-  PRODUCTION body is unconditional: it always raises `AuthenticationRequiredError` (401). There is
-  no header, cookie or query parameter this module ever trusts as identity - `X-User-Id` and
-  similar are explicitly the kind of spoofable shortcut this boundary exists to refuse.
+  Gate-12 PRODUCTION body was unconditional: it always raised `AuthenticationRequiredError` (401).
+  There is no header, cookie or query parameter this module ever trusts as identity - `X-User-Id`
+  and similar are explicitly the kind of spoofable shortcut this boundary exists to refuse (still
+  true of the real Gate 13 resolver).
 - Tests supply a real principal via FastAPI's own `app.dependency_overrides[get_current_principal]`
-  (see `tests/conftest.py`'s `authenticated_as` fixture) - never a header.
-- A future gate wires a real provider (session cookie, JWT, OAuth/OIDC - not decided here) by
-  replacing only `get_current_principal`'s body; no route changes.
+  (see `tests/conftest.py`'s `authenticated_as` fixture) - never a header. Gate 13 additionally
+  exercises the REAL cookie path with NO override at all
+  (`tests/test_auth_real_cookie_e2e.py`).
+- Gate 12 predicted: "a future gate wires a real provider... by replacing only
+  `get_current_principal`'s body; no route changes." Gate 13 is that gate, and did exactly that.
 
 ### Tenant derivation (server-side only)
 
@@ -229,10 +239,10 @@ list) and asserts it stays a small, N-independent constant - never linear.
 
 ## Limitations (intentional, documented debt)
 
-- **No real authentication provider** is wired yet - see "Authorization boundary" above. This is
-  the gate's single biggest piece of intentional debt; everything else assumes it will be filled in
-  without touching any route.
+- **Resolved by Gate 13**: a real authentication provider is now wired (first-party email +
+  password, opaque server-side session - see [auth-session-v1.md](auth-session-v1.md)). No route
+  on this page changed to get it, exactly as this document originally predicted.
 - No caching (no ETag, no Redis) - not needed at V1's scale, and adding it now would be premature.
-- No frontend consumes this API yet (Gate 12 ships no UI).
+- No frontend consumes this API yet (Gate 12/13 ship no UI).
 - `packages/contracts` still does not derive types from this OpenAPI schema automatically (see
   `architecture-v1.md`'s own "API conventions" - unchanged since before this gate).

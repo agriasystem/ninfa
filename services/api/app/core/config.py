@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+from fastapi import Request
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -32,6 +33,11 @@ class Settings(BaseSettings):
     # SQLAlchemy URL with the psycopg 3 driver. Kept secret so it never leaks in logs/repr.
     database_url: SecretStr
 
+    # The session cookie's own `Secure` flag (Gate 13). Defaults to HTTPS-only everywhere; a
+    # local plain-HTTP dev override must be explicit (`SESSION_COOKIE_SECURE=false` in `.env`),
+    # never the default - see `_check_production_safety` below and ADR 0019.
+    session_cookie_secure: bool = True
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: Any) -> Any:
@@ -53,6 +59,8 @@ class Settings(BaseSettings):
                 raise ValueError("DEBUG must be false when APP_ENV=production")
             if "*" in self.cors_origins:
                 raise ValueError("CORS_ORIGINS must not contain '*' when APP_ENV=production")
+            if not self.session_cookie_secure:
+                raise ValueError("SESSION_COOKIE_SECURE must be true when APP_ENV=production")
         return self
 
     @property
@@ -73,3 +81,14 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def get_request_settings(request: Request) -> Settings:
+    """FastAPI dependency: the `Settings` THIS app was actually built with (`app.state.settings`,
+    set by `create_app()`) - not necessarily `get_settings()`'s own process-wide cached instance.
+    Anything a route needs to honour per-app (the session cookie's `Secure` flag, in particular)
+    reads it through here, so a test that builds its own `Settings` override
+    (`tests/conftest.py`'s own `settings` fixture) is actually respected end to end.
+    """
+    settings: Settings = request.app.state.settings
+    return settings

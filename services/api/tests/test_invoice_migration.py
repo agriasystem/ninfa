@@ -18,11 +18,11 @@ from tests.support import alembic_config
 
 GATE_4_HEAD = "0006_expected_engine"
 # Gate 6's own migration. Gate 7 added none; Gate 8 (0008_labor_ingestion) sits directly on top of
-# it, and Gate 11 (0009_decision_layer) on top of that - the real chain head - but neither touches
-# these tables/triggers/keys.
+# it, then Gate 11 (0009_decision_layer), then Gate 13 (0010_auth_session) - the real chain head -
+# but none of them touch these tables/triggers/keys.
 GATE_6_HEAD = "0007_invoice_supplier_ingestion"
 GATE_8_HEAD = "0008_labor_ingestion"
-HEAD = "0009_decision_layer"
+HEAD = "0010_auth_session"
 GATE_6_TABLES = {
     "suppliers",
     "supplier_identifiers",
@@ -158,7 +158,7 @@ def schema_of(engine: Engine) -> dict[str, object]:
 def test_0007_is_the_only_gate_6_migration_and_sits_on_top_of_0006(test_database_url: str) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
-    assert scripts.get_heads() == [HEAD]  # Gate 11's 0009 is the real chain head
+    assert scripts.get_heads() == [HEAD]  # Gate 13's 0010 is the real chain head
     revision_0007 = scripts.get_revision(GATE_6_HEAD)
     assert revision_0007 is not None and revision_0007.down_revision == GATE_4_HEAD
     revision_0008 = scripts.get_revision(GATE_8_HEAD)

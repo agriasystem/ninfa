@@ -1,27 +1,28 @@
-# NINFA — Data model v1 (Gates 1–12)
+# NINFA — Data model v1 (Gates 1–13)
 
 The canonical multi-tenant core (Gate 1): who the users are, which workspaces (tenants) exist, who
 belongs to them, which properties they own, and the metadata skeleton of imports. Gate 2 adds the
 canonical bookings (see "Gate 2 additions"), Gate 3 the room inventory and the daily booking
 snapshots (see "Gate 3 additions"), Gate 4 the Expected baselines (see "Gate 4 additions"),
 Gate 6 the supplier registry and the invoices (see "Gate 6 additions"), Gate 8 the canonical
-labor snapshots/entries and their mapping/staging (see "Gate 8 additions") and Gate 11 the
-persistent Decision layer (see "Gate 11 additions"); Gate 7, Gate 9, Gate 10 and Gate 12 add no
-schema (see "Gate 7: no schema change", "Gate 9: no schema change" and "Gate 10: no schema
-change" - Gate 12 is a pure HTTP read layer over Gate 11's own tables, so it needs none either).
+labor snapshots/entries and their mapping/staging (see "Gate 8 additions"), Gate 11 the
+persistent Decision layer (see "Gate 11 additions") and Gate 13 the credential/session tables (see
+"Gate 13 additions"); Gate 7, Gate 9, Gate 10 and Gate 12 add no schema (see "Gate 7: no schema
+change", "Gate 9: no schema change" and "Gate 10: no schema change" - Gate 12 is a pure HTTP read
+layer over Gate 11's own tables, so it needs none either).
 **No priority is persisted anywhere: only a Decision's identity and lifecycle are, since Gate 11.**
 
 Migrations: `0003_canonical_data_model` (Gate 1), `0004_booking_ingestion` (Gate 2),
 `0005_booking_snapshots_metrics` (Gate 3), `0006_expected_engine` (Gate 4),
 `0007_invoice_supplier_ingestion` (Gate 6, Gate 7 added none), `0008_labor_ingestion`
-(Gate 8, Gate 9 and Gate 10 added none on top of it) and `0009_decision_layer` (Gate 11, still the
-current head - Gate 12 added none on top of it either), on top of `0001_baseline`,
-`0002_procrastinate_schema`.
+(Gate 8, Gate 9 and Gate 10 added none on top of it), `0009_decision_layer` (Gate 11, Gate 12
+added none on top of it) and `0010_auth_session` (Gate 13, the current head), on top of
+`0001_baseline`, `0002_procrastinate_schema`.
 Code: `services/api/app/modules/{identity,tenancy,properties,ingestion,bookings,snapshots,
 intelligence/expected,suppliers,invoices,labor,intelligence/distribution,intelligence/priority,
-decisions,decision_memory}/` (the data/business-logic layer; Gate 12's own HTTP read layer lives in
-`services/api/app/api/v1/decisions/` and touches no table directly - it goes through
-`decision_memory`/`decisions`' own repository, like every other reader).
+decisions,decision_memory,auth}/` (the data/business-logic layer; Gate 12/13's own HTTP read/auth
+layers live in `services/api/app/api/v1/{decisions,auth}/` and touch no table directly - they go
+through each module's own repository, like every other reader/writer in this codebase).
 
 ## Entity relationships
 
@@ -668,15 +669,62 @@ Indexes added: `ix_decisions_workspace_id_property_id_status`,
 `ix_decision_observations_decision_run_id`; the unique keys above double as lookup indexes. Delete
 policy: every new foreign key is `RESTRICT`.
 
+## Gate 13 additions (authentication and session)
+
+Migration `0010_auth_session`. Full description: [auth-session-v1.md](auth-session-v1.md);
+decisions: ADR 0019.
+
+```mermaid
+erDiagram
+    users ||--o| user_credentials : authenticates
+    users ||--o{ auth_sessions : "logs into"
+
+    user_credentials {
+        uuid id PK
+        uuid user_id "unique"
+        text password_hash "Argon2id PHC string"
+        int failed_login_count
+        timestamptz locked_until "nullable"
+        timestamptz password_changed_at
+    }
+    auth_sessions {
+        uuid id PK
+        uuid user_id
+        text token_hash "64 hex, SHA-256(raw token)"
+        timestamptz expires_at "absolute, 7 days, never slides"
+        timestamptz revoked_at "nullable"
+    }
+```
+
+| Table | Tenant integrity | Uniqueness |
+| ----- | ----------------- | ---------- |
+| `user_credentials` | FK `user_id` → `users.id`, `CASCADE` (neither table is tenant-owned - a `User` is global) | `user_id` (at most one credential per user, V1) |
+| `auth_sessions` | FK `user_id` → `users.id`, `CASCADE` | `token_hash` |
+
+Neither table carries a `workspace_id`: authentication happens before any tenant is resolved, and
+a `User` (Gate 1) is a global identity reused across workspaces. `CASCADE` (not `RESTRICT`, unlike
+every tenant-owned FK in this schema): a credential/session has no meaning once its `User` is
+gone - Gate 1 already deletes `WorkspaceMembership` the same way, for the same reason.
+
+`CHECK`s: `failed_login_count >= 0`; `password_hash`/`token_hash` non-blank;
+`token_hash ~ '^[0-9a-f]{64}$'`; `expires_at > created_at`; `revoked_at IS NULL OR
+revoked_at >= created_at`. `auth_sessions` has no `updated_at` and no `last_seen` column at all -
+Gate 11/12's own "no write on read" posture extended here: an ordinary authenticated request never
+touches this table.
+
+Indexes added: `ix_auth_sessions_user_id`, `ix_auth_sessions_expires_at`; the unique key on
+`token_hash` doubles as the lookup index `get_current_principal` uses on every request. Delete
+policy: `CASCADE` (see above, the one exception to this schema's usual `RESTRICT`).
+
 ## Not implemented yet
 
 RevPAR metrics, other detectors, a Decision resolution policy beyond explicit CLEAR, backtesting
 or replaying a historical as-of date, any Decision WRITE endpoint, a Decision recommendation or a
-UI; a real authentication provider (Gate 12 ships only the fail-closed seam,
-`app.core.auth.get_current_principal`) and a `PropertyAccess` primitive finer than workspace
-membership; file upload/storage and the asynchronous ingestion job; PostgreSQL row-level security
-(the schema is compatible: every tenant-owned table has a `workspace_id` column to write policies
-against).
+UI; public signup, password reset, email verification, MFA, passkeys, OAuth/SSO, a
+machine-to-machine service-token system, per-IP/perimeter rate limiting, a session-cleanup
+maintenance job, and a `PropertyAccess` primitive finer than workspace membership; file
+upload/storage and the asynchronous ingestion job; PostgreSQL row-level security (the schema is
+compatible: every tenant-owned table has a `workspace_id` column to write policies against).
 
 ## Adding a tenant-owned entity (checklist for later gates)
 
