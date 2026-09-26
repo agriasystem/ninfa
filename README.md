@@ -2,34 +2,40 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 13 (Authentication & Session V1, `auth-session-v1`), first-party email+password
-> login with an opaque, server-side session - the fail-closed seam Gate 12 left is now genuinely
-> resolvable.** Still no product feature beyond that: the technical base, the multi-tenant data
-> core, the import of booking files into canonical bookings, the daily snapshots derived from them
-> (observed vs reconstructed), the Expected baselines (a historical level with its confidence, not
-> a forecast), two revenue detectors that return typed evaluations, since Gate 6 a workspace-wide
-> supplier registry with canonical invoices and lines (no PDF/OCR), since Gate 7 one cost detector
-> (cost per occupied room, an operating proxy, one currency at a time), since Gate 8 canonical
-> labor entries (minutes, never an employee identity) with one staffing detector reusing Gate 5's
-> own demand forecast, since Gate 9 a read-only, in-memory channel classifier and a fifth detector
-> measuring OTA concentration, since Gate 10 a pure, database-free engine that ranks every
-> TRIGGERED signal deterministically, since Gate 11 a persistence layer that recognises the SAME
-> operational problem across many days of observations, resolves it only on an explicit CLEAR,
-> reopens the same Decision id on a later TRIGGERED, and keeps every day's Observation immutable,
-> since Gate 12 four `GET` endpoints (feed, list, detail, history) that read exactly that memory
-> behind a server-derived tenant scope, and since Gate 13 real login/logout/session-context
-> endpoints (Argon2id, HttpOnly opaque session cookie, 5-failures/15-minute lockout, no JWT, no
-> sliding expiry) that make Gate 12's own `get_current_principal` genuinely resolvable - no
-> spoofable header, no OAuth/SSO/MFA yet, no signup, no password reset, still no UI.
+> **Status: Gate 15 (Decision Detail UI V1, `decision-detail-ui-v1`) — every "Oggi" card now
+> navigates to a real Decision Detail page answering "why does this deserve attention" and "how
+> has it evolved": current lifecycle status, five detector-specific evidence adapters, a
+> deterministic "Perché NINFA te lo mostra" sentence, and a newest-first, cursor-paginated
+> "Evoluzione" timeline over Gate 11's own immutable memory - zero recomputation, zero graphs,
+> zero recommendations, zero mutation controls, zero backend/migration changes.** Underneath it:
+> the technical base, the multi-tenant data core, the import of booking
+> files into canonical bookings, the daily snapshots derived from them (observed vs
+> reconstructed), the Expected baselines (a historical level with its confidence, not a forecast),
+> two revenue detectors that return typed evaluations, since Gate 6 a workspace-wide supplier
+> registry with canonical invoices and lines (no PDF/OCR), since Gate 7 one cost detector (cost per
+> occupied room, an operating proxy, one currency at a time), since Gate 8 canonical labor entries
+> (minutes, never an employee identity) with one staffing detector reusing Gate 5's own demand
+> forecast, since Gate 9 a read-only, in-memory channel classifier and a fifth detector measuring
+> OTA concentration, since Gate 10 a pure, database-free engine that ranks every TRIGGERED signal
+> deterministically, since Gate 11 a persistence layer that recognises the SAME operational
+> problem across many days of observations, resolves it only on an explicit CLEAR, reopens the
+> same Decision id on a later TRIGGERED, and keeps every day's Observation immutable, since Gate 12
+> four `GET` endpoints (feed, list, detail, history) that read exactly that memory behind a
+> server-derived tenant scope, since Gate 13 real login/logout/session-context endpoints (Argon2id,
+> HttpOnly opaque session cookie, 5-failures/15-minute lockout, no JWT, no sliding expiry) that
+> make Gate 12's own `get_current_principal` genuinely resolvable, since Gate 14 the property's
+> own IANA timezone on the Session Context and credentialed CORS for the web origin, and since
+> Gate 15 the Decision Detail/History read surface described above - still no Recommendation
+> layer, no Ask NINFA, no AI-generated text, no signup, no password reset, no OAuth/SSO/MFA.
 
 ## Layout
 
 | Path                 | What                                                        |
 | -------------------- | ----------------------------------------------------------- |
-| `apps/web`           | Next.js (App Router, TypeScript strict) — technical shell   |
+| `apps/web`           | Next.js (App Router, TypeScript strict) — Oggi UI V1         |
 | `services/api`       | FastAPI modular monolith, SQLAlchemy 2, Alembic             |
 | `services/worker`    | Background worker (Procrastinate on PostgreSQL)             |
-| `packages/contracts` | Minimal shared TypeScript types (health, error envelope)    |
+| `packages/contracts` | Minimal shared TypeScript types (health, auth session, decision feed) |
 | `docs/`              | Architecture, ADRs, local development guide                 |
 
 ## Quick start
@@ -63,4 +69,6 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Decision Layer v1](docs/architecture/decision-layer-v1.md) — persistent Decision identity, cross-day deduplication, OPEN/RESOLVED lifecycle, explicit CLEAR resolution, reopening, immutable observation history, Decision Memory
 - [Decision API v1](docs/architecture/decision-api-v1.md) — read-only feed/list/detail/history over the Decision Layer, fail-closed auth, server-derived tenant, cursor pagination, exact Decimal as string
 - [Authentication & Session v1](docs/architecture/auth-session-v1.md) — email+password login, Argon2id, opaque server-side session, HttpOnly cookie, lockout, credential provisioning CLI
+- [Oggi UI v1](docs/architecture/oggi-ui-v1.md) — authenticated shell, login UI, property selection, property-local "today", four feed states, five decision card types, zero graphs, zero recommendations
+- [Decision Detail UI v1](docs/architecture/decision-detail-ui-v1.md) — current lifecycle snapshot, five evidence adapters, deterministic "why" copy, newest-first cursor-paginated history, zero recomputation
 - [Architecture decision records](docs/architecture/adr/)

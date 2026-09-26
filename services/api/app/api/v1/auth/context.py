@@ -39,7 +39,9 @@ def build_session_context(
                 slug=workspace.slug,
                 role=membership.role.value,
                 properties=[
-                    PropertyAccess(id=prop.id, name=prop.name, slug=prop.slug)
+                    PropertyAccess(
+                        id=prop.id, name=prop.name, slug=prop.slug, timezone=prop.timezone
+                    )
                     for prop in properties
                 ],
             )

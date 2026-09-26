@@ -35,6 +35,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origins,
+            # Gate 14: the session cookie only crosses origins at all if the browser is told the
+            # response may be read WITH credentials. `allow_origins` is always an explicit
+            # allowlist (`Settings` forbids "*" in production, and Starlette itself never emits a
+            # literal "*" alongside credentials even if a non-prod list contained one - it echoes
+            # the request Origin instead), so this never combines a wildcard with credentials.
+            allow_credentials=True,
             allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type", REQUEST_ID_HEADER],
             expose_headers=[REQUEST_ID_HEADER],

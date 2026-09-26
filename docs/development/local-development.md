@@ -582,6 +582,55 @@ curl -i -b cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/logout
 curl -b cookies.txt http://127.0.0.1:8000/api/v1/auth/session
 ```
 
+## Oggi UI (Gate 14)
+
+The first real page. Zero migration, zero new runtime dependency. Full guide:
+[oggi-ui-v1.md](../architecture/oggi-ui-v1.md), ADR 0020.
+
+1. **Start the backend**: `npm run dev:api` (see "Run" above), with a Postgres database migrated
+   to head (`npm run db:migrate`).
+2. **Start the frontend**: `npm run dev:web` → `http://127.0.0.1:3100`.
+3. **Create a local dev password**, exactly as in "Authentication and session (Gate 13)" above:
+   ```bash
+   cd services/api
+   uv run python -m app.cli.auth set-password --email you@example.com
+   ```
+   The `User` (and, to see any property on `/oggi`, a `Workspace`/`WorkspaceMembership`/
+   `Property`) must already exist - the CLI never creates one.
+4. **Set `SESSION_COOKIE_SECURE=false`** in `.env` (see above) - required for the browser to keep
+   the cookie across requests to a plain-HTTP local API.
+5. **Confirm `NEXT_PUBLIC_API_BASE_URL`** points at the local API (`.env.example`'s default,
+   `http://127.0.0.1:8000`, already matches `npm run dev:api`'s default address).
+6. **Confirm `CORS_ORIGINS`** includes the web app's own local origin (`.env.example`'s default,
+   `http://127.0.0.1:3100,http://localhost:3100`, already does) - the browser will not let the
+   web app's JavaScript read the API's response otherwise, since they are different origins in
+   local development (see [oggi-ui-v1.md](../architecture/oggi-ui-v1.md), "CORS / transport
+   topology").
+7. **Log in**: open `http://127.0.0.1:3100`, which redirects to `/login` (no session yet). Enter
+   the email/password from step 3.
+8. **Open `/oggi`**: a successful login redirects there automatically. With zero properties you
+   see the empty state; with one, it is selected automatically; with more than one, a selector
+   appears. The feed shown is real - it reads whatever `DecisionRun`/`Decision`/
+   `DecisionObservation` rows already exist for that property's own local "today" (see the
+   Decision Layer / Priority Engine sections above for how to create some).
+
+No real password belongs in this file, a commit, or a ticket - use a throwaway local-only value,
+exactly as Gate 13's own section above already asks.
+
+## Decision Detail UI (Gate 15)
+
+Zero migration, zero new backend route, zero new runtime dependency. Full guide:
+[decision-detail-ui-v1.md](../architecture/decision-detail-ui-v1.md), ADR 0021.
+
+With `/oggi` open (see above) and at least one `ACTION_REQUIRED` decision showing, click (or
+`Tab` + `Enter`) any decision card - each is a real link to
+`/oggi/decisioni/{decisionId}?property={propertyId}`. The page fetches the SAME Decision Detail/
+History endpoints `decision-api-v1.md` already documents
+(`GET /properties/{property_id}/decisions/{decision_id}` and its `/history`), so no additional
+local setup beyond what "Decision persistence, lifecycle and memory (Gate 11)" above already
+needs to have real Decisions to look at. If a Decision has more than one page of history, a
+"Mostra eventi precedenti" button appends the next page.
+
 ## Quality
 
 | Goal            | Command                                                        |

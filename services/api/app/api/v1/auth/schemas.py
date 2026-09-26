@@ -24,9 +24,14 @@ class LoginRequest(BaseModel):
 
 
 class PropertyAccess(BaseModel):
+    """`timezone` (Gate 14): the Property's own canonical IANA zone (`app.modules.properties.
+    models.Property.timezone`, non-nullable since Gate 1) - added additively here so a client can
+    compute "today" in the property's own timezone without guessing the browser's."""
+
     id: UUID
     name: str
     slug: str
+    timezone: str
 
 
 class WorkspaceAccess(BaseModel):
