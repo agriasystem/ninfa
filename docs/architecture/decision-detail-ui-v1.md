@@ -151,6 +151,12 @@ Every card and every detail page shows problem + evidence, never advice: there i
 acknowledge/dismiss/snooze/assign/resolve action, no notes, no comments, no Ask NINFA, no
 AI-generated prose - this gate is entirely a read surface over data Gates 11/12 already produced.
 
+**Update (Gate 16):** the backend's own `GET /decisions/{decisionId}` response now additionally
+carries a deterministic, non-AI `recommendation` field (see
+[recommendation-engine-v1.md](recommendation-engine-v1.md)) - but this page's own typed client
+and components do not read or render it yet. Nothing above changed: still no advice shown here,
+by omission rather than by the field not existing on the wire.
+
 ## No detail data leak
 
 `ObservationDetail`'s audit fields (`source_evaluation_fingerprint`, `source_target_key`,
@@ -187,8 +193,9 @@ focus is always visible; headings follow a real `h1`/`h2` hierarchy; loading/err
 ## Limitations (intentional, documented debt)
 
 - No Decision write actions of any kind (acknowledge/dismiss/snooze/assign/resolve/reopen).
-- No Recommendation layer, no Ask NINFA, no AI-generated prose - explicitly out of scope, see ADR
-  0021, "future recommendation/Ask integration".
+- No Recommendation UI, no Ask NINFA, no AI-generated prose - explicitly out of scope, see ADR
+  0021, "future recommendation/Ask integration". Gate 16 added the recommendation data to the API
+  only (ADR 0022); the UI to render it remains future work.
 - No dedicated E2E/browser-automation suite - visual acceptance at the three target viewports is
   a manual checklist plus component/CSS-level tests, same as Gate 14.
 - No real-time updates: the detail/history pages reflect whatever was true at the moment they

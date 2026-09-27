@@ -74,9 +74,44 @@ def test_no_debug_or_analyze_or_sync_endpoint_exists(client: TestClient) -> None
         "acknowledge",
         "recommend",
         "ask",
+        "execute",
+        "approve",
+        "apply",
+        "auto",
     )
     for word in forbidden_words:
         assert not [p for p in paths if word in p.lower()], word
+
+
+# --- Gate 16 (Recommendation Engine V1, review items 67-71): additive-only, never a new route ---
+
+
+def test_decision_paths_are_still_exactly_the_same_four_after_gate_16(client: TestClient) -> None:
+    """Gate 16 added no route: the exact same 4-path set Gate 12 already defined, still true
+    after `recommendation` was wired into the detail response - see `_DECISION_PATHS` above,
+    unmodified."""
+    schema = client.get("/openapi.json").json()
+    paths = {p for p in schema["paths"] if p.startswith("/api/v1/properties/")}
+    assert paths == _DECISION_PATHS
+
+
+def test_decision_detail_schema_additively_includes_recommendation(client: TestClient) -> None:
+    """The OpenAPI-level proof of the additive design: `DecisionDetailResponse`'s own schema now
+    has a `recommendation` property, with no route, method, or path added to reach it."""
+    schema = client.get("/openapi.json").json()
+    detail_schema = schema["components"]["schemas"]["DecisionDetailResponse"]
+    assert "recommendation" in detail_schema["properties"]
+
+
+def test_decision_detail_route_parameters_unchanged_by_recommendation(client: TestClient) -> None:
+    """No new query parameter (`apply`, `execute`, `include_recommendation`, ...) was added to
+    reach or control the recommendation - it is unconditional, computed fresh every time."""
+    schema = client.get("/openapi.json").json()
+    detail_operation = schema["paths"]["/api/v1/properties/{property_id}/decisions/{decision_id}"][
+        "get"
+    ]
+    parameter_names = {parameter["name"] for parameter in detail_operation.get("parameters", [])}
+    assert parameter_names == {"property_id", "decision_id"}
 
 
 # --- structural auth coverage: every Decision route's OWN dependency graph, not just its HTTP

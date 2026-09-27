@@ -2,12 +2,17 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 15 (Decision Detail UI V1, `decision-detail-ui-v1`) — every "Oggi" card now
-> navigates to a real Decision Detail page answering "why does this deserve attention" and "how
-> has it evolved": current lifecycle status, five detector-specific evidence adapters, a
+> **Status: Gate 16 (Recommendation Engine V1, `recommendation-engine-v1`) — the Decision Detail
+> API now additionally carries a deterministic, non-AI `recommendation`: at most one primary plus
+> two supporting review actions, derived from ONLY a Decision and its latest Observation (never a
+> raw row, never a detector re-invocation), `requires_human_review` always `true`, a SHA-256
+> fingerprint, zero persistence, zero new route, zero new dependency - no Recommendation UI
+> consumes it yet.** Gate 15 (Decision Detail UI V1, `decision-detail-ui-v1`) made every "Oggi"
+> card navigate to a real Decision Detail page answering "why does this deserve attention" and
+> "how has it evolved": current lifecycle status, five detector-specific evidence adapters, a
 > deterministic "Perché NINFA te lo mostra" sentence, and a newest-first, cursor-paginated
 > "Evoluzione" timeline over Gate 11's own immutable memory - zero recomputation, zero graphs,
-> zero recommendations, zero mutation controls, zero backend/migration changes.** Underneath it:
+> zero mutation controls. Underneath it:
 > the technical base, the multi-tenant data core, the import of booking
 > files into canonical bookings, the daily snapshots derived from them (observed vs
 > reconstructed), the Expected baselines (a historical level with its confidence, not a forecast),
@@ -25,8 +30,9 @@ Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 > HttpOnly opaque session cookie, 5-failures/15-minute lockout, no JWT, no sliding expiry) that
 > make Gate 12's own `get_current_principal` genuinely resolvable, since Gate 14 the property's
 > own IANA timezone on the Session Context and credentialed CORS for the web origin, and since
-> Gate 15 the Decision Detail/History read surface described above - still no Recommendation
-> layer, no Ask NINFA, no AI-generated text, no signup, no password reset, no OAuth/SSO/MFA.
+> Gate 15 the Decision Detail/History read surface, and since Gate 16 the additive recommendation
+> block described above - still no Recommendation UI, no Ask NINFA, no AI-generated text, no
+> signup, no password reset, no OAuth/SSO/MFA.
 
 ## Layout
 
@@ -71,4 +77,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Authentication & Session v1](docs/architecture/auth-session-v1.md) — email+password login, Argon2id, opaque server-side session, HttpOnly cookie, lockout, credential provisioning CLI
 - [Oggi UI v1](docs/architecture/oggi-ui-v1.md) — authenticated shell, login UI, property selection, property-local "today", four feed states, five decision card types, zero graphs, zero recommendations
 - [Decision Detail UI v1](docs/architecture/decision-detail-ui-v1.md) — current lifecycle snapshot, five evidence adapters, deterministic "why" copy, newest-first cursor-paginated history, zero recomputation
+- [Recommendation Engine v1](docs/architecture/recommendation-engine-v1.md) — deterministic, non-AI review actions over Decision + latest Observation only, requires_human_review always true, SHA-256 fingerprint, additive on Decision Detail, zero persistence
 - [Architecture decision records](docs/architecture/adr/)

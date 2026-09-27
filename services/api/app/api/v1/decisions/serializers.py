@@ -23,12 +23,16 @@ from app.api.v1.decisions.schemas import (
     ObservationDetail,
     OtaDecisionTarget,
     PrioritySnapshot,
+    RecommendationResponse,
+    RecommendedActionResponse,
     RevenueDecisionTarget,
 )
 from app.modules.decision_memory.types import FeedItem
 from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.precision import canonical_text
 from app.modules.intelligence.priority.types import PriorityDecisionType
+from app.modules.recommendations.engine import RecommendationEngine
+from app.modules.recommendations.types import Action, RecommendationResult
 
 # Audited, by hand, against `app/modules/decisions/serialization.py`'s own `serialize_*`
 # functions: exactly the keys each one writes into `facts_payload`, never more.
@@ -346,9 +350,40 @@ def decision_list_item_of(
     )
 
 
+def _action_response_of(action: Action) -> RecommendedActionResponse:
+    return RecommendedActionResponse(
+        action_code=action.action_code.value,
+        title_key=action.title_key,
+        description_key=action.description_key,
+        category=action.category.value,
+        scope=action.scope.value,
+        supporting_facts=dict(action.supporting_facts),
+        risk_notes=[note.value for note in action.risk_notes],
+        requires_human_review=action.requires_human_review,
+    )
+
+
+def recommendation_of(result: RecommendationResult) -> RecommendationResponse:
+    """Gate 16: the engine's own typed result -> the public, additive `recommendation` field.
+    Deliberately never leaks `generated_from_observation_id`/
+    `generated_from_evaluation_fingerprint`/`reason_codes` - those are the engine's own internal
+    bookkeeping (used to build `fingerprint`), not part of this contract."""
+    return RecommendationResponse(
+        status=result.status.value,
+        version=result.recommendation_version,
+        fingerprint=result.fingerprint,
+        primary_action=None
+        if result.primary_action is None
+        else _action_response_of(result.primary_action),
+        supporting_checks=[_action_response_of(action) for action in result.supporting_checks],
+        confidence=result.confidence,
+    )
+
+
 def decision_detail_of(
     decision: Decision, latest_observation: DecisionObservation
 ) -> DecisionDetailResponse:
+    recommendation = RecommendationEngine().evaluate(decision, latest_observation)
     return DecisionDetailResponse(
         decision_id=decision.id,
         decision_type=decision.decision_type.value,
@@ -361,6 +396,7 @@ def decision_detail_of(
         triggered_observation_count=decision.triggered_observation_count,
         target=target_of(decision),
         latest_observation=observation_detail_of(decision.decision_type, latest_observation),
+        recommendation=recommendation_of(recommendation),
     )
 
 
@@ -374,5 +410,6 @@ __all__ = [
     "latest_observation_summary_of",
     "observation_detail_of",
     "priority_snapshot_of",
+    "recommendation_of",
     "target_of",
 ]

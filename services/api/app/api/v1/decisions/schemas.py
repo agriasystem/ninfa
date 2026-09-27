@@ -170,6 +170,37 @@ class DecisionListResponse(BaseModel):
 # --- endpoint 3: decision detail ---------------------------------------------------------------
 
 
+class RecommendedActionResponse(BaseModel):
+    """One structured action (Gate 16) - `title_key`/`description_key` are deterministic template
+    keys, never generated prose; a future copy/UI layer maps them to human language. See
+    docs/architecture/recommendation-engine-v1.md, "Action model"."""
+
+    action_code: str
+    title_key: str
+    description_key: str
+    category: str
+    scope: str
+    supporting_facts: dict[str, str]
+    risk_notes: list[str]
+    requires_human_review: bool
+
+
+class RecommendationResponse(BaseModel):
+    """Gate 16, additive to Decision Detail: NEVER null (the engine always returns a typed
+    result) - `status` itself is what tells a client whether a real recommendation exists right
+    now. Deliberately omits `generated_from_observation_id`/`generated_from_evaluation_fingerprint`/
+    `reason_codes` (internal engine bookkeeping, not part of the public contract - see "No detail
+    data leak")."""
+
+    status: str
+    version: str
+    fingerprint: str
+    primary_action: RecommendedActionResponse | None
+    supporting_checks: list[RecommendedActionResponse]
+    confidence: str | None
+    requires_human_review: bool = True
+
+
 class DecisionDetailResponse(BaseModel):
     decision_id: UUID
     decision_type: str
@@ -182,6 +213,7 @@ class DecisionDetailResponse(BaseModel):
     triggered_observation_count: int
     target: DecisionTarget
     latest_observation: ObservationDetail
+    recommendation: RecommendationResponse
     decision_api_version: str = DECISION_API_VERSION
 
 
@@ -208,5 +240,7 @@ __all__ = [
     "ObservationDetail",
     "OtaDecisionTarget",
     "PrioritySnapshot",
+    "RecommendationResponse",
+    "RecommendedActionResponse",
     "RevenueDecisionTarget",
 ]
