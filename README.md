@@ -2,12 +2,19 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 16 (Recommendation Engine V1, `recommendation-engine-v1`) — the Decision Detail
-> API now additionally carries a deterministic, non-AI `recommendation`: at most one primary plus
-> two supporting review actions, derived from ONLY a Decision and its latest Observation (never a
-> raw row, never a detector re-invocation), `requires_human_review` always `true`, a SHA-256
-> fingerprint, zero persistence, zero new route, zero new dependency - no Recommendation UI
-> consumes it yet.** Gate 15 (Decision Detail UI V1, `decision-detail-ui-v1`) made every "Oggi"
+> **Status: Gate 17 (Recommendation UI V1, `recommendation-ui-v1`) — Decision Detail now renders
+> Gate 16's own `recommendation` as one new, additive "Cosa puoi valutare" section, always after
+> the evidence and never before it: a primary review action, up to two supporting checks and any
+> risk notes, copy mapped from the backend's own closed `action_code`/`risk_notes` (never from
+> `decision_type`, never AI-generated). `NOT_AVAILABLE` (and any status this frontend does not
+> recognise) hides the section entirely; `INSUFFICIENT_CONTEXT` shows one neutral sentence instead
+> of a fabricated action. No execute/approve/apply control, no checkbox, no chart, no AI aesthetic
+> - zero backend changes, zero new route, zero new dependency.** Gate 16 (Recommendation Engine V1,
+> `recommendation-engine-v1`) built the data this renders: a deterministic, non-AI `recommendation`
+> - at most one primary plus two supporting review actions, derived from ONLY a Decision and its
+> latest Observation (never a raw row, never a detector re-invocation), `requires_human_review`
+> always `true`, a SHA-256 fingerprint, zero persistence. Gate 15 (Decision Detail UI V1,
+> `decision-detail-ui-v1`) made every "Oggi"
 > card navigate to a real Decision Detail page answering "why does this deserve attention" and
 > "how has it evolved": current lifecycle status, five detector-specific evidence adapters, a
 > deterministic "Perché NINFA te lo mostra" sentence, and a newest-first, cursor-paginated
@@ -30,9 +37,9 @@ Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 > HttpOnly opaque session cookie, 5-failures/15-minute lockout, no JWT, no sliding expiry) that
 > make Gate 12's own `get_current_principal` genuinely resolvable, since Gate 14 the property's
 > own IANA timezone on the Session Context and credentialed CORS for the web origin, and since
-> Gate 15 the Decision Detail/History read surface, and since Gate 16 the additive recommendation
-> block described above - still no Recommendation UI, no Ask NINFA, no AI-generated text, no
-> signup, no password reset, no OAuth/SSO/MFA.
+> Gate 15 the Decision Detail/History read surface, since Gate 16 the additive recommendation
+> block, and since Gate 17 the Recommendation UI described above - still no Ask NINFA, no
+> AI-generated text, no signup, no password reset, no OAuth/SSO/MFA.
 
 ## Layout
 
@@ -41,7 +48,7 @@ Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 | `apps/web`           | Next.js (App Router, TypeScript strict) — Oggi UI V1         |
 | `services/api`       | FastAPI modular monolith, SQLAlchemy 2, Alembic             |
 | `services/worker`    | Background worker (Procrastinate on PostgreSQL)             |
-| `packages/contracts` | Minimal shared TypeScript types (health, auth session, decision feed) |
+| `packages/contracts` | Minimal shared TypeScript types (health, auth session, decision feed, recommendation) |
 | `docs/`              | Architecture, ADRs, local development guide                 |
 
 ## Quick start
@@ -78,4 +85,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Oggi UI v1](docs/architecture/oggi-ui-v1.md) — authenticated shell, login UI, property selection, property-local "today", four feed states, five decision card types, zero graphs, zero recommendations
 - [Decision Detail UI v1](docs/architecture/decision-detail-ui-v1.md) — current lifecycle snapshot, five evidence adapters, deterministic "why" copy, newest-first cursor-paginated history, zero recomputation
 - [Recommendation Engine v1](docs/architecture/recommendation-engine-v1.md) — deterministic, non-AI review actions over Decision + latest Observation only, requires_human_review always true, SHA-256 fingerprint, additive on Decision Detail, zero persistence
+- [Recommendation UI v1](docs/architecture/recommendation-ui-v1.md) — "Cosa puoi valutare" section on Decision Detail, evidence-first, action_code-keyed static copy, no execute/approve/apply control, no checkbox, no AI aesthetic
 - [Architecture decision records](docs/architecture/adr/)

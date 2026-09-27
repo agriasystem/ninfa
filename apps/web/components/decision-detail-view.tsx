@@ -18,6 +18,7 @@ import { formatLocalDateItalian } from "@/lib/date/local-date";
 import { oggiRoute } from "@/lib/routes";
 
 import { DecisionTimeline } from "./decision-timeline";
+import { RecommendationPanel } from "./recommendation-panel";
 
 // Every resolved state carries WHICH (propertyId, decisionId) it belongs to, so "is this stale
 // for the current props" is derived during render rather than an effect resetting to "loading"
@@ -266,6 +267,10 @@ export function DecisionDetailContent({ detail }: { detail: DecisionDetailRespon
           </p>
         ) : null}
       </section>
+
+      {/* 5. Cosa puoi valutare (Gate 17) - additive, always after evidence, never before it; renders
+          nothing when the recommendation is not visible (see RecommendationPanel). */}
+      <RecommendationPanel recommendation={detail.recommendation} />
     </article>
   );
 }

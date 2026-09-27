@@ -3,7 +3,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DecisionDetailResponse, ObservationDetail } from "@ninfa/contracts";
+import type {
+  DecisionDetailResponse,
+  ObservationDetail,
+  RecommendationResponse,
+  RecommendedActionResponse,
+} from "@ninfa/contracts";
 
 import { DecisionDetailView } from "./decision-detail-view";
 
@@ -49,6 +54,54 @@ function observation(overrides: Partial<ObservationDetail> = {}): ObservationDet
   };
 }
 
+function recommendedAction(overrides: Partial<RecommendedActionResponse> = {}): RecommendedActionResponse {
+  return {
+    action_code: "REVIEW_PRICING_AND_AVAILABILITY",
+    title_key: "recommendation.action.REVIEW_PRICING_AND_AVAILABILITY.title",
+    description_key: "recommendation.action.REVIEW_PRICING_AND_AVAILABILITY.description",
+    category: "REVIEW_PRICING",
+    scope: "STAY_DATE",
+    supporting_facts: { actual_pickup: "4", expected_pickup: "7.00" },
+    risk_notes: ["PRICING_CHANGE_MAY_AFFECT_REVENUE"],
+    requires_human_review: true,
+    ...overrides,
+  };
+}
+
+/** Mirrors exactly what Gate 16's real `pickup_rule()` would compute from `observation()`'s own
+ * facts above (`actual_pickup`/`expected_pickup`/`missing_rooms`, no `rooms_condition`). */
+function recommendation(overrides: Partial<RecommendationResponse> = {}): RecommendationResponse {
+  return {
+    status: "AVAILABLE",
+    version: "recommendation-engine-v1",
+    fingerprint: "a".repeat(64),
+    primary_action: recommendedAction(),
+    supporting_checks: [
+      recommendedAction({
+        action_code: "CHECK_BOOKING_RESTRICTIONS",
+        title_key: "recommendation.action.CHECK_BOOKING_RESTRICTIONS.title",
+        description_key: "recommendation.action.CHECK_BOOKING_RESTRICTIONS.description",
+        category: "VERIFY_DATA",
+        supporting_facts: { missing_rooms: "3.00" },
+        risk_notes: [],
+      }),
+    ],
+    confidence: "82",
+    requires_human_review: true,
+    ...overrides,
+  };
+}
+
+const NOT_AVAILABLE_RECOMMENDATION: RecommendationResponse = {
+  status: "NOT_AVAILABLE",
+  version: "recommendation-engine-v1",
+  fingerprint: "a".repeat(64),
+  primary_action: null,
+  supporting_checks: [],
+  confidence: null,
+  requires_human_review: true,
+};
+
 function detail(overrides: Partial<DecisionDetailResponse> = {}): DecisionDetailResponse {
   return {
     decision_id: "dec-1",
@@ -62,6 +115,7 @@ function detail(overrides: Partial<DecisionDetailResponse> = {}): DecisionDetail
     triggered_observation_count: 1,
     target: { type: "REV_PICKUP_LOW", booking_data_source_id: "src-1", stay_date: "2026-10-01" },
     latest_observation: observation(),
+    recommendation: recommendation(),
     decision_api_version: "decision-api-v1",
     ...overrides,
   };
@@ -142,16 +196,106 @@ describe("DecisionDetailView - happy path", () => {
     expect(container.textContent).not.toContain("obs-latest");
   });
 
-  it("never renders raw JSON or a recommendation", async () => {
+  it("never renders raw JSON, and any recommendation shown uses only safe review language", async () => {
     getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
 
     const { container } = render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
     await screen.findByText("Pickup sotto le attese");
 
     expect(container.innerHTML).not.toMatch(/[{[]"[a-z_]+":/);
-    expect(container.textContent).not.toMatch(/Abbassa il prezzo|Riduci il personale/);
+    expect(container.textContent).not.toMatch(/Abbassa il prezzo|Riduci il personale/i);
     expect(container.querySelector("svg")).toBeNull();
     expect(container.querySelector("canvas")).toBeNull();
+  });
+});
+
+describe("DecisionDetailView - Recommendation (Gate 17)", () => {
+  it("shows the recommendation section, in DOM order, after Evidenze and before Evoluzione", async () => {
+    getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
+
+    const { container } = render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(screen.getByText("Cosa puoi valutare")).not.toBeNull();
+    expect(screen.getByText("Rivedi prezzi e disponibilità")).not.toBeNull();
+    expect(
+      screen.getByText(
+        "Verifica se prezzi, disponibilità e restrizioni sono coerenti con l'andamento della data.",
+      ),
+    ).not.toBeNull();
+    expect(screen.getByText("Verifica le restrizioni di prenotazione")).not.toBeNull();
+    expect(
+      screen.getByText("Valuta questa indicazione nel contesto operativo della tua struttura."),
+    ).not.toBeNull();
+
+    const text = container.textContent ?? "";
+    const evidenceIndex = text.indexOf("Evidenze");
+    const recommendationIndex = text.indexOf("Cosa puoi valutare");
+    const evolutionIndex = text.indexOf("Evoluzione");
+    expect(evidenceIndex).toBeGreaterThan(-1);
+    expect(recommendationIndex).toBeGreaterThan(evidenceIndex);
+    expect(evolutionIndex).toBeGreaterThan(recommendationIndex);
+  });
+
+  it("hides the recommendation section entirely when NOT_AVAILABLE", async () => {
+    getDecisionDetailMock.mockResolvedValue({
+      ok: true,
+      data: detail({ recommendation: NOT_AVAILABLE_RECOMMENDATION }),
+    });
+
+    render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(screen.queryByText("Cosa puoi valutare")).toBeNull();
+  });
+
+  it("shows neutral copy for INSUFFICIENT_CONTEXT, never a fabricated recommendation", async () => {
+    getDecisionDetailMock.mockResolvedValue({
+      ok: true,
+      data: detail({ recommendation: { ...NOT_AVAILABLE_RECOMMENDATION, status: "INSUFFICIENT_CONTEXT" } }),
+    });
+
+    render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(screen.getByText("Cosa puoi valutare")).not.toBeNull();
+    expect(
+      screen.getByText("Non ci sono ancora elementi sufficienti per proporti una verifica affidabile."),
+    ).not.toBeNull();
+  });
+
+  it("never renders the recommendation's own fingerprint, version, or raw action_code/category/scope", async () => {
+    getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
+
+    const { container } = render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(container.textContent).not.toContain("a".repeat(64));
+    expect(container.textContent).not.toContain("recommendation-engine-v1");
+    expect(container.textContent).not.toContain("REVIEW_PRICING_AND_AVAILABILITY");
+    expect(container.textContent).not.toContain("CHECK_BOOKING_RESTRICTIONS");
+    expect(container.textContent).not.toContain("STAY_DATE");
+  });
+
+  it("has no execute/approve/apply button and no checkbox inside the recommendation section", async () => {
+    getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
+
+    const { container } = render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    const panel = container.querySelector(".recommendation-panel");
+    expect(panel).not.toBeNull();
+    expect(panel?.querySelectorAll("button, a, input").length).toBe(0);
+  });
+
+  it("never repeats the confidence percentage inside the recommendation section", async () => {
+    getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
+
+    const { container } = render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    const panel = container.querySelector(".recommendation-panel");
+    expect(panel?.textContent).not.toMatch(/%/);
   });
 });
 
@@ -167,6 +311,7 @@ describe("DecisionDetailView - RESOLVED / episodes", () => {
           lifecycle_transition: "RESOLVED",
           priority: null,
         }),
+        recommendation: NOT_AVAILABLE_RECOMMENDATION,
       }),
     });
 
@@ -176,6 +321,8 @@ describe("DecisionDetailView - RESOLVED / episodes", () => {
     expect(screen.getAllByText(/Risolta/).length).toBeGreaterThan(0);
     expect(screen.getByText("Risolta il 25 settembre 2026")).not.toBeNull();
     expect(screen.queryByText(/Priorità #/)).toBeNull();
+    // RESOLVED/CLEAR never shows the last real recommendation - Gate 16 doesn't persist history.
+    expect(screen.queryByText("Cosa puoi valutare")).toBeNull();
   });
 
   it("shows no noisy episode copy when episode_count is 1", async () => {
@@ -207,6 +354,7 @@ describe("DecisionDetailView - INSUFFICIENT latest observation", () => {
           lifecycle_transition: "NO_STATE_CHANGE",
           priority: null,
         }),
+        recommendation: NOT_AVAILABLE_RECOMMENDATION,
       }),
     });
 
@@ -217,6 +365,8 @@ describe("DecisionDetailView - INSUFFICIENT latest observation", () => {
     expect(screen.getByText("Dati non sufficienti per una nuova conclusione")).not.toBeNull();
     expect(screen.queryByText(/Risolta/)).toBeNull();
     expect(screen.queryByText(/Priorità #/)).toBeNull();
+    // OPEN with a non-TRIGGERED latest observation still hides the recommendation - never a stale one.
+    expect(screen.queryByText("Cosa puoi valutare")).toBeNull();
   });
 });
 
