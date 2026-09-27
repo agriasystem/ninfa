@@ -2,19 +2,35 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 18 (Ask NINFA Core V1, `ask-ninfa-v1`) — one new endpoint,
+> **Status: Gate 19 (Anthropic Provider V1, `anthropic-provider-v1`) — the first REAL
+> `LanguageModelProvider` implementation, the official Anthropic Python SDK isolated to a single
+> file (`app/modules/ai/gateway/anthropic_provider.py`, proven by an AST-based import scan), model
+> `claude-sonnet-5`, selected only by explicit `ASK_NINFA_PROVIDER=anthropic` configuration -
+> `unconfigured` remains the default, and an `ANTHROPIC_API_KEY` existing is never enough by itself.
+> Anthropic Structured Outputs constrain the model to Gate 18's own closed
+> `{status, answer, grounding_refs, limitations}` shape (`status` limited to the model's own
+> `ANSWERED`/`INSUFFICIENT_CONTEXT`; `REFUSED`/`UNAVAILABLE` remain exclusively service-decided,
+> never left to the model). Exactly one Messages API call per question - no streaming, no tools, no
+> web search, no MCP - with a bounded 15s timeout, zero automatic or application-level retries, and
+> every provider failure (timeout, network, rate limit, 4xx/5xx, auth, malformed output) mapped to
+> the SAME fail-closed `UNAVAILABLE` Gate 18 already defined, never a leaked vendor stack trace, HTTP
+> body, request id, or API key. Adaptive thinking is requested but never exposed, logged, or
+> persisted. Safe telemetry only (provider, model, status, elapsed time, token counts) - never the
+> question, context, system instructions, answer text, or raw provider response. No automated test
+> calls the real Anthropic network or holds a real key. `AskNinfaService`, the context builder, and
+> every other Gate 18 type remain entirely unaware this or any vendor exists.** Gate 18
+> (Ask NINFA Core V1, `ask-ninfa-v1`) built the endpoint this provider now optionally answers,
 > `POST /properties/{id}/decisions/{id}/ask`, the first and only place in this codebase that ever
 > calls a language model: ENGINE CALCULATES, AI EXPLAINS. The model sees ONLY an explicitly
 > whitelisted `AskDecisionContext` (Decision identity/status, the latest Observation's whitelisted
 > facts/evidence/confidence, the Gate 16 recommendation, up to 10 bounded historical observations) -
 > never a raw row, never a `decision_id`, never PII, never a workspace/session identifier. A
-> provider-agnostic `Protocol` stands between the service and any vendor; NO vendor was selected in
-> this gate - the one shipped production implementation always answers `UNAVAILABLE`, on purpose.
-> Output is structured and validated (`ANSWERED`/`INSUFFICIENT_CONTEXT`/`UNAVAILABLE`/`REFUSED`,
-> `grounding_refs` from a closed vocabulary), a deterministic guardrail refuses execution/PII/
-> injection requests before any provider call, and the user's question is treated as untrusted input
-> kept structurally separate from the static system instructions and the context. One question, one
-> answer - no conversation persisted, zero migration, zero new dependency, no chat UI yet.** Gate 17
+> provider-agnostic `Protocol` stands between the service and any vendor. Output is structured and
+> validated (`ANSWERED`/`INSUFFICIENT_CONTEXT`/`UNAVAILABLE`/`REFUSED`, `grounding_refs` from a
+> closed vocabulary), a deterministic guardrail refuses execution/PII/injection requests before any
+> provider call, and the user's question is treated as untrusted input kept structurally separate
+> from the static system instructions and the context. One question, one answer - no conversation
+> persisted, zero migration, no chat UI yet. Gate 17
 > (Recommendation UI V1, `recommendation-ui-v1`) rendered Gate 16's own `recommendation` as one new,
 > additive "Cosa puoi valutare" section on Decision Detail, always after the evidence and never
 > before it: a primary review action, up to two supporting checks and any risk notes, copy mapped
@@ -49,9 +65,10 @@ Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 > make Gate 12's own `get_current_principal` genuinely resolvable, since Gate 14 the property's
 > own IANA timezone on the Session Context and credentialed CORS for the web origin, and since
 > Gate 15 the Decision Detail/History read surface, since Gate 16 the additive recommendation
-> block, since Gate 17 the Recommendation UI, and since Gate 18 the `/ask` endpoint described
-> above - still no chat UI, no connected AI vendor, no free-form AI-generated text outside Ask
-> NINFA's own validated contract, no signup, no password reset, no OAuth/SSO/MFA.
+> block, since Gate 17 the Recommendation UI, since Gate 18 the `/ask` endpoint described
+> above, and since Gate 19 that endpoint's own optional, explicitly-configured Anthropic provider -
+> still no chat UI, no free-form AI-generated text outside Ask NINFA's own validated contract, no
+> signup, no password reset, no OAuth/SSO/MFA.
 
 ## Layout
 

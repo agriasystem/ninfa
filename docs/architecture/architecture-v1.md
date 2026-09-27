@@ -1,4 +1,4 @@
-# NINFA — Architecture v1 (Gates 0–18)
+# NINFA — Architecture v1 (Gates 0–19)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
@@ -34,7 +34,13 @@ ENGINE CALCULATES, AI EXPLAINS, over an explicitly whitelisted `AskDecisionConte
 row, never a `decision_id`, never PII), through a provider-agnostic `Protocol` with NO vendor
 selected yet (the one shipped implementation always fails closed), one `POST /ask` endpoint,
 `ANSWERED`/`INSUFFICIENT_CONTEXT`/`UNAVAILABLE`/`REFUSED` as its only possible outcomes, and zero
-persistence. Data goes in, is stored correctly, is turned into daily "on the books"
+persistence, and Anthropic Provider V1 (Gate 19), the first REAL `LanguageModelProvider`
+implementation - the official Anthropic SDK, isolated to one file, selected only by explicit
+`ASK_NINFA_PROVIDER=anthropic` configuration (never inferred from an API key alone), Structured
+Outputs constrained to Gate 18's own closed statuses, zero automatic or application retries, and
+every failure mapped to the SAME fail-closed `UNAVAILABLE` Gate 18 already defined - `AskNinfaService`
+and every other Gate 18 type remain entirely unaware this or any vendor exists. Data goes in, is
+stored correctly, is turned into daily "on the books"
 facts, into a historical "expected level" and into typed revenue, cost, labor and distribution
 evaluations, purchase invoices become canonical suppliers, invoices and lines, TRIGGERED
 evaluations become typed, ranked priority candidates, those candidates become persistent Decisions
@@ -43,9 +49,10 @@ workspace member, additionally distilled, on demand, into a structured, human-re
 action, actually SHOWN to that user on the same page as the problem and its evidence, and now also
 EXPLAINABLE in plain Italian on request; a real user can log in, see exactly that, open any one of
 those decisions to see why it matters, how it has evolved, what they can now evaluate about it, and
-ask a grounded question about it; no write endpoint, signup, password reset, MFA, OAuth/SSO, a
-chat UI, a connected LLM vendor, or free-form AI-generated content outside Ask NINFA's own
-validated, structured contract exists yet.
+ask a grounded question about it, optionally answered by a real, explicitly-configured Anthropic
+model rather than always failing closed; no write endpoint, signup, password reset, MFA, OAuth/SSO,
+a chat UI, or free-form AI-generated content outside Ask NINFA's own validated, structured contract
+exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -62,7 +69,8 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 UI: [decision-detail-ui-v1.md](decision-detail-ui-v1.md). Recommendation Engine:
 [recommendation-engine-v1.md](recommendation-engine-v1.md). Recommendation UI:
 [recommendation-ui-v1.md](recommendation-ui-v1.md). Ask NINFA Core:
-[ask-ninfa-v1.md](ask-ninfa-v1.md).
+[ask-ninfa-v1.md](ask-ninfa-v1.md). Anthropic Provider:
+[anthropic-provider-v1.md](anthropic-provider-v1.md).
 
 ## Components
 
@@ -76,7 +84,7 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
 | `apps/web`          | Since Gate 14, the real product surface: authenticated shell, login, property selection, the "Oggi" Decision Home; since Gate 15, a Decision Detail page per card (evidence, lifecycle, memory); since Gate 17, an additive "Cosa puoi valutare" Recommendation section on that same page (evidence first, review-only, no AI, no mutation). No AI, no charts, no chat UI, no Recommendation/Ask surface anywhere else (feed, cards, history). |
-| `services/api`      | HTTP API under `/api/v1/` (health, since Gate 12 the read-only Decision API, since Gate 13 auth/session, since Gate 16 the additive, deterministic recommendation on Decision Detail, since Gate 18 one POST `/ask` endpoint calling a provider-agnostic, currently-unconfigured language model gateway), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
+| `services/api`      | HTTP API under `/api/v1/` (health, since Gate 12 the read-only Decision API, since Gate 13 auth/session, since Gate 16 the additive, deterministic recommendation on Decision Detail, since Gate 18 one POST `/ask` endpoint calling a provider-agnostic language model gateway, since Gate 19 optionally backed by a real, explicitly-configured Anthropic provider - `unconfigured` remains the default), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
 | `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists (the booking import is not a job yet: there is no file storage). |
 | PostgreSQL          | The single datastore: the multi-tenant core, the bookings, the suppliers and invoices, and the job queue. |
 | `packages/contracts`| Hand-written TypeScript types mirroring the backend (health, error envelope, since Gate 13 the auth session context, since Gate 12 the decision feed, since Gate 17 the recommendation shape on Decision Detail). No Ask NINFA contract yet - Gate 18 is backend-only. |
@@ -111,7 +119,8 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   own Decision/DecisionObservation, never over `intelligence/*`) since Gate 16, `ai/ask_ninfa` and
   `ai/gateway` (no model in either: `ai/ask_ninfa` reads the SAME `decisions`/`recommendations`
   types the Recommendation Engine does, never `intelligence/*`; `ai/gateway` is a provider-agnostic
-  `Protocol` plus one fail-closed placeholder, with no domain dependency at all) since Gate 18, and
+  `Protocol`, a fail-closed placeholder implementation, and, since Gate 19, one real, isolated
+  Anthropic adapter, with no domain dependency at all) since Gate 18, and
   `auth`
   (UserCredential, AuthSession) since Gate 13 - kept
   separate from `identity` (User): a User's identity and its authenticator(s) are two different
@@ -516,6 +525,22 @@ repeated GET returns byte-identical JSON) and zero new runtime dependency (stdli
 Gate 10/11's own `canonical_text`/fingerprint conventions). Details:
 [recommendation-engine-v1.md](recommendation-engine-v1.md), ADR 0022.
 
+## Anthropic Provider (Gate 19)
+
+The first REAL implementation of Gate 18's `LanguageModelProvider` Protocol
+(`app/modules/ai/gateway/anthropic_provider.py`), backed by the official Anthropic Python SDK
+(`anthropic`, the ONE vendor-specific runtime dependency in this codebase, isolated to that single
+file - proven structurally via an AST-based import scan, `test_anthropic_provider_isolation.py`).
+Selected only by explicit `ASK_NINFA_PROVIDER=anthropic` configuration - `unconfigured` remains the
+default, and an `ANTHROPIC_API_KEY` existing is never enough by itself. Uses Anthropic Structured
+Outputs to constrain the model to Gate 18's own closed `{status, answer, grounding_refs,
+limitations}` shape (status limited to the model's own `ANSWERED`/`INSUFFICIENT_CONTEXT`;
+`REFUSED`/`UNAVAILABLE` remain exclusively service-decided), zero automatic or application-level
+retries, a bounded 15s timeout, and every provider failure mapped to the same fail-closed
+`UNAVAILABLE` Gate 18 already defined - never a leaked vendor stack trace, HTTP body, or API key.
+`AskNinfaService`, the context builder, and every other Gate 18 type remain entirely unaware this or
+any vendor exists. Details: [anthropic-provider-v1.md](anthropic-provider-v1.md), ADR 0025.
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -542,9 +567,10 @@ endpoint or UI control (Gate 16's own recommendation is read-only, computed fres
 Gate 17's UI has no button/checkbox that could mean otherwise), recommendation history/audit
 persistence or UI (nothing is persisted to show), an Ask NINFA chat UI (Gate 18 is backend-only - a
 `POST /ask` endpoint, no frontend), any Ask NINFA conversation/thread persistence (V1 is one
-question, one answer, no `Conversation`/`Message` table), a CONNECTED/configured language model
-vendor (Gate 18's own `LanguageModelProvider` protocol ships with exactly one, fail-closed
-production implementation - see ADR 0024 point 8), any AI-generated prose outside Ask NINFA's own
+question, one answer, no `Conversation`/`Message` table), a SECOND connected language model vendor
+or any provider comparison/routing between them (Gate 19 ships exactly one real, optional
+`LanguageModelProvider` implementation, Anthropic, selected only by explicit configuration - see
+ADR 0025 point 2), any AI-generated prose outside Ask NINFA's own
 validated, structured `{status, answer, grounding_refs, limitations}` contract (Gate 17 still
 renders Gate 16's recommendation data with static, `action_code`-keyed copy only - see ADR 0021
 point 16, ADR 0022 point 16, ADR 0023 point 16), a Decision pricing or pacing engine, budgeting

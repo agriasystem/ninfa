@@ -174,6 +174,9 @@ def test_no_new_runtime_dependency_was_added() -> None:
         "openpyxl",
         # argon2-cffi: added by Gate 13 (password hashing), unrelated to the decision layer.
         "argon2-cffi",
+        # anthropic: added by Gate 19 (Ask NINFA provider), unrelated to the decision layer -
+        # see ADR 0025 and `test_ask_ninfa_provider_boundary.py`.
+        "anthropic",
     }
     unexpected = dependencies - known
     assert unexpected == set(), f"unexpected new dependency: {unexpected}"

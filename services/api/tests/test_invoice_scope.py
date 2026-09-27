@@ -333,6 +333,9 @@ def test_only_the_standard_library_sqlalchemy_pydantic_and_the_app_are_imported(
 
 
 def test_the_xml_reader_uses_the_standard_library_and_the_dependency_set_is_unchanged() -> None:
+    # `anthropic` is deliberately absent here (Gate 19, ADR 0025): it is a real, justified,
+    # structurally-isolated dependency, not an unwanted addition - see
+    # `test_ask_ninfa_provider_boundary.py`, which is the precise guard for it.
     for manifest in PYPROJECTS:
         text = manifest.read_text(encoding="utf-8").lower()
         for library in (
@@ -343,7 +346,6 @@ def test_the_xml_reader_uses_the_standard_library_and_the_dependency_set_is_unch
             "scikit",
             "sklearn",
             "openai",
-            "anthropic",
             "langchain",
             "defusedxml",
             "lxml",
