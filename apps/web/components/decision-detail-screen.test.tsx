@@ -60,6 +60,15 @@ beforeEach(() => {
         economic_proxy: null,
         memory_version: "v1",
       },
+      recommendation: {
+        status: "NOT_AVAILABLE",
+        version: "recommendation-engine-v1",
+        fingerprint: "a".repeat(64),
+        primary_action: null,
+        supporting_checks: [],
+        confidence: null,
+        requires_human_review: true,
+      },
       decision_api_version: "decision-api-v1",
     },
   });

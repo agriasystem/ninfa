@@ -215,6 +215,44 @@ export interface ObservationDetail {
   memory_version: string;
 }
 
+// --- Recommendation Engine V1 (Gate 16, `app/modules/recommendations/`) ------------------------
+
+/** One structured action (Gate 16): a REVIEW or a CHECK, never an executed change.
+ * `action_code`/`category`/`scope`/`risk_notes` are plain strings on the wire - the backend's own
+ * `RecommendedActionResponse` types them as `str`, not a closed enum (unlike `target.type`, a real
+ * `Literal` discriminated union) - so a frontend copy mapping
+ * (`lib/recommendations/copy.ts`) narrows them defensively and fails safe on anything it does not
+ * recognise, rather than assuming closure the wire type itself does not promise.
+ * `title_key`/`description_key` are deterministic template keys, not prose - the frontend maps
+ * `action_code` directly to Italian copy and never reads these two fields. */
+export interface RecommendedActionResponse {
+  action_code: string;
+  title_key: string;
+  description_key: string;
+  category: string;
+  scope: string;
+  supporting_facts: Record<string, string>;
+  risk_notes: string[];
+  requires_human_review: boolean;
+}
+
+/** GET .../decisions/{decision_id}'s additive `recommendation` field (Gate 16) - NEVER null:
+ * `status` itself ("AVAILABLE" | "NOT_AVAILABLE" | "INSUFFICIENT_CONTEXT") says whether a real
+ * recommendation exists right now. Deliberately omits the engine's own internal bookkeeping
+ * (`generated_from_observation_id`, `generated_from_evaluation_fingerprint`, `reason_codes`) - see
+ * docs/architecture/recommendation-engine-v1.md. No field here can ever mean "apply automatically":
+ * `requires_human_review` is always `true`, and there is no `auto_apply`/`execute`/`approved_by_default`
+ * anywhere in this shape. */
+export interface RecommendationResponse {
+  status: string;
+  version: string;
+  fingerprint: string;
+  primary_action: RecommendedActionResponse | null;
+  supporting_checks: RecommendedActionResponse[];
+  confidence: DecimalString | null;
+  requires_human_review: boolean;
+}
+
 /** GET /api/v1/properties/{property_id}/decisions/{decision_id}. */
 export interface DecisionDetailResponse {
   decision_id: string;
@@ -228,6 +266,7 @@ export interface DecisionDetailResponse {
   triggered_observation_count: number;
   target: DecisionTarget;
   latest_observation: ObservationDetail;
+  recommendation: RecommendationResponse;
   decision_api_version: string;
 }
 

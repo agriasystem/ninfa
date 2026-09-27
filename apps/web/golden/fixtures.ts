@@ -2,8 +2,11 @@ import type {
   DecisionDetailResponse,
   DecisionFeedResponse,
   DecisionHistoryResponse,
+  DecisionType,
   FeedItemResponse,
   ObservationDetail,
+  RecommendationResponse,
+  RecommendedActionResponse,
 } from "@ninfa/contracts";
 
 /**
@@ -289,6 +292,162 @@ const GOLDEN_LABOR_ITEM: FeedItemResponse = {
   source_status: "TRIGGERED",
 };
 
+// --- Recommendation V1 golden fixtures (Gate 17) ---------------------------------------------
+//
+// Hand-built to match EXACTLY what Gate 16's real `services/api/app/modules/recommendations/
+// rules.py` would compute from each item's own `facts` object above - never derived from the
+// frontend's own `recommendationViewModel`, for the same reason the rest of this file is never
+// derived from `card-view-models.ts`: the point is to catch a real mapping bug, not to confirm an
+// adapter agrees with itself.
+
+function titleKey(actionCode: string): string {
+  return `recommendation.action.${actionCode}.title`;
+}
+
+function descriptionKey(actionCode: string): string {
+  return `recommendation.action.${actionCode}.description`;
+}
+
+function recommendedAction(
+  actionCode: string,
+  category: string,
+  scope: string,
+  supportingFacts: Record<string, string>,
+  riskNotes: string[] = [],
+): RecommendedActionResponse {
+  return {
+    action_code: actionCode,
+    title_key: titleKey(actionCode),
+    description_key: descriptionKey(actionCode),
+    category,
+    scope,
+    supporting_facts: supportingFacts,
+    risk_notes: riskNotes,
+    requires_human_review: true,
+  };
+}
+
+function availableRecommendation(
+  primary: RecommendedActionResponse,
+  supporting: RecommendedActionResponse[],
+): RecommendationResponse {
+  return {
+    status: "AVAILABLE",
+    version: "recommendation-engine-v1",
+    fingerprint: "a".repeat(64),
+    primary_action: primary,
+    supporting_checks: supporting,
+    confidence: "81",
+    requires_human_review: true,
+  };
+}
+
+export const GOLDEN_NOT_AVAILABLE_RECOMMENDATION: RecommendationResponse = {
+  status: "NOT_AVAILABLE",
+  version: "recommendation-engine-v1",
+  fingerprint: "a".repeat(64),
+  primary_action: null,
+  supporting_checks: [],
+  confidence: null,
+  requires_human_review: true,
+};
+
+export const GOLDEN_INSUFFICIENT_CONTEXT_RECOMMENDATION: RecommendationResponse = {
+  status: "INSUFFICIENT_CONTEXT",
+  version: "recommendation-engine-v1",
+  fingerprint: "a".repeat(64),
+  primary_action: null,
+  supporting_checks: [],
+  confidence: "81",
+  requires_human_review: true,
+};
+
+// Mirrors `pickup_rule(GOLDEN_PICKUP_ITEM.facts)`: actual_pickup/expected_pickup -> primary;
+// rooms_condition then missing_rooms -> the two supporting checks, in that exact order.
+const GOLDEN_PICKUP_RECOMMENDATION = availableRecommendation(
+  recommendedAction("REVIEW_PRICING_AND_AVAILABILITY", "REVIEW_PRICING", "STAY_DATE", {
+    actual_pickup: "3",
+    expected_pickup: "7.50",
+  }, ["PRICING_CHANGE_MAY_AFFECT_REVENUE"]),
+  [
+    recommendedAction("CHECK_CHANNEL_VISIBILITY", "VERIFY_DATA", "STAY_DATE", { rooms_condition: "True" }),
+    recommendedAction("CHECK_BOOKING_RESTRICTIONS", "VERIFY_DATA", "STAY_DATE", { missing_rooms: "4.50" }),
+  ],
+);
+
+// Mirrors `occupancy_rule(GOLDEN_OCCUPANCY_ITEM.facts)`.
+const GOLDEN_OCCUPANCY_RECOMMENDATION = availableRecommendation(
+  recommendedAction("REVIEW_DEMAND_POSITIONING", "REVIEW_AVAILABILITY", "STAY_DATE", {
+    forecast_rooms: "22.00",
+    expected_final_rooms: "34.00",
+  }, ["PRICING_CHANGE_MAY_AFFECT_REVENUE"]),
+  [
+    recommendedAction("CHECK_PRICING", "VERIFY_DATA", "STAY_DATE", { occupancy_gap_pp_exact: "30.00" }),
+    recommendedAction("CHECK_AVAILABILITY_AND_RESTRICTIONS", "VERIFY_DATA", "STAY_DATE", {
+      room_shortfall: "12.00",
+    }),
+  ],
+);
+
+// Mirrors `ota_rule(GOLDEN_OTA_ITEM.facts)`.
+const GOLDEN_OTA_RECOMMENDATION = availableRecommendation(
+  recommendedAction("REVIEW_DISTRIBUTION_MIX", "REVIEW_DISTRIBUTION", "DISTRIBUTION_WINDOW", {
+    ota_share_exact: "62.50",
+    expected_ota_share_exact: "45.00",
+  }, ["DISTRIBUTION_CHANGE_MAY_AFFECT_VISIBILITY"]),
+  [
+    recommendedAction("CHECK_DIRECT_CHANNEL_AVAILABILITY", "VERIFY_DATA", "DISTRIBUTION_WINDOW", {
+      structural_condition: "True",
+    }),
+    recommendedAction("CHECK_DISTRIBUTION_CONFIGURATION", "VERIFY_DATA", "DISTRIBUTION_WINDOW", {
+      rising_condition: "False",
+    }),
+  ],
+);
+
+// Mirrors `cost_rule(GOLDEN_COST_ITEM.facts)` - no risk note fits "review cost drivers" (Gate 16's
+// own honest empty tuple, never a forced fit - see ADR 0022, point 8).
+const GOLDEN_COST_RECOMMENDATION = availableRecommendation(
+  recommendedAction("REVIEW_COST_DRIVERS", "REVIEW_COST_DRIVERS", "COST_PERIOD", {
+    actual_cpor_exact: "12.40",
+    expected_cpor_exact: "9.00",
+  }),
+  [
+    recommendedAction("CHECK_RECENT_COST_ENTRIES", "VERIFY_DATA", "COST_PERIOD", { delta_cpor_exact: "3.40" }),
+    recommendedAction("CHECK_VOLUME_VS_COST", "VERIFY_DATA", "COST_PERIOD", { delta_percent_exact: "37.78" }),
+  ],
+);
+
+// Mirrors `labor_rule(GOLDEN_LABOR_ITEM.facts)`: CHECK_SHIFT_COVERAGE (excess_hours_exact) then the
+// unconditional CHECK_SCHEDULED_HOURS, in that exact order.
+const GOLDEN_LABOR_RECOMMENDATION = availableRecommendation(
+  recommendedAction("REVIEW_STAFFING_PLAN", "REVIEW_STAFFING", "WORK_DATE", {
+    scheduled_hours_exact: "40.00",
+    expected_labor_hours_exact: "28.00",
+  }, ["STAFFING_CHANGE_MAY_AFFECT_SERVICE"]),
+  [
+    recommendedAction("CHECK_SHIFT_COVERAGE", "VERIFY_DATA", "WORK_DATE", { excess_hours_exact: "12.00" }),
+    recommendedAction("CHECK_SCHEDULED_HOURS", "VERIFY_DATA", "WORK_DATE", { scheduled_hours_exact: "40.00" }),
+  ],
+);
+
+const GOLDEN_RECOMMENDATION_BY_TYPE: Record<DecisionType, RecommendationResponse> = {
+  REV_PICKUP_LOW: GOLDEN_PICKUP_RECOMMENDATION,
+  REV_OCCUPANCY_RISK: GOLDEN_OCCUPANCY_RECOMMENDATION,
+  REV_OTA_DEPENDENCY: GOLDEN_OTA_RECOMMENDATION,
+  COST_CPOR_ANOMALY: GOLDEN_COST_RECOMMENDATION,
+  LABOR_OVERSTAFFING: GOLDEN_LABOR_RECOMMENDATION,
+};
+
+/** The recommendation a real Gate 16 engine run would compute for this golden item's OWN
+ * `decision_type`+`facts` - keyed by decision_type here ONLY because this is hand-authored test
+ * data simulating five independent real backend outputs, never a rule the frontend's own
+ * production code is allowed to apply (see `lib/recommendations/view-model.ts`, which keys
+ * exclusively off `action_code`, never `decision_type`). */
+export function recommendationFor(item: FeedItemResponse): RecommendationResponse {
+  return GOLDEN_RECOMMENDATION_BY_TYPE[item.decision_type];
+}
+
 export const GOLDEN_FIVE_DECISION_TYPES: FeedItemResponse[] = [
   GOLDEN_PICKUP_ITEM,
   GOLDEN_OCCUPANCY_ITEM,
@@ -386,6 +545,11 @@ function detailFromFeedItem(
     triggered_observation_count: 1,
     target: item.target,
     latest_observation: observationFromFeedItem(item),
+    // Gate 17: the recommendation a real engine run would compute for this item's OWN
+    // decision_type+facts - a scenario whose OWN latest_observation is overridden to a
+    // non-TRIGGERED source_status below also overrides this to GOLDEN_NOT_AVAILABLE_RECOMMENDATION,
+    // since Gate 16's NOT_AVAILABLE is driven by source_status, never by Decision.status.
+    recommendation: recommendationFor(item),
     decision_api_version: "decision-api-v1",
     ...overrides,
   };
@@ -429,6 +593,8 @@ export const GOLDEN_DETAIL_RESOLVED: DecisionDetailResponse = detailFromFeedItem
     priority: null,
     economic_proxy: null,
   }),
+  // F. RESOLVED/CLEAR -> NOT_AVAILABLE: no stale recommendation from before the problem cleared.
+  recommendation: GOLDEN_NOT_AVAILABLE_RECOMMENDATION,
 });
 
 export const GOLDEN_HISTORY_RESOLVED: DecisionHistoryResponse = {
@@ -451,7 +617,10 @@ export const GOLDEN_HISTORY_RESOLVED: DecisionHistoryResponse = {
 };
 
 /** C. REOPENED: the SAME logical decision, episode_count > 1, a full OPENED -> OBSERVED ->
- * RESOLVED -> REOPENED history. */
+ * RESOLVED -> REOPENED history. H. Also the Recommendation golden scenario for REOPENED/TRIGGERED:
+ * `latest_observation` stays TRIGGERED (only its transition changes to REOPENED), so
+ * `detailFromFeedItem`'s default `recommendation` is the real OTA AVAILABLE recommendation, built
+ * from THIS observation's own facts only - never a prior episode's. */
 export const GOLDEN_DETAIL_REOPENED: DecisionDetailResponse = detailFromFeedItem(GOLDEN_OTA_ITEM, {
   status: "OPEN",
   first_seen_local_date: "2026-08-01",
@@ -510,6 +679,8 @@ export const GOLDEN_DETAIL_INSUFFICIENT_LATEST: DecisionDetailResponse = detailF
       priority: null,
       economic_proxy: null,
     }),
+    // source_status != TRIGGERED -> NOT_AVAILABLE regardless of Decision.status staying OPEN.
+    recommendation: GOLDEN_NOT_AVAILABLE_RECOMMENDATION,
   },
 );
 
@@ -564,3 +735,22 @@ export const GOLDEN_HISTORY_PAGE_2: DecisionHistoryResponse = {
   ],
   next_cursor: null,
 };
+
+// --- Recommendation UI V1 golden scenarios (Gate 17) -------------------------------------------
+
+/** G. INSUFFICIENT_CONTEXT: the latest observation IS TRIGGERED (unlike NOT_AVAILABLE above), but
+ * the facts `pickup_rule` needs (`actual_pickup`/`expected_pickup`) are genuinely missing - the
+ * real shape Gate 11's own minimal `revenue_evaluation()` test fixture produces end to end (see
+ * `recommendation-engine-v1.md`, "Missing or malformed context"). Confidence can still be a real,
+ * non-null value: only the RULE's own facts are insufficient, not the confidence score itself. */
+export const GOLDEN_DETAIL_RECOMMENDATION_INSUFFICIENT_CONTEXT: DecisionDetailResponse = detailFromFeedItem(
+  GOLDEN_PICKUP_ITEM,
+  {
+    decision_id: "55555555-5555-4555-8555-555555555556",
+    latest_observation: observationFromFeedItem(GOLDEN_PICKUP_ITEM, {
+      observation_id: "obs-pickup-insufficient-context",
+      facts: { stay_date: "2026-10-05", kind: "PICKUP" },
+    }),
+    recommendation: GOLDEN_INSUFFICIENT_CONTEXT_RECOMMENDATION,
+  },
+);

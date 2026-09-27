@@ -157,6 +157,15 @@ carries a deterministic, non-AI `recommendation` field (see
 and components do not read or render it yet. Nothing above changed: still no advice shown here,
 by omission rather than by the field not existing on the wire.
 
+**Update (Gate 17):** this page now DOES render `recommendation`, as a new, additive "Cosa puoi
+valutare" section, always after Evidenze and always before Evoluzione - see
+[recommendation-ui-v1.md](recommendation-ui-v1.md), ADR 0023. Everything above this note is
+otherwise unchanged: still no acknowledge/dismiss/snooze/assign/execute/approve/apply control of
+any kind, still no AI-generated prose (the new section's copy is a static mapping keyed by the
+backend's own closed `action_code`, exactly like `decisionTypeTitles` already is for
+`decision_type`), and the recommendation is never shown for a `NOT_AVAILABLE`/unrecognised status -
+a real, current, human-reviewed REVIEW PROMPT, never an executed change.
+
 ## No detail data leak
 
 `ObservationDetail`'s audit fields (`source_evaluation_fingerprint`, `source_target_key`,
@@ -193,9 +202,10 @@ focus is always visible; headings follow a real `h1`/`h2` hierarchy; loading/err
 ## Limitations (intentional, documented debt)
 
 - No Decision write actions of any kind (acknowledge/dismiss/snooze/assign/resolve/reopen).
-- No Recommendation UI, no Ask NINFA, no AI-generated prose - explicitly out of scope, see ADR
-  0021, "future recommendation/Ask integration". Gate 16 added the recommendation data to the API
-  only (ADR 0022); the UI to render it remains future work.
+- No Ask NINFA, no chat, no AI-generated prose anywhere - explicitly out of scope, see ADR 0021
+  point 16 and ADR 0023 point 16, "Ask NINFA future integration". Gate 17 added a read-only
+  Recommendation section (see [recommendation-ui-v1.md](recommendation-ui-v1.md)); a conversational
+  layer remains separate, future work.
 - No dedicated E2E/browser-automation suite - visual acceptance at the three target viewports is
   a manual checklist plus component/CSS-level tests, same as Gate 14.
 - No real-time updates: the detail/history pages reflect whatever was true at the moment they

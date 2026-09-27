@@ -79,4 +79,11 @@ describe("DecisionList", () => {
     const link = screen.getByRole("link");
     expect(link.getAttribute("href")).toBe("/oggi/decisioni/dec-abc?property=prop-1");
   });
+
+  it("never shows a Recommendation (Gate 17 lives only on Decision Detail) - FeedItemResponse carries no such field", () => {
+    const items = [item(1, "d1")];
+    render(<DecisionList items={items} propertyId="prop-1" />);
+
+    expect(screen.queryByText("Cosa puoi valutare")).toBeNull();
+  });
 });
