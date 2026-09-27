@@ -1,0 +1,152 @@
+"""Gate 18 review items 31-37: `AskNinfaService.ask()` against a
+`DeterministicFakeLanguageModelProvider` - no HTTP, no database, exactly like
+`test_recommendation_engine.py`'s own pure-engine posture.
+"""
+
+import dataclasses
+
+from app.modules.ai.ask_ninfa.service import AskNinfaService
+from app.modules.ai.ask_ninfa.types import (
+    MAX_ANSWER_CHARS,
+    AskActionContext,
+    AskDecisionContext,
+    AskObservationContext,
+    AskRecommendationContext,
+    AskStatus,
+)
+from app.modules.ai.gateway.errors import LanguageModelUnavailableError
+from app.modules.ai.gateway.protocol import LanguageModelAnswer, ModelAnswerStatus
+from tests.ask_ninfa_support import DeterministicFakeLanguageModelProvider
+
+
+def _context(**overrides: object) -> AskDecisionContext:
+    base = AskDecisionContext(
+        decision_type="REV_PICKUP_LOW",
+        decision_status="OPEN",
+        first_seen_local_date="2026-08-01",
+        last_seen_local_date="2026-08-01",
+        last_evaluated_local_date="2026-08-01",
+        resolved_local_date=None,
+        episode_count=1,
+        target={"stay_date": "2026-08-15"},
+        latest=AskObservationContext(
+            as_of_local_date="2026-08-01",
+            source_status="TRIGGERED",
+            lifecycle_transition="OPENED",
+            reason_codes=("TRIGGER_PICKUP_SHORTFALL",),
+            confidence="81.23",
+            priority_rank=1,
+            facts={"actual_pickup": 3, "expected_pickup": "7.50"},
+            evidence={"confidence_score": "81.23"},
+        ),
+        recommendation=AskRecommendationContext(
+            status="AVAILABLE",
+            primary_action=AskActionContext(
+                action_code="REVIEW_PRICING_AND_AVAILABILITY",
+                category="REVIEW_PRICING",
+                risk_notes=("PRICING_CHANGE_MAY_AFFECT_REVENUE",),
+            ),
+            supporting_checks=(),
+            requires_human_review=True,
+        ),
+        history=(),
+    )
+    return dataclasses.replace(base, **overrides)  # type: ignore[arg-type]
+
+
+def _answer(**overrides: object) -> LanguageModelAnswer:
+    base = LanguageModelAnswer(
+        status=ModelAnswerStatus.ANSWERED,
+        answer="Il pickup è sotto le attese: sono entrate 3 camere contro le 7.50 previste.",
+        grounding_refs=("LATEST_FACTS",),
+        limitations=(),
+    )
+    return dataclasses.replace(base, **overrides)  # type: ignore[arg-type]
+
+
+# --- 31-33: a real, grounded answer is accepted with refs and limitations ------------------------
+
+
+def test_31_32_33_grounded_answer_with_refs_and_limitations_is_answered() -> None:
+    provider = DeterministicFakeLanguageModelProvider(
+        answer=_answer(
+            grounding_refs=("LATEST_FACTS", "RECOMMENDATION"), limitations=("Stima indicativa.",)
+        )
+    )
+    result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
+
+    assert result.status is AskStatus.ANSWERED
+    assert result.answer is not None and len(result.answer) > 0
+    assert set(ref.value for ref in result.grounding_refs) == {"LATEST_FACTS", "RECOMMENDATION"}
+    assert result.limitations == ("Stima indicativa.",)
+
+
+def test_32_unrecognised_grounding_ref_is_dropped_not_crashed_on() -> None:
+    provider = DeterministicFakeLanguageModelProvider(
+        answer=_answer(grounding_refs=("LATEST_FACTS", "SOME_FUTURE_REF"))
+    )
+    result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
+
+    assert result.status is AskStatus.ANSWERED
+    assert [ref.value for ref in result.grounding_refs] == ["LATEST_FACTS"]
+
+
+def test_33_insufficient_context_status_from_the_model_is_preserved() -> None:
+    provider = DeterministicFakeLanguageModelProvider(
+        answer=_answer(
+            status=ModelAnswerStatus.INSUFFICIENT_CONTEXT,
+            answer="Non posso stabilire di quanto ridurre il prezzo con i dati disponibili.",
+        )
+    )
+    result = AskNinfaService(provider).ask(_context(), "Di quanto devo abbassare il prezzo?")
+
+    assert result.status is AskStatus.INSUFFICIENT_CONTEXT
+    assert result.answer is not None
+
+
+# --- 34: overlong answer is truncated, never rejected outright ------------------------------------
+
+
+def test_34_overlong_answer_is_truncated_to_the_documented_bound() -> None:
+    long_answer = "a" * (MAX_ANSWER_CHARS + 500)
+    provider = DeterministicFakeLanguageModelProvider(answer=_answer(answer=long_answer))
+    result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
+
+    assert result.status is AskStatus.ANSWERED
+    assert result.answer is not None
+    assert len(result.answer) <= MAX_ANSWER_CHARS + 1  # +1 for the truncation ellipsis character
+    assert result.answer.startswith("a")
+
+
+# --- 35: malformed provider output fails closed ---------------------------------------------------
+
+
+def test_35_empty_answer_is_malformed_and_fails_closed_to_unavailable() -> None:
+    provider = DeterministicFakeLanguageModelProvider(answer=_answer(answer="   "))
+    result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
+
+    assert result.status is AskStatus.UNAVAILABLE
+    assert result.answer is None
+    assert result.grounding_refs == ()
+
+
+# --- 36-37: provider timeout/exception fail closed to UNAVAILABLE, never leaked -------------------
+
+
+def test_36_provider_timeout_becomes_unavailable() -> None:
+    provider = DeterministicFakeLanguageModelProvider(
+        error=LanguageModelUnavailableError("simulated timeout")
+    )
+    result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
+
+    assert result.status is AskStatus.UNAVAILABLE
+    assert result.answer is None
+    assert result.limitations == ()
+
+
+def test_37_unexpected_provider_exception_also_becomes_unavailable_never_leaked() -> None:
+    provider = DeterministicFakeLanguageModelProvider(error=RuntimeError("boom: secret detail"))
+    result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
+
+    assert result.status is AskStatus.UNAVAILABLE
+    assert result.answer is None

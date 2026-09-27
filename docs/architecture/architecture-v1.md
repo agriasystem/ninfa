@@ -1,4 +1,4 @@
-# NINFA — Architecture v1 (Gates 0–17)
+# NINFA — Architecture v1 (Gates 0–18)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
@@ -28,16 +28,24 @@ unconditionally, and Recommendation UI (Gate 17), which renders that same data a
 additive "Cosa puoi valutare" section on Decision Detail - always after the evidence, never before
 it - mapping the engine's own closed `action_code`/`risk_notes` to static Italian copy, never a
 `decision_type`-based choice and never generated prose; no execute/approve/apply control, no
-checkbox, no AI aesthetic. Data goes in, is stored correctly, is turned into daily "on the books"
+checkbox, no AI aesthetic, and Ask NINFA Core (Gate 18), a grounded, single-turn, decision-scoped
+explanation layer - the first and only place in this codebase that ever calls a language model:
+ENGINE CALCULATES, AI EXPLAINS, over an explicitly whitelisted `AskDecisionContext` (never a raw
+row, never a `decision_id`, never PII), through a provider-agnostic `Protocol` with NO vendor
+selected yet (the one shipped implementation always fails closed), one `POST /ask` endpoint,
+`ANSWERED`/`INSUFFICIENT_CONTEXT`/`UNAVAILABLE`/`REFUSED` as its only possible outcomes, and zero
+persistence. Data goes in, is stored correctly, is turned into daily "on the books"
 facts, into a historical "expected level" and into typed revenue, cost, labor and distribution
 evaluations, purchase invoices become canonical suppliers, invoices and lines, TRIGGERED
 evaluations become typed, ranked priority candidates, those candidates become persistent Decisions
 with a lifecycle and a memory, that memory is read over HTTP by a real, authenticated, authorized
 workspace member, additionally distilled, on demand, into a structured, human-reviewed review
-action, and now actually SHOWN to that user on the same page as the problem and its evidence; a
-real user can log in, see exactly that, open any one of those decisions to see why it matters, how
-it has evolved, and what they can now evaluate about it; no write endpoint, signup, password
-reset, MFA, OAuth/SSO, Ask NINFA or AI-generated content exists yet.
+action, actually SHOWN to that user on the same page as the problem and its evidence, and now also
+EXPLAINABLE in plain Italian on request; a real user can log in, see exactly that, open any one of
+those decisions to see why it matters, how it has evolved, what they can now evaluate about it, and
+ask a grounded question about it; no write endpoint, signup, password reset, MFA, OAuth/SSO, a
+chat UI, a connected LLM vendor, or free-form AI-generated content outside Ask NINFA's own
+validated, structured contract exists yet.
 Data model: [data-model-v1.md](data-model-v1.md). Bookings: [booking-data-v1.md](booking-data-v1.md).
 Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [expected-engine-v1.md](expected-engine-v1.md). Revenue decisions:
@@ -53,7 +61,8 @@ Snapshots: [booking-snapshots-v1.md](booking-snapshots-v1.md). Expected:
 [auth-session-v1.md](auth-session-v1.md). Oggi UI: [oggi-ui-v1.md](oggi-ui-v1.md). Decision Detail
 UI: [decision-detail-ui-v1.md](decision-detail-ui-v1.md). Recommendation Engine:
 [recommendation-engine-v1.md](recommendation-engine-v1.md). Recommendation UI:
-[recommendation-ui-v1.md](recommendation-ui-v1.md).
+[recommendation-ui-v1.md](recommendation-ui-v1.md). Ask NINFA Core:
+[ask-ninfa-v1.md](ask-ninfa-v1.md).
 
 ## Components
 
@@ -66,11 +75,11 @@ Browser ──► apps/web (Next.js) ──► services/api (FastAPI) ──► 
 
 | Component           | Responsibility today                                                        |
 | ------------------- | --------------------------------------------------------------------------- |
-| `apps/web`          | Since Gate 14, the real product surface: authenticated shell, login, property selection, the "Oggi" Decision Home; since Gate 15, a Decision Detail page per card (evidence, lifecycle, memory); since Gate 17, an additive "Cosa puoi valutare" Recommendation section on that same page (evidence first, review-only, no AI, no mutation). No AI, no charts, no Recommendation surface anywhere else (feed, cards, history). |
-| `services/api`      | HTTP API under `/api/v1/` (health, since Gate 12 the read-only Decision API, since Gate 13 auth/session, since Gate 16 the additive, deterministic recommendation on Decision Detail), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
+| `apps/web`          | Since Gate 14, the real product surface: authenticated shell, login, property selection, the "Oggi" Decision Home; since Gate 15, a Decision Detail page per card (evidence, lifecycle, memory); since Gate 17, an additive "Cosa puoi valutare" Recommendation section on that same page (evidence first, review-only, no AI, no mutation). No AI, no charts, no chat UI, no Recommendation/Ask surface anywhere else (feed, cards, history). |
+| `services/api`      | HTTP API under `/api/v1/` (health, since Gate 12 the read-only Decision API, since Gate 13 auth/session, since Gate 16 the additive, deterministic recommendation on Decision Detail, since Gate 18 one POST `/ask` endpoint calling a provider-agnostic, currently-unconfigured language model gateway), config, logging, error model, the tenant-scoped data core, the booking and invoice import services, the snapshot and Expected services. |
 | `services/worker`   | Runs background jobs from a PostgreSQL-backed queue. Only a smoke job exists (the booking import is not a job yet: there is no file storage). |
 | PostgreSQL          | The single datastore: the multi-tenant core, the bookings, the suppliers and invoices, and the job queue. |
-| `packages/contracts`| Hand-written TypeScript types mirroring the backend (health, error envelope, since Gate 13 the auth session context, since Gate 12 the decision feed, since Gate 17 the recommendation shape on Decision Detail). |
+| `packages/contracts`| Hand-written TypeScript types mirroring the backend (health, error envelope, since Gate 13 the auth session context, since Gate 12 the decision feed, since Gate 17 the recommendation shape on Decision Detail). No Ask NINFA contract yet - Gate 18 is backend-only. |
 
 The worker imports the API package (`app.core.config`, `app.core.logging`): one backend codebase,
 one uv workspace, two entrypoints. Both share the same environment file and database.
@@ -82,7 +91,7 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
 - A module owns its models, schemas and logic; other modules go through its public functions,
   not its tables.
 - Layers stay thin: `api/` (HTTP) → `modules/` (business logic) → `db/` (persistence).
-- Fifteen modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership),
+- Seventeen modules exist: `identity` (User), `tenancy` (Workspace, WorkspaceMembership),
   `properties` (Property), `ingestion` (DataSource, ImportJob, ImportFile) since Gate 1, `bookings`
   since Gate 2, `snapshots` (RoomInventoryDaily, BookingSnapshot) since Gate 3,
   `intelligence/expected` (BookingExpectedBaseline, BookingExpectedComparable) since Gate 4 (the
@@ -99,7 +108,11 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   own evaluation types and writes nothing), `decisions` (DecisionRun, Decision,
   DecisionObservation) with `decision_memory` (no model: an internal read side over `decisions`'
   own repository) since Gate 11, `recommendations` (no model: a pure derivation over `decisions`'
-  own Decision/DecisionObservation, never over `intelligence/*`) since Gate 16, and `auth`
+  own Decision/DecisionObservation, never over `intelligence/*`) since Gate 16, `ai/ask_ninfa` and
+  `ai/gateway` (no model in either: `ai/ask_ninfa` reads the SAME `decisions`/`recommendations`
+  types the Recommendation Engine does, never `intelligence/*`; `ai/gateway` is a provider-agnostic
+  `Protocol` plus one fail-closed placeholder, with no domain dependency at all) since Gate 18, and
+  `auth`
   (UserCredential, AuthSession) since Gate 13 - kept
   separate from `identity` (User): a User's identity and its authenticator(s) are two different
   lifecycles, and `identity` is imported by nearly every other module while `auth` should not
@@ -123,13 +136,16 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   `User`/credential/session is never tenant-scoped (a `User` can belong to several workspaces),
   so it depends only on a `Session` and an injectable clock (`app.core.clock.Clock`).
 - The directories for the still-future domains (`normalization`,
-  `data_quality`, `intelligence/{detection,impact,recommendation}`, `ai/*`) are empty package
-  markers so the structure is settled before those domains land. `intelligence/priority` and
-  `decisions`/`decision_memory` are no longer among them: Gate 10 and Gate 11 filled them in.
+  `data_quality`, `intelligence/{detection,impact,recommendation}`, `ai/narrative`) are empty
+  package markers so the structure is settled before those domains land. `intelligence/priority`
+  and `decisions`/`decision_memory` are no longer among them: Gate 10 and Gate 11 filled them in.
   `intelligence/recommendation` is a deliberate exception: it stays an empty, unused placeholder -
   Gate 16's real Recommendation Engine lives at the top-level `recommendations` module instead
   (see above and ADR 0022, "Alternatives considered"), since it depends on nothing under
-  `intelligence/` at all.
+  `intelligence/` at all. `ai/ask_ninfa` and `ai/gateway` are ALSO no longer among the still-future
+  ones: unlike `intelligence/recommendation`, Gate 0 had already reserved these two specifically
+  and correctly for Gate 18's own concern (see ADR 0024, "Alternatives considered") - `ai/narrative`
+  remains the one still-empty placeholder under `ai/`.
 - Splitting a module into a service is a possible future step, never a starting point.
 
 ## API conventions
@@ -140,7 +156,10 @@ One deployable backend, organised in modules under `services/api/app/modules/`. 
   [decision-api-v1.md](decision-api-v1.md)). Every one is `GET`-only, behind the authorization
   boundary below - no CRUD, no faked tenant header. `app/api/v1/decisions/` holds this gate's own
   `router.py`, `deps.py` (tenant resolution), `schemas.py` (response DTOs), `serializers.py` (ORM
-  row -> DTO, whitelisted) and `cursor.py` (opaque keyset pagination).
+  row -> DTO, whitelisted) and `cursor.py` (opaque keyset pagination). Since Gate 18, the SAME
+  router also carries the one exception to "GET-only": `POST /decisions/{decision_id}/ask` (see
+  [ask-ninfa-v1.md](ask-ninfa-v1.md)) - read-only with respect to business state despite the verb,
+  reusing `deps.py`'s own `resolve_property_scope` unmodified.
 - **Since Gate 13, real authentication:** `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`,
   `GET /api/v1/auth/session` (see [auth-session-v1.md](auth-session-v1.md)). `app/api/v1/auth/`
   mirrors the same `router.py`/`schemas.py`/`deps.py` layering; `app/core/auth.py` holds the
@@ -521,10 +540,17 @@ explicit CLEAR, backtesting/replaying historical as-of dates, any Decision WRITE
 (acknowledge/dismiss/snooze/assign/resolve/reopen), any recommendation write/execute/approve/apply
 endpoint or UI control (Gate 16's own recommendation is read-only, computed fresh every request;
 Gate 17's UI has no button/checkbox that could mean otherwise), recommendation history/audit
-persistence or UI (nothing is persisted to show), Ask NINFA or any AI-generated prose (Gate 17
-renders Gate 16's data with static, `action_code`-keyed copy only - see ADR 0021 point 16, ADR
-0022 point 16, ADR 0023 point 16), a Decision pricing or pacing engine, budgeting
-and accruals, currency conversion, AI gateway / narrative generation, notifications, payments,
+persistence or UI (nothing is persisted to show), an Ask NINFA chat UI (Gate 18 is backend-only - a
+`POST /ask` endpoint, no frontend), any Ask NINFA conversation/thread persistence (V1 is one
+question, one answer, no `Conversation`/`Message` table), a CONNECTED/configured language model
+vendor (Gate 18's own `LanguageModelProvider` protocol ships with exactly one, fail-closed
+production implementation - see ADR 0024 point 8), any AI-generated prose outside Ask NINFA's own
+validated, structured `{status, answer, grounding_refs, limitations}` contract (Gate 17 still
+renders Gate 16's recommendation data with static, `action_code`-keyed copy only - see ADR 0021
+point 16, ADR 0022 point 16, ADR 0023 point 16), a Decision pricing or pacing engine, budgeting
+and accruals, currency conversion, AI narrative generation (`ai/narrative` stays an empty
+placeholder), perimeter/application rate limiting for Ask NINFA specifically (documented debt, see
+ask-ninfa-v1.md's own "Limitations"), notifications, payments,
 analytics, deployment, any chart or graph, a real i18n framework (Gate 14/15's copy is centralised
 but hardcoded to Italian), a browser-automation/E2E test suite, and a frozen NINFA logo asset (the
 shell uses a plain typographic wordmark).

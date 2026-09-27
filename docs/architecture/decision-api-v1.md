@@ -24,10 +24,18 @@ latest Observation this endpoint already returns, computed fresh on every reques
 route and no new query parameter. See [recommendation-engine-v1.md](recommendation-engine-v1.md)
 and ADR 0022. Every other endpoint, and every other field of this one, is unchanged.
 
+**Update (Gate 18):** a fifth route, `POST /decisions/{decision_id}/ask`, was added - the ONE
+exception to "four `GET` endpoints" above, and the only POST anywhere on this router. It mutates no
+business state (no `DecisionService.sync()` call, no persistence of any kind) - it is a POST
+because it carries a `question` body and calls an external, provider-agnostic language model
+gateway. Reuses `resolve_property_scope`/`_decision_in_scope` unmodified: the same 401/404
+semantics as every other route here. See [ask-ninfa-v1.md](ask-ninfa-v1.md) and ADR 0024.
+
 Explicitly NOT in scope (unchanged since Gate 11, now enforced by `test_decision_api_scope.py`
 too): manual Decision creation, acknowledge/dismiss/snooze/resolve/reopen, assignment, generated
-prose, AI, notifications, a scheduler, a frontend, detector execution, Priority execution, and any
-write/execute/approve/apply endpoint for the Gate 16 recommendation itself.
+prose not going through Ask NINFA's own grounded/validated path, notifications, a scheduler, a
+frontend, detector execution, Priority execution, any write/execute/approve/apply endpoint for the
+Gate 16 recommendation, and any conversation/thread/chat-history endpoint for Gate 18's Ask NINFA.
 
 ## Authorization boundary
 
