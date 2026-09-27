@@ -15,7 +15,7 @@ describe("evidenceRows", () => {
       missingRooms: "3.00",
     };
 
-    const rows = evidenceRows(card, "0.81", {});
+    const rows = evidenceRows(card, "81", {});
 
     expect(rows).toEqual([
       { label: "Attuale", value: "4" },
@@ -23,6 +23,23 @@ describe("evidenceRows", () => {
       { label: "Scostamento", value: "-3" },
       { label: "Affidabilità", value: "81%" },
     ]);
+  });
+
+  it("regression: a real Decimal confidence_score like '81.23' displays as 81%, never 8123%", () => {
+    const card: DecisionCardViewModel = {
+      kind: "PICKUP",
+      stayDate: "2026-10-01",
+      windowDays: 7,
+      actualPickup: 4,
+      expectedPickup: "7.00",
+      deltaRooms: "-3.00",
+      missingRooms: "3.00",
+    };
+
+    const rows = evidenceRows(card, "81.23", {});
+
+    expect(rows).toContainEqual({ label: "Affidabilità", value: "81%" });
+    expect(rows.some((row) => row.value === "8123%")).toBe(false);
   });
 
   it("adds a coverage row only when the real evidence carries it (OTA/Cost/Labor)", () => {
@@ -36,7 +53,7 @@ describe("evidenceRows", () => {
       risingCondition: false,
     };
 
-    const rows = evidenceRows(card, "0.84", { classification_coverage_pct_exact: "92.00" });
+    const rows = evidenceRows(card, "84", { classification_coverage_pct_exact: "92.00" });
 
     expect(rows).toContainEqual({ label: "", value: "Copertura dati 92%" });
   });
@@ -52,7 +69,7 @@ describe("evidenceRows", () => {
       missingRooms: "3.00",
     };
 
-    const rows = evidenceRows(card, "0.81", { pattern_pair_count: 8 });
+    const rows = evidenceRows(card, "81", { pattern_pair_count: 8 });
 
     expect(rows).toContainEqual({ label: "", value: "Basato su 8 periodi comparabili" });
   });
@@ -68,7 +85,7 @@ describe("evidenceRows", () => {
       missingRooms: "3.00",
     };
 
-    const rows = evidenceRows(card, "0.81", {});
+    const rows = evidenceRows(card, "81", {});
 
     expect(rows.some((row) => row.label === "")).toBe(false);
   });
@@ -85,7 +102,7 @@ describe("evidenceRows", () => {
       deltaPercent: "24.00",
     };
 
-    const rows = evidenceRows(card, "0.80", { classification_coverage_pct_exact: "92.00" });
+    const rows = evidenceRows(card, "80", { classification_coverage_pct_exact: "92.00" });
 
     expect(rows.length).toBeLessThanOrEqual(5);
   });
@@ -100,7 +117,7 @@ describe("evidenceRows", () => {
       roomShortfall: null,
     };
 
-    const rows = evidenceRows(card, "0.5", {});
+    const rows = evidenceRows(card, "50", {});
 
     expect(rows).toEqual([{ label: "Affidabilità", value: "50%" }]);
   });

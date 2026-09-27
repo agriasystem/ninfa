@@ -191,10 +191,13 @@ function cardViewModelOf(item: FeedItemResponse): DecisionCardViewModel {
 }
 
 /** Exported for reuse by `lib/decisions/evidence-rows.ts` (Gate 15): the SAME confidence-to-
- * percent conversion used here, never a second implementation. */
+ * percent conversion used here, never a second implementation. `confidenceScore` is ALREADY on
+ * the 0-100 scale (the backend's own `confidence_score`, see `priority-engine-v1.md`'s "Confidence:
+ * reused, never recomputed" and the `confidence_score BETWEEN 0 AND 100` DB constraint) - this
+ * only rounds it for display, it NEVER multiplies by 100 again. */
 export function confidencePercentOf(confidenceScore: string): number | null {
   const value = Number.parseFloat(confidenceScore);
-  return Number.isFinite(value) ? Math.round(value * 100) : null;
+  return Number.isFinite(value) ? Math.round(value) : null;
 }
 
 /** The one entry point: a real `FeedItemResponse` -> a typed, presentation-ready view model.
