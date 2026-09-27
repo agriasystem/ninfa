@@ -1,6 +1,12 @@
-"""Authentication & Session V1: exact OpenAPI surface (review items 103-111)."""
+"""Authentication & Session V1: exact OpenAPI surface (review items 103-111).
+
+Gate 18 adds exactly one further path, `.../ask` - the only POST among the `/api/v1/properties/`
+routes (see `test_decision_api_scope.py` for the Gate 18-specific route/method assertions).
+"""
 
 from fastapi.testclient import TestClient
+
+_ASK_PATH = "/api/v1/properties/{property_id}/decisions/{decision_id}/ask"
 
 _EXPECTED_PATHS = {
     "/api/v1/health",
@@ -11,6 +17,7 @@ _EXPECTED_PATHS = {
     "/api/v1/properties/{property_id}/decisions",
     "/api/v1/properties/{property_id}/decisions/{decision_id}",
     "/api/v1/properties/{property_id}/decisions/{decision_id}/history",
+    _ASK_PATH,
 }
 
 
@@ -34,10 +41,14 @@ def test_session_is_get_only(client: TestClient) -> None:
     assert set(schema["paths"]["/api/v1/auth/session"]) == {"get"}
 
 
-def test_decision_routes_remain_get_only(client: TestClient) -> None:
+def test_decision_routes_remain_get_only_except_the_one_ask_post(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
     for path, methods in schema["paths"].items():
-        if path.startswith("/api/v1/properties/"):
+        if not path.startswith("/api/v1/properties/"):
+            continue
+        if path == _ASK_PATH:
+            assert set(methods) == {"post"}, path
+        else:
             assert set(methods) == {"get"}, path
 
 

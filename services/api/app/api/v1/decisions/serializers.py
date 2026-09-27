@@ -1,9 +1,10 @@
 """Decision API V1 serializers: ORM rows -> response DTOs.
 
-`facts_of`/`evidence_of` are the WHITELIST this gate's contract requires: Gate 11's own
-`facts_payload`/`evidence_payload` are already minimized, but this module never trusts that as its
-OWN boundary - only the keys explicitly listed below (audited against the real
-`app/modules/decisions/serialization.py`, one whitelist per `decision_type`) ever leave this API.
+`facts_of`/`evidence_of` (re-exported from `app.modules.decisions.whitelist`, Gate 18) are the
+WHITELIST this gate's contract requires: Gate 11's own `facts_payload`/`evidence_payload` are
+already minimized, but this module never trusts that as its OWN boundary - only the keys explicitly
+whitelisted there (audited against the real `app/modules/decisions/serialization.py`, one whitelist
+per `decision_type`, shared with Ask NINFA's context builder) ever leave this API.
 `observation.facts_payload`/`.evidence_payload` are NEVER returned as-is.
 """
 
@@ -30,163 +31,14 @@ from app.api.v1.decisions.schemas import (
 from app.modules.decision_memory.types import FeedItem
 from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.precision import canonical_text
+from app.modules.decisions.whitelist import evidence_of, facts_of
 from app.modules.intelligence.priority.types import PriorityDecisionType
 from app.modules.recommendations.engine import RecommendationEngine
 from app.modules.recommendations.types import Action, RecommendationResult
 
-# Audited, by hand, against `app/modules/decisions/serialization.py`'s own `serialize_*`
-# functions: exactly the keys each one writes into `facts_payload`, never more.
-_FACTS_WHITELIST: dict[PriorityDecisionType, frozenset[str]] = {
-    PriorityDecisionType.REV_PICKUP_LOW: frozenset(
-        {
-            "stay_date",
-            "lead_time_days",
-            "current_rooms_on_books",
-            "rooms_available",
-            "kind",
-            "window_days",
-            "prior_rooms_on_books",
-            "actual_pickup",
-            "expected_pickup",
-            "delta_rooms",
-            "missing_rooms",
-            "delta_percent_exact",
-            "percent_condition",
-            "rooms_condition",
-        }
-    ),
-    PriorityDecisionType.REV_OCCUPANCY_RISK: frozenset(
-        {
-            "stay_date",
-            "lead_time_days",
-            "current_rooms_on_books",
-            "rooms_available",
-            "kind",
-            "forecast_rooms",
-            "expected_final_rooms",
-            "occupancy_gap_pp_exact",
-            "room_shortfall",
-            "gap_condition",
-            "shortfall_condition",
-        }
-    ),
-    PriorityDecisionType.REV_OTA_DEPENDENCY: frozenset(
-        {
-            "window_start",
-            "window_end",
-            "window_days",
-            "ota_room_nights",
-            "direct_room_nights",
-            "ota_share_exact",
-            "expected_ota_share_exact",
-            "delta_pp_exact",
-            "upper_fence_exact",
-            "structural_condition",
-            "rising_condition",
-        }
-    ),
-    PriorityDecisionType.COST_CPOR_ANOMALY: frozenset(
-        {
-            "target_period_start",
-            "target_period_end",
-            "cost_category",
-            "currency",
-            "actual_cpor_exact",
-            "expected_cpor_exact",
-            "delta_cpor_exact",
-            "delta_percent_exact",
-            "upper_fence_exact",
-            "cost_gap_proxy_exact",
-        }
-    ),
-    PriorityDecisionType.LABOR_OVERSTAFFING: frozenset(
-        {
-            "work_date",
-            "labor_category",
-            "forecast_rooms_exact",
-            "scheduled_hours_exact",
-            "expected_labor_hours_exact",
-            "excess_hours_exact",
-            "delta_percent_exact",
-            "upper_fence_hours_exact",
-        }
-    ),
-}
-
-_REVENUE_EVIDENCE = frozenset(
-    {
-        "booking_data_source_id",
-        "baseline_confidence",
-        "pattern_confidence",
-        "pattern_pair_count",
-        "confidence_score",
-        "revenue_gap_proxy",
-        "reference_adr",
-        "reference_adr_source",
-        "rules_version",
-    }
-)
-
-_EVIDENCE_WHITELIST: dict[PriorityDecisionType, frozenset[str]] = {
-    PriorityDecisionType.REV_PICKUP_LOW: _REVENUE_EVIDENCE,
-    PriorityDecisionType.REV_OCCUPANCY_RISK: _REVENUE_EVIDENCE,
-    PriorityDecisionType.REV_OTA_DEPENDENCY: frozenset(
-        {
-            "booking_data_source_id",
-            "classification_coverage_pct_exact",
-            "observed_day_count",
-            "reconstructed_day_count",
-            "sample_count",
-            "baseline_confidence",
-            "confidence_score",
-            "ota_room_revenue_exposure",
-            "rules_version",
-        }
-    ),
-    PriorityDecisionType.COST_CPOR_ANOMALY: frozenset(
-        {
-            "booking_data_source_id",
-            "classification_coverage_pct_exact",
-            "occupancy_provenance_score_exact",
-            "sample_count",
-            "observed_period_count",
-            "baseline_confidence",
-            "confidence_score",
-            "rules_version",
-        }
-    ),
-    PriorityDecisionType.LABOR_OVERSTAFFING: frozenset(
-        {
-            "booking_data_source_id",
-            "labor_data_source_id",
-            "classification_coverage_pct_exact",
-            "demand_confidence",
-            "target_plan_quality",
-            "sample_count",
-            "fully_observed_count",
-            "confidence_score",
-            "labor_cost_gap_proxy_exact",
-            "cost_currency",
-            "rules_version",
-        }
-    ),
-}
-
 
 def _optional_text(value: Decimal | None) -> str | None:
     return None if value is None else canonical_text(value)
-
-
-def facts_of(decision_type: PriorityDecisionType, facts_payload: dict[str, Any]) -> dict[str, Any]:
-    allowed = _FACTS_WHITELIST[decision_type]
-    return {key: value for key, value in facts_payload.items() if key in allowed}
-
-
-def evidence_of(
-    decision_type: PriorityDecisionType, evidence_payload: dict[str, Any]
-) -> dict[str, Any]:
-    allowed = _EVIDENCE_WHITELIST[decision_type]
-    return {key: value for key, value in evidence_payload.items() if key in allowed}
 
 
 def _str(payload: dict[str, object], key: str) -> str:

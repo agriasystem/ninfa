@@ -225,7 +225,32 @@ class DecisionHistoryResponse(BaseModel):
     next_cursor: str | None
 
 
+# --- endpoint 5: ask NINFA (Gate 18) ------------------------------------------------------------
+
+
+class AskRequest(BaseModel):
+    """`question` is validated again by `app.modules.ai.ask_ninfa.question.validate_question`
+    (length/whitespace) - this `str` type annotation alone does not enforce the `[1, 1000]` bound,
+    that check happens explicitly in the route, never assumed from Pydantic's own defaults."""
+
+    question: str
+
+
+class AskResponse(BaseModel):
+    """`status` is one of `AskStatus`'s four values (Gate 18). No chat id, no thread id, no
+    conversation id anywhere - V1 is one question, one answer, nothing persisted. `answer`/
+    `limitations` carry real content only for `ANSWERED`/`INSUFFICIENT_CONTEXT`; `UNAVAILABLE`/
+    `REFUSED` carry `answer: null` (a `REFUSED`'s explanation, if any, lives in `limitations`)."""
+
+    status: str
+    answer: str | None
+    grounding_refs: list[str]
+    limitations: list[str]
+
+
 __all__ = [
+    "AskRequest",
+    "AskResponse",
     "CostDecisionTarget",
     "DecisionDetailResponse",
     "DecisionFeedResponse",

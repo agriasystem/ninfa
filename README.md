@@ -2,15 +2,26 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 17 (Recommendation UI V1, `recommendation-ui-v1`) — Decision Detail now renders
-> Gate 16's own `recommendation` as one new, additive "Cosa puoi valutare" section, always after
-> the evidence and never before it: a primary review action, up to two supporting checks and any
-> risk notes, copy mapped from the backend's own closed `action_code`/`risk_notes` (never from
-> `decision_type`, never AI-generated). `NOT_AVAILABLE` (and any status this frontend does not
-> recognise) hides the section entirely; `INSUFFICIENT_CONTEXT` shows one neutral sentence instead
-> of a fabricated action. No execute/approve/apply control, no checkbox, no chart, no AI aesthetic
-> - zero backend changes, zero new route, zero new dependency.** Gate 16 (Recommendation Engine V1,
-> `recommendation-engine-v1`) built the data this renders: a deterministic, non-AI `recommendation`
+> **Status: Gate 18 (Ask NINFA Core V1, `ask-ninfa-v1`) — one new endpoint,
+> `POST /properties/{id}/decisions/{id}/ask`, the first and only place in this codebase that ever
+> calls a language model: ENGINE CALCULATES, AI EXPLAINS. The model sees ONLY an explicitly
+> whitelisted `AskDecisionContext` (Decision identity/status, the latest Observation's whitelisted
+> facts/evidence/confidence, the Gate 16 recommendation, up to 10 bounded historical observations) -
+> never a raw row, never a `decision_id`, never PII, never a workspace/session identifier. A
+> provider-agnostic `Protocol` stands between the service and any vendor; NO vendor was selected in
+> this gate - the one shipped production implementation always answers `UNAVAILABLE`, on purpose.
+> Output is structured and validated (`ANSWERED`/`INSUFFICIENT_CONTEXT`/`UNAVAILABLE`/`REFUSED`,
+> `grounding_refs` from a closed vocabulary), a deterministic guardrail refuses execution/PII/
+> injection requests before any provider call, and the user's question is treated as untrusted input
+> kept structurally separate from the static system instructions and the context. One question, one
+> answer - no conversation persisted, zero migration, zero new dependency, no chat UI yet.** Gate 17
+> (Recommendation UI V1, `recommendation-ui-v1`) rendered Gate 16's own `recommendation` as one new,
+> additive "Cosa puoi valutare" section on Decision Detail, always after the evidence and never
+> before it: a primary review action, up to two supporting checks and any risk notes, copy mapped
+> from the backend's own closed `action_code`/`risk_notes` (never from `decision_type`, never
+> AI-generated). Gate 16 (Recommendation Engine V1,
+> `recommendation-engine-v1`) built the data Gate 17 renders and Gate 18 now also explains: a
+> deterministic, non-AI `recommendation`
 > - at most one primary plus two supporting review actions, derived from ONLY a Decision and its
 > latest Observation (never a raw row, never a detector re-invocation), `requires_human_review`
 > always `true`, a SHA-256 fingerprint, zero persistence. Gate 15 (Decision Detail UI V1,
@@ -38,8 +49,9 @@ Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 > make Gate 12's own `get_current_principal` genuinely resolvable, since Gate 14 the property's
 > own IANA timezone on the Session Context and credentialed CORS for the web origin, and since
 > Gate 15 the Decision Detail/History read surface, since Gate 16 the additive recommendation
-> block, and since Gate 17 the Recommendation UI described above - still no Ask NINFA, no
-> AI-generated text, no signup, no password reset, no OAuth/SSO/MFA.
+> block, since Gate 17 the Recommendation UI, and since Gate 18 the `/ask` endpoint described
+> above - still no chat UI, no connected AI vendor, no free-form AI-generated text outside Ask
+> NINFA's own validated contract, no signup, no password reset, no OAuth/SSO/MFA.
 
 ## Layout
 
@@ -86,4 +98,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Decision Detail UI v1](docs/architecture/decision-detail-ui-v1.md) — current lifecycle snapshot, five evidence adapters, deterministic "why" copy, newest-first cursor-paginated history, zero recomputation
 - [Recommendation Engine v1](docs/architecture/recommendation-engine-v1.md) — deterministic, non-AI review actions over Decision + latest Observation only, requires_human_review always true, SHA-256 fingerprint, additive on Decision Detail, zero persistence
 - [Recommendation UI v1](docs/architecture/recommendation-ui-v1.md) — "Cosa puoi valutare" section on Decision Detail, evidence-first, action_code-keyed static copy, no execute/approve/apply control, no checkbox, no AI aesthetic
+- [Ask NINFA Core v1](docs/architecture/ask-ninfa-v1.md) — grounded, single-turn, decision-scoped explanation layer; whitelisted context, provider-agnostic protocol with no vendor selected, structured/validated output, deterministic guardrails, zero persistence
 - [Architecture decision records](docs/architecture/adr/)

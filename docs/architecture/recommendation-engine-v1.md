@@ -240,9 +240,12 @@ pure-unit would not add independent evidence.
 
 ## Limitations (intentional, documented debt)
 
-- No Recommendation UI yet - `recommendation` is available on the API today, but no frontend page
-  renders it (ADR 0021, point 16; ADR 0022, point 16). When it is built, it is a new, additive
-  section on Gate 15's own Decision Detail page.
+- **Update (Gate 17):** a Recommendation UI now exists - see
+  [recommendation-ui-v1.md](recommendation-ui-v1.md), ADR 0023.
+- **Update (Gate 18):** `RecommendationResult` is also now one of Ask NINFA's own grounding inputs
+  (`AskDecisionContextBuilder`) - a user can ask "why should I review this?" and get a grounded,
+  Italian explanation of the SAME primary action/risk notes this engine decided, never a
+  regeneration of a different one. See [ask-ninfa-v1.md](ask-ninfa-v1.md), ADR 0024.
 - No recommendation history/audit persistence - the fingerprint already makes this trivial to add
   later (same input -> same fingerprint -> a natural primary key) without needing to design that
   now (ADR 0022, "Alternatives considered").

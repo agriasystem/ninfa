@@ -1,4 +1,7 @@
-"""Decision API V1 routes: four GET endpoints, read-only (see ADR 0018).
+"""Decision API V1 routes: four GET endpoints, read-only (see ADR 0018), plus one POST added by
+Gate 18 (`/ask`) that is ALSO read-only with respect to business state - it calls an external
+language model provider, never `DecisionService.sync()`, and persists no conversation (see ADR
+0024, "why POST despite read-only business state").
 
 Every route is thin on purpose: authentication + authorization + tenant derivation happen in
 `resolve_property_scope` (a dependency, so FastAPI resolves and rejects BEFORE a handler body ever
@@ -10,7 +13,7 @@ runs), query semantics are validated here, and every actual read goes through
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.v1.decisions.cursor import (
@@ -21,7 +24,11 @@ from app.api.v1.decisions.cursor import (
     encode_decision_history_cursor,
     encode_decision_list_cursor,
 )
-from app.api.v1.decisions.deps import PropertyScope, resolve_property_scope
+from app.api.v1.decisions.deps import (
+    PropertyScope,
+    get_language_model_provider,
+    resolve_property_scope,
+)
 from app.api.v1.decisions.errors import (
     DecisionNotFoundError,
     InvalidAsOfDateError,
@@ -30,6 +37,8 @@ from app.api.v1.decisions.errors import (
     InvalidLimitError,
 )
 from app.api.v1.decisions.schemas import (
+    AskRequest,
+    AskResponse,
     DecisionDetailResponse,
     DecisionFeedResponse,
     DecisionHistoryResponse,
@@ -42,10 +51,17 @@ from app.api.v1.decisions.serializers import (
     observation_detail_of,
 )
 from app.db.session import get_session
+from app.modules.ai.ask_ninfa.context_builder import AskDecisionContextBuilder
+from app.modules.ai.ask_ninfa.guardrails import REFUSAL_COPY, classify_refusal
+from app.modules.ai.ask_ninfa.question import validate_question
+from app.modules.ai.ask_ninfa.service import AskNinfaService
+from app.modules.ai.ask_ninfa.types import AskStatus
+from app.modules.ai.gateway.protocol import LanguageModelProvider
 from app.modules.decision_memory.service import DecisionMemoryService
 from app.modules.decisions.models import Decision
 from app.modules.decisions.types import DecisionStatus
 from app.modules.intelligence.priority.types import PriorityDecisionType
+from app.modules.recommendations.engine import RecommendationEngine
 
 router = APIRouter(prefix="/properties/{property_id}", tags=["decisions"])
 
@@ -215,6 +231,75 @@ def get_decision_history(
             )
         )
     return DecisionHistoryResponse(items=items, next_cursor=next_cursor)
+
+
+# --- endpoint 5: ask NINFA (Gate 18) -------------------------------------------------------------
+
+_ASK_NINFA_HISTORY_LIMIT = 10
+
+
+@router.post(
+    "/decisions/{decision_id}/ask",
+    response_model=AskResponse,
+    summary="Ask NINFA about one Decision",
+)
+def ask_ninfa(
+    decision_id: UUID,
+    payload: AskRequest,
+    response: Response,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    session: Session = Depends(get_session),
+    provider: LanguageModelProvider = Depends(get_language_model_provider),
+) -> AskResponse:
+    """Grounded, single-turn explanation over ONE Decision - never a general-purpose chat.
+
+    Read-only despite being a POST (see ADR 0024, "why POST despite read-only business state"):
+    this handler never calls `DecisionService.sync()`, writes no row, and persists no
+    conversation. `Cache-Control: no-store` because the answer must never be cached by an
+    intermediary or the browser - a question/answer pair is never safe to replay for a different
+    question.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    # Decision-not-found (404) is checked FIRST, unconditionally - never skipped or short-circuited
+    # by the question's own content, so an inaccessible decision answers identically regardless of
+    # what was asked about it.
+    memory = DecisionMemoryService(session, scope.tenant)
+    decision = _decision_in_scope(memory, decision_id, scope)
+
+    cleaned_question = validate_question(payload.question)
+
+    # A REFUSED question never reaches the provider AND never pays for the history/recommendation
+    # queries below - those exist only to build a context a refused question will never use.
+    refusal = classify_refusal(cleaned_question)
+    if refusal is not None:
+        return AskResponse(
+            status=AskStatus.REFUSED.value,
+            answer=None,
+            grounding_refs=[],
+            limitations=[REFUSAL_COPY[refusal]],
+        )
+
+    latest_observation = memory.get_latest_observation(decision_id)
+    assert latest_observation is not None  # Gate 11 invariant: a Decision always has >= 1 row
+
+    history_page = memory.get_history_page_desc(
+        decision_id, limit=_ASK_NINFA_HISTORY_LIMIT, after=None
+    )
+    history = [row.observation for row in history_page.items]
+
+    recommendation = RecommendationEngine().evaluate(decision, latest_observation)
+    context = AskDecisionContextBuilder().build(
+        decision, latest_observation, recommendation, history
+    )
+
+    result = AskNinfaService(provider).ask(context, cleaned_question)
+    return AskResponse(
+        status=result.status.value,
+        answer=result.answer,
+        grounding_refs=[ref.value for ref in result.grounding_refs],
+        limitations=list(result.limitations),
+    )
 
 
 __all__ = ["router"]

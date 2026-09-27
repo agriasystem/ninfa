@@ -1,7 +1,7 @@
-"""Decision API V1: OpenAPI now exposes exactly health + the four Decision API routes, GET only,
-no write operations, no debug endpoint, and every one of the four (never health) sits behind
-`get_current_principal` in its own dependency graph - a central, strong guard so a future route
-can never be registered "by accident" without authentication.
+"""Decision API V1: OpenAPI now exposes exactly health + the five Decision API routes (four GET,
+plus Gate 18's one POST `/ask`), no OTHER write operation, no debug endpoint, and every one of the
+five (never health) sits behind `get_current_principal` in its own dependency graph - a central,
+strong guard so a future route can never be registered "by accident" without authentication.
 """
 
 from collections.abc import Iterable
@@ -13,6 +13,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from app.api.v1.decisions.router import (
+    ask_ninfa,
     get_decision_detail,
     get_decision_feed,
     get_decision_history,
@@ -21,19 +22,23 @@ from app.api.v1.decisions.router import (
 from app.api.v1.health import health
 from app.core.auth import get_current_principal
 
-_DECISION_PATHS = {
+_ASK_PATH = "/api/v1/properties/{property_id}/decisions/{decision_id}/ask"
+
+_GET_ONLY_DECISION_PATHS = {
     "/api/v1/properties/{property_id}/decision-feed",
     "/api/v1/properties/{property_id}/decisions",
     "/api/v1/properties/{property_id}/decisions/{decision_id}",
     "/api/v1/properties/{property_id}/decisions/{decision_id}/history",
 }
 
+_DECISION_PATHS = _GET_ONLY_DECISION_PATHS | {_ASK_PATH}
 
-def test_openapi_still_exposes_the_four_decision_routes(client: TestClient) -> None:
+
+def test_openapi_still_exposes_the_five_decision_routes(client: TestClient) -> None:
     """The EXACT full-surface guard (health + auth + decisions, nothing else) now lives in
     `test_auth_scope.py`, which supersedes this one now that Gate 13 legitimately adds three
     `/auth/*` routes - this file keeps the narrower, still-true claim that is actually its own
-    scope: the four decision routes are still exactly these four, still present."""
+    scope: the decision routes are still exactly these five (four GET, one POST `/ask`)."""
     schema = client.get("/openapi.json").json()
     paths = set(schema["paths"])
     assert paths >= _DECISION_PATHS
@@ -47,17 +52,30 @@ def test_health_route_methods_are_unchanged_from_its_own_real_contract(client: T
     assert set(schema["paths"]["/api/v1/health"]) == {"get"}
 
 
-def test_every_decision_route_is_get_only(client: TestClient) -> None:
+def test_every_decision_route_is_get_only_except_the_one_ask_post(client: TestClient) -> None:
+    """Gate 18's own `/ask` is the SOLE, deliberate exception - a POST because it carries a
+    `question` body and calls an external provider, never because it mutates business state (see
+    ADR 0024, "why POST despite read-only business state"). Every other decision route stays
+    GET-only, exactly as Gate 12 defined it."""
     schema = client.get("/openapi.json").json()
     for path, methods in schema["paths"].items():
         if not path.startswith("/api/v1/properties/"):
             continue
-        assert set(methods) == {"get"}, path
-        for forbidden in ("post", "put", "patch", "delete"):
-            assert forbidden not in methods, (path, forbidden)
+        if path == _ASK_PATH:
+            assert set(methods) == {"post"}, path
+            for forbidden in ("get", "put", "patch", "delete"):
+                assert forbidden not in methods, (path, forbidden)
+        else:
+            assert set(methods) == {"get"}, path
+            for forbidden in ("post", "put", "patch", "delete"):
+                assert forbidden not in methods, (path, forbidden)
 
 
 def test_no_debug_or_analyze_or_sync_endpoint_exists(client: TestClient) -> None:
+    """ "ask" is deliberately NOT in this forbidden list (unlike before Gate 18): the one, exact,
+    read-only `/ask` route is a reviewed, intentional addition - see `_ASK_PATH`'s own dedicated
+    method/auth/mutation assertions elsewhere in this file. Every OTHER autonomous-action or
+    debug-style word stays forbidden, unchanged."""
     schema = client.get("/openapi.json").json()
     paths = list(schema["paths"])
     forbidden_words = (
@@ -73,7 +91,6 @@ def test_no_debug_or_analyze_or_sync_endpoint_exists(client: TestClient) -> None
         "snooze",
         "acknowledge",
         "recommend",
-        "ask",
         "execute",
         "approve",
         "apply",
@@ -84,15 +101,27 @@ def test_no_debug_or_analyze_or_sync_endpoint_exists(client: TestClient) -> None
 
 
 # --- Gate 16 (Recommendation Engine V1, review items 67-71): additive-only, never a new route ---
+# --- Gate 18 (Ask NINFA Core V1, review items 64-69): exactly ONE new route, POST, read-only -----
 
 
-def test_decision_paths_are_still_exactly_the_same_four_after_gate_16(client: TestClient) -> None:
-    """Gate 16 added no route: the exact same 4-path set Gate 12 already defined, still true
-    after `recommendation` was wired into the detail response - see `_DECISION_PATHS` above,
-    unmodified."""
+def test_decision_paths_are_exactly_the_historical_four_plus_gate_18s_one_ask_route(
+    client: TestClient,
+) -> None:
+    """Supersedes the old Gate-16-era claim ("still exactly the same four") now that Gate 18
+    legitimately adds a fifth path: the exact 4-GET-route set Gate 12 defined is still intact
+    (`_GET_ONLY_DECISION_PATHS`), plus exactly one more, `_ASK_PATH` - never a sixth, never a
+    GET-history-of-conversations, never a conversation-management route of any kind."""
     schema = client.get("/openapi.json").json()
     paths = {p for p in schema["paths"] if p.startswith("/api/v1/properties/")}
-    assert paths == _DECISION_PATHS
+    assert paths == _GET_ONLY_DECISION_PATHS | {_ASK_PATH}
+    assert _ASK_PATH in paths
+    for forbidden_conversation_path in (
+        "/api/v1/properties/{property_id}/decisions/{decision_id}/conversations",
+        "/api/v1/properties/{property_id}/decisions/{decision_id}/messages",
+        "/api/v1/properties/{property_id}/decisions/{decision_id}/chat",
+        "/api/v1/ask",
+    ):
+        assert forbidden_conversation_path not in paths
 
 
 def test_decision_detail_schema_additively_includes_recommendation(client: TestClient) -> None:
@@ -146,17 +175,20 @@ def test_every_decision_route_depends_on_get_current_principal(app: FastAPI) -> 
     """Walks the REAL FastAPI dependency graph (not the source text): a future route added to
     `app/api/v1/decisions/router.py` without a path (directly or via `resolve_property_scope`,
     which itself depends on it) to `get_current_principal` would fail this test, not just a
-    behavioural 401 check that a developer might forget to write."""
+    behavioural 401 check that a developer might forget to write. Includes Gate 18's `ask_ninfa` -
+    it authenticates and authorizes exactly like every other decision route, never a lesser bar
+    because it happens to call an external provider."""
     decision_endpoints = {
         get_decision_feed,
         list_decisions,
         get_decision_detail,
         get_decision_history,
+        ask_ninfa,
     }
     decision_routes = [
         route for route in _all_api_routes(app.routes) if route.endpoint in decision_endpoints
     ]
-    assert len(decision_routes) == 4
+    assert len(decision_routes) == 5
     for route in decision_routes:
         closure = _dependency_closure(route.dependant)
         assert get_current_principal in closure, route.path
