@@ -53,7 +53,7 @@ beforeEach(() => {
         source_evaluation_fingerprint: "fp",
         source_target_key: "key",
         reason_codes: [],
-        confidence_score: "0.8",
+        confidence_score: "80",
         priority: null,
         facts: {},
         evidence: {},

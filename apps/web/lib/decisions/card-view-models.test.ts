@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { FeedItemResponse } from "@ninfa/contracts";
 
-import { buildDecisionCardData } from "./card-view-models";
+import { buildDecisionCardData, confidencePercentOf } from "./card-view-models";
 
 function priority(rank: number, confidenceScore: string) {
   return {
@@ -22,7 +22,7 @@ function baseItem(overrides: Partial<FeedItemResponse>): FeedItemResponse {
     decision_type: "REV_PICKUP_LOW",
     lifecycle_status: "OPEN",
     transition: "OPENED",
-    priority: priority(1, "0.8234"),
+    priority: priority(1, "82.34"),
     first_seen_local_date: "2026-09-20",
     last_seen_local_date: "2026-09-26",
     episode_count: 1,
@@ -38,7 +38,7 @@ function baseItem(overrides: Partial<FeedItemResponse>): FeedItemResponse {
 
 describe("buildDecisionCardData", () => {
   it("copies rank and confidence verbatim from the backend's own PrioritySnapshot", () => {
-    const item = baseItem({ priority: priority(3, "0.8234") });
+    const item = baseItem({ priority: priority(3, "82.34") });
 
     const data = buildDecisionCardData(item);
 
@@ -212,5 +212,24 @@ describe("buildDecisionCardData", () => {
 
     const data = buildDecisionCardData(item);
     expect(data.card).toMatchObject({ missingRooms: null, expectedPickup: null, deltaRooms: null });
+  });
+});
+
+describe("confidencePercentOf", () => {
+  // Regression: confidence_score is ALREADY on the 0-100 scale (see priority-engine-v1.md's
+  // "Confidence: reused, never recomputed"). "81.23" must display as "81", never "8123".
+  it.each([
+    ["0", 0],
+    ["0.49", 0],
+    ["49.5", 50],
+    ["81.23", 81],
+    ["100", 100],
+  ])("converts confidence_score %s to %i%% - never multiplying by 100", (confidenceScore, expected) => {
+    expect(confidencePercentOf(confidenceScore)).toBe(expected);
+  });
+
+  it("returns null for a missing/unparseable confidence_score, never a clamped guess", () => {
+    expect(confidencePercentOf("")).toBeNull();
+    expect(confidencePercentOf("not-a-number")).toBeNull();
   });
 });

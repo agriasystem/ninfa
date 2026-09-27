@@ -33,7 +33,7 @@ function triggeredItem(rank: number, decisionId: string): FeedItemResponse {
       rank,
       impact_score: "10",
       urgency_score: "10",
-      confidence_score: "0.9",
+      confidence_score: "90",
       actionability_score: "10",
       priority_score: "10",
       candidate_fingerprint: `fp-${decisionId}`,

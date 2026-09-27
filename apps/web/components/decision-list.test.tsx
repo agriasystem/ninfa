@@ -16,7 +16,7 @@ function item(rank: number, decisionId: string): FeedItemResponse {
       rank,
       impact_score: "10",
       urgency_score: "10",
-      confidence_score: "0.9",
+      confidence_score: "90",
       actionability_score: "10",
       priority_score: String(100 - rank), // rank order is NOT priority_score order
       candidate_fingerprint: `fp-${decisionId}`,
