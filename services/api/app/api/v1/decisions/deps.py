@@ -7,7 +7,7 @@ from real rows, never from a client-supplied workspace id or header.
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import Depends, Path
+from fastapi import Depends, Path, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,21 +16,20 @@ from app.core.auth import AuthenticatedPrincipal, get_current_principal
 from app.core.tenant import TenantContext
 from app.db.session import get_session
 from app.modules.ai.gateway.protocol import LanguageModelProvider
-from app.modules.ai.gateway.unconfigured import UnconfiguredLanguageModelProvider
 from app.modules.properties.models import Property
 from app.modules.tenancy.models import WorkspaceMembership
 
-# One process-wide instance is enough: it is stateless and never blocks (it always raises
-# immediately) - see `UnconfiguredLanguageModelProvider`'s own docstring.
-_unconfigured_provider = UnconfiguredLanguageModelProvider()
 
-
-def get_language_model_provider() -> LanguageModelProvider:
-    """FastAPI dependency: the real (fail-closed) provider in production, overridable per-test via
-    `app.dependency_overrides[get_language_model_provider]` with a
+def get_language_model_provider(request: Request) -> LanguageModelProvider:
+    """FastAPI dependency: the ONE provider `create_app()` built for THIS app instance
+    (`app.state.language_model_provider`, Gate 18/19 - `UnconfiguredLanguageModelProvider` by
+    default, a real `AnthropicLanguageModelProvider` when explicitly configured), read back the
+    SAME way `app.core.config.get_request_settings` already reads `app.state.settings`.
+    Overridable per-test via `app.dependency_overrides[get_language_model_provider]` with a
     `DeterministicFakeLanguageModelProvider` - the SAME seam `app.core.clock.get_clock` already
     established for a different injectable "outside world" dependency."""
-    return _unconfigured_provider
+    provider: LanguageModelProvider = request.app.state.language_model_provider
+    return provider
 
 
 @dataclass(frozen=True, slots=True)

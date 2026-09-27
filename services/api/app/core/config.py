@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     # never the default - see `_check_production_safety` below and ADR 0019.
     session_cookie_secure: bool = True
 
+    # Ask NINFA's own language model provider (Gate 18/19). Defaults to `unconfigured` -
+    # `AskNinfaService` answers `UNAVAILABLE` until a real provider is EXPLICITLY selected here;
+    # an API key existing is never enough by itself (see `_check_ask_ninfa_provider_configuration`
+    # below and ADR 0025, "why provider selection is explicit"). `anthropic_api_key` is `SecretStr`
+    # for the same reason `database_url` is: it must never render in a `repr()`, a log line or an
+    # exception message.
+    ask_ninfa_provider: Literal["unconfigured", "anthropic"] = "unconfigured"
+    anthropic_api_key: SecretStr | None = None
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: Any) -> Any:
@@ -61,6 +70,18 @@ class Settings(BaseSettings):
                 raise ValueError("CORS_ORIGINS must not contain '*' when APP_ENV=production")
             if not self.session_cookie_secure:
                 raise ValueError("SESSION_COOKIE_SECURE must be true when APP_ENV=production")
+        return self
+
+    @model_validator(mode="after")
+    def _check_ask_ninfa_provider_configuration(self) -> "Settings":
+        """FAIL CLOSED at startup, not at the first request: selecting `anthropic` without a real
+        key is a configuration error, never a silent fallback to `unconfigured` (see ADR 0025).
+        Local development is never broken by this - `ask_ninfa_provider` simply defaults to
+        `unconfigured`, which needs no key at all."""
+        if self.ask_ninfa_provider == "anthropic":
+            key = self.anthropic_api_key
+            if key is None or not key.get_secret_value().strip():
+                raise ValueError("ANTHROPIC_API_KEY is required when ASK_NINFA_PROVIDER=anthropic")
         return self
 
     @property

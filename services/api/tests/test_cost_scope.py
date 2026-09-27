@@ -350,6 +350,9 @@ def test_no_worker_task_and_no_scheduler_was_added() -> None:
 
 
 def test_the_dependency_manifests_do_not_mention_scientific_ai_or_currency_libraries() -> None:
+    # `anthropic` is deliberately absent here (Gate 19, ADR 0025): it is a real, justified,
+    # structurally-isolated dependency, not an unwanted addition - see
+    # `test_ask_ninfa_provider_boundary.py`, which is the precise guard for it.
     for manifest in PYPROJECTS:
         text = manifest.read_text(encoding="utf-8").lower()
         for library in (
@@ -360,7 +363,6 @@ def test_the_dependency_manifests_do_not_mention_scientific_ai_or_currency_libra
             "sklearn",
             "statsmodels",
             "openai",
-            "anthropic",
             "langchain",
             "forex",
             "currencyconverter",

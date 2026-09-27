@@ -23,6 +23,7 @@ from app.modules.ai.ask_ninfa.types import (
     AskDecisionContext,
     AskObservationContext,
     AskRecommendationContext,
+    ContextValue,
 )
 from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.precision import canonical_text
@@ -34,6 +35,18 @@ from app.modules.recommendations.types import Action, RecommendationResult
 def _str(payload: dict[str, object], key: str) -> str | None:
     value = payload.get(key)
     return value if isinstance(value, str) else None
+
+
+def _without_data_source_ids(mapping: dict[str, ContextValue]) -> dict[str, ContextValue]:
+    """The shared `facts_of`/`evidence_of` whitelist (`app.modules.decisions.whitelist`) is
+    correct for its OTHER caller, the Decision API's own HTTP serializers - a browser client is
+    allowed to see a `booking_data_source_id`/`labor_data_source_id` UUID even though it never
+    renders it (Gate 15, "No detail data leak"). A language model is held to the STRICTER bar this
+    module's own docstring already states: no internal DB id unless semantically necessary - and
+    linking two internal rows together is never semantically necessary for EXPLAINING a decision.
+    This is Ask NINFA's own, additional filter on top of the shared whitelist, never a change to
+    it (see ADR 0025, "why data source ids are stripped a second time")."""
+    return {key: value for key, value in mapping.items() if not key.endswith("_data_source_id")}
 
 
 def _target_context_of(decision: Decision) -> dict[str, str]:
@@ -92,8 +105,8 @@ def _observation_context_of(
         reason_codes=tuple(observation.source_reason_codes),
         confidence=confidence,
         priority_rank=observation.priority_rank,
-        facts=facts_of(decision_type, observation.facts_payload),
-        evidence=evidence_of(decision_type, observation.evidence_payload),
+        facts=_without_data_source_ids(facts_of(decision_type, observation.facts_payload)),
+        evidence=_without_data_source_ids(evidence_of(decision_type, observation.evidence_payload)),
     )
 
 

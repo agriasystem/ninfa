@@ -7,6 +7,7 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.meta import SERVICE_NAME, get_version
 from app.core.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
+from app.modules.ai.gateway.factory import build_language_model_provider
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -29,6 +30,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # `app.core.config.get_request_settings` reads it back for anything that must honour what
     # THIS app was actually configured with, not the process-wide cached settings.
     app.state.settings = settings
+    # Built ONCE per app instance (Gate 18/19) - never per-request, so a real
+    # `AnthropicLanguageModelProvider`'s own HTTP client is constructed a single time, never a
+    # process-wide global either. `app.api.v1.decisions.deps.get_language_model_provider` reads
+    # it back, the same pattern `get_request_settings` already established above.
+    app.state.language_model_provider = build_language_model_provider(settings)
 
     # Middleware added last is outermost: RequestId must wrap CORS so every response carries the ID.
     if settings.cors_origins:

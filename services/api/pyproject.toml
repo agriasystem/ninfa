@@ -19,6 +19,9 @@ dependencies = [
     # Argon2id password hashing (Gate 13). No existing dependency provides it; this is the
     # mature, maintained CFFI binding the OWASP/Argon2 reference implementation ships.
     "argon2-cffi>=25.1,<26",
+    # Official Anthropic Python SDK (Gate 19): the ONLY vendor-specific runtime dependency in this
+    # codebase, isolated to app/modules/ai/gateway/anthropic_provider.py - see ADR 0025.
+    "anthropic>=1.8.0,<2",
 ]
 
 [dependency-groups]

@@ -20,6 +20,10 @@ def _backend_dependencies() -> set[str]:
 
 
 def test_only_argon2_cffi_was_added_to_backend_dependencies() -> None:
+    """Superseded-but-not-wrong (see Gate 19's own `test_ask_ninfa_provider_boundary.py`): this
+    test still proves Gate 13 added exactly one dependency. `anthropic` is a separate, later,
+    equally-justified and equally-isolated addition (Gate 19, ADR 0025), allow-listed here so this
+    test keeps guarding against any OTHER, unrelated dependency creep."""
     known_before_gate_13 = {
         "fastapi",
         "uvicorn",
@@ -32,7 +36,7 @@ def test_only_argon2_cffi_was_added_to_backend_dependencies() -> None:
         "openpyxl",
     }
     dependencies = _backend_dependencies()
-    unexpected = dependencies - known_before_gate_13 - {"argon2-cffi"}
+    unexpected = dependencies - known_before_gate_13 - {"argon2-cffi", "anthropic"}
     assert unexpected == set(), f"unexpected new dependency: {unexpected}"
     assert "argon2-cffi" in dependencies
 

@@ -148,6 +148,33 @@ def test_5_labor_context(db_session: Session, factory: BookingFactory) -> None:
     assert "scheduled_hours_exact" in context.latest.facts
 
 
+def test_5b_labor_evidence_never_carries_the_booking_or_labor_data_source_id(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    """Regression: `EVIDENCE_WHITELIST` (`app.modules.decisions.whitelist`, shared with the HTTP
+    API) legitimately keeps `booking_data_source_id`/`labor_data_source_id` for the browser client
+    - Ask NINFA's own context builder must additionally strip them, the same way `target` already
+    excludes them, since a model has no semantic use for an internal row-linkage id (found while
+    building Gate 19's own five-decision-types provider test)."""
+    tenant = factory.tenant()
+    labor_data_source_id = factory.data_source(tenant.property).id
+    evaluation = labor_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        booking_data_source_id=tenant.data_source.id,
+        labor_data_source_id=labor_data_source_id,
+        target_work_date=D1,
+        labor_category=LaborCategory.HOUSEKEEPING,
+    )
+    decision_id = _open_decision(db_session, tenant, evaluation, D1)
+    context = _context_for(db_session, tenant, decision_id)
+
+    assert "booking_data_source_id" not in context.latest.evidence
+    assert "labor_data_source_id" not in context.latest.evidence
+    assert str(tenant.data_source.id) not in str(context.latest.evidence)
+    assert str(labor_data_source_id) not in str(context.latest.evidence)
+
+
 # --- 6-9: decision status, latest facts, evidence, recommendation ---------------------------------
 
 

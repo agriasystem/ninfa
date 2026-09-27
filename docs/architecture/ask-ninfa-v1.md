@@ -106,6 +106,13 @@ route do not change. Tests use `DeterministicFakeLanguageModelProvider`
 (`tests/ask_ninfa_support.py`) - configurable answer/error, request-capturing for assertions
 (prompt capture SOLO in test; no production code has an equivalent).
 
+**Update (Gate 19):** that future gate arrived - `AnthropicLanguageModelProvider`
+(`app/modules/ai/gateway/anthropic_provider.py`) is the first real implementation of this same
+Protocol, selected only by explicit `ASK_NINFA_PROVIDER=anthropic` configuration
+(`unconfigured` remains the default). Nothing described above changed: `AskNinfaService`, this
+document's context/grounding/injection/status contracts, and the `/ask` route are exactly as
+written. See [anthropic-provider-v1.md](anthropic-provider-v1.md) and ADR 0025.
+
 ## System instructions (`ask-ninfa-v1`)
 
 Static, versioned Italian text (`app/modules/ai/ask_ninfa/instructions.py`,
@@ -217,8 +224,10 @@ This is real defense in depth, honestly short of a formal proof.
 
 - No chat UI - this gate is backend-only; a future gate builds the frontend surface.
 - No multi-turn conversation, no persistence of any question/answer pair.
-- No real language model provider - `UnconfiguredLanguageModelProvider` always answers
-  `UNAVAILABLE`; a real vendor requires its own, separate, explicitly-approved gate.
+- No real language model provider was configured BY DEFAULT -
+  `UnconfiguredLanguageModelProvider` still answers `UNAVAILABLE` unless a provider is explicitly
+  selected. **Update (Gate 19):** a real, optional Anthropic implementation now exists - see
+  [anthropic-provider-v1.md](anthropic-provider-v1.md) and ADR 0025.
 - No perimeter/application rate limiting - documented debt, required before any real pilot with a
   configured (costed) provider; reuse the first rate-limiting primitive this codebase gains,
   whenever one exists, rather than building a bespoke one here.
