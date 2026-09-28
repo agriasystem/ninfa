@@ -17,6 +17,7 @@ import { whySentence } from "@/lib/decisions/why-copy";
 import { formatLocalDateItalian } from "@/lib/date/local-date";
 import { oggiRoute } from "@/lib/routes";
 
+import { AskNinfaPanel } from "./ask-ninfa-panel";
 import { DecisionTimeline } from "./decision-timeline";
 import { RecommendationPanel } from "./recommendation-panel";
 
@@ -167,6 +168,14 @@ export function DecisionDetailView({ propertyId, decisionId }: DecisionDetailVie
       ) : (
         <DecisionDetailContent detail={detailState.detail} />
       )}
+
+      {/* "Chiedi a NINFA" (Gate 20): always after the recommendation, before Evoluzione. Lives
+          outside DecisionDetailContent on purpose - that function stays a PURE renderer of an
+          already-fetched detail (golden fixtures render it directly, with no fetch mock at all),
+          while this panel owns its own, separate, submit-triggered network call. */}
+      {!detailBusy && detailState.kind === "loaded" ? (
+        <AskNinfaPanel propertyId={propertyId} decisionId={decisionId} />
+      ) : null}
 
       {!detailBusy && detailState.kind === "loaded" ? (
         historyBusy ? (

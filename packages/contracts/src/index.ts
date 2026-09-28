@@ -279,3 +279,24 @@ export interface DecisionHistoryResponse {
   items: ObservationDetail[];
   next_cursor: string | null;
 }
+
+/** Ask NINFA (Gate 18/19/19.1) - the SERVICE's own final result status, a small, closed, stable
+ * protocol-level vocabulary (unlike `RecommendationResponse.status`'s deliberately-open `string`,
+ * which maps a growing set of business codes through a lookup table). A closed union here gets
+ * TypeScript's own exhaustiveness checking on the one `switch` that renders it (Gate 20). */
+export type AskStatus = "ANSWERED" | "INSUFFICIENT_CONTEXT" | "UNAVAILABLE" | "REFUSED";
+
+/** POST /api/v1/properties/{property_id}/decisions/{decision_id}/ask request body. */
+export interface AskRequest {
+  question: string;
+}
+
+/** POST .../ask response (Gate 18). `answer`/`limitations` carry real content only for
+ * `ANSWERED`/`INSUFFICIENT_CONTEXT` - `UNAVAILABLE`/`REFUSED` carry `answer: null`. No chat id, no
+ * thread id, no conversation id anywhere - one question, one answer, nothing persisted. */
+export interface AskResponse {
+  status: AskStatus;
+  answer: string | null;
+  grounding_refs: string[];
+  limitations: string[];
+}
