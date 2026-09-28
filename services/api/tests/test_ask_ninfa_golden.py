@@ -119,11 +119,10 @@ def test_golden_a_pickup_context_and_recommendation_match_the_real_engine(
 
     assert body["status"] == "ANSWERED"
     sent = json.loads(provider.last_request.context)
-    assert sent["decision_type"] == "REV_PICKUP_LOW"
+    assert sent["decision"] == "Pickup sotto le attese"
     assert sent["latest"]["confidence"] == canonical_text(ground_truth.confidence_score)
-    assert sent["recommendation"]["status"] == "AVAILABLE"
-    primary_action_code = sent["recommendation"]["primary_action"]["action_code"]
-    assert primary_action_code == "REVIEW_PRICING_AND_AVAILABILITY"
+    primary_title = sent["recommendation"]["primary_action"]["title"]
+    assert primary_title == "Rivedi prezzi e disponibilità"
     assert len(sent["history"]) >= 1
     for forbidden in _FORBIDDEN_TECHNICAL_STRINGS_HELP:
         assert forbidden not in provider.last_request.context
@@ -156,9 +155,11 @@ def test_golden_b_occupancy_context_and_recommendation_match_the_real_engine(
 
     assert body["status"] == "ANSWERED"
     sent = json.loads(provider.last_request.context)
-    assert sent["decision_type"] == "REV_OCCUPANCY_RISK"
-    assert "occupancy_gap_pp_exact" in sent["latest"]["facts"]
-    assert sent["recommendation"]["primary_action"]["action_code"] == "REVIEW_DEMAND_POSITIONING"
+    assert sent["decision"] == "Rischio occupazione"
+    fact_labels = {point["label"] for point in sent["latest"]["facts"]}
+    assert "Scarto occupazione" in fact_labels
+    primary_title = sent["recommendation"]["primary_action"]["title"]
+    assert primary_title == "Rivedi il posizionamento della data"
 
 
 def test_golden_c_ota_context_and_recommendation_match_the_real_engine(
@@ -186,8 +187,9 @@ def test_golden_c_ota_context_and_recommendation_match_the_real_engine(
 
     assert body["status"] == "ANSWERED"
     sent = json.loads(provider.last_request.context)
-    assert sent["decision_type"] == "REV_OTA_DEPENDENCY"
-    assert sent["recommendation"]["primary_action"]["action_code"] == "REVIEW_DISTRIBUTION_MIX"
+    assert sent["decision"] == "Dipendenza OTA"
+    primary_title = sent["recommendation"]["primary_action"]["title"]
+    assert primary_title == "Rivedi il mix distributivo"
 
 
 def test_golden_d_cost_context_and_recommendation_match_the_real_engine(
@@ -211,8 +213,9 @@ def test_golden_d_cost_context_and_recommendation_match_the_real_engine(
 
     assert body["status"] == "ANSWERED"
     sent = json.loads(provider.last_request.context)
-    assert sent["decision_type"] == "COST_CPOR_ANOMALY"
-    assert sent["recommendation"]["primary_action"]["action_code"] == "REVIEW_COST_DRIVERS"
+    assert sent["decision"] == "Costo per camera anomalo"
+    primary_title = sent["recommendation"]["primary_action"]["title"]
+    assert primary_title == "Verifica cosa sta incidendo sui costi"
     assert sent["recommendation"]["primary_action"]["risk_notes"] == []  # honest empty tuple
 
 
@@ -241,8 +244,9 @@ def test_golden_e_labor_context_and_recommendation_match_the_real_engine(
 
     assert body["status"] == "ANSWERED"
     sent = json.loads(provider.last_request.context)
-    assert sent["decision_type"] == "LABOR_OVERSTAFFING"
-    assert sent["recommendation"]["primary_action"]["action_code"] == "REVIEW_STAFFING_PLAN"
+    assert sent["decision"] == "Ore di personale sopra l'atteso"
+    primary_title = sent["recommendation"]["primary_action"]["title"]
+    assert primary_title == "Rivedi la pianificazione delle ore"
 
 
 # --- Memory question: REOPENED decision, "Era già successo?" -------------------------------------
@@ -288,14 +292,16 @@ def test_golden_memory_question_on_a_reopened_decision_exposes_the_full_lifecycl
     assert body["status"] == "ANSWERED"
     assert "HISTORY" in body["grounding_refs"]
     sent = json.loads(provider.last_request.context)
-    transitions = [observation["lifecycle_transition"] for observation in sent["history"]]
-    assert "OPENED" in transitions
-    assert "RESOLVED" in transitions
-    assert "REOPENED" in transitions
+    # Gate 19.1: the raw `OPENED`/`RESOLVED`/`REOPENED` `LifecycleTransition` values are replaced
+    # by the SAME already-Italian event labels the Decision Detail UI ships (`lifecycleEventCopy`).
+    events = [observation["status"] for observation in sent["history"]]
+    assert "Rilevata" in events
+    assert "Risolta" in events
+    assert "Ricomparsa" in events
     opened, resolved, reopened = (
-        transitions.index("OPENED"),
-        transitions.index("RESOLVED"),
-        transitions.index("REOPENED"),
+        events.index("Rilevata"),
+        events.index("Risolta"),
+        events.index("Ricomparsa"),
     )
     assert opened < resolved < reopened
 

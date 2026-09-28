@@ -249,3 +249,43 @@ def test_63_no_conversation_or_message_table_exists_to_write_to(db_session: Sess
         lowered = table_name.lower()
         for forbidden in forbidden_substrings:
             assert forbidden not in lowered, table_name
+
+
+# --- Gate 19.1 (ADR 0026): UTF-8 is a client-display finding, never a product bug --------------
+
+
+def test_utf8_accented_italian_characters_survive_the_real_http_json_roundtrip(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    """The PowerShell live smoke test showed `perchÃ©`/`prioritÃ `/`Ã¨` - this proves that is a
+    LOCAL CLIENT/terminal display artefact, never a backend or JSON encoding bug: `TestClient`
+    decodes the real HTTP response body exactly like any other real HTTP client would, and the
+    accented characters below come back byte-for-byte identical to what the fake provider sent."""
+    at = authed_tenant(factory, authenticated_as)
+    decision_id = _seed_open_decision(db_session, at.tenant)
+    accented_answer = (
+        "Perché la priorità è alta: l'affidabilità della stima è confermata, è opportuno "
+        "verificarla più a fondo."
+    )
+    with_fake_provider(app)(
+        DeterministicFakeLanguageModelProvider(
+            answer=LanguageModelAnswer(
+                status=ModelAnswerStatus.ANSWERED,
+                answer=accented_answer,
+                grounding_refs=("LATEST_FACTS",),
+                limitations=(),
+            )
+        )
+    )
+
+    response = api_client.post(
+        ask_url(at.tenant.property.id, decision_id), json={"question": "Perché me lo mostri?"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json()["answer"] == accented_answer

@@ -6,6 +6,13 @@ section. This gate adds the ability to ASK about one Decision in plain Italian a
 explanation back - never a second engine, never a chatbot, never a way to act. See ADR 0024 for the
 "why" behind every choice below; this document is the "what" and "how".
 
+**Update (Gate 19.1):** `facts`/`evidence` below are no longer a `dict[str, value]` keyed by the
+raw internal fact/evidence name - every raw engine identifier this document originally described
+(`decision_type`, `source_status`, `action_code`, ...) is now translated to Italian BEFORE it
+reaches the model, and `reason_codes`/`priority_rank` are no longer collected at all. See
+[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md) and ADR 0026 for the full "what"/"why"; this
+document's grounding/injection/status contracts below are otherwise unchanged.
+
 ## Purpose and principle
 
     ENGINE CALCULATES. AI EXPLAINS.
@@ -43,15 +50,22 @@ established - assembles it from:
 - Decision identity/type/status/lifecycle dates/episode count.
 - A minimized target (e.g. `{"stay_date": "2026-10-05"}` - never the `booking_data_source_id` UUID
   behind it).
-- The latest Observation's own source status, lifecycle transition, reason codes, exact confidence
-  (0-100 scale, never rescaled), historical rank (if any), and whitelisted facts/evidence.
-- The Recommendation (Gate 16): status, primary action's `action_code`/`category`/`risk_notes`,
-  supporting checks, `requires_human_review` (always `true`).
+- The latest Observation's own lifecycle event, exact confidence (0-100 scale, never rescaled), and
+  whitelisted facts/evidence.
+- The Recommendation (Gate 16): primary action's title/description/risk notes, supporting checks.
 - Up to 10 historical observations, chronological (oldest -> newest) - see "Bounded history" below.
 
 `facts`/`evidence` are filtered through `app.modules.decisions.whitelist` - the SAME whitelist the
 Decision API's own serializers use (extracted there in this gate specifically so the two never
 drift apart), never a second, ask-ninfa-specific copy of "what's safe".
+
+**Update (Gate 19.1):** the paragraph above still describes WHICH data reaches the context; it no
+longer describes its SHAPE. `source_status`/`lifecycle_transition` are combined into one
+already-Italian `status_label`; `decision_type`/`Decision.status`/`action_code`/`category`/
+`RiskNote` are all translated to Italian; `facts`/`evidence` are `tuple[AskDataPoint, ...]`
+(`{label, value, unit}`), never a `dict` keyed by the raw internal fact/evidence name; `reason
+codes`/`historical rank` are no longer collected at all. See
+[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md) and ADR 0026.
 
 ## Data minimization
 
@@ -113,16 +127,19 @@ Protocol, selected only by explicit `ASK_NINFA_PROVIDER=anthropic` configuration
 document's context/grounding/injection/status contracts, and the `/ask` route are exactly as
 written. See [anthropic-provider-v1.md](anthropic-provider-v1.md) and ADR 0025.
 
-## System instructions (`ask-ninfa-v1`)
+## System instructions (`ask-ninfa-v1.1`)
 
 Static, versioned Italian text (`app/modules/ai/ask_ninfa/instructions.py`,
-`ASK_NINFA_INSTRUCTIONS_VERSION`), stating the twelve mandatory principles: answer only from the
+`ASK_NINFA_INSTRUCTIONS_VERSION`), stating twenty mandatory principles: answer only from the
 context, never invent a number, never recompute a metric/confidence/priority, never invent a
 different recommendation, never present an economic proxy as a certain loss/gain, declare a
 missing datum instead of guessing, distinguish fact from interpretation, no autonomous action,
 Italian only, short and operative. It also states the injection boundary explicitly (see below) and
 mandates the structured JSON output format - no chain-of-thought, no reasoning text outside that
-one JSON object.
+one JSON object. **Update (Gate 19.1):** eight further rules (13-20) forbid technical field/class
+names, enum codes, snake_case/`_exact` suffixes, and require answering the question first, ≤3
+paragraphs, only the numbers actually needed, and a professional tone - see
+[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md) and ADR 0026.
 
 ## Prompt injection boundary
 
@@ -149,8 +166,12 @@ string. `grounding_refs` is a closed, semantic vocabulary
 `app/modules/ai/ask_ninfa/types.py`) - never a database id or citation index. Every field is
 re-validated by `app/modules/ai/ask_ninfa/answer_validation.py`, never trusted as-is: an
 unrecognised `grounding_ref` is dropped (not a crash), an empty `answer` is invalid (fails to
-`UNAVAILABLE`), an overlong `answer` is TRUNCATED to `MAX_ANSWER_CHARS = 1200` (documented policy -
-a real, useful answer that ran a little long is kept, never discarded outright).
+`UNAVAILABLE`), an overlong `answer` is TRUNCATED to `MAX_ANSWER_CHARS = 700` (lowered from 1200 in
+Gate 19.1, ADR 0026 - documented policy: a real, useful answer that ran a little long is kept,
+never discarded outright). **Update (Gate 19.1):** a THIRD check now also runs here -
+`technical_leak.contains_technical_leak` on the answer and every limitation - failing the whole
+answer closed to `UNAVAILABLE` if it ever fires; see
+[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md).
 
 ## Confidence
 

@@ -81,6 +81,24 @@ _FORBIDDEN_MARKERS = (
     "observation_id",
     "identity_key",
     "identity_version",
+    # Gate 19.1 (ADR 0026): raw engine identifiers - never present regardless of which decision
+    # type is being tested, since none of the five decision types, action codes, or reason codes
+    # ever reaches the model-facing context anymore.
+    "REV_PICKUP_LOW",
+    "REV_OCCUPANCY_RISK",
+    "REV_OTA_DEPENDENCY",
+    "COST_CPOR_ANOMALY",
+    "LABOR_OVERSTAFFING",
+    "REVIEW_PRICING_AND_AVAILABILITY",
+    "REVIEW_DEMAND_POSITIONING",
+    "REVIEW_DISTRIBUTION_MIX",
+    "REVIEW_COST_DRIVERS",
+    "REVIEW_STAFFING_PLAN",
+    "TRIGGER_",
+    "decision_type",
+    "action_code",
+    "reason_codes",
+    "priority_rank",
 )
 
 
@@ -98,7 +116,7 @@ def test_71_pickup_context_reaches_the_provider_minimized(
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     blocks_text = _serialized_context_sent_to_provider(db_session, tenant, decision_id)
 
-    assert '"decision_type": "REV_PICKUP_LOW"' in blocks_text
+    assert '"decision": "Pickup sotto le attese"' in blocks_text
     for marker in _FORBIDDEN_MARKERS:
         assert marker not in blocks_text
 
@@ -120,7 +138,7 @@ def test_72_occupancy_context_reaches_the_provider_minimized(
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     blocks_text = _serialized_context_sent_to_provider(db_session, tenant, decision_id)
 
-    assert '"decision_type": "REV_OCCUPANCY_RISK"' in blocks_text
+    assert '"decision": "Rischio occupazione"' in blocks_text
     for marker in _FORBIDDEN_MARKERS:
         assert marker not in blocks_text
 
@@ -138,7 +156,7 @@ def test_73_ota_context_reaches_the_provider_minimized(
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     blocks_text = _serialized_context_sent_to_provider(db_session, tenant, decision_id)
 
-    assert '"decision_type": "REV_OTA_DEPENDENCY"' in blocks_text
+    assert '"decision": "Dipendenza OTA"' in blocks_text
     for marker in _FORBIDDEN_MARKERS:
         assert marker not in blocks_text
 
@@ -156,7 +174,7 @@ def test_74_cost_context_reaches_the_provider_minimized(
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     blocks_text = _serialized_context_sent_to_provider(db_session, tenant, decision_id)
 
-    assert '"decision_type": "COST_CPOR_ANOMALY"' in blocks_text
+    assert '"decision": "Costo per camera anomalo"' in blocks_text
     for marker in _FORBIDDEN_MARKERS:
         assert marker not in blocks_text
 
@@ -176,6 +194,6 @@ def test_75_labor_context_reaches_the_provider_minimized(
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     blocks_text = _serialized_context_sent_to_provider(db_session, tenant, decision_id)
 
-    assert '"decision_type": "LABOR_OVERSTAFFING"' in blocks_text
+    assert '"decision": "Ore di personale sopra l\'atteso"' in blocks_text
     for marker in _FORBIDDEN_MARKERS:
         assert marker not in blocks_text

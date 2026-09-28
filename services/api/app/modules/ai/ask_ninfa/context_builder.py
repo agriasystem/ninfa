@@ -13,10 +13,19 @@ Explicit whitelisting only: no `dataclasses.asdict()` of a `Decision`/`DecisionO
 `__dict__`, no generic serialization anywhere in this module. `facts_of`/`evidence_of`
 (`app.modules.decisions.whitelist`) are the SAME whitelist the Decision API's own serializers use -
 one whitelist, not a second one that could silently drift apart.
+
+Gate 19.1 (ADR 0026, "why model context is semantic"): every raw engine identifier this module
+used to pass straight through - `decision_type`, `DecisionStatus`,
+`source_status`/`lifecycle_transition`, `ActionCode`/`category`, `RiskNote`,
+`cost_category`/`labor_category`, and every whitelisted fact/evidence key - is now translated to
+Italian by `semantic_labels.py` BEFORE it ever reaches
+`AskDecisionContext`. `reason_codes` and `priority_rank` are no longer collected here at all (see
+`semantic_labels.py`'s own module docstring and `AskObservationContext`'s).
 """
 
 from collections.abc import Sequence
 
+from app.modules.ai.ask_ninfa import semantic_labels
 from app.modules.ai.ask_ninfa.types import (
     MAX_HISTORY_OBSERVATIONS,
     AskActionContext,
@@ -29,6 +38,8 @@ from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.precision import canonical_text
 from app.modules.decisions.whitelist import evidence_of, facts_of
 from app.modules.intelligence.priority.types import PriorityDecisionType
+from app.modules.invoices.cost_categories import CostCategory
+from app.modules.labor.roles import LaborCategory
 from app.modules.recommendations.types import Action, RecommendationResult
 
 
@@ -74,7 +85,9 @@ def _target_context_of(decision: Decision) -> dict[str, str]:
         if period_start is not None:
             context["period_start"] = period_start
         if category is not None:
-            context["cost_category"] = category
+            context["cost_category"] = semantic_labels.cost_category_label_of(
+                CostCategory(category)
+            )
         if currency is not None:
             context["currency"] = currency
         return context
@@ -85,7 +98,9 @@ def _target_context_of(decision: Decision) -> dict[str, str]:
         if work_date is not None:
             context["work_date"] = work_date
         if category is not None:
-            context["labor_category"] = category
+            context["labor_category"] = semantic_labels.labor_category_label_of(
+                LaborCategory(category)
+            )
         return context
     raise ValueError(f"unrecognised decision_type {decision_type!r}")  # pragma: no cover
 
@@ -98,33 +113,46 @@ def _observation_context_of(
     # never actually returns `None` - narrowed explicitly for mypy, not defensive dead code.
     confidence = canonical_text(observation.confidence_score)
     assert confidence is not None
+    facts_payload = _without_data_source_ids(facts_of(decision_type, observation.facts_payload))
+    evidence_payload = _without_data_source_ids(
+        evidence_of(decision_type, observation.evidence_payload)
+    )
     return AskObservationContext(
         as_of_local_date=observation.as_of_local_date.isoformat(),
-        source_status=observation.source_status.value,
-        lifecycle_transition=observation.lifecycle_transition.value,
-        reason_codes=tuple(observation.source_reason_codes),
+        status_label=semantic_labels.observation_status_label_of(
+            observation.lifecycle_transition, observation.source_status
+        ),
         confidence=confidence,
-        priority_rank=observation.priority_rank,
-        facts=_without_data_source_ids(facts_of(decision_type, observation.facts_payload)),
-        evidence=_without_data_source_ids(evidence_of(decision_type, observation.evidence_payload)),
+        facts=semantic_labels.data_points_of(
+            semantic_labels.FACT_LABELS[decision_type], facts_payload
+        ),
+        evidence=semantic_labels.data_points_of(
+            semantic_labels.EVIDENCE_LABELS[decision_type], evidence_payload
+        ),
     )
 
 
-def _action_context_of(action: Action) -> AskActionContext:
+def _action_context_of(action: Action, *, is_primary: bool) -> AskActionContext:
+    if is_primary:
+        title = semantic_labels.primary_action_title_of(action.action_code)
+        description: str | None = semantic_labels.primary_action_description_of(action.action_code)
+    else:
+        title = semantic_labels.supporting_action_title_of(action.action_code)
+        description = None
     return AskActionContext(
-        action_code=action.action_code.value,
-        category=action.category.value,
-        risk_notes=tuple(note.value for note in action.risk_notes),
+        title=title,
+        description=description,
+        risk_notes=tuple(semantic_labels.risk_note_text_of(note) for note in action.risk_notes),
     )
 
 
 def _recommendation_context_of(result: RecommendationResult) -> AskRecommendationContext:
     primary = result.primary_action
     return AskRecommendationContext(
-        status=result.status.value,
-        primary_action=None if primary is None else _action_context_of(primary),
-        supporting_checks=tuple(_action_context_of(action) for action in result.supporting_checks),
-        requires_human_review=True,
+        primary_action=None if primary is None else _action_context_of(primary, is_primary=True),
+        supporting_checks=tuple(
+            _action_context_of(action, is_primary=False) for action in result.supporting_checks
+        ),
     )
 
 
@@ -149,8 +177,8 @@ class AskDecisionContextBuilder:
         )
 
         return AskDecisionContext(
-            decision_type=decision_type.value,
-            decision_status=decision.status.value,
+            decision_label=semantic_labels.decision_label_of(decision_type),
+            decision_status=semantic_labels.decision_status_label_of(decision.status),
             first_seen_local_date=decision.first_seen_local_date.isoformat(),
             last_seen_local_date=decision.last_seen_local_date.isoformat(),
             last_evaluated_local_date=decision.last_evaluated_local_date.isoformat(),
