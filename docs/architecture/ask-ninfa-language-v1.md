@@ -169,6 +169,36 @@ After this gate's review, the SAME real decision (`REV_OCCUPANCY_RISK`,
 
 This gate does not execute that live call - it is explicitly deferred to manual review.
 
+## Update (Gate 19.1b): first live acceptance result and further polish
+
+The live acceptance call above ran: `3772` input / `375` output / `6165` ms. Technical leakage was
+gone, grounding stayed correct, and the real provider worked - but the answer was still judged too
+technical/dense (still used "confidence", "pattern storico", "atteso a fine finestra"; cited
+affidabilità and 12 historical comparables even for a generic "perché" question; showed 10 numbers
+at once). It also ended mid-word ("...impatto sui ricavi di 6…") - see "Truncation, fail-closed"
+below.
+
+**Language polish (instructions rules 21-25, `ask-ninfa-v1.2`):** answer-first opening (never
+"NINFA ha rilevato..."/"Secondo i dati..."); question-sensitive number/data selection (a generic
+"perché" question: 3-4 numbers max, booked/available → scostamento → gap%, no
+affidabilità/comparable-count/economic-proxy unless the question asks for it); one final natural
+recommendation sentence, human review implied ("la decisione finale resta a te") rather than
+declared; a 300-500 character STYLE target, explicitly separate from the 700-character hard
+ceiling; "affidabilità" preferred over "confidence" (also renamed at the JSON-key level, see
+"Confidence" in ask-ninfa-v1.md), "andamento storico" over "pattern storico", "livello atteso" over
+"atteso a fine finestra" (both `semantic_labels.py` label text, renamed).
+
+**Truncation, fail-closed (ADR 0026's own update, points 13-14):** the trailing "…" was traced,
+statically, to `_truncated()`'s character-count slice landing mid-digit of "600" - not a model
+artefact, not a PowerShell display issue. `MAX_ANSWER_CHARS` (700) is unchanged and remains the
+hard validation ceiling; an answer over it now fails closed to `UNAVAILABLE` instead of being
+silently cut.
+
+**Context size:** input tokens grew 3071 → 3772 across Gate 19.1 itself. A full field-by-field
+audit (ADR 0026's own update, point 16) found no field clearly duplicated or useless for any
+supported question - the growth is verbosity-for-clarity (labels + full sentences replacing raw
+keys/codes), the expected cost of this gate's own purpose. Nothing was removed.
+
 ## Limitations (intentional, documented debt)
 
 - `semantic_labels.py`'s mapping tables are hand-curated per decision type - a sixth decision type

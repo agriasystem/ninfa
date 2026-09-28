@@ -27,7 +27,7 @@ MAX_HISTORY_OBSERVATIONS = 10
 # instructions' own brevity rules, never a token estimator added to this business-layer constant.
 MAX_ANSWER_CHARS = 700
 
-ASK_NINFA_INSTRUCTIONS_VERSION = "ask-ninfa-v1.1"
+ASK_NINFA_INSTRUCTIONS_VERSION = "ask-ninfa-v1.2"
 
 
 class AskStatus(StrEnum):

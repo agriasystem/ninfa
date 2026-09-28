@@ -24,10 +24,14 @@ def _data_point_dict(point: AskDataPoint) -> dict[str, object]:
 
 
 def _observation_dict(observation: AskObservationContext) -> dict[str, object]:
+    # Gate 19.1b: the JSON key is "affidabilita", never "confidence" - the live answer that
+    # exposed this gate echoed the English word "confidence" verbatim, traced back to this exact
+    # key (plus this module's OWN system instructions using the same English word - both fixed
+    # together, see ADR 0026's own update and instructions.py rule 4/25).
     return {
         "as_of_local_date": observation.as_of_local_date,
         "status": observation.status_label,
-        "confidence": observation.confidence,
+        "affidabilita": observation.confidence,
         "facts": [_data_point_dict(point) for point in observation.facts],
         "evidence": [_data_point_dict(point) for point in observation.evidence],
     }

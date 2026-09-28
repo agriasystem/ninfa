@@ -133,7 +133,7 @@ def test_occupancy_golden_case_serialized_context_carries_no_raw_engine_string(
     assert context.decision_label == "Rischio occupazione"
     fact_by_label = {point.label: point for point in context.latest.facts}
     assert fact_by_label["Previsione camere"].value == "28"
-    assert fact_by_label["Atteso a fine finestra"].value == "34"
+    assert fact_by_label["Livello atteso"].value == "34"
     assert fact_by_label["Scarto camere"].value == "6"
     assert fact_by_label["Scarto occupazione"].value == "15"
     assert context.latest.confidence == "100"

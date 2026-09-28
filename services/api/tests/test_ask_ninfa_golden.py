@@ -120,7 +120,7 @@ def test_golden_a_pickup_context_and_recommendation_match_the_real_engine(
     assert body["status"] == "ANSWERED"
     sent = json.loads(provider.last_request.context)
     assert sent["decision"] == "Pickup sotto le attese"
-    assert sent["latest"]["confidence"] == canonical_text(ground_truth.confidence_score)
+    assert sent["latest"]["affidabilita"] == canonical_text(ground_truth.confidence_score)
     primary_title = sent["recommendation"]["primary_action"]["title"]
     assert primary_title == "Rivedi prezzi e disponibilità"
     assert len(sent["history"]) >= 1

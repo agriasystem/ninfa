@@ -9,6 +9,14 @@ original shape/schema validation below: `technical_leak.contains_technical_leak`
 answer AND every limitation before either ever leaves this module. A leak fails the WHOLE answer
 closed to `None` (`AskStatus.UNAVAILABLE`) exactly like any other validation failure here - never a
 partial/edited answer, never a retry.
+
+Gate 19.1b (ADR 0026's own update, "why an overlong answer now fails closed") REVERSES ADR 0024's
+original "truncate, never reject" policy: a live answer was cut mid-number ("...impatto sui ricavi
+di 6" - the real figure was 600) by the old `_truncated()`, which sliced by raw character count
+with no word/number-boundary awareness. On a product whose entire premise is "never show a wrong
+number", a silently truncated one is worse than an honest `UNAVAILABLE`. `MAX_ANSWER_CHARS` (700)
+remains a hard VALIDATION ceiling - it is never a style target; the ~300-500 character style target
+lives in `instructions.py`'s own prompt-level guidance instead (rule 24).
 """
 
 import logging
@@ -39,15 +47,6 @@ class ValidatedAnswer:
     limitations: tuple[str, ...]
 
 
-def _truncated(answer: str) -> str:
-    """Documented policy: TRUNCATE, never reject, an overlong-but-otherwise-real answer - a real,
-    grounded answer that ran a little long is still more useful than discarding it outright (see
-    ADR 0024, "why truncation, not rejection")."""
-    if len(answer) <= MAX_ANSWER_CHARS:
-        return answer
-    return answer[:MAX_ANSWER_CHARS].rstrip() + "…"
-
-
 def _valid_grounding_refs(raw_refs: tuple[str, ...]) -> tuple[GroundingRef, ...]:
     """Drops (never crashes on) any ref outside the closed `GroundingRef` vocabulary, and any
     duplicate - a provider naming an unrecognised semantic area is a sign the answer was not fully
@@ -73,6 +72,14 @@ def validate_model_answer(raw: LanguageModelAnswer) -> ValidatedAnswer | None:
     if not answer:
         return None
 
+    if len(answer) > MAX_ANSWER_CHARS:
+        # Gate 19.1b: fail closed, never truncate - a character-count slice can (and did, live)
+        # land mid-number/mid-word, which reads as a wrong or incomplete fact, worse than an
+        # honest UNAVAILABLE (see this module's own docstring, "why an overlong answer now fails
+        # closed").
+        logger.warning("ask_ninfa answer_exceeded_max_chars=true")
+        return None
+
     limitations = _valid_limitations(raw.limitations)
     if contains_technical_leak(answer) or any(
         contains_technical_leak(note) for note in limitations
@@ -85,7 +92,7 @@ def validate_model_answer(raw: LanguageModelAnswer) -> ValidatedAnswer | None:
 
     return ValidatedAnswer(
         status=status,
-        answer=_truncated(answer),
+        answer=answer,
         grounding_refs=_valid_grounding_refs(raw.grounding_refs),
         limitations=limitations,
     )

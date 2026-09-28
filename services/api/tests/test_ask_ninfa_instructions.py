@@ -8,8 +8,8 @@ from app.modules.ai.ask_ninfa.instructions import ASK_NINFA_SYSTEM_INSTRUCTIONS
 from app.modules.ai.ask_ninfa.types import ASK_NINFA_INSTRUCTIONS_VERSION
 
 
-def test_version_is_the_documented_v1_1_string() -> None:
-    assert ASK_NINFA_INSTRUCTIONS_VERSION == "ask-ninfa-v1.1"
+def test_version_is_the_documented_v1_2_string() -> None:
+    assert ASK_NINFA_INSTRUCTIONS_VERSION == "ask-ninfa-v1.2"
 
 
 def test_engine_calculates_ai_explains_semantics_are_stated() -> None:
@@ -117,3 +117,44 @@ def test_no_bare_rank_number_is_stated() -> None:
     lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
     assert "rank 1" in lowered
     assert "posizione in classifica" in lowered
+
+
+# --- Gate 19.1b (ADR 0026's own update): question-sensitivity and natural-phrasing rules (21-25) -
+
+
+def test_affidabilita_is_preferred_over_confidence() -> None:
+    lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
+    assert "affidabilità" in lowered
+    assert 'mai "confidence"' in lowered
+
+
+def test_answer_first_sentence_rule_is_stated() -> None:
+    lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
+    assert "prima frase deve rispondere direttamente" in lowered
+    assert "ninfa ha rilevato" in lowered  # the forbidden opening is named explicitly
+
+
+def test_question_sensitive_number_selection_is_stated() -> None:
+    lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
+    assert "domanda generica" in lowered
+    assert "domanda sull'affidabilità" in lowered
+    assert "domanda sull'impatto economico" in lowered
+    assert "domanda su cosa fare" in lowered
+
+
+def test_recommendation_as_one_final_sentence_is_stated() -> None:
+    lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
+    assert "una sola frase finale" in lowered
+    assert "la decisione finale resta a te" in lowered
+
+
+def test_style_length_target_is_stated_separately_from_the_hard_ceiling() -> None:
+    lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
+    assert "300-500 caratteri" in lowered
+    assert "mai come obiettivo da raggiungere" in lowered
+
+
+def test_preferred_italian_vocabulary_is_stated() -> None:
+    lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
+    for preferred in ("andamento storico", "livello atteso", "camere prenotate"):
+        assert preferred in lowered

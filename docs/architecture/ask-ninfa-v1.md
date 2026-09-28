@@ -166,12 +166,15 @@ string. `grounding_refs` is a closed, semantic vocabulary
 `app/modules/ai/ask_ninfa/types.py`) - never a database id or citation index. Every field is
 re-validated by `app/modules/ai/ask_ninfa/answer_validation.py`, never trusted as-is: an
 unrecognised `grounding_ref` is dropped (not a crash), an empty `answer` is invalid (fails to
-`UNAVAILABLE`), an overlong `answer` is TRUNCATED to `MAX_ANSWER_CHARS = 700` (lowered from 1200 in
-Gate 19.1, ADR 0026 - documented policy: a real, useful answer that ran a little long is kept,
-never discarded outright). **Update (Gate 19.1):** a THIRD check now also runs here -
+`UNAVAILABLE`). **Update (Gate 19.1):** a further check now also runs here -
 `technical_leak.contains_technical_leak` on the answer and every limitation - failing the whole
 answer closed to `UNAVAILABLE` if it ever fires; see
-[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md).
+[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md). **Update (Gate 19.1b):** an overlong `answer`
+(over `MAX_ANSWER_CHARS = 700`, lowered from 1200 in Gate 19.1) now ALSO fails closed to
+`UNAVAILABLE` - it is no longer truncated with a trailing ellipsis. A live answer was once cut
+mid-number by the old character-count slice; on a product whose premise is "never show a wrong
+number", a silently truncated one is worse than an honest `UNAVAILABLE`. This reverses ADR 0024's
+original "truncate, never reject" policy - see ADR 0026's own update, point 13.
 
 ## Confidence
 
@@ -179,6 +182,14 @@ Copied from the same `DecisionObservation.confidence_score` the Decision Detail 
 Recommendation already use - exact, 0-100 scale, `canonical_text()`-formatted, never divided or
 multiplied by 100 (the same convention the `fix/frontend-confidence-display` hotfix established for
 the frontend applies identically here). No `Alta`/`Media`/`Bassa` bucketing is introduced.
+
+**Update (Gate 19.1b):** the serialized JSON key is `"affidabilita"`, never `"confidence"` - a live
+answer echoed the English word verbatim, traced back to both this key and `instructions.py`'s own
+prose using it; both were renamed together (ADR 0026's own update, point 15). The underlying
+Python field (`AskObservationContext.confidence`) is unchanged - only the model-facing JSON key and
+the system instructions' vocabulary moved to Italian. Also: the system instructions now tell the
+model to OMIT this figure for a generic "why" question, citing it only when the question concerns
+reliability/history - the data itself always stays in the context regardless.
 
 ## Ask result statuses
 

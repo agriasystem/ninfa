@@ -134,3 +134,59 @@ confidence and ranking are all untouched by this gate.
   if useful, without re-deriving Italian copy - the same wording the model already saw.
 - This gate's brevity rules (700 chars, 2-3 paragraphs, 2-4 numbers) are a V1 product judgment call,
   not a mechanically-derived limit - a future gate may revisit them with real usage data.
+
+## Update (Gate 19.1b) — the first technical-leak-free live answer was still too dense
+
+Live acceptance of the gate above confirmed leakage was solved, grounding stayed correct, and the
+real provider worked - but the answer was still judged too technical/dense, and its own trailing
+"…" turned out to mark a real, unrelated defect. Four further, narrowly-scoped changes:
+
+13. **Why an overlong answer now fails closed instead of being truncated (reverses ADR 0024's own
+    "truncate, never reject" decision).** The live answer ended "...impatto sui ricavi di 6…" - the
+    real figure was 600, cut mid-digit by `_truncated()`'s raw character-count slice
+    (`answer[:MAX_ANSWER_CHARS]`), which has no concept of a word or number boundary. On a product
+    whose entire premise is "never show a wrong number", a silently truncated one that now READS
+    AS a different, smaller, wrong number is strictly worse than an honest `UNAVAILABLE` - ADR
+    0024's original reasoning ("a real answer that ran a little long is more useful truncated than
+    discarded") assumed truncation could only ever cut PROSE, never silently corrupt a fact.
+    `MAX_ANSWER_CHARS` (700) stays exactly where it was - a hard VALIDATION ceiling, never lowered -
+    only its enforcement changed from slice-and-append to fail-closed.
+14. **Why the style target (300-500 characters) is a SEPARATE, softer number from the hard
+    ceiling (700).** Conflating "how long an answer should aim to be" with "the absolute maximum
+    the system will accept" was itself part of why answers ran long - a model given only a hard
+    ceiling has no signal to aim shorter than it. The style target lives in
+    `instructions.py`'s own prompt-level guidance (rule 24) only; `MAX_ANSWER_CHARS` never changed.
+15. **Why "confidence" was replaced with "affidabilità" structurally, not only in prose
+    instructions.** The live answer said "la confidence del rilevamento è 100" - traced to TWO
+    sources at once: `instructions.py`'s own rule 4 used the English word "confidence" as if it
+    were correct terminology (teaching the model to reuse it), AND the serialized JSON key itself
+    was literally `"confidence"`. Both were fixed together (rule 4 now says "affidabilità", never
+    "confidence"; the JSON key is now `"affidabilita"`) - the same "structural over prompt-only"
+    reasoning as point 2 above, applied to a single word instead of a whole identifier class.
+16. **Why no context field was removed for token economy.** Input tokens grew 3071 → 3772 across
+    Gate 19.1 - a full audit of every context field (this update) found NONE clearly duplicated or
+    useless for every supported question: `forecast_rooms`/`expected_final_rooms` are two genuinely
+    different detector-computed numbers (not the same fact twice); `evidence`'s confidence-adjacent
+    fields (`baseline_confidence`/`pattern_confidence`/`pattern_pair_count`) matter specifically for
+    a reliability question, which a generic "perché" question simply chooses not to cite (an
+    INSTRUCTION-level selection, rule 22, never a context-level removal); `history`'s own
+    last-entry/`latest` duplication is conditional (only when `episode_count == 1`) and already an
+    intentional, tested Gate 18 design choice (`test_10_11_history_bounded_and_chronological`). The
+    token growth is the expected, accepted cost of Gate 19.1's OWN purpose - semantic labels and
+    full recommendation sentences are inherently more verbose than the raw keys/codes they replaced
+    - never a sign of duplicated data. Per this gate's own explicit instruction not to optimise
+    prematurely or sacrifice grounding for token savings, nothing was removed.
+
+### Alternatives considered (Gate 19.1b)
+
+- **Truncating at a word boundary (`rsplit(" ", 1)`) instead of failing closed.** Rejected: still
+  loses the last, possibly load-bearing word/number of a real answer, and still requires deciding
+  what counts as an acceptable amount lost - fail-closed needs no such judgment call and matches
+  every other validation failure in this same function.
+- **Lowering `MAX_ANSWER_CHARS` below 700 to force brevity structurally.** Rejected, per this
+  gate's own explicit instruction: the ceiling is a safety backstop, not the brevity mechanism: a
+  model that naturally writes 900 characters and gets hard-capped at 500 would fail closed far more
+  often than one guided by prompt-level style rules toward 300-500 in the first place.
+- **A second pass that rewrites/shortens an accepted answer post-hoc.** Rejected for the same
+  reason ADR 0026's original point 6 rejected rewriting a leaking answer: an edited answer is not
+  one this codebase's own validation ever actually checked.

@@ -64,18 +64,28 @@ def test_33_insufficient_context_status_from_the_model_is_preserved() -> None:
     assert result.answer is not None
 
 
-# --- 34: overlong answer is truncated, never rejected outright ------------------------------------
+# --- 34: overlong answer fails closed, never silently truncated -----------------------------------
 
 
-def test_34_overlong_answer_is_truncated_to_the_documented_bound() -> None:
-    long_answer = "a" * (MAX_ANSWER_CHARS + 500)
+def test_34_overlong_answer_fails_closed_never_silently_truncated() -> None:
+    """Gate 19.1b (ADR 0026's own update): reverses the original "truncate, never reject" policy -
+    a real live answer was once cut mid-number by character-count slicing. An answer over
+    `MAX_ANSWER_CHARS` now fails the WHOLE response closed, exactly like a malformed one."""
+    long_answer = "a" * (MAX_ANSWER_CHARS + 1)
     provider = DeterministicFakeLanguageModelProvider(answer=_answer(answer=long_answer))
     result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
 
+    assert result.status is AskStatus.UNAVAILABLE
+    assert result.answer is None
+
+
+def test_34b_an_answer_at_exactly_the_bound_is_still_accepted() -> None:
+    exact_answer = "a" * MAX_ANSWER_CHARS
+    provider = DeterministicFakeLanguageModelProvider(answer=_answer(answer=exact_answer))
+    result = AskNinfaService(provider).ask(_context(), "Perché me lo stai mostrando?")
+
     assert result.status is AskStatus.ANSWERED
-    assert result.answer is not None
-    assert len(result.answer) <= MAX_ANSWER_CHARS + 1  # +1 for the truncation ellipsis character
-    assert result.answer.startswith("a")
+    assert result.answer == exact_answer
 
 
 # --- 35: malformed provider output fails closed ---------------------------------------------------

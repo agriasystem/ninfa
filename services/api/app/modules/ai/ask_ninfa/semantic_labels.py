@@ -220,7 +220,7 @@ FACT_LABELS: dict[PriorityDecisionType, dict[str, _Spec]] = {
         "rooms_available": ("Camere disponibili", "camere"),
         "lead_time_days": ("Anticipo rispetto al soggiorno", "giorni"),
         "forecast_rooms": ("Previsione camere", "camere"),
-        "expected_final_rooms": ("Atteso a fine finestra", "camere"),
+        "expected_final_rooms": ("Livello atteso", "camere"),
         "occupancy_gap_pp_exact": ("Scarto occupazione", "punti percentuali"),
         "room_shortfall": ("Scarto camere", "camere"),
     },
@@ -260,14 +260,14 @@ _INDICATIVE_ESTIMATE = "stima indicativa, non un valore certo"
 EVIDENCE_LABELS: dict[PriorityDecisionType, dict[str, _Spec]] = {
     PriorityDecisionType.REV_PICKUP_LOW: {
         "baseline_confidence": ("Affidabilità della base storica", "%"),
-        "pattern_confidence": ("Affidabilità del pattern storico", "%"),
+        "pattern_confidence": ("Affidabilità dell'andamento storico", "%"),
         "pattern_pair_count": ("Confronti storici usati", "confronti"),
         "revenue_gap_proxy": (f"Impatto sui ricavi ({_INDICATIVE_ESTIMATE})", None),
         "reference_adr": ("Tariffa media di riferimento", None),
     },
     PriorityDecisionType.REV_OCCUPANCY_RISK: {
         "baseline_confidence": ("Affidabilità della base storica", "%"),
-        "pattern_confidence": ("Affidabilità del pattern storico", "%"),
+        "pattern_confidence": ("Affidabilità dell'andamento storico", "%"),
         "pattern_pair_count": ("Confronti storici usati", "confronti"),
         "revenue_gap_proxy": (f"Impatto sui ricavi ({_INDICATIVE_ESTIMATE})", None),
         "reference_adr": ("Tariffa media di riferimento", None),
