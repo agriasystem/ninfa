@@ -2,10 +2,24 @@
 
 Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 
-> **Status: Gate 19 (Anthropic Provider V1, `anthropic-provider-v1`) — the first REAL
-> `LanguageModelProvider` implementation, the official Anthropic Python SDK isolated to a single
-> file (`app/modules/ai/gateway/anthropic_provider.py`, proven by an AST-based import scan), model
-> `claude-sonnet-5`, selected only by explicit `ASK_NINFA_PROVIDER=anthropic` configuration -
+> **Status: Gate 19.1 (Ask NINFA Language Hardening, `ask-ninfa-language-v1`) — the first live
+> Anthropic-backed answer exposed raw engine identifiers (`forecast_rooms`, `REV_OCCUPANCY_RISK`,
+> `TRIGGER_...`, `REVIEW_DEMAND_POSITIONING`) in the user's own answer text; this gate closes that
+> gap structurally. `semantic_labels.py` translates every raw `decision_type`/`DecisionStatus`/
+> `source_status`/`lifecycle_transition`/`ActionCode`/`category`/`RiskNote`/`cost_category`/
+> `labor_category`/whitelisted-fact-or-evidence-key to Italian BEFORE it ever reaches the
+> model-facing context - `facts`/`evidence` are now `{label, value, unit}` data points, never a
+> `dict` keyed by the raw internal name; `reason_codes`/`priority_rank` are no longer collected at
+> all. A closed-vocabulary output safety validator (`technical_leak.py`, built from this codebase's
+> own real enums/whitelists) adds defense in depth, wired into the existing fail-closed validation
+> path - a leak returns `UNAVAILABLE`, never a post-hoc rewrite or a second provider call. Eight new
+> system-instruction rules and a 1200 → 700 character answer bound target shorter, more natural
+> Italian prose. Expected, every detector, Priority, the Decision Layer, the Recommendation Engine,
+> thresholds, formulas, confidence, and ranking are all untouched - this is a language-quality fix,
+> never a business-logic one.** Gate 19 (Anthropic Provider V1, `anthropic-provider-v1`) built the
+> first REAL `LanguageModelProvider` implementation, the official Anthropic Python SDK isolated to a
+> single file (`app/modules/ai/gateway/anthropic_provider.py`, proven by an AST-based import scan),
+> model `claude-sonnet-5`, selected only by explicit `ASK_NINFA_PROVIDER=anthropic` configuration -
 > `unconfigured` remains the default, and an `ANTHROPIC_API_KEY` existing is never enough by itself.
 > Anthropic Structured Outputs constrain the model to Gate 18's own closed
 > `{status, answer, grounding_refs, limitations}` shape (`status` limited to the model's own
@@ -14,11 +28,8 @@ Hospitality Decision Intelligence — B2B SaaS. Monorepo.
 > web search, no MCP - with a bounded 15s timeout, zero automatic or application-level retries, and
 > every provider failure (timeout, network, rate limit, 4xx/5xx, auth, malformed output) mapped to
 > the SAME fail-closed `UNAVAILABLE` Gate 18 already defined, never a leaked vendor stack trace, HTTP
-> body, request id, or API key. Adaptive thinking is requested but never exposed, logged, or
-> persisted. Safe telemetry only (provider, model, status, elapsed time, token counts) - never the
-> question, context, system instructions, answer text, or raw provider response. No automated test
-> calls the real Anthropic network or holds a real key. `AskNinfaService`, the context builder, and
-> every other Gate 18 type remain entirely unaware this or any vendor exists.** Gate 18
+> body, request id, or API key. `AskNinfaService`, the context builder, and every other Gate 18 type
+> remain entirely unaware this or any vendor exists. Gate 18
 > (Ask NINFA Core V1, `ask-ninfa-v1`) built the endpoint this provider now optionally answers,
 > `POST /properties/{id}/decisions/{id}/ask`, the first and only place in this codebase that ever
 > calls a language model: ENGINE CALCULATES, AI EXPLAINS. The model sees ONLY an explicitly

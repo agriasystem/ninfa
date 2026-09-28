@@ -13,28 +13,34 @@ import json
 
 from app.modules.ai.ask_ninfa.types import (
     AskActionContext,
+    AskDataPoint,
     AskDecisionContext,
     AskObservationContext,
 )
 
 
+def _data_point_dict(point: AskDataPoint) -> dict[str, object]:
+    return {"label": point.label, "value": point.value, "unit": point.unit}
+
+
 def _observation_dict(observation: AskObservationContext) -> dict[str, object]:
+    # Gate 19.1b: the JSON key is "affidabilita", never "confidence" - the live answer that
+    # exposed this gate echoed the English word "confidence" verbatim, traced back to this exact
+    # key (plus this module's OWN system instructions using the same English word - both fixed
+    # together, see ADR 0026's own update and instructions.py rule 4/25).
     return {
         "as_of_local_date": observation.as_of_local_date,
-        "source_status": observation.source_status,
-        "lifecycle_transition": observation.lifecycle_transition,
-        "reason_codes": list(observation.reason_codes),
-        "confidence": observation.confidence,
-        "priority_rank": observation.priority_rank,
-        "facts": dict(observation.facts),
-        "evidence": dict(observation.evidence),
+        "status": observation.status_label,
+        "affidabilita": observation.confidence,
+        "facts": [_data_point_dict(point) for point in observation.facts],
+        "evidence": [_data_point_dict(point) for point in observation.evidence],
     }
 
 
 def _action_dict(action: AskActionContext) -> dict[str, object]:
     return {
-        "action_code": action.action_code,
-        "category": action.category,
+        "title": action.title,
+        "description": action.description,
         "risk_notes": list(action.risk_notes),
     }
 
@@ -43,7 +49,7 @@ def context_to_dict(context: AskDecisionContext) -> dict[str, object]:
     """The explicit, hand-built dict `serialize_context` encodes - exposed separately so a test can
     assert on structure without re-parsing JSON."""
     return {
-        "decision_type": context.decision_type,
+        "decision": context.decision_label,
         "decision_status": context.decision_status,
         "first_seen_local_date": context.first_seen_local_date,
         "last_seen_local_date": context.last_seen_local_date,
@@ -53,7 +59,6 @@ def context_to_dict(context: AskDecisionContext) -> dict[str, object]:
         "target": dict(context.target),
         "latest": _observation_dict(context.latest),
         "recommendation": {
-            "status": context.recommendation.status,
             "primary_action": (
                 None
                 if context.recommendation.primary_action is None
@@ -62,7 +67,6 @@ def context_to_dict(context: AskDecisionContext) -> dict[str, object]:
             "supporting_checks": [
                 _action_dict(action) for action in context.recommendation.supporting_checks
             ],
-            "requires_human_review": context.recommendation.requires_human_review,
         },
         "history": [_observation_dict(observation) for observation in context.history],
     }

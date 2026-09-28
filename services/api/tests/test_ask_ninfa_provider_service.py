@@ -5,13 +5,7 @@
 import inspect
 
 from app.modules.ai.ask_ninfa.service import AskNinfaService
-from app.modules.ai.ask_ninfa.types import (
-    AskActionContext,
-    AskDecisionContext,
-    AskObservationContext,
-    AskRecommendationContext,
-    AskStatus,
-)
+from app.modules.ai.ask_ninfa.types import AskStatus
 from app.modules.ai.gateway.anthropic_provider import AnthropicLanguageModelProvider
 from app.modules.ai.gateway.errors import LanguageModelUnavailableError
 from app.modules.ai.gateway.protocol import LanguageModelProvider
@@ -20,38 +14,9 @@ from tests.anthropic_provider_support import (
     make_message,
     provider_with_fake_transport,
 )
+from tests.ask_ninfa_support import sample_ask_context
 
-_CONTEXT = AskDecisionContext(
-    decision_type="REV_PICKUP_LOW",
-    decision_status="OPEN",
-    first_seen_local_date="2026-08-01",
-    last_seen_local_date="2026-08-01",
-    last_evaluated_local_date="2026-08-01",
-    resolved_local_date=None,
-    episode_count=1,
-    target={"stay_date": "2026-08-15"},
-    latest=AskObservationContext(
-        as_of_local_date="2026-08-01",
-        source_status="TRIGGERED",
-        lifecycle_transition="OPENED",
-        reason_codes=("TRIGGER_PICKUP_SHORTFALL",),
-        confidence="81.23",
-        priority_rank=1,
-        facts={"actual_pickup": 3, "expected_pickup": "7.50"},
-        evidence={"confidence_score": "81.23"},
-    ),
-    recommendation=AskRecommendationContext(
-        status="AVAILABLE",
-        primary_action=AskActionContext(
-            action_code="REVIEW_PRICING_AND_AVAILABILITY",
-            category="REVIEW_PRICING",
-            risk_notes=("PRICING_CHANGE_MAY_AFFECT_REVENUE",),
-        ),
-        supporting_checks=(),
-        requires_human_review=True,
-    ),
-    history=(),
-)
+_CONTEXT = sample_ask_context()
 
 
 # --- 50: the real adapter structurally satisfies the Protocol ------------------------------------

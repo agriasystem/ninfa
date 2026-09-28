@@ -6,20 +6,80 @@
 exact `LanguageModelRequest` it was called with (prompt capture SOLO in test - production code has
 no equivalent) so a test can assert system instructions/context/question stayed on three separate
 fields, never concatenated.
+
+`sample_ask_context`/`sample_ask_observation` (Gate 19.1) are the ONE shared builder of the
+already-semantic `AskDecisionContext` shape (`app.modules.ai.ask_ninfa.semantic_labels`'s own
+output shape) - every test that used to hand-build one with raw `decision_type`/`action_code`/
+`reason_codes` now goes through here instead, so a future context-shape change touches one place,
+never a dozen near-identical literals.
 """
 
+import dataclasses
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from uuid import UUID
 
 from fastapi import FastAPI
 
+from app.modules.ai.ask_ninfa.types import (
+    AskActionContext,
+    AskDataPoint,
+    AskDecisionContext,
+    AskObservationContext,
+    AskRecommendationContext,
+)
 from app.modules.ai.gateway.errors import LanguageModelUnavailableError
 from app.modules.ai.gateway.protocol import (
     LanguageModelAnswer,
     LanguageModelProvider,
     LanguageModelRequest,
 )
+
+
+def sample_ask_observation(**overrides: object) -> AskObservationContext:
+    """A real REV_PICKUP_LOW observation's own already-semantic shape - never a raw
+    `source_status`/`reason_codes`/`priority_rank` (Gate 19.1 dropped all three from this type)."""
+    base = AskObservationContext(
+        as_of_local_date="2026-08-01",
+        status_label="Rilevata",
+        confidence="81.23",
+        facts=(
+            AskDataPoint(label="Pickup rilevato", value="3", unit="camere"),
+            AskDataPoint(label="Pickup atteso", value="7.50", unit="camere"),
+        ),
+        evidence=(),
+    )
+    return dataclasses.replace(base, **overrides)  # type: ignore[arg-type]
+
+
+def sample_ask_context(**overrides: object) -> AskDecisionContext:
+    """A real REV_PICKUP_LOW decision's own already-semantic shape - see `sample_ask_observation`.
+    `overrides` may replace any top-level field, e.g. `sample_ask_context(latest=sample_ask_
+    observation(status_label="Ancora presente"))`."""
+    base = AskDecisionContext(
+        decision_label="Pickup sotto le attese",
+        decision_status="Aperta",
+        first_seen_local_date="2026-08-01",
+        last_seen_local_date="2026-08-01",
+        last_evaluated_local_date="2026-08-01",
+        resolved_local_date=None,
+        episode_count=1,
+        target={"stay_date": "2026-08-15"},
+        latest=sample_ask_observation(),
+        recommendation=AskRecommendationContext(
+            primary_action=AskActionContext(
+                title="Rivedi prezzi e disponibilità",
+                description=(
+                    "Verifica se prezzi, disponibilità e restrizioni sono coerenti con "
+                    "l'andamento della data."
+                ),
+                risk_notes=("Le variazioni di prezzo possono incidere sui ricavi.",),
+            ),
+            supporting_checks=(),
+        ),
+        history=(),
+    )
+    return dataclasses.replace(base, **overrides)  # type: ignore[arg-type]
 
 
 @dataclass
@@ -63,4 +123,10 @@ def ask_url(property_id: UUID, decision_id: UUID) -> str:
     return f"/api/v1/properties/{property_id}/decisions/{decision_id}/ask"
 
 
-__all__ = ["DeterministicFakeLanguageModelProvider", "ask_url", "with_fake_provider"]
+__all__ = [
+    "DeterministicFakeLanguageModelProvider",
+    "ask_url",
+    "sample_ask_context",
+    "sample_ask_observation",
+    "with_fake_provider",
+]

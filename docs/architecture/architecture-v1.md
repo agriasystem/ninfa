@@ -1,4 +1,4 @@
-# NINFA — Architecture v1 (Gates 0–19)
+# NINFA — Architecture v1 (Gates 0–19.1)
 
 Scope: the technical foundation (Gate 0), the canonical multi-tenant data core (Gate 1), the
 booking ingestion with the canonical booking model (Gate 2), the room inventory with the daily
@@ -70,7 +70,8 @@ UI: [decision-detail-ui-v1.md](decision-detail-ui-v1.md). Recommendation Engine:
 [recommendation-engine-v1.md](recommendation-engine-v1.md). Recommendation UI:
 [recommendation-ui-v1.md](recommendation-ui-v1.md). Ask NINFA Core:
 [ask-ninfa-v1.md](ask-ninfa-v1.md). Anthropic Provider:
-[anthropic-provider-v1.md](anthropic-provider-v1.md).
+[anthropic-provider-v1.md](anthropic-provider-v1.md). Ask NINFA Language Hardening:
+[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md).
 
 ## Components
 
@@ -540,6 +541,25 @@ retries, a bounded 15s timeout, and every provider failure mapped to the same fa
 `UNAVAILABLE` Gate 18 already defined - never a leaked vendor stack trace, HTTP body, or API key.
 `AskNinfaService`, the context builder, and every other Gate 18 type remain entirely unaware this or
 any vendor exists. Details: [anthropic-provider-v1.md](anthropic-provider-v1.md), ADR 0025.
+
+## Ask NINFA Language Hardening (Gate 19.1)
+
+The first live Anthropic-backed answer (Gate 19) exposed raw engine identifiers
+(`forecast_rooms`, `REV_OCCUPANCY_RISK`, `TRIGGER_...`, `REVIEW_DEMAND_POSITIONING`) in the user's
+own answer text - a language-quality gap, not a business-logic one. `semantic_labels.py`
+(`app/modules/ai/ask_ninfa/`) now translates every raw `decision_type`/`DecisionStatus`/
+`source_status`/`lifecycle_transition`/`ActionCode`/`category`/`RiskNote`/`cost_category`/
+`labor_category`/whitelisted-fact-or-evidence-key to Italian BEFORE it ever reaches the
+model-facing `AskDecisionContext` - `facts`/`evidence` are now `tuple[AskDataPoint, ...]`
+(`{label, value, unit}`), never a `dict` keyed by the raw internal name; `reason_codes`/
+`priority_rank` are no longer collected at all. `technical_leak.py` adds a closed-vocabulary output
+safety check (built from this codebase's own real enums/whitelists) as defense in depth, wired into
+the existing fail-closed `answer_validation.py` path - a leak returns `AskStatus.UNAVAILABLE`, the
+SAME mechanism already used for a malformed answer, never a post-hoc rewrite or a second provider
+call. The system instructions (`ask-ninfa-v1.1`) gained eight new brevity/language rules, and
+`MAX_ANSWER_CHARS` dropped from 1200 to 700. Expected, every detector, Priority, the Decision
+Layer, the Recommendation Engine, thresholds, formulas, confidence, and ranking are all untouched.
+Details: [ask-ninfa-language-v1.md](ask-ninfa-language-v1.md), ADR 0026.
 
 ## Background processing
 

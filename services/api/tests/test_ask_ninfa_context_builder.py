@@ -57,6 +57,10 @@ def _open_decision(
 # --- 1-5: one context per real decision type ------------------------------------------------------
 
 
+def _fact_labels(context: AskDecisionContext) -> set[str]:
+    return {point.label for point in context.latest.facts}
+
+
 def test_1_pickup_context(db_session: Session, factory: BookingFactory) -> None:
     tenant = factory.tenant()
     evaluation = revenue_evaluation(
@@ -69,9 +73,9 @@ def test_1_pickup_context(db_session: Session, factory: BookingFactory) -> None:
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert context.decision_type == "REV_PICKUP_LOW"
+    assert context.decision_label == "Pickup sotto le attese"
     assert context.target == {"stay_date": STAY.isoformat()}
-    assert "missing_rooms" in context.latest.facts
+    assert "Camere mancanti" in _fact_labels(context)
 
 
 def test_2_occupancy_context(db_session: Session, factory: BookingFactory) -> None:
@@ -87,8 +91,8 @@ def test_2_occupancy_context(db_session: Session, factory: BookingFactory) -> No
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert context.decision_type == "REV_OCCUPANCY_RISK"
-    assert "occupancy_gap_pp_exact" in context.latest.facts
+    assert context.decision_label == "Rischio occupazione"
+    assert "Scarto occupazione" in _fact_labels(context)
 
 
 def test_3_ota_context(db_session: Session, factory: BookingFactory) -> None:
@@ -102,10 +106,10 @@ def test_3_ota_context(db_session: Session, factory: BookingFactory) -> None:
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert context.decision_type == "REV_OTA_DEPENDENCY"
+    assert context.decision_label == "Dipendenza OTA"
     # No human-relevant target field exists for OTA beyond the (excluded) data source id.
     assert context.target == {}
-    assert "ota_share_exact" in context.latest.facts
+    assert "Quota OTA" in _fact_labels(context)
 
 
 def test_4_cost_context(db_session: Session, factory: BookingFactory) -> None:
@@ -120,13 +124,13 @@ def test_4_cost_context(db_session: Session, factory: BookingFactory) -> None:
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert context.decision_type == "COST_CPOR_ANOMALY"
+    assert context.decision_label == "Costo per camera anomalo"
     assert context.target == {
         "period_start": D1.isoformat(),
-        "cost_category": "LAUNDRY",
+        "cost_category": "Lavanderia",
         "currency": "EUR",
     }
-    assert "actual_cpor_exact" in context.latest.facts
+    assert "Costo per camera" in _fact_labels(context)
 
 
 def test_5_labor_context(db_session: Session, factory: BookingFactory) -> None:
@@ -143,9 +147,9 @@ def test_5_labor_context(db_session: Session, factory: BookingFactory) -> None:
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert context.decision_type == "LABOR_OVERSTAFFING"
-    assert context.target == {"work_date": D1.isoformat(), "labor_category": "HOUSEKEEPING"}
-    assert "scheduled_hours_exact" in context.latest.facts
+    assert context.decision_label == "Ore di personale sopra l'atteso"
+    assert context.target == {"work_date": D1.isoformat(), "labor_category": "Housekeeping"}
+    assert "Ore programmate" in _fact_labels(context)
 
 
 def test_5b_labor_evidence_never_carries_the_booking_or_labor_data_source_id(
@@ -169,10 +173,9 @@ def test_5b_labor_evidence_never_carries_the_booking_or_labor_data_source_id(
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert "booking_data_source_id" not in context.latest.evidence
-    assert "labor_data_source_id" not in context.latest.evidence
-    assert str(tenant.data_source.id) not in str(context.latest.evidence)
-    assert str(labor_data_source_id) not in str(context.latest.evidence)
+    evidence_text = str(context.latest.evidence)
+    assert str(tenant.data_source.id) not in evidence_text
+    assert str(labor_data_source_id) not in evidence_text
 
 
 # --- 6-9: decision status, latest facts, evidence, recommendation ---------------------------------
@@ -190,7 +193,7 @@ def test_6_decision_status(db_session: Session, factory: BookingFactory) -> None
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert context.decision_status == "OPEN"
+    assert context.decision_status == "Aperta"
     assert context.first_seen_local_date == D1.isoformat()
     assert context.episode_count == 1
     assert context.resolved_local_date is None
@@ -208,9 +211,9 @@ def test_7_latest_facts_whitelisted(db_session: Session, factory: BookingFactory
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert context.latest.facts["stay_date"] == STAY.isoformat()
-    assert context.latest.source_status == "TRIGGERED"
-    assert context.latest.lifecycle_transition == "OPENED"
+    # `stay_date` itself is not a fact label (Gate 19.1: it already lives in `target`, never
+    # duplicated into `facts` too) - "Rilevata" is the real, already-Italian lifecycle event label.
+    assert context.latest.status_label == "Rilevata"
 
 
 def test_8_evidence_whitelisted(db_session: Session, factory: BookingFactory) -> None:
@@ -225,8 +228,11 @@ def test_8_evidence_whitelisted(db_session: Session, factory: BookingFactory) ->
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    assert "confidence_score" in context.latest.evidence
-    assert "revenue_gap_proxy" in context.latest.evidence
+    evidence_labels = {point.label for point in context.latest.evidence}
+    # `confidence_score` is deliberately NOT duplicated into evidence (Gate 19.1: the SAME number
+    # already lives in `context.latest.confidence`) - `revenue_gap_proxy` is, with its caveat baked
+    # into the label itself.
+    assert any("Impatto sui ricavi" in label for label in evidence_labels)
 
 
 def test_9_recommendation_context_matches_real_engine(
@@ -243,12 +249,11 @@ def test_9_recommendation_context_matches_real_engine(
     decision_id = _open_decision(db_session, tenant, evaluation, D1)
     context = _context_for(db_session, tenant, decision_id)
 
-    # This minimal fixture never sets actual_pickup/expected_pickup (see Gate 16's own docs),
-    # so the real engine genuinely reaches INSUFFICIENT_CONTEXT here - exactly what proves the
-    # context builder copies the engine's REAL status, never a hardcoded AVAILABLE.
-    assert context.recommendation.status == "INSUFFICIENT_CONTEXT"
+    # This minimal fixture never sets actual_pickup/expected_pickup (see Gate 16's own docs), so
+    # the real engine genuinely reaches INSUFFICIENT_CONTEXT here - exactly what proves the context
+    # builder copies the engine's REAL outcome, never a hardcoded "available" primary action.
     assert context.recommendation.primary_action is None
-    assert context.recommendation.requires_human_review is True
+    assert context.recommendation.supporting_checks == ()
 
 
 # --- 10-11: bounded, chronological history --------------------------------------------------------
