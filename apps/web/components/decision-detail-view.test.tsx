@@ -14,10 +14,18 @@ import { DecisionDetailView } from "./decision-detail-view";
 
 const getDecisionDetailMock = vi.fn();
 const getDecisionHistoryMock = vi.fn();
+const askNinfaMock = vi.fn();
 
 vi.mock("@/lib/api/decisions", () => ({
   getDecisionDetail: (...args: unknown[]) => getDecisionDetailMock(...args),
   getDecisionHistory: (...args: unknown[]) => getDecisionHistoryMock(...args),
+}));
+
+// Gate 20: AskNinfaPanel never fetches on mount (only on explicit submit), so none of the tests
+// below that never interact with it need this to resolve anything - it exists only so a real
+// network call is never accidentally made if a future test does click submit.
+vi.mock("@/lib/api/ask-ninfa", () => ({
+  askNinfa: (...args: unknown[]) => askNinfaMock(...args),
 }));
 
 function observation(overrides: Partial<ObservationDetail> = {}): ObservationDetail {
@@ -127,6 +135,7 @@ beforeEach(() => {
     ok: true,
     data: { items: [], next_cursor: null },
   });
+  askNinfaMock.mockReset();
 });
 
 describe("DecisionDetailView - happy path", () => {
@@ -296,6 +305,52 @@ describe("DecisionDetailView - Recommendation (Gate 17)", () => {
 
     const panel = container.querySelector(".recommendation-panel");
     expect(panel?.textContent).not.toMatch(/%/);
+  });
+});
+
+describe("DecisionDetailView - Ask NINFA (Gate 20)", () => {
+  it("renders 'Chiedi a NINFA', in DOM order, after the recommendation and before Evoluzione", async () => {
+    getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
+
+    const { container } = render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(screen.getByRole("heading", { name: "Chiedi a NINFA" })).not.toBeNull();
+
+    const text = container.textContent ?? "";
+    const recommendationIndex = text.indexOf("Cosa puoi valutare");
+    const askIndex = text.indexOf("Chiedi a NINFA");
+    const evolutionIndex = text.indexOf("Evoluzione");
+    expect(recommendationIndex).toBeGreaterThan(-1);
+    expect(askIndex).toBeGreaterThan(recommendationIndex);
+    expect(evolutionIndex).toBeGreaterThan(askIndex);
+  });
+
+  it("submitting a question calls askNinfa with THIS page's own propertyId/decisionId", async () => {
+    getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
+    askNinfaMock.mockResolvedValue({
+      ok: true,
+      data: { status: "ANSWERED", answer: "Risposta.", grounding_refs: [], limitations: [] },
+    });
+    const user = userEvent.setup();
+
+    render(<DecisionDetailView propertyId="prop-42" decisionId="dec-77" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    await user.type(screen.getByLabelText("La tua domanda"), "Perché me lo mostri?");
+    await user.click(screen.getByRole("button", { name: "Chiedi a NINFA" }));
+
+    await waitFor(() => expect(askNinfaMock).toHaveBeenCalledOnce());
+    expect(askNinfaMock).toHaveBeenCalledWith("prop-42", "dec-77", "Perché me lo mostri?");
+  });
+
+  it("does not call askNinfa on mount - only detail/history fetch automatically", async () => {
+    getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
+
+    render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(askNinfaMock).not.toHaveBeenCalled();
   });
 });
 
