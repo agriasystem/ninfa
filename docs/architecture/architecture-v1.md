@@ -561,6 +561,22 @@ call. The system instructions (`ask-ninfa-v1.1`) gained eight new brevity/langua
 Layer, the Recommendation Engine, thresholds, formulas, confidence, and ranking are all untouched.
 Details: [ask-ninfa-language-v1.md](ask-ninfa-language-v1.md), ADR 0026.
 
+## Pilot readiness (Gate 21B)
+
+Gate 21A's own audit found every domain service reachable only from the test suite - zero HTTP
+routes, zero CLI commands, zero composition of Expected + the four detectors + Priority + Decision
+persistence. Gate 21B closes exactly that gap with three new internal, operator-run CLI modules
+(`app/cli/pilot.py`, `app/cli/imports.py`, `app/cli/analysis.py`): tenant/property/data-source
+bootstrap over the existing canonical models, file import over the existing
+`BookingImportService`/`InvoiceImportService`/`LaborImportService` using ONE canonical
+per-domain CSV convention (headers = the service's own canonical field names) plus FatturaPA XML
+unchanged, and ONE production orchestration entrypoint composing observed snapshots, Expected,
+all four detectors, Priority ranking and `DecisionService.sync()` in the order the test suite
+already exercises. No migration, no dependency, no HTTP route, no scheduler, no threshold or
+formula changed anywhere. The orchestrator never calls `sync()` if any detector evaluation raises,
+closing the Gate 21A false-all-clear risk structurally, without a `DecisionRun` schema change.
+Details: [pilot-readiness-v1.md](pilot-readiness-v1.md).
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in
@@ -576,8 +592,10 @@ maintenance job, a CSRF policy (needed before the first business-mutating endpoi
 asynchronous ingestion job, PDF/OCR/signed invoices, an HR system, payroll, shift scheduling or a
 workforce optimizer, a channel manager, a booking engine, commission accounting, channel
 profitability/conversion/CAC/ROAS, rate parity, marketing attribution, supplier merge and review
-resolution, the Property Profile, RevPAR, scheduling of snapshot, Expected, revenue, cost, labor,
-distribution, priority-ranking and Decision Layer sync runs, persisted labor, cost or distribution
+resolution, the Property Profile, RevPAR, AUTOMATIC/periodic scheduling of snapshot, Expected,
+revenue, cost, labor, distribution, priority-ranking and Decision Layer sync runs (Gate 21B's
+`app/cli/analysis.py` composes exactly this chain, but only as a manually-run, operator-triggered
+CLI command - not a cron job or a worker task), persisted labor, cost or distribution
 baselines (all are non-persistent values, recomputed on demand), a customer-facing
 channel-classification setup workflow (Gate 9's classifier stays entirely in-memory and
 read-only), a sixth detector (e.g. supplier price anomalies), a Decision resolution policy beyond

@@ -127,4 +127,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Recommendation Engine v1](docs/architecture/recommendation-engine-v1.md) — deterministic, non-AI review actions over Decision + latest Observation only, requires_human_review always true, SHA-256 fingerprint, additive on Decision Detail, zero persistence
 - [Recommendation UI v1](docs/architecture/recommendation-ui-v1.md) — "Cosa puoi valutare" section on Decision Detail, evidence-first, action_code-keyed static copy, no execute/approve/apply control, no checkbox, no AI aesthetic
 - [Ask NINFA Core v1](docs/architecture/ask-ninfa-v1.md) — grounded, single-turn, decision-scoped explanation layer; whitelisted context, provider-agnostic protocol with no vendor selected, structured/validated output, deterministic guardrails, zero persistence
+- [Pilot readiness v1](docs/architecture/pilot-readiness-v1.md) — internal operator CLI for tenant/property setup, canonical-format data intake, and the one production analysis-orchestration entrypoint; fail-loud, never a false all-clear
 - [Architecture decision records](docs/architecture/adr/)
