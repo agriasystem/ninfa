@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
 from app.db.locks import lock_decision_layer
+from app.modules.decisions.coverage import AnalysisCoverage
 from app.modules.decisions.errors import DecisionError, DecisionErrorCode
 from app.modules.decisions.fingerprint import observation_fingerprint, run_input_fingerprint
 from app.modules.decisions.identity import (
@@ -86,9 +87,14 @@ class DecisionService:
         context: PriorityContext,
         ranking_result: PriorityRankingResult,
         evaluations: Iterable[SourceEvaluation],
+        coverage: AnalysisCoverage | None = None,
     ) -> DecisionSyncResult:
+        """`coverage` (Gate 22) is optional so every caller that predates it - the whole existing
+        test suite included - is unaffected: omitted, a run's `analysis_coverage` persists as
+        NULL ("not recorded"), exactly like every run synced before this gate existed. The one
+        production caller that matters, `app/cli/analysis.py`, always supplies a real one."""
         try:
-            return self._sync(context, ranking_result, list(evaluations))
+            return self._sync(context, ranking_result, list(evaluations), coverage)
         except Exception:
             self._session.rollback()
             raise
@@ -100,6 +106,7 @@ class DecisionService:
         context: PriorityContext,
         ranking_result: PriorityRankingResult,
         evaluations: list[SourceEvaluation],
+        coverage: AnalysisCoverage | None,
     ) -> DecisionSyncResult:
         if context.workspace_id != self._tenant.workspace_id:
             raise DecisionError(
@@ -129,6 +136,7 @@ class DecisionService:
             not_applicable_count=counts[SourceStatus.NOT_APPLICABLE],
             suppressed_count=counts[SourceStatus.SUPPRESSED_LOW_CONFIDENCE],
             duplicate_input_count=duplicate_input_count,
+            coverage=coverage,
         )
 
         lock_decision_layer(self._session, context.workspace_id, context.property_id)
@@ -189,6 +197,7 @@ class DecisionService:
                 "not_applicable_count": counts[SourceStatus.NOT_APPLICABLE],
                 "suppressed_count": counts[SourceStatus.SUPPRESSED_LOW_CONFIDENCE],
                 "duplicate_input_count": duplicate_input_count,
+                "analysis_coverage": None if coverage is None else coverage.to_json(),
             }
         )
 

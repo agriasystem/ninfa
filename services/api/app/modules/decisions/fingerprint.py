@@ -14,6 +14,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from app.modules.decisions.coverage import AnalysisCoverage
 from app.modules.decisions.precision import canonical_text
 from app.modules.decisions.types import (
     DECISION_LAYER_VERSION,
@@ -40,14 +41,23 @@ def run_input_fingerprint(
     not_applicable_count: int,
     suppressed_count: int,
     duplicate_input_count: int,
+    coverage: AnalysisCoverage | None = None,
 ) -> str:
     """SHA-256 of everything that makes ONE DecisionRun's logical input unique.
 
     The source fingerprints are hashed as a SORTED, DEDUPLICATED set: the caller's own order (and
     a duplicate seen twice) never changes the fingerprint - `duplicate_input_count` already
     carries that information on its own.
+
+    `coverage` (Gate 22) is folded in explicitly, on purpose, even though a change of scope
+    already changes `source_evaluation_fingerprints`/the counts as a side effect of adding or
+    removing evaluations: making scope an EXPLICIT part of a run's identity - not an incidental
+    side effect of how many evaluations happened to be attached - is what "same data + same scope
+    -> idempotent replay, same data + different scope -> a distinct run" is asked to guarantee
+    deterministically, not just today. Omitted entirely (not even as a null placeholder) when the
+    caller passes none, so every pre-Gate-22 caller's fingerprint is byte-for-byte unchanged.
     """
-    payload = {
+    payload: dict[str, Any] = {
         "v": _RUN_FINGERPRINT_FORMAT,
         "decision_layer_version": DECISION_LAYER_VERSION,
         "workspace_id": str(workspace_id),
@@ -63,6 +73,8 @@ def run_input_fingerprint(
         "suppressed_count": suppressed_count,
         "duplicate_input_count": duplicate_input_count,
     }
+    if coverage is not None:
+        payload["analysis_coverage"] = coverage.to_json()
     return _hash(payload)
 
 

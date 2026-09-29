@@ -80,6 +80,16 @@ class DecisionRun(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     suppressed_count: Mapped[int] = mapped_column(Integer, nullable=False)
     duplicate_input_count: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    # Gate 22: which of the four user-facing analysis domains this run attempted (see
+    # app.modules.decisions.coverage.AnalysisCoverage.to_json for the exact shape). NULL for
+    # every run persisted before this gate - and NULL means "not recorded", never "nothing was
+    # analysed" or "everything was analysed": no backfill exists or is attempted.
+    # `none_as_null=True`: without it, SQLAlchemy's JSONB type binds a Python `None` as the JSON
+    # literal 'null' (a real, non-NULL jsonb value) rather than SQL NULL, which the CHECK
+    # constraint below would then correctly reject - every caller that omits `coverage` must
+    # persist a true SQL NULL, not a JSON null.
+    analysis_coverage: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
+
     __table_args__ = (
         ForeignKeyConstraint(
             ["workspace_id", "property_id"],
@@ -114,6 +124,10 @@ class DecisionRun(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         CheckConstraint(
             "priority_ranking_fingerprint ~ '^[0-9a-f]{64}$'",
             name="priority_ranking_fingerprint_format",
+        ),
+        CheckConstraint(
+            "analysis_coverage IS NULL OR jsonb_typeof(analysis_coverage) = 'object'",
+            name="analysis_coverage_is_object",
         ),
     )
 

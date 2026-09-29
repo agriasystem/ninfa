@@ -45,6 +45,7 @@ from app.api.v1.decisions.schemas import (
     DecisionListResponse,
 )
 from app.api.v1.decisions.serializers import (
+    coverage_response_of,
     decision_detail_of,
     decision_list_item_of,
     feed_item_of,
@@ -121,6 +122,7 @@ def get_decision_feed(
         insufficient_count=None if run is None else run.insufficient_count,
         not_applicable_count=None if run is None else run.not_applicable_count,
         suppressed_count=None if run is None else run.suppressed_count,
+        analysis_coverage=coverage_response_of(None if run is None else run.analysis_coverage),
         items=[feed_item_of(item) for item in feed.items],
     )
 

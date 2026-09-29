@@ -42,6 +42,7 @@ beforeEach(() => {
       insufficient_count: 0,
       not_applicable_count: 0,
       suppressed_count: 0,
+      analysis_coverage: { summary: "FULL", domains: [] },
       items: [],
     },
   });

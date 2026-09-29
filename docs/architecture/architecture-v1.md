@@ -577,6 +577,22 @@ formula changed anywhere. The orchestrator never calls `sync()` if any detector 
 closing the Gate 21A false-all-clear risk structurally, without a `DecisionRun` schema change.
 Details: [pilot-readiness-v1.md](pilot-readiness-v1.md).
 
+## Analysis coverage (Gate 22)
+
+The Gate 21C manual dry run surfaced a related, subtler gap: `DecisionRun` only ever persisted
+domain-blind aggregate counts, so a booking-only run showing `NO_ACTION_REQUIRED` was
+indistinguishable from a full-scope one - nothing recorded which of REVENUE/DISTRIBUTION/
+COSTS/LABOR were actually attempted. Gate 22 closes it additively: one nullable
+`decision_runs.analysis_coverage` JSONB column (migration `0011_analysis_coverage`), a typed
+domain model (`app/modules/decisions/coverage.py`) built once, in `app/cli/analysis.py`, from the
+same booleans that already decide which detectors to call, an additive `analysis_coverage` field
+on the feed API response, and one subordinate UI line on Oggi ("Non analizzati: Costi,
+Personale.") - never a new `FeedState`, never a changed detector or threshold. Coverage now
+participates explicitly in `DecisionRun`'s own input fingerprint, so a materially different scope
+of the same underlying data is never collapsed into an earlier run's idempotent replay. Every run
+persisted before this gate reads back as coverage `UNKNOWN`, never inferred as full or partial.
+Details: [analysis-coverage-v1.md](analysis-coverage-v1.md).
+
 ## Background processing
 
 The worker uses [Procrastinate](https://procrastinate.readthedocs.io/): jobs are rows in

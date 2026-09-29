@@ -35,6 +35,7 @@ def test_feed_response_contract() -> None:
         "insufficient_count",
         "not_applicable_count",
         "suppressed_count",
+        "analysis_coverage",
         "items",
     }
     assert _fields(FeedItemResponse) == {

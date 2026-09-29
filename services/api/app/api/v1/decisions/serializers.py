@@ -13,10 +13,12 @@ from typing import Any
 from uuid import UUID
 
 from app.api.v1.decisions.schemas import (
+    AnalysisCoverageResponse,
     CostDecisionTarget,
     DecisionDetailResponse,
     DecisionListItem,
     DecisionTarget,
+    DomainCoverageResponse,
     EconomicProxy,
     FeedItemResponse,
     LaborDecisionTarget,
@@ -29,6 +31,7 @@ from app.api.v1.decisions.schemas import (
     RevenueDecisionTarget,
 )
 from app.modules.decision_memory.types import FeedItem
+from app.modules.decisions.coverage import AnalysisCoverage, CoverageSummary
 from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.precision import canonical_text
 from app.modules.decisions.whitelist import evidence_of, facts_of
@@ -45,6 +48,28 @@ def _str(payload: dict[str, object], key: str) -> str:
     value = payload[key]
     assert isinstance(value, str)
     return value
+
+
+def coverage_response_of(raw: dict[str, object] | None) -> AnalysisCoverageResponse:
+    """`raw` is `DecisionRun.analysis_coverage` exactly as stored (or `None` for "no run" and
+    for every run persisted before Gate 22) - never returned to a client as raw JSON: `None`
+    becomes `summary="UNKNOWN"` with an empty domain list, on purpose (see
+    `app.modules.decisions.coverage`'s own module docstring - UNKNOWN is never inferred as FULL
+    or PARTIAL)."""
+    if raw is None:
+        return AnalysisCoverageResponse(summary=CoverageSummary.UNKNOWN.value, domains=[])
+    coverage = AnalysisCoverage.from_json(raw)
+    return AnalysisCoverageResponse(
+        summary=coverage.summary.value,
+        domains=[
+            DomainCoverageResponse(
+                domain=item.domain.value,
+                status=item.status.value,
+                reason=None if item.reason is None else item.reason.value,
+            )
+            for item in coverage.domains
+        ],
+    )
 
 
 def target_of(decision: Decision) -> DecisionTarget:

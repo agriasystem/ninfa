@@ -243,11 +243,11 @@ def test_the_schema_gained_no_table() -> None:
 def test_there_is_no_migration_for_gate_7() -> None:
     script = ScriptDirectory.from_config(alembic_config("postgresql+psycopg://unused/unused"))
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
-    # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008. Gate 13's
-    # own 0010 (authentication and session) is the real chain head, unrelated to cost intelligence.
+    # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008. Gate 22's
+    # own 0011 (analysis coverage) is the real chain head, unrelated to cost intelligence.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0010_auth_session"]
-    assert len(revisions) == 10  # 0001 .. 0010: Gate 7 added none
+    assert script.get_heads() == ["0011_analysis_coverage"]
+    assert len(revisions) == 11  # 0001 .. 0011: Gate 7 added none
 
 
 # --- read-only, no clock, no float ---------------------------------------------------------------

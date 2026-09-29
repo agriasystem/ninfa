@@ -21,6 +21,12 @@ FAIL LOUD, NEVER A FALSE ALL-CLEAR (the Gate 21A finding this closes): every det
 below runs OUTSIDE any try/except that could swallow it. If a detector call raises, this command
 lets the exception propagate, prints nothing further and exits non-zero - `DecisionService.sync()`
 is NEVER reached. A run either evaluates everything it attempted, or it persists nothing at all.
+
+COVERAGE (Gate 22): this function is also the ONE place that builds the `AnalysisCoverage` a run
+persists - which of REVENUE/DISTRIBUTION/COSTS/LABOR were actually attempted this run, from the
+SAME booleans that already decide steps 5-6 below, never reconstructed afterward from the
+evaluations list (see `app/modules/decisions/coverage.py`). Revenue and OTA are unconditional in
+this CLI, so REVENUE and DISTRIBUTION are always EVALUATED.
 """
 
 import argparse
@@ -32,6 +38,13 @@ from sqlalchemy.orm import Session
 
 from app.cli._support import resolve_tenant_and_property, run_cli
 from app.db.session import get_sessionmaker
+from app.modules.decisions.coverage import (
+    AnalysisCoverage,
+    AnalysisDomain,
+    DomainCoverage,
+    DomainCoverageStatus,
+    DomainSkipReason,
+)
 from app.modules.decisions.service import DecisionService
 from app.modules.intelligence.costs.service import CostDecisionService
 from app.modules.intelligence.distribution.service import OtaDependencyService
@@ -44,6 +57,10 @@ from app.modules.labor.roles import LaborCategory
 from app.modules.snapshots.models import SnapshotOrigin
 from app.modules.snapshots.observed import ObservedSnapshotService
 from app.modules.snapshots.repository import BookingSnapshotRepository
+
+
+def _skipped_domain_names(coverage: AnalysisCoverage) -> list[str]:
+    return [d.domain.value for d in coverage.domains if d.status is DomainCoverageStatus.SKIPPED]
 
 
 def run_analysis(
@@ -165,13 +182,36 @@ def run_analysis(
     else:
         print("  [6/6] labor overstaffing: skipped (no --labor-data-source-id given)")
 
-    # 7. Rank, then persist. Every evaluation gathered above reaches BOTH calls, or the process
+    # 7. Coverage (Gate 22): built from the SAME booleans that decided steps 5-6 above, never
+    # reconstructed from the evaluations list afterward - see app.modules.decisions.coverage's
+    # own module docstring for why. Revenue and OTA are unconditional in this CLI, so REVENUE and
+    # DISTRIBUTION are always EVALUATED; COSTS/LABOR mirror whichever branch actually ran.
+    coverage = AnalysisCoverage(
+        domains=(
+            DomainCoverage(AnalysisDomain.REVENUE, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(AnalysisDomain.DISTRIBUTION, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(AnalysisDomain.COSTS, DomainCoverageStatus.EVALUATED)
+            if cost_year is not None and cost_month is not None
+            else DomainCoverage(
+                AnalysisDomain.COSTS, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
+            ),
+            DomainCoverage(AnalysisDomain.LABOR, DomainCoverageStatus.EVALUATED)
+            if labor_data_source_id is not None
+            else DomainCoverage(
+                AnalysisDomain.LABOR, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
+            ),
+        )
+    )
+
+    # 8. Rank, then persist. Every evaluation gathered above reaches BOTH calls, or the process
     # already crashed above and neither call happens - see the module docstring.
     context = PriorityContext(
         workspace_id=tenant.workspace_id, property_id=prop.id, as_of_local_date=as_of_local_date
     )
     ranking_result = PriorityService().rank(context, evaluations)
-    sync_result = DecisionService(session, tenant).sync(context, ranking_result, evaluations)
+    sync_result = DecisionService(session, tenant).sync(
+        context, ranking_result, evaluations, coverage
+    )
 
     print(
         f"Analysis complete: as_of_local_date={as_of_local_date.isoformat()} "
@@ -185,7 +225,9 @@ def run_analysis(
         f"decisions_created={sync_result.created_decision_count} "
         f"decisions_resolved={sync_result.resolved_count} "
         f"decisions_reopened={sync_result.reopened_count} "
-        f"open_decisions_after_sync={sync_result.open_decision_count_after_sync}"
+        f"open_decisions_after_sync={sync_result.open_decision_count_after_sync} "
+        f"coverage={coverage.summary.value} "
+        f"skipped_domains={_skipped_domain_names(coverage)}"
     )
     return 0
 

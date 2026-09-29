@@ -22,6 +22,7 @@ from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
 from app.modules.decision_memory.service import DecisionMemoryService
 from app.modules.decision_memory.types import FeedState
+from app.modules.decisions.coverage import AnalysisCoverage, AnalysisDomain, CoverageSummary
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.ingestion.repository import DataSourceRepository
 from app.modules.properties.models import Property
@@ -105,6 +106,24 @@ def test_01_end_to_end_pilot_acceptance_reaches_persisted_decision_state(
     # counts that happen to imply it today): missing/insufficient data must never present as
     # NO_ACTION_REQUIRED ("Tutto sotto controllo") - see DecisionMemoryService.get_feed().
     assert feed_after.state == FeedState.DATA_QUALITY_LIMITED
+
+    # Gate 22: booking-only scope (no --cost-year/--cost-month, no --labor-data-source-id) ->
+    # PARTIAL coverage; REVENUE/DISTRIBUTION are unconditional in this CLI, so both are
+    # EVALUATED even though cold start makes them all resolve to INSUFFICIENT_DATA.
+    assert feed_after.run.analysis_coverage is not None
+    coverage = AnalysisCoverage.from_json(feed_after.run.analysis_coverage)
+    assert coverage.summary is CoverageSummary.PARTIAL
+    by_domain = {item.domain: item for item in coverage.domains}
+    assert by_domain[AnalysisDomain.REVENUE].status.value == "EVALUATED"
+    assert by_domain[AnalysisDomain.DISTRIBUTION].status.value == "EVALUATED"
+    assert by_domain[AnalysisDomain.COSTS].status.value == "SKIPPED"
+    costs_reason = by_domain[AnalysisDomain.COSTS].reason
+    assert costs_reason is not None
+    assert costs_reason.value == "NOT_REQUESTED"
+    assert by_domain[AnalysisDomain.LABOR].status.value == "SKIPPED"
+    labor_reason = by_domain[AnalysisDomain.LABOR].reason
+    assert labor_reason is not None
+    assert labor_reason.value == "NOT_REQUESTED"
 
 
 def test_02_unknown_property_rejected(db_session: Session) -> None:
@@ -239,3 +258,85 @@ def test_05_cost_and_labor_flags_degrade_gracefully_with_no_history(
     assert feed.state != FeedState.NOT_PROCESSED
     assert feed.run is not None
     assert feed.run.triggered_count == 0
+
+    # Gate 22: full scope (both optional domains requested) -> FULL coverage, and EVALUATED
+    # regardless of the INSUFFICIENT_DATA/NOT_APPLICABLE outcome cold start produces for them -
+    # coverage records that NINFA looked, never what it found.
+    assert feed.run.analysis_coverage is not None
+    coverage = AnalysisCoverage.from_json(feed.run.analysis_coverage)
+    assert coverage.summary is CoverageSummary.FULL
+    by_domain = {item.domain: item for item in coverage.domains}
+    assert by_domain[AnalysisDomain.COSTS].status.value == "EVALUATED"
+    assert by_domain[AnalysisDomain.LABOR].status.value == "EVALUATED"
+
+
+def test_06_cost_only_run_marks_only_costs_evaluated(db_session: Session, tmp_path: Path) -> None:
+    """Cost requested, labor not: coverage tracks each optional domain independently."""
+    stay_dates = [date.today() + timedelta(days=23)]
+    tenant, prop, data_source_id = _bootstrap_with_bookings(
+        db_session, "aurora-analysis-06", tmp_path, stay_dates=stay_dates
+    )
+    today = date.today()
+    exit_code = run_analysis(
+        db_session,
+        workspace_slug="aurora-analysis-06",
+        property_slug="aurora-analysis-06",
+        booking_data_source_id=data_source_id,
+        stay_date_start=stay_dates[0],
+        stay_date_end=stay_dates[0],
+        labor_data_source_id=None,
+        cost_year=today.year,
+        cost_month=today.month,
+        currency=None,
+    )
+    assert exit_code == 0
+    feed = DecisionMemoryService(db_session, tenant).get_feed(prop.id, today)
+    assert feed.run is not None
+    assert feed.run.analysis_coverage is not None
+    coverage = AnalysisCoverage.from_json(feed.run.analysis_coverage)
+    assert coverage.summary is CoverageSummary.PARTIAL
+    by_domain = {item.domain: item for item in coverage.domains}
+    assert by_domain[AnalysisDomain.COSTS].status.value == "EVALUATED"
+    assert by_domain[AnalysisDomain.LABOR].status.value == "SKIPPED"
+
+
+def test_07_labor_only_run_marks_only_labor_evaluated(db_session: Session, tmp_path: Path) -> None:
+    """Labor requested, cost not: coverage tracks each optional domain independently."""
+    stay_dates = [date.today() + timedelta(days=24)]
+    tenant, prop, data_source_id = _bootstrap_with_bookings(
+        db_session, "aurora-analysis-07", tmp_path, stay_dates=stay_dates
+    )
+    run_create_data_source(
+        db_session,
+        workspace_slug="aurora-analysis-07",
+        property_slug="aurora-analysis-07",
+        domain=DataSourceDomain.LABOR,
+        name="Labor",
+    )
+    labor_source = [
+        source
+        for source in DataSourceRepository(db_session, tenant).list_all(property_id=prop.id)
+        if source.domain == DataSourceDomain.LABOR
+    ][0]
+
+    exit_code = run_analysis(
+        db_session,
+        workspace_slug="aurora-analysis-07",
+        property_slug="aurora-analysis-07",
+        booking_data_source_id=data_source_id,
+        stay_date_start=stay_dates[0],
+        stay_date_end=stay_dates[0],
+        labor_data_source_id=labor_source.id,
+        cost_year=None,
+        cost_month=None,
+        currency=None,
+    )
+    assert exit_code == 0
+    feed = DecisionMemoryService(db_session, tenant).get_feed(prop.id, date.today())
+    assert feed.run is not None
+    assert feed.run.analysis_coverage is not None
+    coverage = AnalysisCoverage.from_json(feed.run.analysis_coverage)
+    assert coverage.summary is CoverageSummary.PARTIAL
+    by_domain = {item.domain: item for item in coverage.domains}
+    assert by_domain[AnalysisDomain.LABOR].status.value == "EVALUATED"
+    assert by_domain[AnalysisDomain.COSTS].status.value == "SKIPPED"

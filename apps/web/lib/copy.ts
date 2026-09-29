@@ -1,4 +1,10 @@
-import type { DecisionStatus, DecisionType, LifecycleTransition, SourceStatus } from "@ninfa/contracts";
+import type {
+  AnalysisDomain,
+  DecisionStatus,
+  DecisionType,
+  LifecycleTransition,
+  SourceStatus,
+} from "@ninfa/contracts";
 
 /**
  * Centralised Italian copy for Oggi UI V1 (Gate 14). No i18n framework: a single object, one
@@ -43,6 +49,11 @@ export const copy = {
     dataQualitySuppressedCount: (count: number) => `${count} con confidenza troppo bassa`,
     noActionTitle: "Tutto sotto controllo",
     noActionBody: "Nessuna decisione richiede la tua attenzione in questo momento.",
+    // Gate 22: additive to every state above - qualifies "Tutto sotto controllo"/"Analisi
+    // parziale" without ever implying every area was checked when it was not (see
+    // docs/architecture/analysis-coverage-v1.md, "Semantica 'Tutto sotto controllo'").
+    coveragePartial: (domains: string) => `Non analizzati: ${domains}.`,
+    coverageUnknown: "Copertura dell'analisi non disponibile per questo run.",
     actionRequiredHeading: "Decisioni di oggi",
     moreDecisions: (count: number) => `+ ${count} altre decisioni`,
     reliabilityLabel: "Affidabilità",
@@ -128,4 +139,13 @@ export const decisionTypeTitles: Record<DecisionType, string> = {
   REV_OTA_DEPENDENCY: "Dipendenza OTA",
   COST_CPOR_ANOMALY: "Costo per camera anomalo",
   LABOR_OVERSTAFFING: "Ore di personale sopra l'atteso",
+};
+
+/** Plain-language labels for the four Gate 22 analysis domains - a client NEVER renders
+ * `AnalysisDomain`'s own raw values ("REVENUE", "COSTS", ...) in the UI. */
+export const analysisDomainLabels: Record<AnalysisDomain, string> = {
+  REVENUE: "Ricavi",
+  DISTRIBUTION: "Canali",
+  COSTS: "Costi",
+  LABOR: "Personale",
 };

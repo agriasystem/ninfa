@@ -14,7 +14,8 @@ from app.db.base import Base
 from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
-HEAD = "0010_auth_session"  # Gate 13's own migration, and the real current global head
+HEAD = "0011_analysis_coverage"  # Gate 22's own migration, and the real current global head
+GATE_13_HEAD = "0010_auth_session"
 GATE_11_HEAD = "0009_decision_layer"
 GATE_8_HEAD = "0008_labor_ingestion"
 GATE_6_HEAD = "0007_invoice_supplier_ingestion"
@@ -122,7 +123,7 @@ def at_head(db_engine: Engine, test_database_url: str) -> Iterator[None]:
 # --- revision history ------------------------------------------------------------------------
 
 
-def test_gate_0_to_11_migrations_are_untouched_and_gate_13_sits_on_top(
+def test_gate_0_to_13_migrations_are_untouched_and_gate_22_sits_on_top(
     test_database_url: str,
 ) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
@@ -130,7 +131,8 @@ def test_gate_0_to_11_migrations_are_untouched_and_gate_13_sits_on_top(
     assert scripts.get_heads() == [HEAD]
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
     assert revisions == {
-        HEAD: GATE_11_HEAD,
+        HEAD: GATE_13_HEAD,
+        GATE_13_HEAD: GATE_11_HEAD,
         GATE_11_HEAD: GATE_8_HEAD,
         GATE_8_HEAD: GATE_6_HEAD,
         GATE_6_HEAD: GATE_4_HEAD,
