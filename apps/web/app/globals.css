@@ -366,6 +366,12 @@ select {
   font-size: 0.875rem;
 }
 
+.feed-state__coverage {
+  margin-top: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
 /* --- decision list / cards ------------------------------------------------------------------------ */
 
 .decision-list__heading {

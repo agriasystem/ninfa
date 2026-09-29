@@ -174,6 +174,35 @@ export type FeedState =
   | "DATA_QUALITY_LIMITED"
   | "NO_ACTION_REQUIRED";
 
+/** The four user-facing analysis domains (Gate 22) - group the five detector types the way an
+ * operator/hotel thinks about them, never the raw `DecisionType` enum (that never reaches the
+ * frontend here). */
+export type AnalysisDomain = "REVENUE" | "DISTRIBUTION" | "COSTS" | "LABOR";
+
+/** Coverage != outcome: a domain is EVALUATED whichever status its detectors returned, CLEAR
+ * through TRIGGERED - this only says whether NINFA looked, never what it found. */
+export type DomainCoverageStatus = "EVALUATED" | "SKIPPED";
+
+/** One value in V1: every skip here is a caller-side choice (an optional domain not requested
+ * this run), never a runtime failure - a crashed run never persists at all (Gate 21's fail-loud
+ * guarantee). */
+export type DomainSkipReason = "NOT_REQUESTED";
+
+export interface DomainCoverage {
+  domain: AnalysisDomain;
+  status: DomainCoverageStatus;
+  reason: DomainSkipReason | null;
+}
+
+/** `"UNKNOWN"` (with an empty `domains` list) means this run predates Gate 22 or no run exists
+ * yet - NEVER inferred as `"FULL"` or `"PARTIAL"` by the backend, and a client must not either. */
+export type CoverageSummary = "FULL" | "PARTIAL" | "UNKNOWN";
+
+export interface AnalysisCoverage {
+  summary: CoverageSummary;
+  domains: DomainCoverage[];
+}
+
 /** GET /api/v1/properties/{property_id}/decision-feed?as_of=YYYY-MM-DD.
  *
  * `items` already carries EVERY triggered candidate, ordered `priority_rank ASC` - a client only
@@ -189,6 +218,7 @@ export interface DecisionFeedResponse {
   insufficient_count: number | null;
   not_applicable_count: number | null;
   suppressed_count: number | null;
+  analysis_coverage: AnalysisCoverage;
   items: FeedItemResponse[];
 }
 

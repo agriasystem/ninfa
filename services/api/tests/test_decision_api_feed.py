@@ -9,6 +9,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
+from app.modules.decisions.coverage import (
+    AnalysisCoverage,
+    AnalysisDomain,
+    DomainCoverage,
+    DomainCoverageStatus,
+    DomainSkipReason,
+)
 from app.modules.intelligence.priority.service import PriorityService
 from app.modules.intelligence.priority.types import PriorityContext
 from app.modules.intelligence.revenue.service import RevenueDecisionService
@@ -32,10 +39,29 @@ STAY = date(2026, 8, 15)
 
 
 def _sync(
-    db_session: Session, tenant: Tenant, evaluations: list[Evaluation], as_of: date = D1
+    db_session: Session,
+    tenant: Tenant,
+    evaluations: list[Evaluation],
+    as_of: date = D1,
+    coverage: AnalysisCoverage | None = None,
 ) -> RunOutcome:
     context = PriorityContext(tenant.workspace.id, tenant.property.id, as_of)
-    return sync_run(db_session, TenantContext(tenant.workspace.id), context, evaluations)
+    return sync_run(db_session, TenantContext(tenant.workspace.id), context, evaluations, coverage)
+
+
+def _booking_only_coverage() -> AnalysisCoverage:
+    return AnalysisCoverage(
+        domains=(
+            DomainCoverage(AnalysisDomain.REVENUE, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(AnalysisDomain.DISTRIBUTION, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(
+                AnalysisDomain.COSTS, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
+            ),
+            DomainCoverage(
+                AnalysisDomain.LABOR, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
+            ),
+        )
+    )
 
 
 # --- 13-14: no run --------------------------------------------------------------------------
@@ -61,6 +87,8 @@ def test_no_run_is_not_processed(
     for count in count_fields:
         assert body[count] is None, count
     assert body["items"] == []
+    # Gate 22: no run at all -> coverage UNKNOWN, never inferred as FULL or PARTIAL.
+    assert body["analysis_coverage"] == {"summary": "UNKNOWN", "domains": []}
 
 
 # --- 15-18: ACTION_REQUIRED ------------------------------------------------------------------
@@ -286,3 +314,94 @@ def test_no_server_clock_default_in_the_feed_route_source() -> None:
     source = inspect.getsource(decisions_router_module)
     assert "date.today()" not in source
     assert "datetime.now()" not in source
+
+
+# --- Gate 22: analysis coverage, typed and API-visible ----------------------------------------
+
+
+def test_partial_coverage_is_typed_and_never_raw_db_json(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    _sync(db_session, tenant, [evaluation], coverage=_booking_only_coverage())
+
+    response = api_client.get(feed_url(tenant.property.id, D1_ISO))
+    body = response.json()
+    coverage = body["analysis_coverage"]
+    assert coverage["summary"] == "PARTIAL"
+    by_domain = {item["domain"]: item for item in coverage["domains"]}
+    assert by_domain["REVENUE"] == {"domain": "REVENUE", "status": "EVALUATED", "reason": None}
+    assert by_domain["COSTS"] == {
+        "domain": "COSTS",
+        "status": "SKIPPED",
+        "reason": "NOT_REQUESTED",
+    }
+    # never a raw pass-through of the stored JSONB shape (no top-level "version" key leaks out)
+    assert "version" not in coverage
+
+
+def test_full_coverage_summary(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    full = AnalysisCoverage(
+        domains=(
+            DomainCoverage(AnalysisDomain.REVENUE, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(AnalysisDomain.DISTRIBUTION, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(AnalysisDomain.COSTS, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(AnalysisDomain.LABOR, DomainCoverageStatus.EVALUATED),
+        )
+    )
+    _sync(db_session, tenant, [evaluation], coverage=full)
+
+    response = api_client.get(feed_url(tenant.property.id, D1_ISO))
+    assert response.json()["analysis_coverage"]["summary"] == "FULL"
+
+
+def test_historical_run_without_coverage_is_unknown_never_inferred(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    """A run synced with no `coverage` at all (every pre-Gate-22 caller) must read back as
+    UNKNOWN through the API - never FULL (nothing was actually recorded as evaluated) and never
+    PARTIAL (nothing was recorded as skipped either)."""
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    _sync(db_session, tenant, [evaluation])  # coverage=None, the pre-Gate-22 default
+
+    response = api_client.get(feed_url(tenant.property.id, D1_ISO))
+    assert response.json()["analysis_coverage"] == {"summary": "UNKNOWN", "domains": []}

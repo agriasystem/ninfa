@@ -104,6 +104,26 @@ class ObservationDetail(BaseModel):
 # --- endpoint 1: decision feed ---------------------------------------------------------------
 
 
+class DomainCoverageResponse(BaseModel):
+    """One of the four user-facing analysis domains (Gate 22) and whether THIS run attempted it -
+    never what it found: a domain is EVALUATED whichever status its detectors returned, CLEAR
+    through TRIGGERED. `reason` is populated only for `status = "SKIPPED"`."""
+
+    domain: Literal["REVENUE", "DISTRIBUTION", "COSTS", "LABOR"]
+    status: Literal["EVALUATED", "SKIPPED"]
+    reason: Literal["NOT_REQUESTED"] | None = None
+
+
+class AnalysisCoverageResponse(BaseModel):
+    """`summary` is ALWAYS present and never crashes a client: `"UNKNOWN"` with an empty
+    `domains` list means this run predates Gate 22 (`DecisionRun.analysis_coverage IS NULL`) or
+    no run exists yet - never inferred as `"FULL"` or `"PARTIAL"`, on purpose (see
+    `app.modules.decisions.coverage`'s own module docstring)."""
+
+    summary: Literal["FULL", "PARTIAL", "UNKNOWN"]
+    domains: list[DomainCoverageResponse]
+
+
 class FeedItemResponse(BaseModel):
     decision_id: UUID
     decision_type: str
@@ -132,6 +152,7 @@ class DecisionFeedResponse(BaseModel):
     insufficient_count: int | None
     not_applicable_count: int | None
     suppressed_count: int | None
+    analysis_coverage: AnalysisCoverageResponse
     items: list[FeedItemResponse]
 
 
@@ -249,6 +270,7 @@ class AskResponse(BaseModel):
 
 
 __all__ = [
+    "AnalysisCoverageResponse",
     "AskRequest",
     "AskResponse",
     "CostDecisionTarget",
@@ -258,6 +280,7 @@ __all__ = [
     "DecisionListItem",
     "DecisionListResponse",
     "DecisionTarget",
+    "DomainCoverageResponse",
     "EconomicProxy",
     "FeedItemResponse",
     "LaborDecisionTarget",

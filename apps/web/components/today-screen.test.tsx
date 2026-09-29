@@ -25,6 +25,7 @@ function feed(overrides: Partial<DecisionFeedResponse>): DecisionFeedResponse {
     insufficient_count: 0,
     not_applicable_count: 0,
     suppressed_count: 0,
+    analysis_coverage: { summary: "FULL", domains: [] },
     items: [],
     ...overrides,
   };

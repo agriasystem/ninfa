@@ -128,4 +128,5 @@ Quality gates: `npm run test`, `npm run lint`, `npm run typecheck`, `npm run bui
 - [Recommendation UI v1](docs/architecture/recommendation-ui-v1.md) — "Cosa puoi valutare" section on Decision Detail, evidence-first, action_code-keyed static copy, no execute/approve/apply control, no checkbox, no AI aesthetic
 - [Ask NINFA Core v1](docs/architecture/ask-ninfa-v1.md) — grounded, single-turn, decision-scoped explanation layer; whitelisted context, provider-agnostic protocol with no vendor selected, structured/validated output, deterministic guardrails, zero persistence
 - [Pilot readiness v1](docs/architecture/pilot-readiness-v1.md) — internal operator CLI for tenant/property setup, canonical-format data intake, and the one production analysis-orchestration entrypoint; fail-loud, never a false all-clear
+- [Analysis coverage v1](docs/architecture/analysis-coverage-v1.md) — which of REVENUE/DISTRIBUTION/COSTS/LABOR a run actually attempted, additive to DecisionRun/the feed API/Oggi, coverage participates in run identity explicitly, "Tutto sotto controllo" stays honest under partial scope
 - [Architecture decision records](docs/architecture/adr/)

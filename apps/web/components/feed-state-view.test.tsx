@@ -18,10 +18,26 @@ function feed(overrides: Partial<DecisionFeedResponse>): DecisionFeedResponse {
     insufficient_count: null,
     not_applicable_count: null,
     suppressed_count: null,
+    analysis_coverage: { summary: "FULL", domains: [] },
     items: [],
     ...overrides,
   };
 }
+
+const partialCoverage: DecisionFeedResponse["analysis_coverage"] = {
+  summary: "PARTIAL",
+  domains: [
+    { domain: "REVENUE", status: "EVALUATED", reason: null },
+    { domain: "DISTRIBUTION", status: "EVALUATED", reason: null },
+    { domain: "COSTS", status: "SKIPPED", reason: "NOT_REQUESTED" },
+    { domain: "LABOR", status: "SKIPPED", reason: "NOT_REQUESTED" },
+  ],
+};
+
+const unknownCoverage: DecisionFeedResponse["analysis_coverage"] = {
+  summary: "UNKNOWN",
+  domains: [],
+};
 
 function triggeredItem(rank: number, decisionId: string): FeedItemResponse {
   return {
@@ -116,5 +132,75 @@ describe("FeedStateView", () => {
       expect(renderedStates(container)).toEqual([state]);
       unmount();
     }
+  });
+
+  // --- Gate 22: analysis coverage ---------------------------------------------------------------
+
+  it("FULL coverage adds no extra line", () => {
+    const { container } = render(
+      <FeedStateView feed={feed({ feed_state: "NO_ACTION_REQUIRED" })} />,
+    );
+
+    expect(container.querySelector(".feed-state__coverage")).toBeNull();
+  });
+
+  it("PARTIAL coverage shows the skipped domains with Italian labels, never raw enum names", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: partialCoverage })}
+      />,
+    );
+
+    expect(container.textContent).toContain("Non analizzati: Costi, Personale.");
+    expect(container.textContent).not.toContain("COSTS");
+    expect(container.textContent).not.toContain("LABOR");
+    expect(container.textContent).not.toContain("NOT_REQUESTED");
+  });
+
+  it("NO_ACTION_REQUIRED + PARTIAL still says 'Tutto sotto controllo' but visibly qualifies it", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: partialCoverage })}
+      />,
+    );
+
+    expect(container.textContent).toContain("Tutto sotto controllo");
+    expect(container.textContent).toContain("Non analizzati: Costi, Personale.");
+  });
+
+  it("DATA_QUALITY_LIMITED + PARTIAL shows both the insufficient-data note and the skipped domains, without confusion", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({
+          feed_state: "DATA_QUALITY_LIMITED",
+          insufficient_count: 2,
+          analysis_coverage: partialCoverage,
+        })}
+      />,
+    );
+
+    expect(container.textContent).toContain("2 in attesa di dati sufficienti");
+    expect(container.textContent).toContain("Non analizzati: Costi, Personale.");
+  });
+
+  it("UNKNOWN coverage shows the neutral note, not FULL or PARTIAL copy", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: unknownCoverage })}
+      />,
+    );
+
+    expect(container.textContent).toContain("Copertura dell'analisi non disponibile per questo run.");
+    expect(container.textContent).not.toContain("Non analizzati");
+  });
+
+  it("a historical/null-shaped coverage payload never crashes the render", () => {
+    expect(() =>
+      render(
+        <FeedStateView
+          feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: unknownCoverage })}
+        />,
+      ),
+    ).not.toThrow();
   });
 });

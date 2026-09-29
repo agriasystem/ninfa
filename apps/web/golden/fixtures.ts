@@ -32,6 +32,7 @@ function baseFeed(overrides: Partial<DecisionFeedResponse>): DecisionFeedRespons
     insufficient_count: null,
     not_applicable_count: null,
     suppressed_count: null,
+    analysis_coverage: { summary: "FULL", domains: [] },
     items: [],
     ...overrides,
   };
@@ -64,6 +65,28 @@ export const GOLDEN_NO_ACTION_REQUIRED: DecisionFeedResponse = baseFeed({
   insufficient_count: 0,
   not_applicable_count: 2,
   suppressed_count: 0,
+});
+
+/** C2 (Gate 22): the same "nothing to act on" result, but only a booking-only analysis ran -
+ * "Tutto sotto controllo" must stay honest about what it actually checked. */
+export const GOLDEN_NO_ACTION_REQUIRED_PARTIAL_COVERAGE: DecisionFeedResponse = baseFeed({
+  feed_state: "NO_ACTION_REQUIRED",
+  decision_run_id: "55555555-4444-4444-8444-444444444444",
+  run_sequence: 5,
+  triggered_count: 0,
+  clear_count: 6,
+  insufficient_count: 0,
+  not_applicable_count: 2,
+  suppressed_count: 0,
+  analysis_coverage: {
+    summary: "PARTIAL",
+    domains: [
+      { domain: "REVENUE", status: "EVALUATED", reason: null },
+      { domain: "DISTRIBUTION", status: "EVALUATED", reason: null },
+      { domain: "COSTS", status: "SKIPPED", reason: "NOT_REQUESTED" },
+      { domain: "LABOR", status: "SKIPPED", reason: "NOT_REQUESTED" },
+    ],
+  },
 });
 
 function priority(rank: number, fingerprint: string) {
