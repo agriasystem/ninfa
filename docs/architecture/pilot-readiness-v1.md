@@ -67,9 +67,17 @@ There is no mapping-review UI. Instead, each file format is fixed:
 - **Invoices (FatturaPA XML)**: a real Italian e-invoice XML file, parsed directly with no mapping
   step at all (`app/modules/invoices/fatturapa.py` - this already existed before this gate).
 
-A hotel whose export does not match this convention needs a developer to reshape the file before
-import; there is deliberately no generic, user-configurable mapping engine in V1 (see
-[Gate 21A's recommendation](architecture-v1.md) against building one before a real pilot needs it).
+**Operational contract: Gate 21B accepts this one AGRIA canonical CSV format, not an arbitrary PMS
+export.** There is deliberately no generic, user-configurable mapping engine in V1 (see
+[Gate 21A's recommendation](architecture-v1.md) against building one before a real pilot needs
+it), so the hotel's/PMS's real export will usually need to be reshaped to match it first:
+
+- For a normal tabular CSV/XLSX export, this is typically a manual step an AGRIA operator can do
+  in Excel or Google Sheets - rename the header row to the canonical names above, and normalize
+  dates to `YYYY-MM-DD` and decimals to `.`. No code is required for this common case.
+- An irregular or proprietary export (a PDF, a multi-sheet workbook needing joins, computed
+  fields not present as a plain column) may still need a developer's help to produce a clean
+  canonical CSV first.
 
 ```
 python -m app.cli.imports bookings --workspace-slug hotel-aurora --property-slug hotel-aurora \
@@ -112,6 +120,19 @@ everything it attempted, or it persists nothing at all.
 
 Re-running the same day is a safe idempotent replay (`is_idempotent_replay=true`, zero new
 writes) - the analysis's own existing idempotency (input-fingerprint keyed) is unchanged.
+
+**Known limitation - partial analysis scope is not visible on Oggi (future hardening item).**
+Revenue and OTA are always evaluated; cost and labor are evaluated only when the operator passes
+`--cost-year`/`--cost-month` and `--labor-data-source-id`. A domain that is never requested
+contributes nothing to the run's `insufficient_count`/`not_applicable_count` at all - it is not
+"insufficient," it is simply never measured. Concretely: **`NO_ACTION_REQUIRED` only means no
+actionable issue was found in the domains actually evaluated this run** - it must not be read
+operationally as proof that cost and labor were checked when they were intentionally omitted.
+`DecisionRun`/`FeedState` carry no "N of 5 domains evaluated" signal today (the same structural
+gap Gate 21A flagged for a crashed detector, here reached by an intentional CLI choice instead of
+a failure). Until a coverage signal exists, the AGRIA operator running `analysis run` must read
+its own printed `[5/6]`/`[6/6] ... skipped (...)` lines each time to know what was actually
+covered - do not rely on the Oggi feed state alone to infer full coverage.
 
 ## 5. Where to inspect the result
 

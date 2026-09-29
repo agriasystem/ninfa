@@ -96,12 +96,15 @@ def test_01_end_to_end_pilot_acceptance_reaches_persisted_decision_state(
     assert exit_code == 0
 
     feed_after = DecisionMemoryService(db_session, tenant).get_feed(prop.id, date.today())
-    assert feed_after.state != FeedState.NOT_PROCESSED
     assert feed_after.run is not None
     # Cold start (one file, no history yet): every detector legitimately reports
     # INSUFFICIENT_DATA, never a fabricated trigger - see the module's "Cold Start" contract.
     assert feed_after.run.insufficient_count > 0
     assert feed_after.run.triggered_count == 0
+    # The product invariant itself, asserted directly on the derived enum (not just on the
+    # counts that happen to imply it today): missing/insufficient data must never present as
+    # NO_ACTION_REQUIRED ("Tutto sotto controllo") - see DecisionMemoryService.get_feed().
+    assert feed_after.state == FeedState.DATA_QUALITY_LIMITED
 
 
 def test_02_unknown_property_rejected(db_session: Session) -> None:
