@@ -41,7 +41,16 @@ export const copy = {
     loadErrorGeneric: "Non siamo riusciti a caricare l'analisi. Riprova.",
     retry: "Riprova",
     notProcessedTitle: "Analisi non ancora disponibile",
+    // Gate 24B: this body line is now used ONLY for "ran before, just not today yet" (a prior
+    // successful run exists) - `notProcessedNeverAnalyzed` below covers the OTHER real meaning
+    // of NOT_PROCESSED ("this property has never been analysed, ever"). Neither line may claim
+    // WHY today itself has no run (no "l'analisi di oggi è fallita" wording anywhere): a failed
+    // run is never persisted, so it is indistinguishable from "not yet run" - see
+    // docs/architecture/pilot-readiness-v1.md.
     notProcessedBody: "NINFA non ha ancora completato l'analisi per oggi.",
+    notProcessedNeverAnalyzed: "NINFA non ha ancora completato una prima analisi.",
+    lastSuccessfulAnalysis: (businessDate: string) =>
+      `L'ultima analisi completata risale al ${businessDate}.`,
     dataQualityTitle: "Analisi parziale",
     dataQualityBody:
       "Alcuni controlli non dispongono ancora di dati sufficienti. NINFA non mostra conclusioni incerte.",

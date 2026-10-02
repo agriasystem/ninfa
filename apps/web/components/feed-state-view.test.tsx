@@ -22,6 +22,7 @@ function feed(overrides: Partial<DecisionFeedResponse>): DecisionFeedResponse {
     suppressed_count: null,
     analysis_coverage: { summary: "FULL", domains: [] },
     input_freshness: { bookings: { status: "UNKNOWN", last_successful_import_finished_at: null } },
+    last_successful_analysis: null,
     items: [],
     ...overrides,
   };
@@ -346,5 +347,125 @@ describe("FeedStateView", () => {
     );
 
     expect(container.querySelector(".feed-state__freshness")).toBeNull();
+  });
+
+  // --- Gate 24B: last successful analysis ----------------------------------------------------
+
+  const priorRun: DecisionFeedResponse["last_successful_analysis"] = {
+    as_of_local_date: "2026-10-01",
+    completed_at: "2026-10-01T09:15:00Z",
+  };
+
+  it("NOT_PROCESSED + null renders the 'never analysed' copy, not the generic 'per oggi' one", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NOT_PROCESSED", last_successful_analysis: null })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    expect(container.textContent).toContain("NINFA non ha ancora completato una prima analisi.");
+    expect(container.textContent).not.toContain("NINFA non ha ancora completato l'analisi per oggi.");
+    expect(container.querySelector(".feed-state__last-successful")).toBeNull();
+  });
+
+  it("NOT_PROCESSED + a prior run renders the business-date line, in Italian, no year", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NOT_PROCESSED", last_successful_analysis: priorRun })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    expect(container.textContent).toContain("NINFA non ha ancora completato l'analisi per oggi.");
+    expect(container.textContent).toContain("L'ultima analisi completata risale al 1 ottobre.");
+    expect(container.textContent).not.toContain("2026"); // no year, like the headline date
+  });
+
+  it("uses as_of_local_date for the sentence, never completed_at's own instant", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({
+          feed_state: "NOT_PROCESSED",
+          last_successful_analysis: {
+            as_of_local_date: "2026-01-05",
+            completed_at: "2026-10-01T09:15:00Z", // deliberately a very different instant
+          },
+        })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    expect(container.textContent).toContain("L'ultima analisi completata risale al 5 gennaio.");
+    expect(container.textContent).not.toContain("1 ottobre");
+  });
+
+  it("the business-date line never leaks run_sequence, ids or raw timestamps", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NOT_PROCESSED", last_successful_analysis: priorRun })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("2026-10-01T09:15:00Z");
+    expect(container.innerHTML).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/); // no UUID
+  });
+
+  it("a processed state never shows the last-successful line, even if the feed carries one", () => {
+    const states: DecisionFeedResponse["feed_state"][] = [
+      "ACTION_REQUIRED",
+      "DATA_QUALITY_LIMITED",
+      "NO_ACTION_REQUIRED",
+    ];
+    for (const state of states) {
+      const { container, unmount } = render(
+        <FeedStateView
+          feed={feed({
+            feed_state: state,
+            triggered_count: state === "ACTION_REQUIRED" ? 1 : 0,
+            items: state === "ACTION_REQUIRED" ? [triggeredItem(1, "dec-1")] : [],
+            last_successful_analysis: priorRun,
+          })}
+          timeZone={TIME_ZONE}
+        />,
+      );
+      expect(container.querySelector(".feed-state__last-successful")).toBeNull();
+      expect(container.textContent).not.toContain("L'ultima analisi completata risale al");
+      unmount();
+    }
+  });
+
+  it("never claims today's own analysis failed or was never started", () => {
+    const { container: withPrior } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NOT_PROCESSED", last_successful_analysis: priorRun })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+    const { container: withoutPrior } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NOT_PROCESSED", last_successful_analysis: null })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    for (const text of [withPrior.textContent ?? "", withoutPrior.textContent ?? ""]) {
+      expect(text.toLowerCase()).not.toContain("fallit"); // "fallita"/"fallito"
+      expect(text.toLowerCase()).not.toContain("errore");
+      expect(text).not.toContain("non è stata avviata");
+    }
+  });
+
+  it("a historical/legacy feed shape (no last_successful_analysis at all) never crashes", () => {
+    expect(() =>
+      render(
+        <FeedStateView
+          feed={feed({ feed_state: "NOT_PROCESSED", last_successful_analysis: null })}
+          timeZone={TIME_ZONE}
+        />,
+      ),
+    ).not.toThrow();
   });
 });

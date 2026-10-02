@@ -182,6 +182,31 @@ class DecisionRepository:
         )
         return self._session.scalars(stmt).first()
 
+    def latest_run_overall(self, property_id: UUID) -> DecisionRun | None:
+        """Gate 24B: the most recently PERSISTED `DecisionRun` of this property, across EVERY
+        `as_of_local_date` - never `MAX(as_of_local_date)`, never `created_at` (same tie-break
+        reasoning as `latest_run()` above: `created_at` cannot break a tie within one
+        transaction). `run_sequence` is the one authoritative, strictly-increasing, DB-generated
+        order of when a run actually finished.
+
+        Deliberately a SEPARATE query from `latest_run()`, not a relaxed version of it: nothing
+        in this schema guarantees `as_of_local_date` and `run_sequence` move together at the
+        property level (Gate 21's own `DECISION_OUT_OF_ORDER_RUN` guard only fires for a decision
+        IDENTITY that already exists - a run whose evaluations are all brand-new identities hits
+        no such guard, however its `as_of_local_date` compares to an existing later run's). Used
+        ONLY to answer "when did NINFA last finish a run, period" - never to pick which run a
+        given as-of's own feed shows."""
+        stmt = (
+            select(DecisionRun)
+            .where(
+                DecisionRun.workspace_id == self._tenant.workspace_id,
+                DecisionRun.property_id == property_id,
+            )
+            .order_by(DecisionRun.run_sequence.desc())
+            .limit(1)
+        )
+        return self._session.scalars(stmt).first()
+
     def feed_rows(self, run_id: UUID) -> Sequence[tuple[DecisionObservation, Decision]]:
         """The TRIGGERED observations of ONE run, each paired with its Decision's current
         lifecycle row, ordered `priority_rank ASC` - ONE query, never one per item."""

@@ -16,6 +16,7 @@ from app.modules.decisions.coverage import (
     DomainCoverageStatus,
     DomainSkipReason,
 )
+from app.modules.decisions.models import DecisionRun
 from app.modules.decisions.provenance import BookingProvenance, RunInputProvenance
 from app.modules.intelligence.priority.service import PriorityService
 from app.modules.intelligence.priority.types import PriorityContext
@@ -93,6 +94,8 @@ def test_no_run_is_not_processed(
     assert body["items"] == []
     # Gate 22: no run at all -> coverage UNKNOWN, never inferred as FULL or PARTIAL.
     assert body["analysis_coverage"] == {"summary": "UNKNOWN", "domains": []}
+    # Gate 24B: no run EVER -> last_successful_analysis is null, never fabricated.
+    assert body["last_successful_analysis"] is None
 
 
 # --- 15-18: ACTION_REQUIRED ------------------------------------------------------------------
@@ -523,3 +526,80 @@ def test_no_run_at_all_reports_unknown_freshness(
     assert response.json()["input_freshness"] == {
         "bookings": {"status": "UNKNOWN", "last_successful_import_finished_at": None}
     }
+
+
+# --- Gate 24B: last successful analysis, typed and API-visible ----------------------------------
+
+D2 = date(2026, 8, 2)
+D2_ISO = "2026-08-02"
+
+
+def test_never_analysed_reports_null_last_successful_analysis(
+    api_client: TestClient, factory: BookingFactory, authenticated_as: Callable[[UUID], None]
+) -> None:
+    at = authed_tenant(factory, authenticated_as)
+    response = api_client.get(feed_url(at.tenant.property.id, D1_ISO))
+    assert response.json()["feed_state"] == "NOT_PROCESSED"
+    assert response.json()["last_successful_analysis"] is None
+
+
+def test_not_processed_with_a_prior_run_reports_its_business_date_and_completed_at(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    outcome = _sync(db_session, tenant, [evaluation], as_of=D1)
+
+    # Today (D2) has no run of its own - D1's own real run exists.
+    response = api_client.get(feed_url(tenant.property.id, D2_ISO))
+    body = response.json()
+    assert body["feed_state"] == "NOT_PROCESSED"
+    last = body["last_successful_analysis"]
+    assert last is not None
+    assert last["as_of_local_date"] == D1_ISO
+    # offset-aware timestamp, parseable, and matches the persisted run's own created_at.
+    completed_at = datetime.fromisoformat(last["completed_at"])
+    assert completed_at.tzinfo is not None
+    run = db_session.get(DecisionRun, outcome.result.decision_run_id)
+    assert run is not None
+    assert completed_at == run.created_at
+    # no internal ids leak into the public shape.
+    assert set(last) == {"as_of_local_date", "completed_at"}
+    assert str(outcome.result.decision_run_id) not in response.text
+
+
+def test_todays_own_run_never_shows_a_last_successful_analysis(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    """A processed feed (today's own run exists) must never populate this field - its one
+    product purpose is qualifying NOT_PROCESSED, not restating what the feed already shows."""
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    _sync(db_session, tenant, [evaluation], as_of=D1)
+
+    response = api_client.get(feed_url(tenant.property.id, D1_ISO))
+    body = response.json()
+    assert body["feed_state"] != "NOT_PROCESSED"
+    assert body["last_successful_analysis"] is None

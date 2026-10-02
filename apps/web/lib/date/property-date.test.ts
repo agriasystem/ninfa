@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  formatBusinessDateItalian,
   formatPropertyLocalDateItalian,
   formatPropertyLocalDateTimeItalian,
   propertyLocalDate,
@@ -91,5 +92,49 @@ describe("formatPropertyLocalDateTimeItalian", () => {
     expect(formatPropertyLocalDateTimeItalian(new Date("2026-07-15T07:15:00Z"), "Europe/Rome")).toContain(
       "09:15",
     );
+  });
+});
+
+describe("formatBusinessDateItalian", () => {
+  const ORIGINAL_TZ = process.env.TZ;
+
+  afterEach(() => {
+    process.env.TZ = ORIGINAL_TZ;
+  });
+
+  it("formats a bare business date as Italian day + month, no year", () => {
+    expect(formatBusinessDateItalian("2026-10-01")).toBe("1 ottobre");
+  });
+
+  it("does not zero-pad the day, and lower-cases the month like Italian prose", () => {
+    expect(formatBusinessDateItalian("2026-01-05")).toBe("5 gennaio");
+    expect(formatBusinessDateItalian("2026-12-31")).toBe("31 dicembre");
+  });
+
+  it("rejects a malformed input rather than guessing", () => {
+    expect(() => formatBusinessDateItalian("not-a-date")).toThrow();
+    expect(() => formatBusinessDateItalian("2026-13-01")).toThrow(); // month 13 does not exist
+  });
+
+  it(
+    "never shifts the printed day regardless of the runtime's own timezone - it never " +
+      "constructs a Date from the bare string at all",
+    () => {
+      // `new Date("2026-10-01")` parses as UTC midnight; reading it back in a negative-offset
+      // runtime (here, Pacific/Honolulu, UTC-10) prints the PREVIOUS day (30 September) - the
+      // exact bug class this function exists to avoid. Proven by actually flipping the
+      // runtime's own TZ, not just by construction.
+      process.env.TZ = "Pacific/Honolulu";
+      expect(formatBusinessDateItalian("2026-10-01")).toBe("1 ottobre");
+      expect(new Date("2026-10-01").getDate()).toBe(30); // sanity check: the naive bug is real
+
+      process.env.TZ = "Pacific/Kiritimati"; // UTC+14, the opposite extreme
+      expect(formatBusinessDateItalian("2026-10-01")).toBe("1 ottobre");
+    },
+  );
+
+  it("is independent of the property's own timezone too - a bare business date has none", () => {
+    // formatBusinessDateItalian deliberately takes no timeZone parameter at all.
+    expect(formatBusinessDateItalian("2026-10-01")).toBe("1 ottobre");
   });
 });

@@ -16,6 +16,7 @@ from app.api.v1.decisions.schemas import (
     DecisionListResponse,
     FeedItemResponse,
     InputFreshnessResponse,
+    LastSuccessfulAnalysisResponse,
     RecommendationResponse,
     RecommendedActionResponse,
 )
@@ -39,6 +40,7 @@ def test_feed_response_contract() -> None:
         "suppressed_count",
         "analysis_coverage",
         "input_freshness",  # Gate 23B, additive
+        "last_successful_analysis",  # Gate 24B, additive
         "items",
     }
     assert _fields(FeedItemResponse) == {
@@ -65,6 +67,12 @@ def test_input_freshness_response_contract() -> None:
     `freshness_response_of()`'s own docstring)."""
     assert _fields(InputFreshnessResponse) == {"bookings"}
     assert _fields(BookingFreshnessResponse) == {"status", "last_successful_import_finished_at"}
+
+
+def test_last_successful_analysis_response_contract() -> None:
+    """Gate 24B: the additive `last_successful_analysis` field's own shape - deliberately omits
+    the run's id and `run_sequence` (see `last_successful_analysis_of()`'s own docstring)."""
+    assert _fields(LastSuccessfulAnalysisResponse) == {"as_of_local_date", "completed_at"}
 
 
 def test_list_response_contract() -> None:

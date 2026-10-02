@@ -27,6 +27,7 @@ function feed(overrides: Partial<DecisionFeedResponse>): DecisionFeedResponse {
     suppressed_count: 0,
     analysis_coverage: { summary: "FULL", domains: [] },
     input_freshness: { bookings: { status: "UNKNOWN", last_successful_import_finished_at: null } },
+    last_successful_analysis: null,
     items: [],
     ...overrides,
   };

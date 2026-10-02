@@ -23,6 +23,7 @@ from app.modules.decision_memory.types import (
     FeedState,
     HistoryObservation,
     HistoryPage,
+    LastSuccessfulAnalysis,
 )
 from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.repository import DecisionRepository
@@ -69,10 +70,28 @@ class DecisionMemoryService:
     def get_feed(self, property_id: UUID, as_of_local_date: date) -> FeedResult:
         """The typed feed state of one property/as-of, built ONLY from the counts and rows the
         LATEST `DecisionRun` of that exact as-of already persisted - never a fresh Priority run,
-        never a detector call. See `FeedState`'s own docstring for the exact state rules."""
+        never a detector call. See `FeedState`'s own docstring for the exact state rules.
+
+        Gate 24B: the `latest_run_overall` lookup only ever runs when this exact as-of has no
+        run of its own (`NOT_PROCESSED`) - a second query is never spent on a processed feed,
+        which already has everything it needs from `run` itself."""
         run = self._repo.latest_run(property_id, as_of_local_date)
         if run is None:
-            return FeedResult(property_id, as_of_local_date, FeedState.NOT_PROCESSED, None)
+            overall = self._repo.latest_run_overall(property_id)
+            last_successful = (
+                None
+                if overall is None
+                else LastSuccessfulAnalysis(
+                    as_of_local_date=overall.as_of_local_date, completed_at=overall.created_at
+                )
+            )
+            return FeedResult(
+                property_id,
+                as_of_local_date,
+                FeedState.NOT_PROCESSED,
+                None,
+                last_successful_analysis=last_successful,
+            )
 
         if run.triggered_count > 0:
             state = FeedState.ACTION_REQUIRED

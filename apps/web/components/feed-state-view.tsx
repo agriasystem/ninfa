@@ -1,7 +1,7 @@
 import type { AnalysisCoverage, DecisionFeedResponse, InputFreshness } from "@ninfa/contracts";
 
 import { analysisDomainLabels, copy } from "@/lib/copy";
-import { formatPropertyLocalDateTimeItalian } from "@/lib/date/property-date";
+import { formatBusinessDateItalian, formatPropertyLocalDateTimeItalian } from "@/lib/date/property-date";
 
 import { DecisionList } from "./decision-list";
 
@@ -54,13 +54,23 @@ export function FeedStateView({ feed, timeZone }: FeedStateViewProps) {
   const freshness = freshnessNote(feed.input_freshness, timeZone);
 
   switch (feed.feed_state) {
-    case "NOT_PROCESSED":
+    case "NOT_PROCESSED": {
+      // Gate 24B: distinguishes "never analysed" from "not analysed today, but a previous run
+      // exists" - without ever claiming WHY today's own run is absent (see copy.ts's own
+      // comment on notProcessedBody/notProcessedNeverAnalyzed).
+      const last = feed.last_successful_analysis;
       return (
         <section className="feed-state feed-state--not-processed" data-feed-state="NOT_PROCESSED">
           <h2>{copy.today.notProcessedTitle}</h2>
-          <p>{copy.today.notProcessedBody}</p>
+          <p>{last === null ? copy.today.notProcessedNeverAnalyzed : copy.today.notProcessedBody}</p>
+          {last !== null ? (
+            <p className="feed-state__last-successful">
+              {copy.today.lastSuccessfulAnalysis(formatBusinessDateItalian(last.as_of_local_date))}
+            </p>
+          ) : null}
         </section>
       );
+    }
 
     case "DATA_QUALITY_LIMITED":
       return (

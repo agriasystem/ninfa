@@ -50,6 +50,7 @@ from app.api.v1.decisions.serializers import (
     decision_list_item_of,
     feed_item_of,
     freshness_response_of,
+    last_successful_analysis_of,
     observation_detail_of,
 )
 from app.db.session import get_session
@@ -125,6 +126,7 @@ def get_decision_feed(
         suppressed_count=None if run is None else run.suppressed_count,
         analysis_coverage=coverage_response_of(None if run is None else run.analysis_coverage),
         input_freshness=freshness_response_of(None if run is None else run.input_provenance),
+        last_successful_analysis=last_successful_analysis_of(feed.last_successful_analysis),
         items=[feed_item_of(item) for item in feed.items],
     )
 

@@ -24,6 +24,7 @@ from app.api.v1.decisions.schemas import (
     FeedItemResponse,
     InputFreshnessResponse,
     LaborDecisionTarget,
+    LastSuccessfulAnalysisResponse,
     LatestObservationSummary,
     ObservationDetail,
     OtaDecisionTarget,
@@ -32,7 +33,7 @@ from app.api.v1.decisions.schemas import (
     RecommendedActionResponse,
     RevenueDecisionTarget,
 )
-from app.modules.decision_memory.types import FeedItem
+from app.modules.decision_memory.types import FeedItem, LastSuccessfulAnalysis
 from app.modules.decisions.coverage import AnalysisCoverage, CoverageSummary
 from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.precision import canonical_text
@@ -93,6 +94,21 @@ def freshness_response_of(raw: dict[str, object] | None) -> InputFreshnessRespon
         bookings=BookingFreshnessResponse(
             status="KNOWN", last_successful_import_finished_at=finished_at
         )
+    )
+
+
+def last_successful_analysis_of(
+    value: LastSuccessfulAnalysis | None,
+) -> LastSuccessfulAnalysisResponse | None:
+    """`value` is `FeedResult.last_successful_analysis` exactly as `DecisionMemoryService
+    .get_feed()` computed it (Gate 24B) - `None` passes through unchanged: no run requested for
+    this as-of (a processed feed, which never needs this field) and "never analysed at all" are
+    both legitimately `None`, and this function never tries to tell them apart - that is the
+    caller's own `FeedState`/history-existence concern, not this DTO's."""
+    if value is None:
+        return None
+    return LastSuccessfulAnalysisResponse(
+        as_of_local_date=value.as_of_local_date, completed_at=value.completed_at
     )
 
 
@@ -309,6 +325,7 @@ __all__ = [
     "facts_of",
     "feed_item_of",
     "freshness_response_of",
+    "last_successful_analysis_of",
     "latest_observation_summary_of",
     "observation_detail_of",
     "priority_snapshot_of",

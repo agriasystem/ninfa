@@ -121,18 +121,22 @@ everything it attempted, or it persists nothing at all.
 Re-running the same day is a safe idempotent replay (`is_idempotent_replay=true`, zero new
 writes) - the analysis's own existing idempotency (input-fingerprint keyed) is unchanged.
 
-**Known limitation - partial analysis scope is not visible on Oggi (future hardening item).**
 Revenue and OTA are always evaluated; cost and labor are evaluated only when the operator passes
 `--cost-year`/`--cost-month` and `--labor-data-source-id`. A domain that is never requested
 contributes nothing to the run's `insufficient_count`/`not_applicable_count` at all - it is not
 "insufficient," it is simply never measured. Concretely: **`NO_ACTION_REQUIRED` only means no
 actionable issue was found in the domains actually evaluated this run** - it must not be read
 operationally as proof that cost and labor were checked when they were intentionally omitted.
-`DecisionRun`/`FeedState` carry no "N of 5 domains evaluated" signal today (the same structural
-gap Gate 21A flagged for a crashed detector, here reached by an intentional CLI choice instead of
-a failure). Until a coverage signal exists, the AGRIA operator running `analysis run` must read
-its own printed `[5/6]`/`[6/6] ... skipped (...)` lines each time to know what was actually
-covered - do not rely on the Oggi feed state alone to infer full coverage.
+
+**This is now visible on Oggi itself, not only in CLI stdout** (Gate 22 closed the gap this
+section used to describe as an open limitation): every `DecisionRun` persists which of the four
+user-facing domains it attempted (`analysis_coverage`), and Oggi renders a qualifying line
+("Non analizzati: Costi, Personale.") whenever coverage is `PARTIAL` - including under "Tutto
+sotto controllo" itself, so that headline can never be misread as "every area was checked." See
+`docs/architecture/analysis-coverage-v1.md`. The operator's own printed `[5/6]`/`[6/6] ...
+skipped (...)` lines remain accurate and useful at the moment of the run, but reading Oggi alone
+is now sufficient to know what a given day's run actually covered - it no longer requires going
+back to that run's own CLI output.
 
 ## 5. Where to inspect the result
 
@@ -150,7 +154,7 @@ show `DATA_QUALITY_LIMITED` or `NO_ACTION_REQUIRED` until enough real history ac
 | Import `status=FAILED error_code=VALIDATION_FAILED` | One or more rows failed validation | Fix the file; nothing was imported |
 | Import `status=FAILED error_code=MAPPING_REQUIRED` | Headers don't match the canonical field names | Rename the file's columns to the canonical names listed above |
 | `analysis run` fails with a data-source error | A `--*-data-source-id` is wrong, wrong-domain, or belongs to another property | Re-check the id against `create-data-source`'s own printed output |
-| Oggi stays `NOT_PROCESSED` for today | `analysis run` genuinely failed (see its own error) or was never run for that day | Fix the underlying error and re-run; nothing partial was ever written |
+| Oggi stays `NOT_PROCESSED` for today | `analysis run` genuinely failed (see its own error) or was never run for that day | Fix the underlying error and re-run; nothing partial was ever written. Oggi itself now shows which: if a previous successful run exists for this property, Oggi's `NOT_PROCESSED` screen adds "L'ultima analisi completata risale al ..." (that prior run's own business date); with no prior run at all, it says "NINFA non ha ancora completato una prima analisi." Neither line explains WHY today's own run is absent - a failed run is never persisted, so "not yet run today" and "today's run failed" remain indistinguishable (Gate 24B; see `last_successful_analysis` in the decision-feed response). |
 
 ## Explicitly out of scope (deferred, not built here)
 
