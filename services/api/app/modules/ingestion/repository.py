@@ -112,6 +112,23 @@ class ImportJobRepository:
             query = query.where(ImportJob.status == status)
         return self._session.scalars(query.order_by(ImportJob.created_at)).all()
 
+    def latest_succeeded_for_data_source(self, data_source_id: UUID) -> ImportJob | None:
+        """The latest SUCCEEDED import of this EXACT data source (Gate 23B), ordered by
+        `finished_at` DESC - the authoritative completion instant, never `created_at` - with `id`
+        as a deterministic tie-break. Never a property-wide/domain-wide MAX across every data
+        source: a property with several BOOKINGS sources must get the freshness of the ONE source
+        a run actually used, not whichever source happened to import most recently overall."""
+        return self._session.scalar(
+            select(ImportJob)
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.data_source_id == data_source_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+            )
+            .order_by(ImportJob.finished_at.desc(), ImportJob.id.desc())
+            .limit(1)
+        )
+
     # --- lifecycle: PENDING -> RUNNING -> SUCCEEDED | FAILED (PENDING -> FAILED is allowed) ----
 
     def _load_for_transition(self, import_job_id: UUID, allowed: set[ImportJobStatus]) -> ImportJob:

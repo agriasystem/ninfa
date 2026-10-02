@@ -534,6 +534,99 @@ def test_import_job_transitions_stay_inside_the_tenant(
     assert status_of(b.import_job) == ImportJobStatus.PENDING
 
 
+# --- ImportJobRepository.latest_succeeded_for_data_source (Gate 23B) --------------------------
+
+
+def _succeed_at(job: ImportJob, finished_at: datetime, session: Session) -> None:
+    """Set a job straight to SUCCEEDED with an explicit `finished_at`, bypassing the repository's
+    own real-clock `succeed()` - needed here to control ordering deterministically."""
+    job.status = ImportJobStatus.SUCCEEDED
+    job.started_at = finished_at - timedelta(minutes=1)
+    job.finished_at = finished_at
+    session.flush()
+
+
+def test_latest_succeeded_for_data_source_picks_the_newest_finished_at_not_created_at(
+    db_session: Session, factory: Factory, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, _ = two_tenants
+    repo = ImportJobRepository(db_session, a.context)
+    older_by_created_at = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+    newer_by_created_at = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+
+    # finished_at is deliberately the OPPOSITE order of created_at: the newer-created job
+    # finished FIRST, the older-created job finished LAST - proving finished_at is authoritative.
+    _succeed_at(newer_by_created_at, datetime(2026, 9, 1, tzinfo=UTC), db_session)
+    _succeed_at(older_by_created_at, datetime(2026, 9, 29, 9, 15, tzinfo=UTC), db_session)
+
+    latest = repo.latest_succeeded_for_data_source(a.data_source.id)
+    assert latest is not None
+    assert latest.id == older_by_created_at.id
+
+
+def test_latest_succeeded_for_data_source_ignores_a_newer_failed_import(
+    db_session: Session, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, _ = two_tenants
+    repo = ImportJobRepository(db_session, a.context)
+    succeeded = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+    _succeed_at(succeeded, datetime(2026, 9, 1, tzinfo=UTC), db_session)
+
+    failed = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+    failed.status = ImportJobStatus.FAILED
+    failed.finished_at = datetime(2026, 9, 29, tzinfo=UTC)  # newer, but never SUCCEEDED
+    db_session.flush()
+
+    latest = repo.latest_succeeded_for_data_source(a.data_source.id)
+    assert latest is not None
+    assert latest.id == succeeded.id
+
+
+def test_latest_succeeded_for_data_source_ignores_another_sources_newer_import(
+    db_session: Session, factory: Factory, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    """Never a property-wide/domain-wide MAX: a second BOOKINGS source of the SAME property, with
+    a strictly newer successful import, must not affect the first source's own result."""
+    a, _ = two_tenants
+    other_source = factory.data_source(a.property)
+    repo = ImportJobRepository(db_session, a.context)
+
+    own = repo.add(ImportJobCreate(data_source_id=a.data_source.id))
+    _succeed_at(own, datetime(2026, 9, 1, tzinfo=UTC), db_session)
+
+    other = repo.add(ImportJobCreate(data_source_id=other_source.id))
+    # newer, but a different source
+    _succeed_at(other, datetime(2026, 9, 29, tzinfo=UTC), db_session)
+
+    latest = repo.latest_succeeded_for_data_source(a.data_source.id)
+    assert latest is not None
+    assert latest.id == own.id
+
+
+def test_latest_succeeded_for_data_source_returns_none_without_a_successful_import(
+    db_session: Session, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, _ = two_tenants
+    repo = ImportJobRepository(db_session, a.context)
+    # a.import_job already exists (PENDING, from the fixture) - still no SUCCEEDED import exists.
+
+    assert repo.latest_succeeded_for_data_source(a.data_source.id) is None
+
+
+def test_latest_succeeded_for_data_source_stays_inside_the_tenant(
+    db_session: Session, two_tenants: tuple[Tenant, Tenant]
+) -> None:
+    a, b = two_tenants
+    _succeed_at(b.import_job, datetime(2026, 9, 1, tzinfo=UTC), db_session)
+
+    assert (
+        ImportJobRepository(db_session, a.context).latest_succeeded_for_data_source(
+            b.data_source.id
+        )
+        is None
+    )
+
+
 def test_a_file_hash_is_only_a_duplicate_within_the_same_data_source_and_after_success(
     db_session: Session, factory: Factory, two_tenants: tuple[Tenant, Tenant]
 ) -> None:

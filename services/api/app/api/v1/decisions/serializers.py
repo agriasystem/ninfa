@@ -14,6 +14,7 @@ from uuid import UUID
 
 from app.api.v1.decisions.schemas import (
     AnalysisCoverageResponse,
+    BookingFreshnessResponse,
     CostDecisionTarget,
     DecisionDetailResponse,
     DecisionListItem,
@@ -21,6 +22,7 @@ from app.api.v1.decisions.schemas import (
     DomainCoverageResponse,
     EconomicProxy,
     FeedItemResponse,
+    InputFreshnessResponse,
     LaborDecisionTarget,
     LatestObservationSummary,
     ObservationDetail,
@@ -34,6 +36,7 @@ from app.modules.decision_memory.types import FeedItem
 from app.modules.decisions.coverage import AnalysisCoverage, CoverageSummary
 from app.modules.decisions.models import Decision, DecisionObservation
 from app.modules.decisions.precision import canonical_text
+from app.modules.decisions.provenance import RunInputProvenance
 from app.modules.decisions.whitelist import evidence_of, facts_of
 from app.modules.intelligence.priority.types import PriorityDecisionType
 from app.modules.recommendations.engine import RecommendationEngine
@@ -69,6 +72,27 @@ def coverage_response_of(raw: dict[str, object] | None) -> AnalysisCoverageRespo
             )
             for item in coverage.domains
         ],
+    )
+
+
+def freshness_response_of(raw: dict[str, object] | None) -> InputFreshnessResponse:
+    """`raw` is `DecisionRun.input_provenance` exactly as stored (or `None` for "no run" and for
+    every run persisted before Gate 23B) - never returned to a client as raw JSON. `UNKNOWN`
+    covers BOTH "no provenance recorded at all" and "a source was known but no SUCCEEDED import
+    of it existed yet at analysis time" (see `app.modules.decisions.provenance`'s own module
+    docstring) - a client never sees the difference between the two, since both mean the same
+    thing to a reader: no factual freshness timestamp to show. Deliberately never leaks the
+    internal `ImportJob`/`DataSource` UUIDs the stored provenance carries."""
+    if raw is None:
+        return InputFreshnessResponse(bookings=BookingFreshnessResponse(status="UNKNOWN"))
+    provenance = RunInputProvenance.from_json(raw)
+    finished_at = provenance.bookings.last_successful_import_finished_at
+    if finished_at is None:
+        return InputFreshnessResponse(bookings=BookingFreshnessResponse(status="UNKNOWN"))
+    return InputFreshnessResponse(
+        bookings=BookingFreshnessResponse(
+            status="KNOWN", last_successful_import_finished_at=finished_at
+        )
     )
 
 
@@ -284,6 +308,7 @@ __all__ = [
     "evidence_of",
     "facts_of",
     "feed_item_of",
+    "freshness_response_of",
     "latest_observation_summary_of",
     "observation_detail_of",
     "priority_snapshot_of",

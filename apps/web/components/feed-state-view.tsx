@@ -1,11 +1,15 @@
-import type { AnalysisCoverage, DecisionFeedResponse } from "@ninfa/contracts";
+import type { AnalysisCoverage, DecisionFeedResponse, InputFreshness } from "@ninfa/contracts";
 
 import { analysisDomainLabels, copy } from "@/lib/copy";
+import { formatPropertyLocalDateTimeItalian } from "@/lib/date/property-date";
 
 import { DecisionList } from "./decision-list";
 
 export interface FeedStateViewProps {
   feed: DecisionFeedResponse;
+  /** The Property's own IANA timezone (Gate 23B) - the freshness line below is formatted in
+   * THIS timezone, never the browser's own (see `lib/date/property-date.ts`). */
+  timeZone: string;
 }
 
 /** Gate 22: the one qualifying line every feed state below may add under its own headline -
@@ -21,6 +25,23 @@ function coverageNote(coverage: AnalysisCoverage): string | null {
   return copy.today.coveragePartial(skipped.join(", "));
 }
 
+/** Gate 23B: the one qualifying FACTUAL line every processed feed state below may add under
+ * its own headline (never NOT_PROCESSED - see `copy.today.freshnessKnown`'s own module
+ * docstring for why this is never a judgement like CURRENT/STALE). A separate dimension from
+ * both `feed_state` and coverage: this never changes which branch renders, only adds one more
+ * subordinate line to it. */
+function freshnessNote(freshness: InputFreshness, timeZone: string): string {
+  const { bookings } = freshness;
+  if (bookings.status === "UNKNOWN" || bookings.last_successful_import_finished_at === null) {
+    return copy.today.freshnessUnknown;
+  }
+  const formatted = formatPropertyLocalDateTimeItalian(
+    new Date(bookings.last_successful_import_finished_at),
+    timeZone,
+  );
+  return copy.today.freshnessKnown(formatted);
+}
+
 /**
  * The four feed states are NON-NEGOTIABLY distinct, both visually and semantically (Gate 14
  * spec): "Tutto sotto controllo" (or its equivalent) may ONLY ever appear for
@@ -28,8 +49,9 @@ function coverageNote(coverage: AnalysisCoverage): string | null {
  * copy can never leak between them. Gate 22's coverage note is additive within each branch, never
  * a fifth branch of its own.
  */
-export function FeedStateView({ feed }: FeedStateViewProps) {
+export function FeedStateView({ feed, timeZone }: FeedStateViewProps) {
   const coverage = coverageNote(feed.analysis_coverage);
+  const freshness = freshnessNote(feed.input_freshness, timeZone);
 
   switch (feed.feed_state) {
     case "NOT_PROCESSED":
@@ -59,6 +81,7 @@ export function FeedStateView({ feed }: FeedStateViewProps) {
             </p>
           ) : null}
           {coverage !== null ? <p className="feed-state__coverage">{coverage}</p> : null}
+          <p className="feed-state__freshness">{freshness}</p>
         </section>
       );
 
@@ -68,6 +91,7 @@ export function FeedStateView({ feed }: FeedStateViewProps) {
           <h2>{copy.today.noActionTitle}</h2>
           <p>{copy.today.noActionBody}</p>
           {coverage !== null ? <p className="feed-state__coverage">{coverage}</p> : null}
+          <p className="feed-state__freshness">{freshness}</p>
         </section>
       );
 
@@ -76,6 +100,7 @@ export function FeedStateView({ feed }: FeedStateViewProps) {
         <section className="feed-state feed-state--action-required" data-feed-state="ACTION_REQUIRED">
           <DecisionList items={feed.items} propertyId={feed.property_id} />
           {coverage !== null ? <p className="feed-state__coverage">{coverage}</p> : null}
+          <p className="feed-state__freshness">{freshness}</p>
         </section>
       );
   }

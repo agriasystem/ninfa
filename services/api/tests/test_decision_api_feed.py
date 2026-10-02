@@ -1,7 +1,7 @@
 """Decision API V1: the decision-feed endpoint (Gate 12 review items 13-29)."""
 
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -16,6 +16,7 @@ from app.modules.decisions.coverage import (
     DomainCoverageStatus,
     DomainSkipReason,
 )
+from app.modules.decisions.provenance import BookingProvenance, RunInputProvenance
 from app.modules.intelligence.priority.service import PriorityService
 from app.modules.intelligence.priority.types import PriorityContext
 from app.modules.intelligence.revenue.service import RevenueDecisionService
@@ -44,9 +45,12 @@ def _sync(
     evaluations: list[Evaluation],
     as_of: date = D1,
     coverage: AnalysisCoverage | None = None,
+    provenance: RunInputProvenance | None = None,
 ) -> RunOutcome:
     context = PriorityContext(tenant.workspace.id, tenant.property.id, as_of)
-    return sync_run(db_session, TenantContext(tenant.workspace.id), context, evaluations, coverage)
+    return sync_run(
+        db_session, TenantContext(tenant.workspace.id), context, evaluations, coverage, provenance
+    )
 
 
 def _booking_only_coverage() -> AnalysisCoverage:
@@ -405,3 +409,117 @@ def test_historical_run_without_coverage_is_unknown_never_inferred(
 
     response = api_client.get(feed_url(tenant.property.id, D1_ISO))
     assert response.json()["analysis_coverage"] == {"summary": "UNKNOWN", "domains": []}
+
+
+# --- Gate 23B: input freshness, typed and API-visible ------------------------------------------
+
+
+def _known_provenance() -> RunInputProvenance:
+    return RunInputProvenance(
+        bookings=BookingProvenance(
+            data_source_id=uuid4(),
+            import_job_id=uuid4(),
+            last_successful_import_finished_at=datetime(2026, 9, 29, 9, 15, tzinfo=UTC),
+        )
+    )
+
+
+def test_known_freshness_is_typed_and_never_leaks_internal_uuids(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    provenance = _known_provenance()
+    _sync(db_session, tenant, [evaluation], provenance=provenance)
+
+    response = api_client.get(feed_url(tenant.property.id, D1_ISO))
+    freshness = response.json()["input_freshness"]
+    assert freshness["bookings"]["status"] == "KNOWN"
+    returned_raw = freshness["bookings"]["last_successful_import_finished_at"]
+    returned_instant = datetime.fromisoformat(returned_raw)
+    assert returned_instant == provenance.bookings.last_successful_import_finished_at
+    # never a raw pass-through of the stored JSONB shape - no internal UUID leaks out
+    assert "data_source_id" not in freshness["bookings"]
+    assert "last_successful_import_job_id" not in freshness["bookings"]
+    assert str(provenance.bookings.data_source_id) not in response.text
+    assert str(provenance.bookings.import_job_id) not in response.text
+
+
+def test_unknown_freshness_when_source_known_but_no_successful_import_yet(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    provenance = RunInputProvenance(
+        bookings=BookingProvenance(
+            data_source_id=tenant.data_source.id,
+            import_job_id=None,
+            last_successful_import_finished_at=None,
+        )
+    )
+    _sync(db_session, tenant, [evaluation], provenance=provenance)
+
+    response = api_client.get(feed_url(tenant.property.id, D1_ISO))
+    freshness = response.json()["input_freshness"]
+    assert freshness == {
+        "bookings": {"status": "UNKNOWN", "last_successful_import_finished_at": None}
+    }
+
+
+def test_historical_run_without_provenance_is_unknown_never_inferred(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    """A run synced with no `provenance` at all (every pre-Gate-23B caller) must read back as
+    UNKNOWN through the API - never a crash, never a guessed historical timestamp."""
+    at = authed_tenant(factory, authenticated_as)
+    tenant = at.tenant
+    evaluation = revenue_evaluation(
+        workspace_id=tenant.workspace.id,
+        property_id=tenant.property.id,
+        data_source_id=tenant.data_source.id,
+        stay_date=STAY,
+        snapshot_local_date=D1,
+        status=CLEAR,
+    )
+    _sync(db_session, tenant, [evaluation])  # provenance=None, the pre-Gate-23B default
+
+    response = api_client.get(feed_url(tenant.property.id, D1_ISO))
+    freshness = response.json()["input_freshness"]
+    assert freshness == {
+        "bookings": {"status": "UNKNOWN", "last_successful_import_finished_at": None}
+    }
+
+
+def test_no_run_at_all_reports_unknown_freshness(
+    api_client: TestClient, factory: BookingFactory, authenticated_as: Callable[[UUID], None]
+) -> None:
+    at = authed_tenant(factory, authenticated_as)
+    response = api_client.get(feed_url(at.tenant.property.id, D1_ISO))
+    assert response.json()["input_freshness"] == {
+        "bookings": {"status": "UNKNOWN", "last_successful_import_finished_at": None}
+    }

@@ -16,6 +16,7 @@ from uuid import UUID
 
 from app.modules.decisions.coverage import AnalysisCoverage
 from app.modules.decisions.precision import canonical_text
+from app.modules.decisions.provenance import RunInputProvenance
 from app.modules.decisions.types import (
     DECISION_LAYER_VERSION,
     DECISION_MEMORY_VERSION,
@@ -42,6 +43,7 @@ def run_input_fingerprint(
     suppressed_count: int,
     duplicate_input_count: int,
     coverage: AnalysisCoverage | None = None,
+    provenance: RunInputProvenance | None = None,
 ) -> str:
     """SHA-256 of everything that makes ONE DecisionRun's logical input unique.
 
@@ -56,6 +58,13 @@ def run_input_fingerprint(
     -> idempotent replay, same data + different scope -> a distinct run" is asked to guarantee
     deterministically, not just today. Omitted entirely (not even as a null placeholder) when the
     caller passes none, so every pre-Gate-22 caller's fingerprint is byte-for-byte unchanged.
+
+    `provenance` (Gate 23B) is folded in the same way, for the same reason: a newer successful
+    booking import for the SAME scope/evaluations must still produce a DISTINCT run (its frozen
+    freshness fact changed), and an exact replay of the same provenance must still collapse to the
+    SAME run - see `docs/architecture/booking-freshness-provenance-v1.md`, "Replay / fingerprint
+    semantics". Omitted entirely when the caller passes none, so every pre-Gate-23B fingerprint
+    (including every Gate-22-aware one) stays byte-for-byte unchanged.
     """
     payload: dict[str, Any] = {
         "v": _RUN_FINGERPRINT_FORMAT,
@@ -75,6 +84,8 @@ def run_input_fingerprint(
     }
     if coverage is not None:
         payload["analysis_coverage"] = coverage.to_json()
+    if provenance is not None:
+        payload["input_provenance"] = provenance.to_json()
     return _hash(payload)
 
 

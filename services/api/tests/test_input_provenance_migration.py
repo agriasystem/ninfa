@@ -1,12 +1,9 @@
-"""Migration 0011 on real PostgreSQL: 0010 <-> 0011, base -> head, alembic current/heads/check.
+"""Migration 0012 on real PostgreSQL: 0011 <-> 0012, base -> head, alembic current/heads/check.
 
-Gate 22 added `0011_analysis_coverage` on top of `0010_auth_session`. Gate 23B then added
-`0012_input_provenance` on top of THAT (widening `decision_runs` itself with one more nullable
-column): "is X the global head" questions now belong to `test_input_provenance_migration.py`
-(which owns the real current head); this file keeps only what is still actually about GATE 22's
-own schema - that it round-trips cleanly and survives being reached via `base -> ... -> head`
-regardless of what sits on top of it (see `test_decision_migration.py`'s own docstring for the
-same pattern one gate earlier).
+Gate 23B added `0012_input_provenance` on top of `0011_analysis_coverage`: "is X the global head"
+questions now belong HERE (see `test_analysis_coverage_migration.py`'s own docstring for the same
+pattern one gate earlier) - that file keeps only what is still actually about Gate 22's own
+schema.
 """
 
 from collections.abc import Iterator
@@ -27,12 +24,9 @@ from app.modules.properties.models import Property
 from app.modules.tenancy.models import Workspace
 from tests.support import Rejects, alembic_config
 
-GATE_10_HEAD = "0010_auth_session"
-HEAD = "0011_analysis_coverage"
-# Gate 23B added 0012_input_provenance on top; owned/asserted by
-# test_input_provenance_migration.py.
-CURRENT_GLOBAL_HEAD = "0012_input_provenance"
-GATE_22_COLUMN = "analysis_coverage"
+GATE_22_HEAD = "0011_analysis_coverage"
+HEAD = "0012_input_provenance"
+GATE_23B_COLUMN = "input_provenance"
 
 
 @pytest.fixture
@@ -56,49 +50,42 @@ def nullable_of(engine: Engine, table: str, column: str) -> bool:
     return bool(info["nullable"])
 
 
-# --- 0010 <-> 0011 round trip --------------------------------------------------------------------
+# --- 0011 <-> 0012 round trip --------------------------------------------------------------------
 
 
-def test_gate_22_objects_are_present_at_the_real_current_head(
-    at_head: None, db_engine: Engine
-) -> None:
-    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
-    assert GATE_22_COLUMN in columns_of(db_engine, "decision_runs")
-    assert nullable_of(db_engine, "decision_runs", GATE_22_COLUMN) is True
+def test_head_is_the_input_provenance_migration(at_head: None, db_engine: Engine) -> None:
+    assert revision(db_engine) == HEAD
+    assert GATE_23B_COLUMN in columns_of(db_engine, "decision_runs")
+    assert nullable_of(db_engine, "decision_runs", GATE_23B_COLUMN) is True
 
 
-def test_downgrade_to_0010_removes_only_the_new_column(
+def test_downgrade_to_0011_removes_only_the_new_column(
     at_head: None, db_engine: Engine, test_database_url: str
 ) -> None:
-    command.downgrade(alembic_config(test_database_url), GATE_10_HEAD)
-    assert revision(db_engine) == GATE_10_HEAD
-    assert GATE_22_COLUMN not in columns_of(db_engine, "decision_runs")
-    # decision_runs itself, and every other Gate 11 table, is untouched
+    command.downgrade(alembic_config(test_database_url), GATE_22_HEAD)
+    assert revision(db_engine) == GATE_22_HEAD
+    assert GATE_23B_COLUMN not in columns_of(db_engine, "decision_runs")
+    # analysis_coverage (Gate 22) and decision_runs itself are untouched
+    assert "analysis_coverage" in columns_of(db_engine, "decision_runs")
     assert {"decision_runs", "decisions", "decision_observations"} <= set(
         inspect(db_engine).get_table_names()
     )
 
 
-def test_0010_to_0011_to_0010_to_0011_recreates_an_identical_schema(
+def test_0011_to_0012_to_0011_to_0012_recreates_an_identical_schema(
     at_head: None, db_engine: Engine, test_database_url: str
 ) -> None:
-    """`before` is captured at EXACTLY `HEAD` (Gate 22's own revision), never at the real current
-    head: Gate 23B (`0012_input_provenance`) widens `decision_runs` with one column of its own,
-    so "Gate 22's tables round-trip to their OWN original shape" and "the real head's tables
-    include everything every later gate added" are two different, both true, claims (see
-    `test_decision_migration.py`'s own docstring for the same distinction one gate earlier)."""
     config = alembic_config(test_database_url)
-
-    command.downgrade(config, GATE_10_HEAD)
-    command.upgrade(config, HEAD)  # 0010 -> 0011
     before = columns_of(db_engine, "decision_runs")
 
-    command.downgrade(config, GATE_10_HEAD)
+    command.downgrade(config, GATE_22_HEAD)
     command.upgrade(config, HEAD)
     assert columns_of(db_engine, "decision_runs") == before
 
-    command.upgrade(config, "head")  # forward again to the real current head (post Gate 23B)
-    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
+    command.downgrade(config, GATE_22_HEAD)
+    command.upgrade(config, "head")
+    assert revision(db_engine) == HEAD
+    assert columns_of(db_engine, "decision_runs") == before
 
 
 # --- base -> head ---------------------------------------------------------------------------------
@@ -111,18 +98,20 @@ def test_a_fresh_database_goes_from_base_to_head(
     command.downgrade(config, "base")
     assert set(inspect(db_engine).get_table_names()) == {"alembic_version"}
     command.upgrade(config, "head")
-    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
-    assert GATE_22_COLUMN in columns_of(db_engine, "decision_runs")
+    assert revision(db_engine) == HEAD
+    assert GATE_23B_COLUMN in columns_of(db_engine, "decision_runs")
 
 
 # --- alembic current / heads / check --------------------------------------------------------------
-#
-# "alembic current is the one true head" / "exactly one head" are now owned by
-# test_input_provenance_migration.py, which asserts them against the real current head
-# (0012_input_provenance); duplicating them here under a stale name would only reassert a fact
-# about the global chain, not about Gate 22's own schema. The "no pending model changes" check
-# below stays here too (and in every later gate's own file): it is driven by the REAL head via
-# `at_head`, so it is never stale, whichever revision that head happens to be.
+
+
+def test_alembic_current_is_0012(at_head: None, db_engine: Engine) -> None:
+    assert revision(db_engine) == HEAD
+
+
+def test_alembic_has_exactly_one_head(test_database_url: str) -> None:
+    scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
+    assert scripts.get_heads() == [HEAD]
 
 
 def test_alembic_check_reports_no_pending_model_changes(
@@ -136,16 +125,17 @@ def test_alembic_check_reports_no_pending_model_changes(
     assert differences == []
 
 
-# --- 0001-0010 untouched, 0011 sits on top -----------------------------------------------------
+# --- 0001-0011 untouched, 0012 sits on top -----------------------------------------------------
 
 
-def test_migrations_0001_to_0010_are_untouched_and_0011_sits_on_top(
+def test_migrations_0001_to_0011_are_untouched_and_0012_sits_on_top(
     test_database_url: str,
 ) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
-    assert revisions[HEAD] == GATE_10_HEAD
-    assert revisions[GATE_10_HEAD] == "0009_decision_layer"
+    assert revisions[HEAD] == GATE_22_HEAD
+    assert revisions[GATE_22_HEAD] == "0010_auth_session"
+    assert revisions["0010_auth_session"] == "0009_decision_layer"
     assert revisions["0009_decision_layer"] == "0008_labor_ingestion"
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
     assert revisions["0007_invoice_supplier_ingestion"] == "0006_expected_engine"
@@ -160,24 +150,24 @@ def test_migrations_0001_to_0010_are_untouched_and_0011_sits_on_top(
 # --- the CHECK constraint itself --------------------------------------------------------------
 
 
-def test_analysis_coverage_check_constraint_rejects_a_non_object_jsonb_value(
+def test_input_provenance_check_constraint_rejects_a_non_object_jsonb_value(
     at_head: None, db_engine: Engine, rejects: Rejects, db_session: Session
 ) -> None:
-    workspace = Workspace(name="W", slug="ck-analysis-coverage")
+    workspace = Workspace(name="W", slug="ck-input-provenance")
     db_session.add(workspace)
     db_session.flush()
-    prop = Property(workspace_id=workspace.id, name="P", slug="ck-analysis-coverage")
+    prop = Property(workspace_id=workspace.id, name="P", slug="ck-input-provenance")
     db_session.add(prop)
     db_session.flush()
 
-    with rejects(pg.CheckViolation, "ck_decision_runs_analysis_coverage_is_object"):
+    with rejects(pg.CheckViolation, "ck_decision_runs_input_provenance_is_object"):
         db_session.execute(
             text(
                 "INSERT INTO decision_runs (id, run_sequence, workspace_id, property_id, "
                 "as_of_local_date, input_fingerprint, priority_ranking_fingerprint, "
                 "evaluation_count, triggered_count, clear_count, insufficient_count, "
                 "not_applicable_count, suppressed_count, duplicate_input_count, "
-                "analysis_coverage) VALUES (gen_random_uuid(), DEFAULT, :workspace_id, "
+                "input_provenance) VALUES (gen_random_uuid(), DEFAULT, :workspace_id, "
                 ":property_id, CURRENT_DATE, repeat('a', 64), repeat('b', 64), 0, 0, 0, 0, 0, "
                 "0, 0, '[1, 2, 3]'::jsonb)"
             ),

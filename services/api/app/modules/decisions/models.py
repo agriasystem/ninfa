@@ -90,6 +90,14 @@ class DecisionRun(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     # persist a true SQL NULL, not a JSON null.
     analysis_coverage: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
 
+    # Gate 23B: from which booking input/source freshness this run's facts derived, frozen at
+    # analysis time (see app.modules.decisions.provenance.RunInputProvenance.to_json for the
+    # exact shape). NULL for every run persisted before this gate, and for any run whose caller
+    # omits it - NULL means "not recorded", never a fabricated historical freshness fact (no
+    # backfill exists or is attempted). Same `none_as_null=True` requirement as
+    # `analysis_coverage` above - see that column's own comment.
+    input_provenance: Mapped[dict[str, object] | None] = mapped_column(JSONB(none_as_null=True))
+
     __table_args__ = (
         ForeignKeyConstraint(
             ["workspace_id", "property_id"],
@@ -128,6 +136,10 @@ class DecisionRun(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         CheckConstraint(
             "analysis_coverage IS NULL OR jsonb_typeof(analysis_coverage) = 'object'",
             name="analysis_coverage_is_object",
+        ),
+        CheckConstraint(
+            "input_provenance IS NULL OR jsonb_typeof(input_provenance) = 'object'",
+            name="input_provenance_is_object",
         ),
     )
 

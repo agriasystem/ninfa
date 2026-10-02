@@ -20,9 +20,11 @@ import {
  * would from a real API response).
  */
 
+const TIME_ZONE = "Europe/Rome";
+
 describe("Golden A: NOT_PROCESSED", () => {
   it("renders the not-processed copy and nothing resembling 'all clear'", () => {
-    const { container } = render(<FeedStateView feed={GOLDEN_NOT_PROCESSED} />);
+    const { container } = render(<FeedStateView feed={GOLDEN_NOT_PROCESSED} timeZone={TIME_ZONE} />);
 
     expect(screen.getByText("Analisi non ancora disponibile")).not.toBeNull();
     expect(container.textContent).not.toContain("Tutto sotto controllo");
@@ -31,7 +33,9 @@ describe("Golden A: NOT_PROCESSED", () => {
 
 describe("Golden B: DATA_QUALITY_LIMITED", () => {
   it("renders the partial-analysis copy with the real insufficient/suppressed counts", () => {
-    const { container } = render(<FeedStateView feed={GOLDEN_DATA_QUALITY_LIMITED} />);
+    const { container } = render(
+      <FeedStateView feed={GOLDEN_DATA_QUALITY_LIMITED} timeZone={TIME_ZONE} />,
+    );
 
     expect(screen.getByText("Analisi parziale")).not.toBeNull();
     expect(container.textContent).toContain("3 in attesa di dati sufficienti");
@@ -42,7 +46,7 @@ describe("Golden B: DATA_QUALITY_LIMITED", () => {
 
 describe("Golden C: NO_ACTION_REQUIRED", () => {
   it("is the only golden state allowed to say 'Tutto sotto controllo'", () => {
-    const { container } = render(<FeedStateView feed={GOLDEN_NO_ACTION_REQUIRED} />);
+    const { container } = render(<FeedStateView feed={GOLDEN_NO_ACTION_REQUIRED} timeZone={TIME_ZONE} />);
 
     expect(container.textContent).toContain("Tutto sotto controllo");
   });
@@ -50,7 +54,9 @@ describe("Golden C: NO_ACTION_REQUIRED", () => {
 
 describe("Golden D: ACTION_REQUIRED with the five MVP decision types", () => {
   it("renders all five static titles, in the backend's own priority_rank order", () => {
-    const { container } = render(<FeedStateView feed={GOLDEN_ACTION_REQUIRED_FIVE_TYPES} />);
+    const { container } = render(
+      <FeedStateView feed={GOLDEN_ACTION_REQUIRED_FIVE_TYPES} timeZone={TIME_ZONE} />,
+    );
 
     const titles = Array.from(container.querySelectorAll(".decision-card__title")).map(
       (element) => element.textContent,
@@ -65,7 +71,9 @@ describe("Golden D: ACTION_REQUIRED with the five MVP decision types", () => {
   });
 
   it("renders each card's real facts, never raw JSON, never a recommendation", () => {
-    const { container } = render(<FeedStateView feed={GOLDEN_ACTION_REQUIRED_FIVE_TYPES} />);
+    const { container } = render(
+      <FeedStateView feed={GOLDEN_ACTION_REQUIRED_FIVE_TYPES} timeZone={TIME_ZONE} />,
+    );
 
     expect(container.textContent).toContain("2026-10-05"); // pickup stay date
     expect(container.textContent).toContain("HOUSEKEEPING"); // labor category
@@ -76,7 +84,7 @@ describe("Golden D: ACTION_REQUIRED with the five MVP decision types", () => {
   });
 
   it("shows no '+N altre decisioni' indicator - exactly 5 candidates, nothing hidden", () => {
-    render(<FeedStateView feed={GOLDEN_ACTION_REQUIRED_FIVE_TYPES} />);
+    render(<FeedStateView feed={GOLDEN_ACTION_REQUIRED_FIVE_TYPES} timeZone={TIME_ZONE} />);
 
     expect(screen.queryByText(/altre decisioni/)).toBeNull();
   });
@@ -84,7 +92,9 @@ describe("Golden D: ACTION_REQUIRED with the five MVP decision types", () => {
 
 describe("Golden E: ACTION_REQUIRED with more than 5 triggered candidates", () => {
   it("presents only the top 5 and discloses the rest, without ever re-sorting them", () => {
-    const { container } = render(<FeedStateView feed={GOLDEN_ACTION_REQUIRED_EIGHT_ITEMS} />);
+    const { container } = render(
+      <FeedStateView feed={GOLDEN_ACTION_REQUIRED_EIGHT_ITEMS} timeZone={TIME_ZONE} />,
+    );
 
     const ranks = Array.from(container.querySelectorAll(".decision-card__rank")).map(
       (element) => element.textContent,

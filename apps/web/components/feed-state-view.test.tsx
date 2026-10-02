@@ -6,6 +6,8 @@ import type { DecisionFeedResponse, FeedItemResponse } from "@ninfa/contracts";
 
 import { FeedStateView } from "./feed-state-view";
 
+const TIME_ZONE = "Europe/Rome";
+
 function feed(overrides: Partial<DecisionFeedResponse>): DecisionFeedResponse {
   return {
     property_id: "prop-1",
@@ -19,6 +21,7 @@ function feed(overrides: Partial<DecisionFeedResponse>): DecisionFeedResponse {
     not_applicable_count: null,
     suppressed_count: null,
     analysis_coverage: { summary: "FULL", domains: [] },
+    input_freshness: { bookings: { status: "UNKNOWN", last_successful_import_finished_at: null } },
     items: [],
     ...overrides,
   };
@@ -37,6 +40,14 @@ const partialCoverage: DecisionFeedResponse["analysis_coverage"] = {
 const unknownCoverage: DecisionFeedResponse["analysis_coverage"] = {
   summary: "UNKNOWN",
   domains: [],
+};
+
+const knownFreshness: DecisionFeedResponse["input_freshness"] = {
+  bookings: { status: "KNOWN", last_successful_import_finished_at: "2026-09-29T07:15:00Z" },
+};
+
+const unknownFreshness: DecisionFeedResponse["input_freshness"] = {
+  bookings: { status: "UNKNOWN", last_successful_import_finished_at: null },
 };
 
 function triggeredItem(rank: number, decisionId: string): FeedItemResponse {
@@ -74,7 +85,9 @@ function renderedStates(container: HTMLElement): string[] {
 
 describe("FeedStateView", () => {
   it("renders the NOT_PROCESSED copy and never 'Tutto sotto controllo'", () => {
-    const { container } = render(<FeedStateView feed={feed({ feed_state: "NOT_PROCESSED" })} />);
+    const { container } = render(
+      <FeedStateView feed={feed({ feed_state: "NOT_PROCESSED" })} timeZone={TIME_ZONE} />,
+    );
 
     expect(screen.getByText("Analisi non ancora disponibile")).not.toBeNull();
     expect(container.textContent).not.toContain("Tutto sotto controllo");
@@ -85,6 +98,7 @@ describe("FeedStateView", () => {
     const { container } = render(
       <FeedStateView
         feed={feed({ feed_state: "DATA_QUALITY_LIMITED", insufficient_count: 2, suppressed_count: 1 })}
+        timeZone={TIME_ZONE}
       />,
     );
 
@@ -98,7 +112,9 @@ describe("FeedStateView", () => {
   });
 
   it("renders 'Tutto sotto controllo' ONLY for NO_ACTION_REQUIRED", () => {
-    const { container } = render(<FeedStateView feed={feed({ feed_state: "NO_ACTION_REQUIRED" })} />);
+    const { container } = render(
+      <FeedStateView feed={feed({ feed_state: "NO_ACTION_REQUIRED" })} timeZone={TIME_ZONE} />,
+    );
 
     expect(container.textContent).toContain("Tutto sotto controllo");
     expect(renderedStates(container)).toEqual(["NO_ACTION_REQUIRED"]);
@@ -112,6 +128,7 @@ describe("FeedStateView", () => {
           triggered_count: 1,
           items: [triggeredItem(1, "dec-1")],
         })}
+        timeZone={TIME_ZONE}
       />,
     );
 
@@ -128,7 +145,9 @@ describe("FeedStateView", () => {
       "ACTION_REQUIRED",
     ];
     for (const state of states) {
-      const { container, unmount } = render(<FeedStateView feed={feed({ feed_state: state })} />);
+      const { container, unmount } = render(
+        <FeedStateView feed={feed({ feed_state: state })} timeZone={TIME_ZONE} />,
+      );
       expect(renderedStates(container)).toEqual([state]);
       unmount();
     }
@@ -138,7 +157,7 @@ describe("FeedStateView", () => {
 
   it("FULL coverage adds no extra line", () => {
     const { container } = render(
-      <FeedStateView feed={feed({ feed_state: "NO_ACTION_REQUIRED" })} />,
+      <FeedStateView feed={feed({ feed_state: "NO_ACTION_REQUIRED" })} timeZone={TIME_ZONE} />,
     );
 
     expect(container.querySelector(".feed-state__coverage")).toBeNull();
@@ -148,6 +167,7 @@ describe("FeedStateView", () => {
     const { container } = render(
       <FeedStateView
         feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: partialCoverage })}
+        timeZone={TIME_ZONE}
       />,
     );
 
@@ -161,6 +181,7 @@ describe("FeedStateView", () => {
     const { container } = render(
       <FeedStateView
         feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: partialCoverage })}
+        timeZone={TIME_ZONE}
       />,
     );
 
@@ -176,6 +197,7 @@ describe("FeedStateView", () => {
           insufficient_count: 2,
           analysis_coverage: partialCoverage,
         })}
+        timeZone={TIME_ZONE}
       />,
     );
 
@@ -187,6 +209,7 @@ describe("FeedStateView", () => {
     const { container } = render(
       <FeedStateView
         feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: unknownCoverage })}
+        timeZone={TIME_ZONE}
       />,
     );
 
@@ -199,8 +222,129 @@ describe("FeedStateView", () => {
       render(
         <FeedStateView
           feed={feed({ feed_state: "NO_ACTION_REQUIRED", analysis_coverage: unknownCoverage })}
+          timeZone={TIME_ZONE}
         />,
       ),
     ).not.toThrow();
+  });
+
+  // --- Gate 23B: booking input freshness ---------------------------------------------------------
+
+  it("KNOWN freshness renders the factual 'Ultimo import prenotazioni' line", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NO_ACTION_REQUIRED", input_freshness: knownFreshness })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    expect(container.textContent).toContain("Ultimo import prenotazioni:");
+    expect(container.textContent).toContain("29 settembre");
+    expect(container.textContent).toContain("09:15"); // 07:15 UTC -> 09:15 Europe/Rome (CEST)
+  });
+
+  it("respects the property's own timezone, never the browser's", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NO_ACTION_REQUIRED", input_freshness: knownFreshness })}
+        timeZone="America/New_York"
+      />,
+    );
+
+    expect(container.textContent).toContain("03:15"); // 07:15 UTC -> 03:15 America/New_York
+    expect(container.textContent).not.toContain("09:15");
+  });
+
+  it("UNKNOWN freshness shows the neutral unavailable copy, never a timestamp", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NO_ACTION_REQUIRED", input_freshness: unknownFreshness })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    expect(container.textContent).toContain(
+      "Informazione sull'ultimo import prenotazioni non disponibile per questo run.",
+    );
+    expect(container.textContent).not.toContain("Ultimo import prenotazioni:");
+  });
+
+  it("never shows a CURRENT/STALE label or raw ids", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NO_ACTION_REQUIRED", input_freshness: knownFreshness })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("CURRENT");
+    expect(text).not.toContain("STALE");
+    expect(text.toLowerCase()).not.toContain("aggiornat"); // never "Prenotazioni aggiornate al ..."
+  });
+
+  it("a historical run (UNKNOWN freshness) never crashes the render", () => {
+    expect(() =>
+      render(
+        <FeedStateView
+          feed={feed({ feed_state: "NO_ACTION_REQUIRED", input_freshness: unknownFreshness })}
+          timeZone={TIME_ZONE}
+        />,
+      ),
+    ).not.toThrow();
+  });
+
+  it("coverage and freshness lines render together without confusion", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({
+          feed_state: "DATA_QUALITY_LIMITED",
+          insufficient_count: 2,
+          analysis_coverage: partialCoverage,
+          input_freshness: knownFreshness,
+        })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    expect(container.textContent).toContain("2 in attesa di dati sufficienti");
+    expect(container.textContent).toContain("Non analizzati: Costi, Personale.");
+    expect(container.textContent).toContain("Ultimo import prenotazioni:");
+    expect(container.querySelector(".feed-state__coverage")).not.toBeNull();
+    expect(container.querySelector(".feed-state__freshness")).not.toBeNull();
+  });
+
+  it("ACTION_REQUIRED / DATA_QUALITY_LIMITED / NO_ACTION_REQUIRED all preserve the freshness line", () => {
+    const states: DecisionFeedResponse["feed_state"][] = [
+      "ACTION_REQUIRED",
+      "DATA_QUALITY_LIMITED",
+      "NO_ACTION_REQUIRED",
+    ];
+    for (const state of states) {
+      const { container, unmount } = render(
+        <FeedStateView
+          feed={feed({
+            feed_state: state,
+            triggered_count: state === "ACTION_REQUIRED" ? 1 : 0,
+            items: state === "ACTION_REQUIRED" ? [triggeredItem(1, "dec-1")] : [],
+            input_freshness: knownFreshness,
+          })}
+          timeZone={TIME_ZONE}
+        />,
+      );
+      expect(container.querySelector(".feed-state__freshness")).not.toBeNull();
+      unmount();
+    }
+  });
+
+  it("NOT_PROCESSED never shows a freshness line", () => {
+    const { container } = render(
+      <FeedStateView
+        feed={feed({ feed_state: "NOT_PROCESSED", input_freshness: knownFreshness })}
+        timeZone={TIME_ZONE}
+      />,
+    );
+
+    expect(container.querySelector(".feed-state__freshness")).toBeNull();
   });
 });

@@ -45,6 +45,7 @@ describe("getDecisionFeed", () => {
       not_applicable_count: 0,
       suppressed_count: 0,
       analysis_coverage: { summary: "FULL", domains: [] },
+      input_freshness: { bookings: { status: "UNKNOWN", last_successful_import_finished_at: null } },
       items: [],
     };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(feed));

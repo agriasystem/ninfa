@@ -27,6 +27,14 @@ persists - which of REVENUE/DISTRIBUTION/COSTS/LABOR were actually attempted thi
 SAME booleans that already decide steps 5-6 below, never reconstructed afterward from the
 evaluations list (see `app/modules/decisions/coverage.py`). Revenue and OTA are unconditional in
 this CLI, so REVENUE and DISTRIBUTION are always EVALUATED.
+
+PROVENANCE (Gate 23B): this function is also the ONE place that resolves the booking
+`RunInputProvenance` a run persists - the latest SUCCEEDED `ImportJob` known, at this exact
+moment, for the EXACT `booking_data_source_id` given below (never the property's domain-wide
+latest import across every booking source it may have - see `app/modules/decisions/provenance.py`
+and `ImportJobRepository.latest_succeeded_for_data_source`). Resolved BEFORE `DecisionService
+.sync()` and frozen into the run atomically with it: a later, newer import of this same source
+can never retroactively rewrite what an already-persisted run reports.
 """
 
 import argparse
@@ -45,7 +53,9 @@ from app.modules.decisions.coverage import (
     DomainCoverageStatus,
     DomainSkipReason,
 )
+from app.modules.decisions.provenance import BookingProvenance, RunInputProvenance
 from app.modules.decisions.service import DecisionService
+from app.modules.ingestion.repository import ImportJobRepository
 from app.modules.intelligence.costs.service import CostDecisionService
 from app.modules.intelligence.distribution.service import OtaDependencyService
 from app.modules.intelligence.expected.service import BookingExpectedService
@@ -203,14 +213,45 @@ def run_analysis(
         )
     )
 
-    # 8. Rank, then persist. Every evaluation gathered above reaches BOTH calls, or the process
+    # 8. Provenance (Gate 23B): resolve the latest SUCCEEDED import known, right now, for the
+    # EXACT booking data source this run used - never the property's domain-wide latest import
+    # across every booking source it may have (see the module docstring). No successful import
+    # yet is a legitimate, non-fatal outcome: freshness stays UNKNOWN, never fabricated.
+    latest_booking_import = ImportJobRepository(session, tenant).latest_succeeded_for_data_source(
+        booking_data_source_id
+    )
+    if latest_booking_import is None:
+        provenance = RunInputProvenance(
+            bookings=BookingProvenance(
+                data_source_id=booking_data_source_id,
+                import_job_id=None,
+                last_successful_import_finished_at=None,
+            )
+        )
+    else:
+        assert latest_booking_import.finished_at is not None  # SUCCEEDED implies finished_at
+        provenance = RunInputProvenance(
+            bookings=BookingProvenance(
+                data_source_id=booking_data_source_id,
+                import_job_id=latest_booking_import.id,
+                last_successful_import_finished_at=latest_booking_import.finished_at,
+            )
+        )
+    print(
+        "  [provenance] bookings: "
+        f"data_source_id={booking_data_source_id} "
+        f"last_successful_import_finished_at="
+        f"{provenance.bookings.last_successful_import_finished_at}"
+    )
+
+    # 9. Rank, then persist. Every evaluation gathered above reaches BOTH calls, or the process
     # already crashed above and neither call happens - see the module docstring.
     context = PriorityContext(
         workspace_id=tenant.workspace_id, property_id=prop.id, as_of_local_date=as_of_local_date
     )
     ranking_result = PriorityService().rank(context, evaluations)
     sync_result = DecisionService(session, tenant).sync(
-        context, ranking_result, evaluations, coverage
+        context, ranking_result, evaluations, coverage, provenance
     )
 
     print(
