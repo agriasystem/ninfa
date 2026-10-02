@@ -8,7 +8,7 @@ returned raw: `target` is one of four explicit, decision_type-discriminated DTOs
 `serializers.py`, never a passthrough of the stored JSON.
 """
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -124,6 +124,26 @@ class AnalysisCoverageResponse(BaseModel):
     domains: list[DomainCoverageResponse]
 
 
+class BookingFreshnessResponse(BaseModel):
+    """Gate 23B: a FACT, never a judgement - `status = "KNOWN"` only states that a SUCCEEDED
+    booking import was known at analysis time, and WHEN it finished; it never claims that import
+    was "the" source of this run's numbers (canonical booking state is cumulative/upserted - see
+    `app.modules.decisions.provenance`'s own module docstring) and never implies CURRENT/STALE
+    (no freshness threshold exists in V1). Deliberately omits the internal `ImportJob`/
+    `DataSource` UUIDs - no frontend need for them exists yet."""
+
+    status: Literal["KNOWN", "UNKNOWN"]
+    last_successful_import_finished_at: datetime | None = None
+
+
+class InputFreshnessResponse(BaseModel):
+    """`bookings` is the only key in V1 (Gate 23B's own P0 scope) - no cost/labor freshness
+    exists yet. Always present and never null, exactly like `AnalysisCoverageResponse` above:
+    `UNKNOWN` covers both "no run yet" and a run that predates this gate."""
+
+    bookings: BookingFreshnessResponse
+
+
 class FeedItemResponse(BaseModel):
     decision_id: UUID
     decision_type: str
@@ -153,6 +173,7 @@ class DecisionFeedResponse(BaseModel):
     not_applicable_count: int | None
     suppressed_count: int | None
     analysis_coverage: AnalysisCoverageResponse
+    input_freshness: InputFreshnessResponse
     items: list[FeedItemResponse]
 
 
@@ -273,6 +294,7 @@ __all__ = [
     "AnalysisCoverageResponse",
     "AskRequest",
     "AskResponse",
+    "BookingFreshnessResponse",
     "CostDecisionTarget",
     "DecisionDetailResponse",
     "DecisionFeedResponse",
@@ -283,6 +305,7 @@ __all__ = [
     "DomainCoverageResponse",
     "EconomicProxy",
     "FeedItemResponse",
+    "InputFreshnessResponse",
     "LaborDecisionTarget",
     "LatestObservationSummary",
     "ObservationDetail",

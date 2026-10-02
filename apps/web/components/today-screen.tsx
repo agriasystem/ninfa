@@ -108,7 +108,7 @@ export function TodayScreen({ propertyId, timeZone, onPropertyInvalid }: TodaySc
           </button>
         </div>
       ) : state.kind === "loaded" ? (
-        <FeedStateView feed={state.feed} />
+        <FeedStateView feed={state.feed} timeZone={timeZone} />
       ) : null}
     </div>
   );

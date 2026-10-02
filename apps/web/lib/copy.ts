@@ -54,6 +54,14 @@ export const copy = {
     // docs/architecture/analysis-coverage-v1.md, "Semantica 'Tutto sotto controllo'").
     coveragePartial: (domains: string) => `Non analizzati: ${domains}.`,
     coverageUnknown: "Copertura dell'analisi non disponibile per questo run.",
+    // Gate 23B: additive to every processed state above (never NOT_PROCESSED) - a plain FACT,
+    // never a judgement. "Ultimo import prenotazioni", NEVER "Prenotazioni aggiornate al ...":
+    // ImportJob.finished_at proves when NINFA finished importing, not up to which business date
+    // the file's content was actually current (see
+    // docs/architecture/booking-freshness-provenance-v1.md).
+    freshnessKnown: (formatted: string) => `Ultimo import prenotazioni: ${formatted}.`,
+    freshnessUnknown:
+      "Informazione sull'ultimo import prenotazioni non disponibile per questo run.",
     actionRequiredHeading: "Decisioni di oggi",
     moreDecisions: (count: number) => `+ ${count} altre decisioni`,
     reliabilityLabel: "Affidabilità",

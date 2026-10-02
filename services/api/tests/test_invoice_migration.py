@@ -19,10 +19,11 @@ from tests.support import alembic_config
 GATE_4_HEAD = "0006_expected_engine"
 # Gate 6's own migration. Gate 7 added none; Gate 8 (0008_labor_ingestion) sits directly on top of
 # it, then Gate 11 (0009_decision_layer), then Gate 13 (0010_auth_session), then Gate 22
-# (0011_analysis_coverage) - the real chain head - none of them touch these tables/triggers/keys.
+# (0011_analysis_coverage), then Gate 23B (0012_input_provenance) - the real chain head - none of
+# them touch these tables/triggers/keys.
 GATE_6_HEAD = "0007_invoice_supplier_ingestion"
 GATE_8_HEAD = "0008_labor_ingestion"
-HEAD = "0011_analysis_coverage"
+HEAD = "0012_input_provenance"
 GATE_6_TABLES = {
     "suppliers",
     "supplier_identifiers",

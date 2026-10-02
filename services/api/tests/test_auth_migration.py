@@ -1,10 +1,11 @@
 """Migration 0010 on real PostgreSQL: 0009 <-> 0010, base -> head, alembic current/heads/check
 (review items 112-119).
 
-Gate 22 added `0011_analysis_coverage` on top of `0010_auth_session`: "is 0010 the global head"
-questions now belong to `test_analysis_coverage_migration.py` (which owns the real current head);
-this file keeps only what is still actually about Gate 13's own schema - that it round-trips
-cleanly and survives being reached via `base -> ... -> head` regardless of what sits on top of it.
+Gate 22 added `0011_analysis_coverage` on top of `0010_auth_session`, and Gate 23B added
+`0012_input_provenance` on top of THAT: "is 0010 the global head" questions now belong to
+`test_input_provenance_migration.py` (which owns the real current head); this file keeps only
+what is still actually about Gate 13's own schema - that it round-trips cleanly and survives
+being reached via `base -> ... -> head` regardless of what sits on top of it.
 """
 
 from collections.abc import Iterator
@@ -23,9 +24,9 @@ from tests.support import alembic_config
 
 GATE_9_HEAD = "0009_decision_layer"
 HEAD = "0010_auth_session"
-# Gate 22 added 0011_analysis_coverage on top; owned/asserted by
-# test_analysis_coverage_migration.py.
-CURRENT_GLOBAL_HEAD = "0011_analysis_coverage"
+# Gate 22 added 0011_analysis_coverage on top, then Gate 23B added 0012_input_provenance on top
+# of THAT; owned/asserted by test_input_provenance_migration.py.
+CURRENT_GLOBAL_HEAD = "0012_input_provenance"
 GATE_13_TABLES = {"user_credentials", "auth_sessions"}
 
 
@@ -82,7 +83,7 @@ def test_0009_to_0010_to_0009_to_0010_recreates_an_identical_schema(
     assert columns_of(db_engine) == before
 
     command.downgrade(config, GATE_9_HEAD)
-    command.upgrade(config, "head")  # back to the real current head (0011, post Gate 22)
+    command.upgrade(config, "head")  # back to the real current head (0012, post Gate 23B)
     assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert columns_of(db_engine) == before
 
@@ -104,8 +105,8 @@ def test_a_fresh_database_goes_from_base_to_head(
 # --- 116-118: alembic current / heads / check -----------------------------------------------------
 #
 # "alembic current is the one true head" / "exactly one head" are now owned by
-# test_analysis_coverage_migration.py, which asserts them against the real current head
-# (0011_analysis_coverage); duplicating them here under a stale name would only reassert a fact
+# test_input_provenance_migration.py, which asserts them against the real current head
+# (0012_input_provenance); duplicating them here under a stale name would only reassert a fact
 # about the global chain, not about Gate 13's own schema. The "no pending model changes" check
 # below stays here too (and in every later gate's own file): it is driven by the REAL head via
 # `at_head`, so it is never stale, whichever revision that head happens to be.

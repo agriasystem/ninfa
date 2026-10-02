@@ -4,12 +4,13 @@
 Metadata/migration agreement and constraint-name parity for the Gate 11 tables are asserted by
 `test_data_model_migration.py` (its table sets include them).
 
-Gate 13 added `0010_auth_session` on top of `0009_decision_layer`, and Gate 22 added
+Gate 13 added `0010_auth_session` on top of `0009_decision_layer`, Gate 22 added
 `0011_analysis_coverage` on top of THAT (widening `decision_runs` itself with one nullable
-column): "IS 0009 the global head" questions now belong to `test_analysis_coverage_migration.py`
-(which owns the real current head); this file keeps only what is still actually about GATE 11's
-own schema - that it round-trips cleanly and survives being reached via `base -> ... -> head`
-regardless of what sits on top of it.
+column), and Gate 23B added `0012_input_provenance` on top of THAT (widening `decision_runs`
+again, with one more): "IS 0009 the global head" questions now belong to
+`test_input_provenance_migration.py` (which owns the real current head); this file keeps only
+what is still actually about GATE 11's own schema - that it round-trips cleanly and survives
+being reached via `base -> ... -> head` regardless of what sits on top of it.
 """
 
 from collections.abc import Iterator
@@ -28,9 +29,9 @@ from tests.support import alembic_config
 
 GATE_8_HEAD = "0008_labor_ingestion"
 GATE_11_REVISION = "0009_decision_layer"
-# Gate 22 added 0011_analysis_coverage on top (via 0010_auth_session); owned/asserted by
-# test_analysis_coverage_migration.py.
-CURRENT_GLOBAL_HEAD = "0011_analysis_coverage"
+# Gate 22 added 0011_analysis_coverage on top (via 0010_auth_session), then Gate 23B added
+# 0012_input_provenance on top of THAT; owned/asserted by test_input_provenance_migration.py.
+CURRENT_GLOBAL_HEAD = "0012_input_provenance"
 GATE_11_TABLES = {"decision_runs", "decisions", "decision_observations"}
 FUNCTION = "decisions_forbid_update"
 TRIGGERS = {"trg_decision_runs_immutable", "trg_decision_observations_immutable"}
@@ -124,7 +125,7 @@ def test_0008_to_0009_to_0008_to_0009_recreates_an_identical_schema(
     command.upgrade(config, GATE_11_REVISION)
     assert columns_of(db_engine) == before
 
-    command.upgrade(config, "head")  # forward again to the real current head (post Gate 22)
+    command.upgrade(config, "head")  # forward again to the real current head (post Gate 23B)
     assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert function_exists(db_engine)
     assert triggers_of(db_engine) == TRIGGERS

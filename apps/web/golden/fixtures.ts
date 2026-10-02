@@ -33,6 +33,7 @@ function baseFeed(overrides: Partial<DecisionFeedResponse>): DecisionFeedRespons
     not_applicable_count: null,
     suppressed_count: null,
     analysis_coverage: { summary: "FULL", domains: [] },
+    input_freshness: { bookings: { status: "UNKNOWN", last_successful_import_finished_at: null } },
     items: [],
     ...overrides,
   };

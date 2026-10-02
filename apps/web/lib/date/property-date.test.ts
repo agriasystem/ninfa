@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPropertyLocalDateItalian, propertyLocalDate } from "./property-date";
+import {
+  formatPropertyLocalDateItalian,
+  formatPropertyLocalDateTimeItalian,
+  propertyLocalDate,
+} from "./property-date";
 
 describe("propertyLocalDate", () => {
   it("uses the property's own timezone, not UTC", () => {
@@ -59,5 +63,33 @@ describe("formatPropertyLocalDateItalian", () => {
     const now = new Date("2026-01-15T23:30:00Z");
     expect(formatPropertyLocalDateItalian(now, "Europe/Rome")).toContain("16");
     expect(formatPropertyLocalDateItalian(now, "Europe/Rome")).not.toContain("15");
+  });
+});
+
+describe("formatPropertyLocalDateTimeItalian", () => {
+  it("formats the day, month and time in Italian prose, no year", () => {
+    // 07:15 UTC is 09:15 in Europe/Rome (CEST, UTC+2 in September).
+    const instant = new Date("2026-09-29T07:15:00Z");
+    const formatted = formatPropertyLocalDateTimeItalian(instant, "Europe/Rome");
+    expect(formatted).toContain("29");
+    expect(formatted).toContain("settembre");
+    expect(formatted).toContain("09:15");
+    expect(formatted).not.toContain("2026"); // no year, like formatPropertyLocalDateItalian
+  });
+
+  it("uses the property's own timezone, not UTC and not the browser's", () => {
+    const instant = new Date("2026-09-29T07:15:00Z");
+    expect(formatPropertyLocalDateTimeItalian(instant, "Europe/Rome")).toContain("09:15");
+    expect(formatPropertyLocalDateTimeItalian(instant, "America/New_York")).toContain("03:15");
+  });
+
+  it("applies the real DST offset of the day, not a fixed UTC offset", () => {
+    // Winter CET (+1): 08:15 UTC -> 09:15. Summer CEST (+2): 07:15 UTC -> 09:15.
+    expect(formatPropertyLocalDateTimeItalian(new Date("2026-01-15T08:15:00Z"), "Europe/Rome")).toContain(
+      "09:15",
+    );
+    expect(formatPropertyLocalDateTimeItalian(new Date("2026-07-15T07:15:00Z"), "Europe/Rome")).toContain(
+      "09:15",
+    );
   });
 });

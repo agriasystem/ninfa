@@ -28,6 +28,7 @@ from uuid import UUID, uuid4
 
 from app.core.tenant import TenantContext
 from app.modules.decisions.coverage import AnalysisCoverage
+from app.modules.decisions.provenance import RunInputProvenance
 from app.modules.decisions.service import DecisionService
 from app.modules.decisions.types import DecisionSyncResult
 from app.modules.intelligence.costs.types import (
@@ -600,12 +601,15 @@ def sync_run(
     context: PriorityContext,
     evaluations: Sequence[Evaluation],
     coverage: AnalysisCoverage | None = None,
+    provenance: RunInputProvenance | None = None,
 ) -> RunOutcome:
     """Build the matching ranking and call `DecisionService.sync()`: one line per "day" for the
-    focused lifecycle tests. `coverage` (Gate 22) defaults to `None`, exactly like `sync()`
-    itself - every existing call site is unaffected."""
+    focused lifecycle tests. `coverage` (Gate 22) and `provenance` (Gate 23B) both default to
+    `None`, exactly like `sync()` itself - every existing call site is unaffected."""
     ranking = ranking_result_for(context, evaluations)
-    result = DecisionService(session, tenant).sync(context, ranking, evaluations, coverage)
+    result = DecisionService(session, tenant).sync(
+        context, ranking, evaluations, coverage, provenance
+    )
     return RunOutcome(result, ranking)
 
 

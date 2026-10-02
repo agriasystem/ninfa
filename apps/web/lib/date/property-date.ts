@@ -7,6 +7,7 @@
 
 const partsFormatterCache = new Map<string, Intl.DateTimeFormat>();
 const italianLongDateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const italianLongDateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
 
 function partsFormatterFor(timeZone: string): Intl.DateTimeFormat {
   let formatter = partsFormatterCache.get(timeZone);
@@ -56,4 +57,26 @@ export function propertyLocalDate(now: Date, timeZone: string): string {
 export function formatPropertyLocalDateItalian(now: Date, timeZone: string): string {
   const formatted = italianLongDateFormatterFor(timeZone).format(now);
   return formatted.length === 0 ? formatted : formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+function italianLongDateTimeFormatterFor(timeZone: string): Intl.DateTimeFormat {
+  let formatter = italianLongDateTimeFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("it-IT", {
+      timeZone,
+      day: "numeric",
+      month: "long",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    italianLongDateTimeFormatterCache.set(timeZone, formatter);
+  }
+  return formatter;
+}
+
+/** An INSTANT (e.g. `ImportJob.finished_at` - Gate 23B), as Italian prose IN the property's own
+ * timezone ("29 settembre, 09:15") - never the browser's own timezone. Display only - never
+ * parsed back, never compared. */
+export function formatPropertyLocalDateTimeItalian(instant: Date, timeZone: string): string {
+  return italianLongDateTimeFormatterFor(timeZone).format(instant);
 }

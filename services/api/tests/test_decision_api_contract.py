@@ -9,11 +9,13 @@ pagination shape are checked directly against `openapi.json`'s own generated sch
 from pydantic import BaseModel
 
 from app.api.v1.decisions.schemas import (
+    BookingFreshnessResponse,
     DecisionDetailResponse,
     DecisionFeedResponse,
     DecisionHistoryResponse,
     DecisionListResponse,
     FeedItemResponse,
+    InputFreshnessResponse,
     RecommendationResponse,
     RecommendedActionResponse,
 )
@@ -36,6 +38,7 @@ def test_feed_response_contract() -> None:
         "not_applicable_count",
         "suppressed_count",
         "analysis_coverage",
+        "input_freshness",  # Gate 23B, additive
         "items",
     }
     assert _fields(FeedItemResponse) == {
@@ -54,6 +57,14 @@ def test_feed_response_contract() -> None:
         "economic_proxy",
         "source_status",
     }
+
+
+def test_input_freshness_response_contract() -> None:
+    """Gate 23B: the additive `input_freshness` field's own shape - deliberately omits the
+    internal `ImportJob`/`DataSource` UUIDs the persisted provenance carries (see
+    `freshness_response_of()`'s own docstring)."""
+    assert _fields(InputFreshnessResponse) == {"bookings"}
+    assert _fields(BookingFreshnessResponse) == {"status", "last_successful_import_finished_at"}
 
 
 def test_list_response_contract() -> None:

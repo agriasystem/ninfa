@@ -203,6 +203,25 @@ export interface AnalysisCoverage {
   domains: DomainCoverage[];
 }
 
+/** Gate 23B: a FACT, never a judgement - `"KNOWN"` only states that a SUCCEEDED booking import
+ * was known at analysis time, and WHEN it finished; it never claims that import was "the" source
+ * of this run's numbers (canonical booking state is cumulative/upserted) and never implies
+ * CURRENT/STALE (no freshness threshold exists in V1). Deliberately omits the internal
+ * `ImportJob`/`DataSource` UUIDs - no frontend need for them exists yet. */
+export type BookingFreshnessStatus = "KNOWN" | "UNKNOWN";
+
+export interface BookingFreshness {
+  status: BookingFreshnessStatus;
+  /** ISO 8601 datetime, timezone-aware. Present only when `status === "KNOWN"`. */
+  last_successful_import_finished_at: string | null;
+}
+
+/** `bookings` is the only key in V1 (Gate 23B's own P0 scope) - no cost/labor freshness exists
+ * yet. Always present and never null, exactly like `AnalysisCoverage` above. */
+export interface InputFreshness {
+  bookings: BookingFreshness;
+}
+
 /** GET /api/v1/properties/{property_id}/decision-feed?as_of=YYYY-MM-DD.
  *
  * `items` already carries EVERY triggered candidate, ordered `priority_rank ASC` - a client only
@@ -219,6 +238,7 @@ export interface DecisionFeedResponse {
   not_applicable_count: number | null;
   suppressed_count: number | null;
   analysis_coverage: AnalysisCoverage;
+  input_freshness: InputFreshness;
   items: FeedItemResponse[];
 }
 

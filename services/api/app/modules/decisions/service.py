@@ -32,6 +32,7 @@ from app.modules.decisions.identity import (
 )
 from app.modules.decisions.lifecycle import apply_lifecycle
 from app.modules.decisions.models import Decision
+from app.modules.decisions.provenance import RunInputProvenance
 from app.modules.decisions.repository import DecisionRepository
 from app.modules.decisions.serialization import reason_codes_of, serialize_facts
 from app.modules.decisions.types import (
@@ -88,13 +89,19 @@ class DecisionService:
         ranking_result: PriorityRankingResult,
         evaluations: Iterable[SourceEvaluation],
         coverage: AnalysisCoverage | None = None,
+        provenance: RunInputProvenance | None = None,
     ) -> DecisionSyncResult:
         """`coverage` (Gate 22) is optional so every caller that predates it - the whole existing
         test suite included - is unaffected: omitted, a run's `analysis_coverage` persists as
         NULL ("not recorded"), exactly like every run synced before this gate existed. The one
-        production caller that matters, `app/cli/analysis.py`, always supplies a real one."""
+        production caller that matters, `app/cli/analysis.py`, always supplies a real one.
+
+        `provenance` (Gate 23B) is optional for the exact same reason: omitted, a run's
+        `input_provenance` persists as NULL ("freshness not recorded"), exactly like every run
+        synced before this gate existed - including every Gate-22-aware caller that predates it.
+        """
         try:
-            return self._sync(context, ranking_result, list(evaluations), coverage)
+            return self._sync(context, ranking_result, list(evaluations), coverage, provenance)
         except Exception:
             self._session.rollback()
             raise
@@ -107,6 +114,7 @@ class DecisionService:
         ranking_result: PriorityRankingResult,
         evaluations: list[SourceEvaluation],
         coverage: AnalysisCoverage | None,
+        provenance: RunInputProvenance | None,
     ) -> DecisionSyncResult:
         if context.workspace_id != self._tenant.workspace_id:
             raise DecisionError(
@@ -137,6 +145,7 @@ class DecisionService:
             suppressed_count=counts[SourceStatus.SUPPRESSED_LOW_CONFIDENCE],
             duplicate_input_count=duplicate_input_count,
             coverage=coverage,
+            provenance=provenance,
         )
 
         lock_decision_layer(self._session, context.workspace_id, context.property_id)
@@ -198,6 +207,7 @@ class DecisionService:
                 "suppressed_count": counts[SourceStatus.SUPPRESSED_LOW_CONFIDENCE],
                 "duplicate_input_count": duplicate_input_count,
                 "analysis_coverage": None if coverage is None else coverage.to_json(),
+                "input_provenance": None if provenance is None else provenance.to_json(),
             }
         )
 
