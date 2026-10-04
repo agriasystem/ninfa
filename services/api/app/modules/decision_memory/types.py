@@ -5,7 +5,7 @@ schemas and never the other way around.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -32,6 +32,24 @@ class FeedState(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class LastSuccessfulAnalysis:
+    """Gate 24B: the one fact needed to distinguish `NOT_PROCESSED`'s two real meanings - "this
+    property has never been analysed" vs. "not analysed today, but a previous run exists" -
+    without inventing a cause for today's own absence (no "failed" state exists to report; a
+    failed run is never persisted at all, so it is indistinguishable from "not yet run").
+
+    Deliberately narrower than `DecisionRun` itself: no id, no `run_sequence`, no fingerprint, no
+    counts - only what Oggi's copy actually needs. `as_of_local_date` is the BUSINESS date the
+    run represents; `completed_at` (`DecisionRun.created_at`) is the instant NINFA actually
+    finished/persisted it - two different facts, kept separate on purpose (see
+    `DecisionRepository.latest_run_overall`'s own docstring for why they are not assumed to move
+    together)."""
+
+    as_of_local_date: date
+    completed_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class FeedItem:
     """One TRIGGERED Observation of the feed's selected run, paired with its Decision's current
     lifecycle row (identity, first_seen/last_seen, episode_count - the feed never duplicates these
@@ -46,13 +64,17 @@ class FeedResult:
     """The typed, immutable outcome of `DecisionMemoryService.get_feed()`. `run` is `None` only
     when `state is FeedState.NOT_PROCESSED`; `items` is non-empty only when `state is
     FeedState.ACTION_REQUIRED` (every other state has nothing to act on, by construction - see
-    `FeedState`'s own docstring)."""
+    `FeedState`'s own docstring). `last_successful_analysis` (Gate 24B) is populated ONLY when
+    `state is FeedState.NOT_PROCESSED` AND a prior run exists for this property on some OTHER
+    as-of date - every other state (and a property with no run at all) leaves it `None`, since
+    its one product purpose is qualifying `NOT_PROCESSED` itself."""
 
     property_id: UUID
     as_of_local_date: date
     state: FeedState
     run: DecisionRun | None
     items: tuple[FeedItem, ...] = ()
+    last_successful_analysis: LastSuccessfulAnalysis | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,4 +114,5 @@ __all__ = [
     "FeedState",
     "HistoryObservation",
     "HistoryPage",
+    "LastSuccessfulAnalysis",
 ]

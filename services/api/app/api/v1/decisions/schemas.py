@@ -144,6 +144,20 @@ class InputFreshnessResponse(BaseModel):
     bookings: BookingFreshnessResponse
 
 
+class LastSuccessfulAnalysisResponse(BaseModel):
+    """Gate 24B: populated ONLY when `feed_state == "NOT_PROCESSED"` and a prior run exists for
+    this property on some OTHER as-of date - `null` for every processed feed state and `null`
+    when the property has never been analysed at all (never inferred, never fabricated).
+    `as_of_local_date` is the BUSINESS date that run represents; `completed_at` is when NINFA
+    actually finished/persisted it (`DecisionRun.created_at`) - two distinct facts, kept
+    separate on purpose (see `app.modules.decision_memory.types.LastSuccessfulAnalysis`'s own
+    docstring). Deliberately omits the run's id and `run_sequence` - no frontend need for them
+    exists, exactly like `AnalysisCoverageResponse`/`InputFreshnessResponse` above."""
+
+    as_of_local_date: date
+    completed_at: datetime
+
+
 class FeedItemResponse(BaseModel):
     decision_id: UUID
     decision_type: str
@@ -174,6 +188,7 @@ class DecisionFeedResponse(BaseModel):
     suppressed_count: int | None
     analysis_coverage: AnalysisCoverageResponse
     input_freshness: InputFreshnessResponse
+    last_successful_analysis: LastSuccessfulAnalysisResponse | None
     items: list[FeedItemResponse]
 
 
@@ -307,6 +322,7 @@ __all__ = [
     "FeedItemResponse",
     "InputFreshnessResponse",
     "LaborDecisionTarget",
+    "LastSuccessfulAnalysisResponse",
     "LatestObservationSummary",
     "ObservationDetail",
     "OtaDecisionTarget",

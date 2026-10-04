@@ -80,3 +80,42 @@ function italianLongDateTimeFormatterFor(timeZone: string): Intl.DateTimeFormat 
 export function formatPropertyLocalDateTimeItalian(instant: Date, timeZone: string): string {
   return italianLongDateTimeFormatterFor(timeZone).format(instant);
 }
+
+const ITALIAN_MONTHS = [
+  "gennaio",
+  "febbraio",
+  "marzo",
+  "aprile",
+  "maggio",
+  "giugno",
+  "luglio",
+  "agosto",
+  "settembre",
+  "ottobre",
+  "novembre",
+  "dicembre",
+];
+
+/** A bare BUSINESS date (`YYYY-MM-DD`, e.g. `DecisionRun.as_of_local_date` - Gate 24B's
+ * `last_successful_analysis.as_of_local_date`), as Italian prose ("1 ottobre") - no year, no
+ * weekday.
+ *
+ * Deliberately takes NO `timeZone` parameter and never constructs a `Date` from `isoDate` at
+ * all: `new Date("2026-10-01")` parses a date-only ISO string as UTC MIDNIGHT, and reading it
+ * back in a negative-UTC-offset runtime (e.g. `America/...`) prints the PREVIOUS calendar day -
+ * exactly the class of bug this function exists to avoid. A bare business date already IS the
+ * day in question; it has no instant and no timezone to convert, so this parses the three
+ * digit groups directly out of the string and never touches `Date`/`Intl.DateTimeFormat` at
+ * all. */
+export function formatBusinessDateItalian(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) {
+    throw new Error(`Invalid business date: "${isoDate}"`);
+  }
+  const [, , monthStr, dayStr] = match;
+  const monthName = ITALIAN_MONTHS[Number(monthStr) - 1];
+  if (monthName === undefined) {
+    throw new Error(`Invalid business date: "${isoDate}"`);
+  }
+  return `${Number(dayStr)} ${monthName}`;
+}

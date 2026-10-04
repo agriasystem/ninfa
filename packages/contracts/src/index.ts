@@ -222,6 +222,21 @@ export interface InputFreshness {
   bookings: BookingFreshness;
 }
 
+/** Gate 24B: populated ONLY when `feed_state === "NOT_PROCESSED"` AND a prior run exists for
+ * this property on some OTHER as-of date - `null` for every processed feed state and `null`
+ * when the property has never been analysed at all (never inferred, never fabricated - a client
+ * must not treat `null` as "never analysed" by itself, since a processed feed is also `null`).
+ * `as_of_local_date` is the BUSINESS date that run represents (use this for "L'ultima analisi
+ * completata risale al ..." copy - never `completed_at` for that sentence);  `completed_at` is
+ * when NINFA actually finished/persisted it - two distinct facts, kept separate on purpose. No
+ * run id, no `run_sequence` - no frontend need for them exists. */
+export interface LastSuccessfulAnalysis {
+  /** ISO date (YYYY-MM-DD). */
+  as_of_local_date: string;
+  /** ISO 8601 datetime, timezone-aware. */
+  completed_at: string;
+}
+
 /** GET /api/v1/properties/{property_id}/decision-feed?as_of=YYYY-MM-DD.
  *
  * `items` already carries EVERY triggered candidate, ordered `priority_rank ASC` - a client only
@@ -239,6 +254,7 @@ export interface DecisionFeedResponse {
   suppressed_count: number | null;
   analysis_coverage: AnalysisCoverage;
   input_freshness: InputFreshness;
+  last_successful_analysis: LastSuccessfulAnalysis | null;
   items: FeedItemResponse[];
 }
 
