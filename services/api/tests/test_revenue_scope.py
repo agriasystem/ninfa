@@ -23,7 +23,7 @@ from app.modules.intelligence.revenue.types import (
     ReasonCode,
     RevenueDecisionType,
 )
-from tests.support import alembic_config
+from tests.support import alembic_config, engine_free_worker_files
 
 PACKAGE_DIR = Path(revenue_package.__file__).parent
 APP_DIR = Path(app_root.__file__).parent
@@ -294,10 +294,11 @@ def test_the_only_public_endpoint_is_still_the_health_check(client: TestClient) 
 def test_no_worker_task_and_no_scheduler_was_added() -> None:
     for word in ("revenue", "pickup", "occupancy", "decision"):
         assert not any(
-            word in path.read_text(encoding="utf-8").lower() for path in WORKER_DIR.glob("*.py")
+            word in path.read_text(encoding="utf-8").lower()
+            for path in engine_free_worker_files(WORKER_DIR)
         ), word
     tasks = (WORKER_DIR / "tasks.py").read_text(encoding="utf-8")
-    assert tasks.count("@app.task") == 1  # still only the Gate 0 heartbeat
+    assert tasks.count("@app.task") == 2  # the Gate 0 heartbeat + Gate 25B analysis
 
 
 def test_only_the_standard_library_sqlalchemy_and_the_app_are_imported() -> None:
