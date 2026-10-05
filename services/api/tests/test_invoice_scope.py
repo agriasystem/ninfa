@@ -18,10 +18,12 @@ import app as app_root
 import app.modules.invoices as invoices_package
 import app.modules.suppliers as suppliers_package
 from app.db.base import Base
+from tests.support import engine_free_worker_files
 
 INVOICES_DIR = Path(invoices_package.__file__).parent
 SUPPLIERS_DIR = Path(suppliers_package.__file__).parent
 APP_DIR = Path(app_root.__file__).parent
+
 WORKER_DIR = Path(__file__).resolve().parents[2] / "worker" / "worker"
 ROOT = Path(__file__).resolve().parents[3]
 PYPROJECTS = [
@@ -312,10 +314,11 @@ def test_no_router_or_endpoint_was_added_by_the_gate_6_modules() -> None:
 def test_no_worker_task_and_no_scheduler_was_added() -> None:
     for word in ("invoice", "supplier", "fattura", "cost"):
         assert not any(
-            word in path.read_text(encoding="utf-8").lower() for path in WORKER_DIR.glob("*.py")
+            word in path.read_text(encoding="utf-8").lower()
+            for path in engine_free_worker_files(WORKER_DIR)
         ), word
     tasks = (WORKER_DIR / "tasks.py").read_text(encoding="utf-8")
-    assert tasks.count("@app.task") == 1  # still only the Gate 0 heartbeat
+    assert tasks.count("@app.task") == 2  # the Gate 0 heartbeat + Gate 25B analysis
 
 
 def test_only_the_standard_library_sqlalchemy_pydantic_and_the_app_are_imported() -> None:

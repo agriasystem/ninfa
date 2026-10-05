@@ -6,39 +6,16 @@ property - closing the Gate 21A P0 finding that this composition existed nowhere
         --booking-data-source-id <uuid> --stay-date-start 2026-09-29 --stay-date-end 2026-10-29 \
         [--labor-data-source-id <uuid>] [--cost-year 2026 --cost-month 8] [--currency EUR]
 
-ORCHESTRATION ONLY: every number here is computed by the existing engines
-(`ObservedSnapshotService`, `BookingExpectedService`, `RevenueDecisionService`,
-`OtaDependencyService`, `CostDecisionService`, `LaborDecisionService`, `PriorityService`,
-`DecisionService`) exactly as the test suite already exercises them - this module recalculates
-nothing and adds no business rule of its own.
-
-The snapshot day is ALWAYS the real clock's "today" in the property's own time zone
-(`ObservedSnapshotService.take_snapshot` reads the injected real clock, never an operator-passed
-date - see `snapshots/common.py`): there is no way to fabricate a past business date through this
-CLI, on purpose.
-
-FAIL LOUD, NEVER A FALSE ALL-CLEAR (the Gate 21A finding this closes): every detector evaluation
-below runs OUTSIDE any try/except that could swallow it. If a detector call raises, this command
-lets the exception propagate, prints nothing further and exits non-zero - `DecisionService.sync()`
-is NEVER reached. A run either evaluates everything it attempted, or it persists nothing at all.
-
-COVERAGE (Gate 22): this function is also the ONE place that builds the `AnalysisCoverage` a run
-persists - which of REVENUE/DISTRIBUTION/COSTS/LABOR were actually attempted this run, from the
-SAME booleans that already decide steps 5-6 below, never reconstructed afterward from the
-evaluations list (see `app/modules/decisions/coverage.py`). Revenue and OTA are unconditional in
-this CLI, so REVENUE and DISTRIBUTION are always EVALUATED.
-
-PROVENANCE (Gate 23B): this function is also the ONE place that resolves the booking
-`RunInputProvenance` a run persists - the latest SUCCEEDED `ImportJob` known, at this exact
-moment, for the EXACT `booking_data_source_id` given below (never the property's domain-wide
-latest import across every booking source it may have - see `app/modules/decisions/provenance.py`
-and `ImportJobRepository.latest_succeeded_for_data_source`). Resolved BEFORE `DecisionService
-.sync()` and frozen into the run atomically with it: a later, newer import of this same source
-can never retroactively rewrite what an already-persisted run reports.
+THIN ADAPTER (Gate 25B): the orchestration itself lives in `app/modules/analysis`
+(`run_property_analysis`), shared verbatim with the worker task `analysis.run_property`.
+This module only parses arguments, resolves slugs to ids, calls it and prints the result. Engines,
+snapshot-day rule (the real clock's "today" in the property's own time zone, never operator-passed),
+fail-loud behaviour (a detector exception propagates, nothing is persisted), coverage (Gate 22) and
+provenance (Gate 23B) are all documented there. An inconsistent --cost-year/--cost-month pair is
+rejected by that shared function and surfaces here as the usual `Error: ...` line and exit 1.
 """
 
 import argparse
-import sys
 from datetime import date
 from uuid import UUID
 
@@ -46,31 +23,66 @@ from sqlalchemy.orm import Session
 
 from app.cli._support import resolve_tenant_and_property, run_cli
 from app.db.session import get_sessionmaker
-from app.modules.decisions.coverage import (
-    AnalysisCoverage,
-    AnalysisDomain,
-    DomainCoverage,
-    DomainCoverageStatus,
-    DomainSkipReason,
-)
-from app.modules.decisions.provenance import BookingProvenance, RunInputProvenance
-from app.modules.decisions.service import DecisionService
-from app.modules.ingestion.repository import ImportJobRepository
-from app.modules.intelligence.costs.service import CostDecisionService
-from app.modules.intelligence.distribution.service import OtaDependencyService
-from app.modules.intelligence.expected.service import BookingExpectedService
-from app.modules.intelligence.labor.service import LaborDecisionService
-from app.modules.intelligence.priority.service import PriorityService, SourceEvaluation
-from app.modules.intelligence.priority.types import PriorityContext
-from app.modules.intelligence.revenue.service import RevenueDecisionService
+from app.modules.analysis import AnalysisRunRequest, AnalysisRunResult, run_property_analysis
+from app.modules.decisions.coverage import AnalysisCoverage, DomainCoverageStatus
 from app.modules.labor.roles import LaborCategory
-from app.modules.snapshots.models import SnapshotOrigin
-from app.modules.snapshots.observed import ObservedSnapshotService
-from app.modules.snapshots.repository import BookingSnapshotRepository
 
 
 def _skipped_domain_names(coverage: AnalysisCoverage) -> list[str]:
     return [d.domain.value for d in coverage.domains if d.status is DomainCoverageStatus.SKIPPED]
+
+
+def _print_result(
+    result: AnalysisRunResult, *, cost_year: int | None, cost_month: int | None
+) -> None:
+    """The existing operator output, rendered from the shared typed result."""
+    print(
+        f"  [1/6] observed snapshots: snapshot_local_date={result.as_of_local_date.isoformat()} "
+        f"created={result.snapshots_created} unchanged={result.snapshots_unchanged}"
+    )
+    print(
+        f"  [2/6] expected baselines: created={result.expected_created} "
+        f"unchanged={result.expected_unchanged} ready={result.expected_ready} "
+        f"insufficient={result.expected_insufficient}"
+    )
+    print(f"  [3/6] revenue signals: targets={result.revenue_target_count}")
+    print(f"  [4/6] ota dependency: status={result.ota_status}")
+    if result.cost_category_count is not None:
+        print(
+            f"  [5/6] cost cpor anomaly: year={cost_year} month={cost_month} "
+            f"currency={result.cost_currency} categories={result.cost_category_count}"
+        )
+    else:
+        print("  [5/6] cost cpor anomaly: skipped (no --cost-year/--cost-month given)")
+    if result.labor_evaluation_count is not None:
+        print(
+            f"  [6/6] labor overstaffing: targets={result.labor_target_count} "
+            f"categories={len(LaborCategory)} evaluations={result.labor_evaluation_count}"
+        )
+    else:
+        print("  [6/6] labor overstaffing: skipped (no --labor-data-source-id given)")
+    print(
+        "  [provenance] bookings: "
+        f"data_source_id={result.provenance.bookings.data_source_id} "
+        f"last_successful_import_finished_at="
+        f"{result.provenance.bookings.last_successful_import_finished_at}"
+    )
+    print(
+        f"Analysis complete: as_of_local_date={result.as_of_local_date.isoformat()} "
+        f"evaluations={result.evaluation_count} triggered={result.triggered_count} "
+        f"clear={result.clear_count} "
+        f"insufficient_data={result.insufficient_count} "
+        f"not_applicable={result.not_applicable_count} "
+        f"suppressed={result.suppressed_count} "
+        f"decision_run_id={result.decision_run_id} "
+        f"is_idempotent_replay={result.is_idempotent_replay} "
+        f"decisions_created={result.decisions_created} "
+        f"decisions_resolved={result.decisions_resolved} "
+        f"decisions_reopened={result.decisions_reopened} "
+        f"open_decisions_after_sync={result.open_decisions_after_sync} "
+        f"coverage={result.coverage.summary.value} "
+        f"skipped_domains={_skipped_domain_names(result.coverage)}"
+    )
 
 
 def run_analysis(
@@ -86,190 +98,24 @@ def run_analysis(
     cost_month: int | None,
     currency: str | None,
 ) -> int:
-    if (cost_year is None) != (cost_month is None):
-        print("Error: --cost-year and --cost-month must be given together", file=sys.stderr)
-        return 1
-
     tenant, prop = resolve_tenant_and_property(session, workspace_slug, property_slug)
     print(f"Analysis run: workspace={workspace_slug} property={property_slug}")
 
-    # 1. Materialize today's OBSERVED booking snapshots - the ONLY step below that writes
-    # anything before the final sync(). The snapshot day is the real clock's "today" in the
-    # property's own time zone: never an operator-supplied date (see the module docstring).
-    snapshot_result = ObservedSnapshotService(session, tenant).take_snapshot(
-        property_id=prop.id,
-        data_source_id=booking_data_source_id,
-        stay_date_start=stay_date_start,
-        stay_date_end=stay_date_end,
-    )
-    as_of_local_date = snapshot_result.snapshot_date_first
-    print(
-        f"  [1/6] observed snapshots: snapshot_local_date={as_of_local_date.isoformat()} "
-        f"created={snapshot_result.created} unchanged={snapshot_result.unchanged}"
-    )
-
-    # 2. Expected baselines for those same targets.
-    expected_result = BookingExpectedService(session, tenant).calculate_for_snapshot_date(
-        property_id=prop.id,
-        data_source_id=booking_data_source_id,
-        snapshot_local_date=as_of_local_date,
-        stay_date_start=stay_date_start,
-        stay_date_end=stay_date_end,
-    )
-    print(
-        f"  [2/6] expected baselines: created={expected_result.created} "
-        f"unchanged={expected_result.unchanged} ready={expected_result.ready} "
-        f"insufficient={expected_result.insufficient}"
-    )
-
-    evaluations: list[SourceEvaluation] = []
-
-    # 3. Revenue: REV_PICKUP_LOW + REV_OCCUPANCY_RISK for every OBSERVED target in the window.
-    signals = RevenueDecisionService(session, tenant).evaluate_snapshot_date(
-        property_id=prop.id,
-        data_source_id=booking_data_source_id,
-        snapshot_local_date=as_of_local_date,
-        stay_date_start=stay_date_start,
-        stay_date_end=stay_date_end,
-    )
-    for signal in signals:
-        evaluations.append(signal.pickup_low)
-        evaluations.append(signal.occupancy_risk)
-    print(f"  [3/6] revenue signals: targets={len(signals)}")
-
-    # 4. OTA: property-wide, one evaluation.
-    ota_evaluation = OtaDependencyService(session, tenant).evaluate(
-        property_id=prop.id,
-        booking_data_source_id=booking_data_source_id,
-        as_of_local_date=as_of_local_date,
-    )
-    evaluations.append(ota_evaluation)
-    print(f"  [4/6] ota dependency: status={ota_evaluation.status.value}")
-
-    # 5. Cost: only when the operator gave an explicit target month - never a hidden default.
-    if cost_year is not None and cost_month is not None:
-        cost_currency = currency or prop.currency
-        cost_evaluations = CostDecisionService(session, tenant).evaluate_month(
+    result = run_property_analysis(
+        session,
+        AnalysisRunRequest(
+            workspace_id=tenant.workspace_id,
             property_id=prop.id,
             booking_data_source_id=booking_data_source_id,
-            year=cost_year,
-            month=cost_month,
-            currency=cost_currency,
-        )
-        evaluations.extend(cost_evaluations)
-        print(
-            f"  [5/6] cost cpor anomaly: year={cost_year} month={cost_month} "
-            f"currency={cost_currency} categories={len(cost_evaluations)}"
-        )
-    else:
-        print("  [5/6] cost cpor anomaly: skipped (no --cost-year/--cost-month given)")
-
-    # 6. Labor: only when the operator gave an explicit labor data source - one evaluation per
-    # OBSERVED target snapshot and labor category, reusing the same targets as step 3.
-    if labor_data_source_id is not None:
-        target_snapshots = BookingSnapshotRepository(session, tenant).list_for_snapshot_date(
-            booking_data_source_id,
-            as_of_local_date,
-            stay_date_from=stay_date_start,
-            stay_date_to=stay_date_end,
-            origin=SnapshotOrigin.OBSERVED,
-        )
-        labor_service = LaborDecisionService(session, tenant)
-        labor_evaluations = [
-            labor_service.evaluate_overstaffing(
-                target_booking_snapshot_id=target.id,
-                labor_data_source_id=labor_data_source_id,
-                labor_category=category,
-            )
-            for target in target_snapshots
-            for category in LaborCategory
-        ]
-        evaluations.extend(labor_evaluations)
-        print(
-            f"  [6/6] labor overstaffing: targets={len(target_snapshots)} "
-            f"categories={len(LaborCategory)} evaluations={len(labor_evaluations)}"
-        )
-    else:
-        print("  [6/6] labor overstaffing: skipped (no --labor-data-source-id given)")
-
-    # 7. Coverage (Gate 22): built from the SAME booleans that decided steps 5-6 above, never
-    # reconstructed from the evaluations list afterward - see app.modules.decisions.coverage's
-    # own module docstring for why. Revenue and OTA are unconditional in this CLI, so REVENUE and
-    # DISTRIBUTION are always EVALUATED; COSTS/LABOR mirror whichever branch actually ran.
-    coverage = AnalysisCoverage(
-        domains=(
-            DomainCoverage(AnalysisDomain.REVENUE, DomainCoverageStatus.EVALUATED),
-            DomainCoverage(AnalysisDomain.DISTRIBUTION, DomainCoverageStatus.EVALUATED),
-            DomainCoverage(AnalysisDomain.COSTS, DomainCoverageStatus.EVALUATED)
-            if cost_year is not None and cost_month is not None
-            else DomainCoverage(
-                AnalysisDomain.COSTS, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
-            ),
-            DomainCoverage(AnalysisDomain.LABOR, DomainCoverageStatus.EVALUATED)
-            if labor_data_source_id is not None
-            else DomainCoverage(
-                AnalysisDomain.LABOR, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
-            ),
-        )
+            stay_date_start=stay_date_start,
+            stay_date_end=stay_date_end,
+            labor_data_source_id=labor_data_source_id,
+            cost_year=cost_year,
+            cost_month=cost_month,
+            currency=currency,
+        ),
     )
-
-    # 8. Provenance (Gate 23B): resolve the latest SUCCEEDED import known, right now, for the
-    # EXACT booking data source this run used - never the property's domain-wide latest import
-    # across every booking source it may have (see the module docstring). No successful import
-    # yet is a legitimate, non-fatal outcome: freshness stays UNKNOWN, never fabricated.
-    latest_booking_import = ImportJobRepository(session, tenant).latest_succeeded_for_data_source(
-        booking_data_source_id
-    )
-    if latest_booking_import is None:
-        provenance = RunInputProvenance(
-            bookings=BookingProvenance(
-                data_source_id=booking_data_source_id,
-                import_job_id=None,
-                last_successful_import_finished_at=None,
-            )
-        )
-    else:
-        assert latest_booking_import.finished_at is not None  # SUCCEEDED implies finished_at
-        provenance = RunInputProvenance(
-            bookings=BookingProvenance(
-                data_source_id=booking_data_source_id,
-                import_job_id=latest_booking_import.id,
-                last_successful_import_finished_at=latest_booking_import.finished_at,
-            )
-        )
-    print(
-        "  [provenance] bookings: "
-        f"data_source_id={booking_data_source_id} "
-        f"last_successful_import_finished_at="
-        f"{provenance.bookings.last_successful_import_finished_at}"
-    )
-
-    # 9. Rank, then persist. Every evaluation gathered above reaches BOTH calls, or the process
-    # already crashed above and neither call happens - see the module docstring.
-    context = PriorityContext(
-        workspace_id=tenant.workspace_id, property_id=prop.id, as_of_local_date=as_of_local_date
-    )
-    ranking_result = PriorityService().rank(context, evaluations)
-    sync_result = DecisionService(session, tenant).sync(
-        context, ranking_result, evaluations, coverage, provenance
-    )
-
-    print(
-        f"Analysis complete: as_of_local_date={as_of_local_date.isoformat()} "
-        f"evaluations={len(evaluations)} triggered={ranking_result.candidate_count} "
-        f"clear={ranking_result.excluded_clear_count} "
-        f"insufficient_data={ranking_result.excluded_insufficient_count} "
-        f"not_applicable={ranking_result.excluded_not_applicable_count} "
-        f"suppressed={ranking_result.excluded_suppressed_count} "
-        f"decision_run_id={sync_result.decision_run_id} "
-        f"is_idempotent_replay={sync_result.is_idempotent_replay} "
-        f"decisions_created={sync_result.created_decision_count} "
-        f"decisions_resolved={sync_result.resolved_count} "
-        f"decisions_reopened={sync_result.reopened_count} "
-        f"open_decisions_after_sync={sync_result.open_decision_count_after_sync} "
-        f"coverage={coverage.summary.value} "
-        f"skipped_domains={_skipped_domain_names(coverage)}"
-    )
+    _print_result(result, cost_year=cost_year, cost_month=cost_month)
     return 0
 
 
