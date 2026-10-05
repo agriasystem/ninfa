@@ -83,7 +83,9 @@ processes the queue with `python -m worker run --once` (or an already running wo
 Italy-only pilot one run at 10:00 Europe/Rome is enough; the code still reads each property's
 timezone. There is no internal Procrastinate periodic job on purpose: a periodic tick missed for
 more than ten minutes (for example a worker restart) is silently dropped, which is unsafe for a
-once-a-day job. The scheduler host and its configuration are an AGRIA operations decision.
+once-a-day job. The scheduler host and its configuration are an AGRIA operations decision; the provider-neutral
+deployment package, the daily wrapper (`scripts/run-daily-analysis.sh`) and the operator runbooks are in
+[docs/operations/](../operations/README.md).
 
 ## Manual override
 

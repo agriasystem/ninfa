@@ -1,0 +1,39 @@
+# NINFA web (Next.js) - reference unit. EXAMPLE: adjust the paths and install it as
+# /etc/systemd/system/ninfa-web.service.
+#
+# /opt/ninfa/app is a PLACEHOLDER for the repository checkout; the app must already be BUILT there
+# (npm ci, then scripts/with-env.sh /etc/ninfa/web.env npm run build -w @ninfa/web). Point ExecStart
+# at the Node 24 binary of the host (not necessarily /usr/bin/node).
+#
+# ENVIRONMENT: the web process receives ONLY /etc/ninfa/web.env (public API origin, host, port).
+# apps/web/scripts/run-next.mjs would also load a repository-root .env if one existed, which could
+# carry database credentials and API keys into this process - so the unit REFUSES to start if that
+# file exists. Never share the API environment file with this service.
+# Listens on loopback only (WEB_HOST=127.0.0.1, WEB_PORT=3100), behind the reverse proxy.
+[Unit]
+Description=NINFA web
+Documentation=file:///opt/ninfa/app/docs/operations/pilot-deployment-v1.md
+After=network-online.target ninfa-api.service
+Wants=network-online.target ninfa-api.service
+
+[Service]
+Type=simple
+User=ninfa
+Group=ninfa
+WorkingDirectory=/opt/ninfa/app
+EnvironmentFile=/etc/ninfa/web.env
+ExecStartPre=/usr/bin/test ! -e /opt/ninfa/app/.env
+# run-next.mjs forwards SIGTERM to Next.js.
+ExecStart=/usr/bin/node /opt/ninfa/app/apps/web/scripts/run-next.mjs start
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ninfa-web
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
