@@ -149,6 +149,8 @@ KNOWN_TABLES = {
     # Gate 13 (authentication and session), likewise unrelated to cost intelligence.
     "user_credentials",
     "auth_sessions",
+    # Gate 26B (automatic analysis policy), likewise unrelated to cost intelligence.
+    "property_analysis_policies",
 }
 WRITER_ATTRIBUTES = {
     "commit",
@@ -246,8 +248,8 @@ def test_there_is_no_migration_for_gate_7() -> None:
     # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008. Gate 23B's
     # own 0012 (input provenance) is the real chain head, unrelated to cost intelligence.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0012_input_provenance"]
-    assert len(revisions) == 12  # 0001 .. 0012: Gate 7 added none
+    assert script.get_heads() == ["0013_property_analysis_policy"]
+    assert len(revisions) == 13  # 0001 .. 0013: Gate 7 added none
 
 
 # --- read-only, no clock, no float ---------------------------------------------------------------
@@ -347,7 +349,7 @@ def test_no_worker_task_and_no_scheduler_was_added() -> None:
             for path in engine_free_worker_files(WORKER_DIR)
         ), word
     tasks = (WORKER_DIR / "tasks.py").read_text(encoding="utf-8")
-    assert tasks.count("@app.task") == 2  # the Gate 0 heartbeat + Gate 25B analysis
+    assert tasks.count("@app.task") == 3  # heartbeat + Gate 25B run_property + 26B run_policy
 
 
 def test_the_dependency_manifests_do_not_mention_scientific_ai_or_currency_libraries() -> None:

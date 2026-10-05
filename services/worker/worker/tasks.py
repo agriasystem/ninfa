@@ -1,11 +1,15 @@
 """Registered background tasks.
 
 * `system.heartbeat` (Gate 0): smoke task proving that the worker starts, connects and executes.
-* `analysis.run_property` (Gate 25B): runs the shared production analysis for ONE property.
+* `analysis.run_property` (Gate 25B): runs the shared production analysis for ONE property, every
+  choice explicit.
+* `analysis.run_policy` (Gate 26B): one AUTOMATIC opportunity for ONE property: it re-validates the
+  policy and computes the 30-date window at execution time (Revenue + Distribution only).
 
-NOTHING enqueues `analysis.run_property` automatically: there is no periodic job, no dispatcher,
-no startup hook and no import trigger. It runs only when an operator enqueues it explicitly
-(`python -m worker enqueue-analysis ...`), and every execution choice is an explicit argument.
+NOTHING inside NINFA schedules anything: there is no periodic job, no startup hook and no import
+trigger. `analysis.run_property` runs only when an operator enqueues it explicitly
+(`python -m worker enqueue-analysis ...`); `analysis.run_policy` is enqueued only by the
+dispatcher command (`python -m worker dispatch-analysis`), which an EXTERNAL scheduler invokes.
 """
 
 import logging
@@ -14,13 +18,14 @@ from typing import Any
 from uuid import UUID
 
 from app.db.session import get_sessionmaker
-from app.modules.analysis import AnalysisRunRequest, run_property_analysis
+from app.modules.analysis import AnalysisRunRequest, run_automatic_analysis, run_property_analysis
 from worker.app import DEFAULT_QUEUE, app
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_TASK = "system.heartbeat"
 ANALYSIS_RUN_PROPERTY_TASK = "analysis.run_property"
+ANALYSIS_RUN_POLICY_TASK = "analysis.run_policy"
 
 
 @app.task(name=HEARTBEAT_TASK, queue=DEFAULT_QUEUE)
@@ -79,6 +84,39 @@ def run_property_analysis_task(
         ids,
         result.decision_run_id,
         result.is_idempotent_replay,
+    )
+
+
+# Sync `def` for the same reason as above. Only the policy's identity is an argument: the stay
+# dates are computed here, at EXECUTION time, so a job that waited in the queue past local midnight
+# still analyses the right window - or skips, if the day's rules no longer hold. No retry.
+@app.task(name=ANALYSIS_RUN_POLICY_TASK, queue=DEFAULT_QUEUE)
+def run_policy_analysis_task(*, workspace_id: str, property_id: str) -> None:
+    ids = f"workspace_id={workspace_id} property_id={property_id}"
+    logger.info("Policy analysis job started: %s", ids)
+    with get_sessionmaker()() as session:
+        try:
+            outcome = run_automatic_analysis(session, UUID(workspace_id), UUID(property_id))
+        except Exception as error:
+            logger.error(
+                "Policy analysis job failed: %s status=failed error_type=%s",
+                ids,
+                type(error).__name__,
+            )
+            raise
+
+    if outcome.result is None:
+        logger.info(
+            "Policy analysis job skipped: %s status=skipped reason=%s", ids, outcome.skip_reason
+        )
+        return
+    logger.info(
+        "Policy analysis job completed: %s status=succeeded local_date=%s decision_run_id=%s "
+        "is_idempotent_replay=%s",
+        ids,
+        outcome.local_date,
+        outcome.result.decision_run_id,
+        outcome.result.is_idempotent_replay,
     )
 
 

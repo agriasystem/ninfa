@@ -23,7 +23,7 @@ GATE_4_HEAD = "0006_expected_engine"
 # them touch these tables/triggers/keys.
 GATE_6_HEAD = "0007_invoice_supplier_ingestion"
 GATE_8_HEAD = "0008_labor_ingestion"
-HEAD = "0012_input_provenance"
+HEAD = "0013_property_analysis_policy"
 GATE_6_TABLES = {
     "suppliers",
     "supplier_identifiers",

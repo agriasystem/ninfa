@@ -31,7 +31,7 @@ GATE_8_HEAD = "0008_labor_ingestion"
 GATE_11_REVISION = "0009_decision_layer"
 # Gate 22 added 0011_analysis_coverage on top (via 0010_auth_session), then Gate 23B added
 # 0012_input_provenance on top of THAT; owned/asserted by test_input_provenance_migration.py.
-CURRENT_GLOBAL_HEAD = "0012_input_provenance"
+CURRENT_GLOBAL_HEAD = "0013_property_analysis_policy"
 GATE_11_TABLES = {"decision_runs", "decisions", "decision_observations"}
 FUNCTION = "decisions_forbid_update"
 TRIGGERS = {"trg_decision_runs_immutable", "trg_decision_observations_immutable"}

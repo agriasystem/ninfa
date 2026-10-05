@@ -295,9 +295,9 @@ def test_12_nothing_is_scheduled_or_enqueued_automatically() -> None:
     for name, tree in _worker_sources():
         attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
         assert "periodic" not in attributes, f"{name} registers a periodic task"
-        if name not in {"enqueue.py", "__main__.py"}:
+        if name not in {"enqueue.py", "dispatch.py", "__main__.py"}:
             assert not {"defer", "defer_async"} & attributes, f"{name} enqueues a job"
-    # The only defer of the analysis task is the explicit operator command module.
+    # Only the explicit operator commands (enqueue, dispatch) defer a job.
     tasks_tree = ast.parse((_WORKER_DIR / "tasks.py").read_text(encoding="utf-8"))
     decorators = [
         ast.unparse(decorator)
