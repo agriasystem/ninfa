@@ -14,7 +14,8 @@ from app.db.base import Base
 from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
-HEAD = "0012_input_provenance"  # Gate 23B's own migration, and the real current global head
+HEAD = "0013_property_analysis_policy"  # Gate 26B's own migration, and the real current global head
+GATE_23B_HEAD = "0012_input_provenance"
 GATE_22_HEAD = "0011_analysis_coverage"
 GATE_13_HEAD = "0010_auth_session"
 GATE_11_HEAD = "0009_decision_layer"
@@ -62,6 +63,8 @@ GATE_8_TABLES = {
 # nullable column of their own.
 GATE_11_TABLES = {"decision_runs", "decisions", "decision_observations"}
 GATE_13_TABLES = {"user_credentials", "auth_sessions"}
+# Gate 26B (0013_property_analysis_policy): the automatic-analysis policy, one row per property.
+GATE_26B_TABLES = {"property_analysis_policies"}
 MODEL_TABLES = (
     GATE_1_TABLES
     | GATE_2_TABLES
@@ -71,6 +74,7 @@ MODEL_TABLES = (
     | GATE_8_TABLES
     | GATE_11_TABLES
     | GATE_13_TABLES
+    | GATE_26B_TABLES
 )
 GATE_0_TABLES = {
     "alembic_version",
@@ -93,6 +97,7 @@ TENANT_OWNED_TABLES = (
     | GATE_6_TABLES
     | GATE_8_TABLES
     | GATE_11_TABLES
+    | GATE_26B_TABLES
     # GATE_13_TABLES is deliberately excluded: user_credentials/auth_sessions key off users.id,
     # a global identity, and carry no workspace_id at all.
 )
@@ -126,7 +131,7 @@ def at_head(db_engine: Engine, test_database_url: str) -> Iterator[None]:
 # --- revision history ------------------------------------------------------------------------
 
 
-def test_gate_0_to_13_migrations_are_untouched_and_gate_23b_sits_on_top(
+def test_gate_0_to_23b_migrations_are_untouched_and_gate_26b_sits_on_top(
     test_database_url: str,
 ) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
@@ -134,7 +139,8 @@ def test_gate_0_to_13_migrations_are_untouched_and_gate_23b_sits_on_top(
     assert scripts.get_heads() == [HEAD]
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
     assert revisions == {
-        HEAD: GATE_22_HEAD,
+        HEAD: GATE_23B_HEAD,
+        GATE_23B_HEAD: GATE_22_HEAD,
         GATE_22_HEAD: GATE_13_HEAD,
         GATE_13_HEAD: GATE_11_HEAD,
         GATE_11_HEAD: GATE_8_HEAD,
@@ -287,9 +293,10 @@ def test_delete_policy_only_memberships_cascade(db_engine: Engine, at_head: None
     }
     assert {name for name, rule in rules.items() if rule == "CASCADE"} == cascade_names
     assert {rule for name, rule in rules.items() if name not in cascade_names} == {"RESTRICT"}
-    # 6 Gate 1 + 7 Gate 2 + 3 Gate 3 + 5 Gate 4 + 14 Gate 6 + 7 Gate 8 + 5 Gate 11 + 2 Gate 13;
+    # 6 Gate 1 + 7 Gate 2 + 3 Gate 3 + 5 Gate 4 + 14 Gate 6 + 7 Gate 8 + 5 Gate 11 + 2 Gate 13
+    # + 2 Gate 26B;
     # classify a new FK here (user_credentials->users, auth_sessions->users: both CASCADE)
-    assert len(rules) == 49
+    assert len(rules) == 51
 
 
 def test_every_tenant_owned_table_has_a_not_null_workspace_id(

@@ -144,7 +144,7 @@ def test_no_worker_task_and_no_scheduler_was_added() -> None:
         for path in engine_free_worker_files(WORKER_DIR)
     )
     tasks = (WORKER_DIR / "tasks.py").read_text(encoding="utf-8")
-    assert tasks.count("@app.task") == 2  # the Gate 0 heartbeat + Gate 25B analysis
+    assert tasks.count("@app.task") == 3  # heartbeat + Gate 25B run_property + 26B run_policy
 
 
 def test_the_expected_service_does_not_depend_on_the_web_framework() -> None:

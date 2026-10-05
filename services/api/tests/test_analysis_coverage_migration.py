@@ -31,7 +31,7 @@ GATE_10_HEAD = "0010_auth_session"
 HEAD = "0011_analysis_coverage"
 # Gate 23B added 0012_input_provenance on top; owned/asserted by
 # test_input_provenance_migration.py.
-CURRENT_GLOBAL_HEAD = "0012_input_provenance"
+CURRENT_GLOBAL_HEAD = "0013_property_analysis_policy"
 GATE_22_COLUMN = "analysis_coverage"
 
 

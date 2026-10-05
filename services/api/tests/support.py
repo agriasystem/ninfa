@@ -251,11 +251,11 @@ class BookingFactory(Factory):
         return self._flush(BookingImportRow(**values))
 
 
-# Gate 25B added the worker's `analysis.run_property` task, its enqueue command and their CLI
+# Gates 25B/26B added the worker's analysis tasks, the enqueue/dispatch commands and their CLI
 # wiring. They call the shared orchestration only (no engine logic), so the older "the worker never
 # mentions this engine" scope guards scan every OTHER worker file; `test_analysis_task.py` (worker)
 # and `test_worker_analysis_integration.py` pin what these files may do.
-GATE_25B_WORKER_FILES = frozenset({"tasks.py", "enqueue.py", "__main__.py"})
+GATE_25B_WORKER_FILES = frozenset({"tasks.py", "enqueue.py", "dispatch.py", "__main__.py"})
 
 
 def engine_free_worker_files(worker_dir: Path) -> list[Path]:

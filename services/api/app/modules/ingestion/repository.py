@@ -129,6 +129,27 @@ class ImportJobRepository:
             .limit(1)
         )
 
+    def has_succeeded_between(
+        self, data_source_id: UUID, not_before: datetime, not_after: datetime
+    ) -> bool:
+        """Did an import of this EXACT data source SUCCEED with `not_before <= finished_at <=
+        not_after` (Gate 26B: "today's import" for the automatic analysis)? A FAILED import, or
+        one of another source, never counts."""
+        return (
+            self._session.scalar(
+                select(ImportJob.id)
+                .where(
+                    ImportJob.workspace_id == self._tenant.workspace_id,
+                    ImportJob.data_source_id == data_source_id,
+                    ImportJob.status == ImportJobStatus.SUCCEEDED,
+                    ImportJob.finished_at >= not_before,
+                    ImportJob.finished_at <= not_after,
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
     # --- lifecycle: PENDING -> RUNNING -> SUCCEEDED | FAILED (PENDING -> FAILED is allowed) ----
 
     def _load_for_transition(self, import_job_id: UUID, allowed: set[ImportJobStatus]) -> ImportJob:

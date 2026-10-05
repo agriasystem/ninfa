@@ -5,6 +5,7 @@ relationship() string references rely on it). Models live in their module
 (`app/modules/<module>/models.py`); a model added by a later gate must be imported here.
 """
 
+from app.modules.analysis.models import PropertyAnalysisPolicy
 from app.modules.auth.models import AuthSession, UserCredential
 from app.modules.bookings.models import (
     Booking,
@@ -85,6 +86,7 @@ __all__ = [
     "LaborSnapshot",
     "MembershipRole",
     "Property",
+    "PropertyAnalysisPolicy",
     "RoomInventoryDaily",
     "SnapshotOrigin",
     "Supplier",

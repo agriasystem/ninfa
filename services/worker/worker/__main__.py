@@ -4,6 +4,8 @@ python -m worker run              start the worker (Ctrl+C to stop)
 python -m worker run --once       process the jobs currently queued, then exit
 python -m worker heartbeat        enqueue the smoke job
 python -m worker enqueue-analysis enqueue ONE explicit analysis.run_property job (see enqueue.py)
+python -m worker dispatch-analysis evaluate the automatic policy, enqueue eligible properties
+python -m worker analysis-status    read-only: enabled properties and today's run/import facts
 """
 
 import argparse
@@ -18,6 +20,7 @@ from app.core.logging import configure_logging
 from app.modules.analysis import AnalysisRunRequest
 from worker import runtime
 from worker.app import DEFAULT_QUEUE, app
+from worker.dispatch import analysis_status, dispatch_analysis
 from worker.enqueue import enqueue_analysis
 from worker.tasks import heartbeat
 
@@ -76,6 +79,11 @@ def main(argv: list[str] | None = None) -> int:
     enqueue.add_argument("--cost-year", type=int, default=None)
     enqueue.add_argument("--cost-month", type=int, default=None)
     enqueue.add_argument("--currency", type=str, default=None)
+    commands.add_parser(
+        "dispatch-analysis",
+        help="evaluate the automatic-analysis policy and enqueue one job per eligible property",
+    )
+    commands.add_parser("analysis-status", help="read-only status of the enabled properties")
     args = parser.parse_args(argv)
 
     settings = get_settings()
@@ -93,6 +101,10 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Error: {error}", file=sys.stderr)
                 return 1
             return runtime.run(enqueue_analysis(request))
+        elif args.command == "dispatch-analysis":
+            return dispatch_analysis()
+        elif args.command == "analysis-status":
+            return analysis_status()
         else:
             runtime.run(_enqueue_heartbeat())
     except KeyboardInterrupt:

@@ -26,6 +26,9 @@ from tests.support import Rejects, alembic_config
 
 GATE_22_HEAD = "0011_analysis_coverage"
 HEAD = "0012_input_provenance"
+# Gate 26B added 0013_property_analysis_policy on top: "is X the global head" questions now belong
+# to the CURRENT head below; this module owns only the 0012 migration itself.
+CURRENT_GLOBAL_HEAD = "0013_property_analysis_policy"
 GATE_23B_COLUMN = "input_provenance"
 
 
@@ -53,8 +56,10 @@ def nullable_of(engine: Engine, table: str, column: str) -> bool:
 # --- 0011 <-> 0012 round trip --------------------------------------------------------------------
 
 
-def test_head_is_the_input_provenance_migration(at_head: None, db_engine: Engine) -> None:
-    assert revision(db_engine) == HEAD
+def test_the_input_provenance_migration_is_applied_below_the_current_head(
+    at_head: None, db_engine: Engine
+) -> None:
+    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert GATE_23B_COLUMN in columns_of(db_engine, "decision_runs")
     assert nullable_of(db_engine, "decision_runs", GATE_23B_COLUMN) is True
 
@@ -84,7 +89,7 @@ def test_0011_to_0012_to_0011_to_0012_recreates_an_identical_schema(
 
     command.downgrade(config, GATE_22_HEAD)
     command.upgrade(config, "head")
-    assert revision(db_engine) == HEAD
+    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert columns_of(db_engine, "decision_runs") == before
 
 
@@ -98,20 +103,20 @@ def test_a_fresh_database_goes_from_base_to_head(
     command.downgrade(config, "base")
     assert set(inspect(db_engine).get_table_names()) == {"alembic_version"}
     command.upgrade(config, "head")
-    assert revision(db_engine) == HEAD
+    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert GATE_23B_COLUMN in columns_of(db_engine, "decision_runs")
 
 
 # --- alembic current / heads / check --------------------------------------------------------------
 
 
-def test_alembic_current_is_0012(at_head: None, db_engine: Engine) -> None:
-    assert revision(db_engine) == HEAD
+def test_alembic_current_is_the_current_head(at_head: None, db_engine: Engine) -> None:
+    assert revision(db_engine) == CURRENT_GLOBAL_HEAD
 
 
 def test_alembic_has_exactly_one_head(test_database_url: str) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
-    assert scripts.get_heads() == [HEAD]
+    assert scripts.get_heads() == [CURRENT_GLOBAL_HEAD]
 
 
 def test_alembic_check_reports_no_pending_model_changes(
