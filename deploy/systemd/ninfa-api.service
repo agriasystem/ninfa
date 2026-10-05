@@ -1,0 +1,38 @@
+# NINFA API (FastAPI / uvicorn) - reference unit. EXAMPLE: adjust the paths and install it as
+# /etc/systemd/system/ninfa-api.service.
+#
+# /opt/ninfa/app is a PLACEHOLDER for the repository checkout (with its .venv from
+# `uv sync --all-packages --locked --no-dev`). The listen address comes from /etc/ninfa/api.env
+# (API_HOST=127.0.0.1, API_PORT=8000): loopback only, behind the reverse proxy.
+# No secrets in this file. Migrations are NEVER run from here: they are an explicit deployment step.
+[Unit]
+Description=NINFA API
+Documentation=file:///opt/ninfa/app/docs/operations/pilot-deployment-v1.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ninfa
+Group=ninfa
+WorkingDirectory=/opt/ninfa/app
+EnvironmentFile=/etc/ninfa/api.env
+Environment=PYTHONUNBUFFERED=1
+# Refuse to start if a repository-root .env exists: production configuration lives ONLY in the
+# environment file above.
+ExecStartPre=/usr/bin/test ! -e /opt/ninfa/app/.env
+ExecStart=/opt/ninfa/app/.venv/bin/python -m app
+Restart=always
+RestartSec=5
+# uvicorn shuts down gracefully on SIGTERM.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+# stdout/stderr go to the journal (structured JSON logs in production).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ninfa-api
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

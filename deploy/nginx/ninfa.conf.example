@@ -1,0 +1,102 @@
+# NINFA reverse proxy - reference nginx configuration (EXAMPLE, not a deployed configuration).
+#
+#   https://ninfa.example.com  -- ONE public origin, TLS terminated here
+#     /api/*        -> FastAPI (uvicorn)   on 127.0.0.1:8000
+#     everything else -> Next.js           on 127.0.0.1:3100
+#
+# Replace ninfa.example.com and the certificate paths (placeholders below). TLS is MANDATORY: the
+# session cookie is HttpOnly, SameSite=Lax, host-only and Secure, and a browser will not keep a
+# Secure cookie over plain HTTP. This file does not touch cookies in any way (no proxy_cookie_*,
+# no Domain), so the Gate 13 cookie semantics stay exactly as the API sets them.
+#
+# NINFA's own security does NOT depend on the proxy headers below: the application does not read
+# the client address or the forwarded scheme. They are forwarded for normal HTTP serving and logs.
+#
+# Edge responsibilities this example only partly covers (see docs/operations/pilot-deployment-v1.md,
+# "Edge security checklist"): TLS, HSTS, security headers, request body limit, Host filtering, and
+# per-IP login rate limiting. No numeric limit is chosen here: AGRIA sets them (placeholders below).
+#
+# Validate with `nginx -t` on the host before reloading. Not validated in this repository.
+
+# server_tokens off;   # (http {} context) do not advertise the nginx version
+
+# Rate limiting for the login endpoint - the zone is declared in http {} context, AGRIA chooses the
+# rate. Left commented on purpose: no arbitrary limit is invented here.
+# limit_req_zone $binary_remote_addr zone=ninfa_login:10m rate=<AGRIA_CHOSEN_RATE>;
+
+# Unknown Host headers never reach the application.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+    ssl_reject_handshake on;
+}
+
+# Plain HTTP only redirects to HTTPS.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ninfa.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    # `http2 on;` needs nginx >= 1.25.1 (older versions: `listen 443 ssl http2;` above instead).
+    http2 on;
+    server_name ninfa.example.com;
+
+    # PLACEHOLDER certificate paths - never real paths or keys in this repository.
+    ssl_certificate     /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Standard security headers (add_header in a location block would REPLACE these, so none are
+    # used in the locations below).
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # HSTS: enable ONLY after HTTPS is verified end to end, with a max-age chosen by AGRIA. The
+    # value is intentionally a placeholder, not a recommendation.
+    # add_header Strict-Transport-Security "max-age=<AGRIA_CHOSEN_SECONDS>" always;
+    # A Content-Security-Policy needs a deliberate design for the Next.js app; not included here.
+
+    # Request body limit: nginx's own default applies (1 MB). Set it explicitly if AGRIA decides
+    # on a different value:
+    # client_max_body_size <AGRIA_CHOSEN_SIZE>;
+
+    # Login rate limiting (needs the limit_req_zone above). Placeholder, commented out.
+    # location = /api/v1/auth/login {
+    #     limit_req zone=ninfa_login;
+    #     proxy_pass http://127.0.0.1:8000;
+    #     (same proxy_* headers as the /api/ location)
+    # }
+
+    # API: the request path is passed through unchanged (/api/v1/...).
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Everything else is the Next.js app.
+    location / {
+        proxy_pass http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
