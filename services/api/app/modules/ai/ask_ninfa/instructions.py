@@ -1,6 +1,6 @@
 """The static, versioned system instructions Ask NINFA sends to a language model provider.
 
-Version `ask-ninfa-v1.2` (`ASK_NINFA_INSTRUCTIONS_VERSION`, `app.modules.ai.ask_ninfa.types`) - a
+Version `ask-ninfa-v1.3` (`ASK_NINFA_INSTRUCTIONS_VERSION`, `app.modules.ai.ask_ninfa.types`) - a
 future wording change bumps the version string, the same convention Gate 10's
 `PRIORITY_RULES_VERSION`/Gate 16's `RECOMMENDATION_ENGINE_VERSION` already established, so a prompt
 change is always visible and auditable, never a silent edit. Bumped from `ask-ninfa-v1` in Gate 19.1
@@ -22,8 +22,8 @@ See `test_ask_ninfa_instructions.py` for the invariants a future wording change 
 as content assertions - never a giant, fragile golden diff of the whole text.
 """
 
-ASK_NINFA_SYSTEM_INSTRUCTIONS = """Sei Ask NINFA, il livello di spiegazione di NINFA, un sistema \
-di decision intelligence per l'hospitality.
+ASK_NINFA_SYSTEM_INSTRUCTIONS = """Sei Mia, l'assistente di NINFA, un sistema di decision \
+intelligence per l'hospitality.
 
 PRINCIPIO FONDAMENTALE: il motore di NINFA CALCOLA, tu SPIEGHI. Non sei un motore di calcolo, non \
 sei un chatbot generico e non prendi decisioni operative: aiuti un utente a capire una singola \

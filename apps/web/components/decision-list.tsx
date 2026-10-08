@@ -14,12 +14,17 @@ export interface DecisionListProps {
   /** The property these decisions belong to - needed only to build each card's Decision Detail
    * link (Gate 15); the feed request itself already used it. */
   propertyId: string;
+  /** `/decisioni` (Home UI V1) lists EVERY triggered decision of today's feed - the very number the
+   * Home's "N decisioni richiedono attenzione" counted. Left `false`, the historical top-5
+   * presentation limit (Gate 14) applies. */
+  showAll?: boolean;
 }
 
-/** Presents AT MOST 5 decisions - the API still returns every triggered candidate; this only
- * ever slices the array for display (`items.slice(0, 5)`), never filters or reorders it. */
-export function DecisionList({ items, propertyId }: DecisionListProps) {
-  const visible = items.slice(0, MAX_VISIBLE_DECISIONS);
+/** Presents AT MOST 5 decisions (unless `showAll`) - the API still returns every triggered
+ * candidate; this only ever slices the array for display (`items.slice(0, 5)`), never filters or
+ * reorders it. */
+export function DecisionList({ items, propertyId, showAll = false }: DecisionListProps) {
+  const visible = showAll ? items : items.slice(0, MAX_VISIBLE_DECISIONS);
   const remaining = items.length - visible.length;
 
   return (

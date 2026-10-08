@@ -81,6 +81,59 @@ export function formatPropertyLocalDateTimeItalian(instant: Date, timeZone: stri
   return italianLongDateTimeFormatterFor(timeZone).format(instant);
 }
 
+const italianLongDateWithYearFormatterCache = new Map<string, Intl.DateTimeFormat>();
+const italianTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+/** `now`'s calendar date IN `timeZone`, as Italian prose WITH the year and no weekday ("8 ottobre
+ * 2026") - the Home header's own date (Home UI V1). Display only - never parsed back, never
+ * compared. */
+export function formatPropertyLocalDateLongItalian(now: Date, timeZone: string): string {
+  let formatter = italianLongDateWithYearFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("it-IT", {
+      timeZone,
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    italianLongDateWithYearFormatterCache.set(timeZone, formatter);
+  }
+  return formatter.format(now);
+}
+
+/** An INSTANT's wall-clock time IN `timeZone`, 24-hour ("09:31", never "9:31" and never "24:05" -
+ * `hourCycle: "h23"` is explicit because some ICU builds otherwise render midnight as 24:xx).
+ * Display only. Never the browser's own timezone. */
+export function formatPropertyLocalTimeItalian(instant: Date, timeZone: string): string {
+  let formatter = italianTimeFormatterCache.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("it-IT", {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    italianTimeFormatterCache.set(timeZone, formatter);
+  }
+  return formatter.format(instant);
+}
+
+/** The business date (`YYYY-MM-DD`) one calendar day before `isoDate` - pure date arithmetic on the
+ * three digit groups (UTC calendar math only to roll month/year boundaries; no timezone is ever
+ * involved, exactly like `formatBusinessDateItalian` below). */
+export function previousBusinessDate(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!match) {
+    throw new Error(`Invalid business date: "${isoDate}"`);
+  }
+  const [, year, month, day] = match;
+  const previous = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day) - 1));
+  const yyyy = String(previous.getUTCFullYear()).padStart(4, "0");
+  const mm = String(previous.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(previous.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 const ITALIAN_MONTHS = [
   "gennaio",
   "febbraio",

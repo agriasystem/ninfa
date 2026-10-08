@@ -40,6 +40,18 @@ _VALID_GROUNDING_REFS = frozenset(ref.value for ref in GroundingRef)
 
 
 @dataclass(frozen=True, slots=True)
+class ValidatedCore:
+    """The vocabulary-agnostic part of a validated answer: `grounding_refs` are plain strings here,
+    already narrowed to the caller's own closed vocabulary - the Decision Ask wraps them back into
+    `GroundingRef` (`ValidatedAnswer`), Mia Home keeps them as `HomeGroundingRef` values."""
+
+    status: AskStatus
+    answer: str
+    grounding_refs: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ValidatedAnswer:
     status: AskStatus
     answer: str
@@ -47,15 +59,18 @@ class ValidatedAnswer:
     limitations: tuple[str, ...]
 
 
-def _valid_grounding_refs(raw_refs: tuple[str, ...]) -> tuple[GroundingRef, ...]:
-    """Drops (never crashes on) any ref outside the closed `GroundingRef` vocabulary, and any
+def _valid_grounding_refs(
+    raw_refs: tuple[str, ...], vocabulary: frozenset[str] = _VALID_GROUNDING_REFS
+) -> tuple[str, ...]:
+    """Drops (never crashes on) any ref outside the closed `vocabulary` (the Decision Ask's own
+    `GroundingRef` by default, Mia Home's `HomeGroundingRef` when the caller names it), and any
     duplicate - a provider naming an unrecognised semantic area is a sign the answer was not fully
     grounded in a way this contract understands, not a reason to fail the whole answer."""
     seen: dict[str, None] = {}
     for ref in raw_refs:
-        if ref in _VALID_GROUNDING_REFS:
+        if ref in vocabulary:
             seen.setdefault(ref, None)
-    return tuple(GroundingRef(ref) for ref in seen)
+    return tuple(seen)
 
 
 def _valid_limitations(raw_limitations: tuple[str, ...]) -> tuple[str, ...]:
@@ -63,7 +78,11 @@ def _valid_limitations(raw_limitations: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(limitation for limitation in cleaned if limitation)[:_MAX_LIMITATIONS]
 
 
-def validate_model_answer(raw: LanguageModelAnswer) -> ValidatedAnswer | None:
+def validate_model_answer_core(
+    raw: LanguageModelAnswer, vocabulary: frozenset[str]
+) -> ValidatedCore | None:
+    """The one shape/length/technical-leak validation every Ask-family answer goes through
+    (Decision Ask and Mia Home alike) - only the closed `grounding_refs` vocabulary differs."""
     status = _STATUS_MAP.get(raw.status)
     if status is None:
         return None  # defensive: unreachable while ModelAnswerStatus stays a 2-value StrEnum
@@ -90,12 +109,29 @@ def validate_model_answer(raw: LanguageModelAnswer) -> ValidatedAnswer | None:
         logger.warning("ask_ninfa technical_leak_detected=true")
         return None
 
-    return ValidatedAnswer(
+    return ValidatedCore(
         status=status,
         answer=answer,
-        grounding_refs=_valid_grounding_refs(raw.grounding_refs),
+        grounding_refs=_valid_grounding_refs(raw.grounding_refs, vocabulary),
         limitations=limitations,
     )
 
 
-__all__ = ["ValidatedAnswer", "validate_model_answer"]
+def validate_model_answer(raw: LanguageModelAnswer) -> ValidatedAnswer | None:
+    core = validate_model_answer_core(raw, _VALID_GROUNDING_REFS)
+    if core is None:
+        return None
+    return ValidatedAnswer(
+        status=core.status,
+        answer=core.answer,
+        grounding_refs=tuple(GroundingRef(ref) for ref in core.grounding_refs),
+        limitations=core.limitations,
+    )
+
+
+__all__ = [
+    "ValidatedAnswer",
+    "ValidatedCore",
+    "validate_model_answer",
+    "validate_model_answer_core",
+]

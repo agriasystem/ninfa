@@ -293,6 +293,16 @@ class AskRequest(BaseModel):
     question: str
 
 
+class AskHomeRequest(BaseModel):
+    """Mia Home (property-level Ask): the question AND the explicit business date of the feed it is
+    about - the SAME property-local `YYYY-MM-DD` the Decision Feed endpoint requires, never a server
+    clock. Both are validated explicitly in the route (`question` length, `as_of_local_date` ISO
+    parse), never assumed from the type annotation alone."""
+
+    question: str
+    as_of_local_date: str
+
+
 class AskResponse(BaseModel):
     """`status` is one of `AskStatus`'s four values (Gate 18). No chat id, no thread id, no
     conversation id anywhere - V1 is one question, one answer, nothing persisted. `answer`/
@@ -307,6 +317,7 @@ class AskResponse(BaseModel):
 
 __all__ = [
     "AnalysisCoverageResponse",
+    "AskHomeRequest",
     "AskRequest",
     "AskResponse",
     "BookingFreshnessResponse",

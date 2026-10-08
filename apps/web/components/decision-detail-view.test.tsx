@@ -309,17 +309,17 @@ describe("DecisionDetailView - Recommendation (Gate 17)", () => {
 });
 
 describe("DecisionDetailView - Ask NINFA (Gate 20)", () => {
-  it("renders 'Chiedi a NINFA', in DOM order, after the recommendation and before Evoluzione", async () => {
+  it("renders 'Chiedi a Mia', in DOM order, after the recommendation and before Evoluzione", async () => {
     getDecisionDetailMock.mockResolvedValue({ ok: true, data: detail() });
 
     const { container } = render(<DecisionDetailView propertyId="prop-1" decisionId="dec-1" />);
     await screen.findByText("Pickup sotto le attese");
 
-    expect(screen.getByRole("heading", { name: "Chiedi a NINFA" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Chiedi a Mia" })).not.toBeNull();
 
     const text = container.textContent ?? "";
     const recommendationIndex = text.indexOf("Cosa puoi valutare");
-    const askIndex = text.indexOf("Chiedi a NINFA");
+    const askIndex = text.indexOf("Chiedi a Mia");
     const evolutionIndex = text.indexOf("Evoluzione");
     expect(recommendationIndex).toBeGreaterThan(-1);
     expect(askIndex).toBeGreaterThan(recommendationIndex);
@@ -338,7 +338,7 @@ describe("DecisionDetailView - Ask NINFA (Gate 20)", () => {
     await screen.findByText("Pickup sotto le attese");
 
     await user.type(screen.getByLabelText("La tua domanda"), "Perché me lo mostri?");
-    await user.click(screen.getByRole("button", { name: "Chiedi a NINFA" }));
+    await user.click(screen.getByRole("button", { name: "Chiedi a Mia" }));
 
     await waitFor(() => expect(askNinfaMock).toHaveBeenCalledOnce());
     expect(askNinfaMock).toHaveBeenCalledWith("prop-42", "dec-77", "Perché me lo mostri?");
@@ -438,7 +438,7 @@ describe("DecisionDetailView - errors", () => {
 
     expect(await screen.findByText("Decisione non disponibile")).not.toBeNull();
     expect(screen.getByText(/Questa decisione non è disponibile/)).not.toBeNull();
-    expect(screen.getByRole("link", { name: "Torna a Oggi" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Torna alle Decisioni" })).not.toBeNull();
     expect(container.textContent).not.toContain("dec-1");
     expect(container.textContent).not.toContain("Decision not found");
   });

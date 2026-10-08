@@ -1,7 +1,9 @@
 /* Design tokens (Gate 14, "Oggi" UI v1) - off-white/ink/neutral base, one controlled indigo
    accent, semantic status colors used only where they mean something (never decorative). */
 :root {
-  --color-background: #faf9f7;
+  color-scheme: light;
+  /* A cool near-white: the approved reference's page is white with a faint blue cast. */
+  --color-background: #fbfcfe;
   --color-surface: #ffffff;
   --color-surface-elevated: #ffffff;
   --color-text-primary: #16161d;
@@ -16,8 +18,31 @@
   --color-danger: #a3271f;
   --color-danger-soft: #fbebe9;
 
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
+  /* Poppins (self-hosted through next/font/local, see app/layout.tsx), then the system stack. */
+  --font-sans: var(--font-poppins), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+
+  /* Home UI V1 - LIGHT ONLY (no dark token set, no prefers-color-scheme anywhere). Values sampled
+     from the approved reference (docs/ui/references/home-v1/home-light.png.png); the text tones were
+     nudged where needed to keep >= 4.5:1 on white. */
+  --home-ink: #101936;
+  --home-greeting: #5d6279;
+  --home-muted: #6b7287;
+  --home-link: #1550e8;
+  --home-sky: #1b9ef5;
+  --home-attention: #f2840c;
+  --home-attention-text: #b4530a;
+  --home-neutral: #8a91a3;
+  --home-hairline: #e6ebf6;
+  --home-sidebar: #f5f8fd;
+  --home-sidebar-border: #e8edf8;
+  --home-active-pill: #e4ecfd;
+  --home-active-ink: #1049e6;
+  --home-chip: rgba(226, 235, 252, 0.72);
+  --home-bar: #2b313b;
+  --home-focus: #1550e8;
+  --sidebar-width: 240px;
+  --sidebar-pad: 13px;
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -172,65 +197,339 @@ select {
   font-size: 0.875rem;
 }
 
-/* --- authenticated shell ------------------------------------------------------------------------- */
+/* --- authenticated shell (Home UI V1): sidebar + content -------------------------------------------
+   LIGHT ONLY. Desktop is the source of truth (approved reference 1672x941); everything below is
+   responsive CSS - never screenshot coordinates. */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: -80px;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--home-link);
+  font-weight: 500;
+  box-shadow: var(--shadow-elevated);
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+}
 
 .app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-background);
+}
+
+.app-shell__content {
   display: flex;
   flex-direction: column;
-}
-
-.app-shell__topbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-3) var(--space-6);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-.app-shell__wordmark {
-  font-size: 1.125rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-text-primary);
-}
-
-.app-shell__account {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.app-shell__email {
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-}
-
-.app-shell__account button {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
+  min-width: 0;
+  position: relative;
 }
 
 .app-shell__main {
   flex: 1;
   width: 100%;
+}
+
+.app-shell__main:focus {
+  outline: none;
+}
+
+.app-shell__main--page {
   max-width: var(--max-content-width);
   margin: 0 auto;
-  padding: var(--space-8) var(--space-6) var(--space-12);
+  padding: var(--space-4) var(--space-6) var(--space-12);
+}
+
+.app-shell__main--home {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+/* --- sidebar ---------------------------------------------------------------------------------- */
+
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 50px var(--sidebar-pad) 34px;
+  background: linear-gradient(180deg, #f8faff 0%, var(--home-sidebar) 100%);
+  border-right: 1px solid var(--home-sidebar-border);
+  z-index: 10;
+}
+
+.app-sidebar__logo {
+  display: block;
+  align-self: flex-start;
+  margin-left: 31px; /* the logo's own centre sits over the nav icons' column */
+  border-radius: var(--radius-sm);
+}
+
+.app-sidebar__logo-slot {
+  width: 32px;
+  height: 41px;
+  transition: opacity 0.24s ease;
+}
+
+.app-sidebar__logo-slot[data-hidden="true"] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.app-sidebar__logo-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.app-sidebar__nav {
+  margin-top: 31px;
+}
+
+.app-sidebar__nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 56px;
+  padding: 0 29px;
+  border-radius: 18px;
+  color: var(--home-ink);
+  font-size: 1.0625rem;
+  font-weight: 400;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-item__icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+}
+
+.nav-item__label {
+  min-width: 0;
+}
+
+a.nav-item:hover {
+  background: rgba(21, 80, 232, 0.06);
+}
+
+a.nav-item[aria-current="page"] {
+  background: var(--home-active-pill);
+  color: var(--home-active-ink);
+  font-weight: 500;
+}
+
+/* The active "Oggi" icon is the solid house of the reference. */
+a.nav-item[aria-current="page"] .nav-item__icon path {
+  fill: currentColor;
+}
+
+a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
+  stroke: #fff;
+}
+
+.nav-item--soon {
+  color: var(--home-muted);
+  cursor: default;
+}
+
+.nav-item__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+/* "In arrivo": a discreet caption under the label (never a badge that can collide with it). */
+.nav-item__soon {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--home-muted);
+  opacity: 0.85;
+}
+
+.nav-item--icon-only {
+  height: 44px;
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.app-sidebar__footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-left: 28px;
+}
+
+.app-sidebar__divider {
+  width: 1px;
+  height: 34px;
+  background: #d5dbe8;
+}
+
+/* --- profile menu ----------------------------------------------------------------------------- */
+
+.profile-menu {
+  position: relative;
+}
+
+.profile-menu__button {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: #ececf1;
+  color: #4a4e5c;
+}
+
+.profile-menu__button:hover:not(:disabled) {
+  opacity: 1;
+  background: #e2e4ec;
+}
+
+.profile-menu__button svg {
+  width: 28px;
+  height: 28px;
+}
+
+.profile-menu__panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 12px);
+  min-width: 288px;
+  max-width: min(340px, 90vw);
+  padding: var(--space-4);
+  border-radius: 18px;
+  border: 1px solid var(--home-hairline);
+  background: var(--color-surface);
+  box-shadow: 0 12px 36px rgba(20, 30, 70, 0.14);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-menu__name {
+  font-weight: 600;
+  color: var(--home-ink);
+  overflow-wrap: anywhere;
+}
+
+.profile-menu__email {
+  color: var(--home-muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.profile-menu__logout {
+  margin-top: var(--space-3);
+  min-height: 44px;
+  background: transparent;
+  color: var(--home-link);
+  border: 1px solid var(--home-hairline);
+  border-radius: 12px;
+}
+
+.profile-menu__logout:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--home-active-pill);
+}
+
+/* --- property header (top-right of the content) ------------------------------------------------ */
+
+.property-header {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 24px 36px 0;
+  text-align: right;
+}
+
+.property-header__name {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--home-ink);
+  line-height: 1.35;
+}
+
+.property-header__date {
+  font-size: 0.9375rem;
+  color: var(--home-muted);
+  line-height: 1.4;
 }
 
 .property-selector {
-  display: flex;
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
 }
 
-.property-selector__label {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
+.property-selector select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 2px 28px 2px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--home-ink);
+  font-size: 1.0625rem;
+  font-weight: 500;
+  text-align: right;
+  text-align-last: right;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.property-selector__chevron {
+  position: absolute;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  color: var(--home-ink);
 }
 
 .property-empty-state {
@@ -246,30 +545,697 @@ select {
   margin-bottom: var(--space-2);
 }
 
-/* --- today screen -------------------------------------------------------------------------------- */
+/* --- Home ("Oggi") ----------------------------------------------------------------------------- */
 
-.today-screen__header {
+.home {
+  position: relative;
+  flex: 1;
   display: flex;
-  align-items: baseline;
-  gap: var(--space-4);
-  margin-bottom: var(--space-8);
+  flex-direction: column;
+  overflow-x: clip;
 }
 
-.today-screen__header h1 {
+/* The lower light-blue / violet glow of the reference: static CSS gradients, no image. It sits at
+   the bottom of the VIEWPORT (fixed) so the sticky Mia bar always rests on it. */
+.home__aurora {
+  position: fixed;
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: 0;
+  height: min(46vh, 430px);
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 34% 70% at 34% 100%, rgba(110, 185, 255, 0.85), rgba(110, 185, 255, 0) 72%),
+    radial-gradient(ellipse 30% 62% at 74% 100%, rgba(165, 145, 250, 0.7), rgba(165, 145, 250, 0) 72%),
+    radial-gradient(ellipse 22% 30% at 50% 100%, rgba(150, 240, 250, 0.55), rgba(150, 240, 250, 0) 75%),
+    radial-gradient(ellipse 60% 55% at 50% 100%, rgba(190, 200, 255, 0.5), rgba(190, 200, 255, 0) 75%);
+}
+
+.home__aurora::after {
+  content: "";
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 56%;
+  height: 220%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(190, 180, 255, 0.55);
+  -webkit-mask-image: linear-gradient(#000 0, transparent 30%);
+  mask-image: linear-gradient(#000 0, transparent 30%);
+}
+
+.home__layout {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 clamp(16px, 3vw, 48px) clamp(20px, 4.5vh, 44px);
+}
+
+.home__hero {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: clamp(8px, 4vh, 40px);
+}
+
+.home__logo-wrap {
+  height: var(--home-logo-height);
+  --home-logo-height: clamp(84px, 11.7vh, 112px);
+  display: flex;
+  justify-content: center;
+  transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* After the transition the hero logo is gone and its room closes smoothly (no jump). */
+.home[data-logo-phase="settled"] .home__logo-wrap {
+  height: 0;
+}
+
+.home__logo {
+  height: 100%;
+  width: auto;
+  filter: drop-shadow(0 14px 22px rgba(60, 120, 255, 0.26));
+  user-select: none;
+}
+
+.home__logo--leaving {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.home__greeting {
+  margin-top: clamp(12px, 3vh, 30px);
+  font-size: clamp(1.25rem, 1.05rem + 0.9vw, 2.05rem);
+  font-weight: 500;
+  color: var(--home-greeting);
+  line-height: 1.3;
+}
+
+.home__feed {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.home__message {
+  margin-top: clamp(12px, 2.6vh, 26px);
+  max-width: 19em;
+  font-size: clamp(1.75rem, 1.1rem + 1.75vw, 3rem);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+  color: var(--home-ink);
+  text-wrap: balance;
+}
+
+.hero-fragment--plain {
+  font-weight: 500;
+}
+
+.hero-fragment--strong {
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.hero-fragment--accent {
+  font-weight: 500;
+  color: var(--home-sky);
+}
+
+.home__supporting {
+  margin-top: var(--space-3);
+  max-width: 40em;
+  font-size: clamp(0.9375rem, 0.85rem + 0.25vw, 1.0625rem);
+  color: var(--home-muted);
+  text-wrap: balance;
+}
+
+.home__status {
+  margin-top: clamp(14px, 2.6vh, 28px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 16px;
+  font-size: clamp(0.9375rem, 0.82rem + 0.4vw, 1.2rem);
+}
+
+.home__decisions-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  color: var(--home-link);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.home__decisions-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.home__decisions-link-arrow {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.home__status-divider {
+  width: 1px;
+  height: 24px;
+  background: #d5dbe8;
+}
+
+.home__freshness-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.home__freshness {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--home-muted);
+}
+
+/* A NEUTRAL dot, never green: Gate 23B allows no CURRENT/STALE judgement. */
+.home__freshness-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--home-neutral);
+}
+
+.home__freshness[data-freshness="unknown"] .home__freshness-dot {
+  background: transparent;
+  border: 2px solid var(--home-neutral);
+}
+
+.refresh-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--home-muted);
+}
+
+.refresh-button:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(21, 80, 232, 0.07);
+  color: var(--home-link);
+}
+
+.refresh-button__icon {
+  width: 20px;
+  height: 20px;
+}
+
+.refresh-button[aria-busy="true"] .refresh-button__icon {
+  animation: refresh-spin 1s linear infinite;
+}
+
+@keyframes refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.home__skeleton {
+  margin-top: clamp(16px, 3vh, 32px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.home__skeleton-line {
+  display: block;
+  width: min(100%, 640px);
+  height: 34px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #eef2fa 25%, #f8faff 37%, #eef2fa 63%);
+  background-size: 400% 100%;
+  animation: today-screen-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.home__skeleton-line--wide {
+  height: 44px;
+}
+
+.home__skeleton-line--short {
+  width: min(100%, 360px);
+  height: 22px;
+}
+
+.home__error {
+  margin-top: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--home-hairline);
+  color: var(--home-muted);
+}
+
+.home__error button {
+  min-height: 44px;
+  background: var(--home-link);
+  border-radius: 999px;
+  padding: 0 var(--space-6);
+}
+
+/* --- domain strip ------------------------------------------------------------------------------ */
+
+.domain-summary {
+  list-style: none;
+  margin: clamp(18px, 3.6vh, 38px) 0 0;
+  padding: 0;
+  width: min(100%, 1120px);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--home-hairline);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 1px 2px rgba(20, 30, 70, 0.03);
+  text-align: left;
+}
+
+.domain-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 22px;
+}
+
+.domain-tile + .domain-tile {
+  border-left: 1px solid var(--home-hairline);
+}
+
+.domain-tile__dot {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--home-neutral);
+}
+
+/* ONE attention colour (the backend exposes no severity). Evaluated-and-quiet or partial read as a
+   hollow ring; not analysed / not available as a filled neutral dot - and always in words too. */
+.domain-tile[data-tone="attention"] .domain-tile__dot {
+  background: var(--home-attention);
+}
+
+.domain-tile[data-tone="clear"] .domain-tile__dot {
+  background: transparent;
+  border: 2px solid var(--home-neutral);
+}
+
+.domain-tile[data-tone="partial"] .domain-tile__dot {
+  background: transparent;
+  border: 2px solid var(--home-attention);
+}
+
+.domain-tile__icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  color: var(--home-ink);
+}
+
+.domain-tile__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.domain-tile__label {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  color: var(--home-ink);
+}
+
+.domain-tile__status {
+  font-size: 0.9375rem;
+  color: var(--home-muted);
+}
+
+.domain-tile[data-tone="attention"] .domain-tile__status,
+.domain-tile[data-tone="partial"] .domain-tile__status {
+  color: var(--home-attention-text);
+}
+
+/* --- Mia ("Chiedi a Mia...") --------------------------------------------------------------------- */
+
+.mia {
+  margin-top: auto;
+  padding-top: var(--space-6);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The dock keeps the bar reachable when the page is taller than the viewport (a sticky composer);
+   on a page that fits (the desktop reference) it is just the normal bottom of the Home. */
+.mia__dock {
+  position: sticky;
+  bottom: clamp(12px, 2.4vh, 24px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.mia__suggest {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Once there is a question in flight or an answer, the suggestions step aside: the Home stays clean. */
+.mia[data-answering="true"] .mia__suggest {
+  display: none;
+}
+
+.mia__caption {
+  font-size: 1rem;
+  color: var(--home-muted);
+}
+
+.mia__suggestions {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  width: min(100%, 1150px);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.mia__suggestions li {
+  display: flex;
+}
+
+.mia__chip {
+  flex: 1;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 22px;
+  border-radius: 40px;
+  border: 1px solid #dfe8fa;
+  background: var(--home-chip);
+  color: var(--home-ink);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: left;
+  backdrop-filter: blur(6px);
+}
+
+.mia__chip:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(214, 227, 252, 0.9);
+}
+
+.mia__chip-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  color: #2f6fe4;
+}
+
+.mia__answer {
+  margin-top: 18px;
+  width: min(100%, 760px);
+  padding: 18px 24px;
+  border-radius: 24px;
+  border: 1px solid #dfe7f6;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 28px rgba(40, 70, 140, 0.1);
+  text-align: left;
+  color: var(--home-ink);
+}
+
+.mia__asked {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--home-hairline);
+}
+
+.mia__asked-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--home-muted);
+}
+
+.mia__asked-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.9375rem;
+  color: var(--home-greeting);
+}
+
+.mia__answer-heading {
+  margin: 0 0 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.mia__answer-text {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.mia__note,
+.mia__loading {
+  font-size: 0.9375rem;
+  color: var(--home-muted);
+}
+
+.mia__limitations {
+  margin-top: 12px;
+}
+
+.mia__limitations h3 {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--home-muted);
+}
+
+.mia__limitations ul {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.875rem;
+  color: var(--home-muted);
+}
+
+.mia__retry {
+  margin-top: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-6);
+  border-radius: 999px;
+  background: var(--home-link);
+}
+
+.mia__form {
+  margin-top: clamp(18px, 3.2vh, 34px);
+  width: min(100%, 650px);
+  min-height: 68px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px 0 24px;
+  border-radius: 999px;
+  background: var(--home-bar);
+  color: #fff;
+  box-shadow: 0 12px 34px rgba(26, 36, 80, 0.28);
+}
+
+.mia__answer + .mia__form {
+  margin-top: 16px;
+}
+
+.mia__form:focus-within {
+  outline: 3px solid var(--home-focus);
+  outline-offset: 3px;
+}
+
+.mia__form-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  color: #fff;
+}
+
+.mia__input {
+  flex: 1;
+  min-width: 0;
+  padding: 18px 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-size: 1.125rem;
+}
+
+.mia__input::placeholder {
+  color: #c4c9d6;
+  opacity: 1;
+}
+
+.mia__input:focus-visible {
+  outline: none;
+}
+
+.mia__input:disabled {
+  opacity: 0.7;
+}
+
+.mia__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  color: var(--home-bar);
+}
+
+.mia__send:hover:not(:disabled) {
+  opacity: 1;
+  background: #e8efff;
+}
+
+.mia__send svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Short or narrow screens (laptops, phones): the page cannot show the suggestions AND the bar
+   without scrolling, so - exactly as the brief describes - the suggested questions appear when the
+   user interacts with the bar, as a panel above it, never over an answer. The reference desktop
+   (>= 881px tall and > 1100px wide) keeps them visible at rest. */
+@media (max-height: 880px), (max-width: 1100px) {
+  .mia__suggest {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 14px);
+    width: min(92vw, 800px);
+    padding: 14px 16px 16px;
+    border-radius: 28px;
+    border: 1px solid #dfe7f6;
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 14px 40px rgba(40, 70, 140, 0.16);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(-50%, 8px);
+    transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  }
+
+  .mia:not([data-answering="true"]):not([data-has-text="true"]):focus-within .mia__suggest {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+  }
+
+  .mia__suggestions {
+    margin-top: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mia__chip {
+    min-height: 60px;
+  }
+
+  .mia {
+    padding-top: var(--space-2);
+  }
+
+  .mia__form {
+    margin-top: var(--space-3);
+  }
+
+  .home__layout {
+    padding-bottom: clamp(12px, 2.4vh, 24px);
+  }
+}
+
+/* --- the logo transition canvas: decoration only ---------------------------------------------- */
+
+.logo-trail-canvas {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+}
+
+/* --- /decisioni -------------------------------------------------------------------------------- */
+
+.decisioni-screen__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.decisioni-screen__header h1 {
   font-size: 1.75rem;
 }
 
-.today-screen__date {
+.decisioni-screen__error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
-  font-size: 1rem;
 }
 
-.today-screen__header button {
-  margin-left: auto;
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
-}
+/* --- feed-state skeleton (shared) -------------------------------------------------------------- */
 
 .today-screen__skeleton {
   display: flex;
@@ -299,18 +1265,6 @@ select {
   100% {
     background-position: 0 0;
   }
-}
-
-.today-screen__error {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-6);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
 }
 
 /* --- feed states ---------------------------------------------------------------------------------
@@ -462,41 +1416,295 @@ select {
   color: var(--color-text-secondary);
 }
 
-/* --- responsive: laptop / mobile -------------------------------------------------------------- */
+/* --- responsive: laptop / tablet / mobile ------------------------------------------------------
+   Desktop (>= 1280px) is the source of truth. Laptop keeps the same structure with tighter spacing;
+   tablet turns the sidebar into a compact icon rail; mobile into a top bar. Never a scaled copy of
+   the desktop coordinates. */
 
-@media (max-width: 1024px) {
-  .app-shell__main {
-    padding: var(--space-6) var(--space-5) var(--space-10);
+@media (max-width: 1279px) {
+  :root {
+    --sidebar-width: 216px;
+  }
+
+  .app-sidebar__logo {
+    margin-left: 24px;
+  }
+
+  .nav-item {
+    height: 50px;
+    padding: 0 22px;
+    gap: 12px;
+    font-size: 1rem;
+  }
+
+  .app-sidebar__footer {
+    padding-left: 20px;
+  }
+
+  .mia__suggestions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: min(100%, 780px);
+  }
+
+  .domain-tile {
+    padding: 14px 16px;
   }
 }
 
-@media (max-width: 480px) {
-  .app-shell__topbar {
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    padding: var(--space-3) var(--space-4);
+/* Below ~1200px the four areas no longer fit on one line: a 2x2 grid (and the status row may wrap,
+   so its divider - which would dangle at a line end - is dropped). */
+@media (max-width: 1199px) {
+  .home__status-divider {
+    display: none;
   }
 
-  .app-shell__account {
+  .domain-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-radius: 28px;
+  }
+
+  .domain-tile:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .domain-tile:nth-child(n + 3) {
+    border-top: 1px solid var(--home-hairline);
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --sidebar-width: 76px;
+  }
+
+  .app-sidebar {
+    align-items: center;
+    padding: 28px 10px 24px;
+  }
+
+  .app-sidebar__logo {
     margin-left: 0;
+    align-self: center;
+  }
+
+  .app-sidebar__nav {
+    margin-top: 24px;
+  }
+
+  .app-sidebar__nav ul {
+    align-items: center;
+  }
+
+  .nav-item {
+    position: relative;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border-radius: 16px;
+  }
+
+  /* Icon-only rail: the labels stay in the accessibility tree (visually hidden, never display:none),
+     so every item keeps its accessible name. */
+  .nav-item__label,
+  .nav-item__soon {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .app-sidebar__footer {
+    flex-direction: column;
+    gap: 12px;
+    padding-left: 0;
+  }
+
+  .app-sidebar__divider {
+    width: 34px;
+    height: 1px;
+  }
+
+  .profile-menu__panel {
+    left: calc(100% + 12px);
+    bottom: 0;
+  }
+
+  .property-header {
+    padding: 16px 24px 0;
+  }
+
+  .app-shell__main--page {
+    padding: var(--space-4) var(--space-5) var(--space-10);
+  }
+
+}
+
+@media (max-width: 639px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .app-sidebar {
+    flex-direction: row;
+    align-items: center;
     width: 100%;
-    justify-content: space-between;
+    height: auto;
+    gap: 4px;
+    padding: 8px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--home-sidebar-border);
   }
 
-  .app-shell__main {
-    padding: var(--space-5) var(--space-4) var(--space-10);
+  .app-sidebar__logo {
+    margin: 0 4px 0 0;
   }
 
-  .today-screen__header {
-    flex-wrap: wrap;
+  .app-sidebar__logo-slot {
+    width: 26px;
+    height: 33px;
   }
 
-  .today-screen__header button {
-    margin-left: 0;
+  .app-sidebar__nav {
+    margin: 0;
+    flex: 1;
+  }
+
+  .app-sidebar__nav ul {
+    flex-direction: row;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .nav-item {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .nav-item__icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .app-sidebar__footer {
+    margin-top: 0;
+    flex-direction: row;
+    gap: 2px;
+  }
+
+  .app-sidebar__divider {
+    display: none;
+  }
+
+  .profile-menu__button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .profile-menu__button svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .profile-menu__panel {
+    left: auto;
+    right: 0;
+    top: calc(100% + 8px);
+    bottom: auto;
+  }
+
+  .property-header {
+    align-self: stretch;
+    align-items: flex-end;
+    padding: 12px 16px 0;
+  }
+
+  .app-shell__main--page {
+    padding: var(--space-4) var(--space-4) var(--space-10);
+  }
+
+  .home__hero {
+    padding-top: var(--space-2);
+  }
+
+  .home__status {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .home__status-divider {
+    display: none;
+  }
+
+  .home__freshness {
+    font-size: 0.875rem;
+  }
+
+  .domain-summary {
+    border-radius: 24px;
+  }
+
+  .domain-tile {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .domain-tile__icon {
+    display: none;
+  }
+
+  .domain-tile__label {
+    font-size: 1rem;
+  }
+
+  .domain-tile__status {
+    font-size: 0.875rem;
+  }
+
+  .mia__suggestions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .mia__chip {
+    min-height: 56px;
+    border-radius: 28px;
+  }
+
+  .mia__form {
+    min-height: 60px;
+    padding-left: 18px;
+  }
+
+  .mia__answer {
+    padding: 16px 18px;
   }
 
   .decision-card__facts {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home__logo-wrap,
+  .home__logo--leaving,
+  .app-sidebar__logo-slot,
+  .nav-item {
+    transition: none;
+  }
+
+  .refresh-button[aria-busy="true"] .refresh-button__icon,
+  .home__skeleton-line {
+    animation: none;
   }
 }
 

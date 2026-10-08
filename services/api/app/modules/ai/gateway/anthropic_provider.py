@@ -12,6 +12,7 @@ given (`_answer_from_message` re-validates it byte for byte) - Gate 18's own
 `answer_validation.py` is the second, independent layer of distrust on top of this one.
 """
 
+import copy
 import json
 import logging
 import time
@@ -77,6 +78,18 @@ _OUTPUT_SCHEMA: dict[str, Any] = {
 }
 
 _EXPECTED_KEYS = frozenset(_OUTPUT_SCHEMA["required"])
+
+
+def _output_schema_for(request: LanguageModelRequest) -> dict[str, Any]:
+    """The default Decision Ask schema itself (the SAME object, so nothing about that path
+    changes) unless the request names its own closed `grounding_refs` vocabulary - then a deep
+    copy whose `items.enum` is exactly that vocabulary, never a mutation of the shared constant."""
+    if request.grounding_ref_values is None:
+        return _OUTPUT_SCHEMA
+    schema = copy.deepcopy(_OUTPUT_SCHEMA)
+    schema["properties"]["grounding_refs"]["items"]["enum"] = list(request.grounding_ref_values)
+    return schema
+
 
 # Fixed, deterministic: adaptive thinking (Sonnet 5's own default reasoning mode), but never
 # exposed - `display: "omitted"` redacts the content itself at the API level, so there is nothing
@@ -146,7 +159,10 @@ class AnthropicLanguageModelProvider:
 
     def generate(self, request: LanguageModelRequest) -> LanguageModelAnswer:
         started = time.monotonic()
-        output_format: JSONOutputFormatParam = {"type": "json_schema", "schema": _OUTPUT_SCHEMA}
+        output_format: JSONOutputFormatParam = {
+            "type": "json_schema",
+            "schema": _output_schema_for(request),
+        }
         output_config: OutputConfigParam = {"effort": _EFFORT, "format": output_format}
         messages: list[MessageParam] = [{"role": "user", "content": _content_blocks(request)}]
         try:

@@ -357,6 +357,16 @@ export interface AskRequest {
   question: string;
 }
 
+/** POST /api/v1/properties/{property_id}/ask request body (Home UI V1, "Mia Home"): one question
+ * about TODAY'S analysis of the whole property, never about one Decision. `as_of_local_date` is the
+ * SAME property-local business date (`YYYY-MM-DD`) the Decision Feed was requested for - explicit,
+ * never a server clock. Answered with the same `AskResponse` shape as the Decision Ask below. */
+export interface AskHomeRequest {
+  question: string;
+  /** ISO date (YYYY-MM-DD). */
+  as_of_local_date: string;
+}
+
 /** POST .../ask response (Gate 18). `answer`/`limitations` carry real content only for
  * `ANSWERED`/`INSUFFICIENT_CONTEXT` - `UNAVAILABLE`/`REFUSED` carry `answer: null`. No chat id, no
  * thread id, no conversation id anywhere - one question, one answer, nothing persisted. */

@@ -39,6 +39,12 @@ class LanguageModelRequest:
     context: str
     question: str
     max_answer_chars: int
+    # The closed set of `grounding_refs` values the provider's structured output may name. `None`
+    # (the default) keeps the Decision Ask vocabulary (`GroundingRef`) every pre-Mia-Home caller
+    # already relies on; the property-level Mia Home request (`AskHomeService`) passes its own,
+    # separate vocabulary instead - never a widened union that would let a Decision answer name a
+    # Home-only area (and vice versa).
+    grounding_ref_values: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)

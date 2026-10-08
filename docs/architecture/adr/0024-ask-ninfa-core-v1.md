@@ -10,7 +10,9 @@ deliberately provider-agnostic, deliberately not yet connected to a real vendor.
 
 ## Decision
 
-1. **Ask is scoped to exactly one Decision, never a general conversation.** The input is
+1. **Ask is scoped to exactly one Decision, never a general conversation.** *(Home UI V1 added a
+   sibling endpoint at property scope - [ADR 0028](0028-mia-home-context.md); this endpoint is
+   unchanged.)* The input is
    `property + decision + question`; the output is grounded ONLY in that Decision's own memory. A
    question that needs data outside that scope ("how's the Italian market doing?") has nothing to
    be grounded in, by construction - there is no broader context this endpoint could even offer it.

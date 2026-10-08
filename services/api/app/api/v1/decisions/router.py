@@ -12,6 +12,7 @@ runs), query semantics are validated here, and every actual read goes through
 
 from datetime import date
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
@@ -37,6 +38,7 @@ from app.api.v1.decisions.errors import (
     InvalidLimitError,
 )
 from app.api.v1.decisions.schemas import (
+    AskHomeRequest,
     AskRequest,
     AskResponse,
     DecisionDetailResponse,
@@ -56,6 +58,8 @@ from app.api.v1.decisions.serializers import (
 from app.db.session import get_session
 from app.modules.ai.ask_ninfa.context_builder import AskDecisionContextBuilder
 from app.modules.ai.ask_ninfa.guardrails import REFUSAL_COPY, classify_refusal
+from app.modules.ai.ask_ninfa.home_context_builder import AskHomeContextBuilder
+from app.modules.ai.ask_ninfa.home_service import AskHomeService
 from app.modules.ai.ask_ninfa.question import validate_question
 from app.modules.ai.ask_ninfa.service import AskNinfaService
 from app.modules.ai.ask_ninfa.types import AskStatus
@@ -64,6 +68,7 @@ from app.modules.decision_memory.service import DecisionMemoryService
 from app.modules.decisions.models import Decision
 from app.modules.decisions.types import DecisionStatus
 from app.modules.intelligence.priority.types import PriorityDecisionType
+from app.modules.properties.models import Property
 from app.modules.recommendations.engine import RecommendationEngine
 
 router = APIRouter(prefix="/properties/{property_id}", tags=["decisions"])
@@ -304,6 +309,62 @@ def ask_ninfa(
         status=result.status.value,
         answer=result.answer,
         grounding_refs=[ref.value for ref in result.grounding_refs],
+        limitations=list(result.limitations),
+    )
+
+
+# --- endpoint 6: ask Mia on the Home (property level, Home UI V1) --------------------------------
+
+
+@router.post(
+    "/ask",
+    response_model=AskResponse,
+    summary="Ask Mia about today's analysis of one property",
+)
+def ask_mia_home(
+    payload: AskHomeRequest,
+    response: Response,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    session: Session = Depends(get_session),
+    provider: LanguageModelProvider = Depends(get_language_model_provider),
+) -> AskResponse:
+    """Grounded, single-turn explanation over TODAY'S FEED of one property - never a general chat,
+    never an analysis of raw data. ENGINE CALCULATES, MIA EXPLAINS (ADR 0028): the context is built
+    ONLY from `DecisionMemoryService.get_feed()` - exactly what the Decision Feed endpoint already
+    returns for the same `(property, as_of_local_date)` - so Mia can never see, let alone find,
+    anything a detector did not already decide.
+
+    Read-only despite being a POST, exactly like the Decision Ask: no `DecisionService.sync()`, no
+    detector, no `PriorityService`, no write, no persisted conversation. `Cache-Control: no-store`
+    because a question/answer pair is never safe to replay for a different question.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    # Property-not-found (404) already happened inside `resolve_property_scope`, before this body.
+    as_of_date = _parse_as_of(payload.as_of_local_date)
+    cleaned_question = validate_question(payload.question)
+
+    # A REFUSED question never reaches the provider AND never pays for the feed query below.
+    refusal = classify_refusal(cleaned_question)
+    if refusal is not None:
+        return AskResponse(
+            status=AskStatus.REFUSED.value,
+            answer=None,
+            grounding_refs=[],
+            limitations=[REFUSAL_COPY[refusal]],
+        )
+
+    memory = DecisionMemoryService(session, scope.tenant)
+    feed = memory.get_feed(scope.property_id, as_of_date)
+    prop = session.get(Property, scope.property_id)
+    assert prop is not None  # `resolve_property_scope` just loaded this exact row
+    context = AskHomeContextBuilder().build(feed, ZoneInfo(prop.timezone))
+
+    result = AskHomeService(provider).ask(context, cleaned_question)
+    return AskResponse(
+        status=result.status.value,
+        answer=result.answer,
+        grounding_refs=list(result.grounding_refs),
         limitations=list(result.limitations),
     )
 

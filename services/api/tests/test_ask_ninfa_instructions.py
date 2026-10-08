@@ -8,8 +8,14 @@ from app.modules.ai.ask_ninfa.instructions import ASK_NINFA_SYSTEM_INSTRUCTIONS
 from app.modules.ai.ask_ninfa.types import ASK_NINFA_INSTRUCTIONS_VERSION
 
 
-def test_version_is_the_documented_v1_2_string() -> None:
-    assert ASK_NINFA_INSTRUCTIONS_VERSION == "ask-ninfa-v1.2"
+def test_version_is_the_documented_v1_3_string() -> None:
+    # v1.3 (Home UI V1, D5): the visible assistant is called Mia - persona line only.
+    assert ASK_NINFA_INSTRUCTIONS_VERSION == "ask-ninfa-v1.3"
+
+
+def test_the_visible_assistant_is_named_mia_not_ask_ninfa() -> None:
+    assert ASK_NINFA_SYSTEM_INSTRUCTIONS.startswith("Sei Mia")
+    assert "Sei Ask NINFA" not in ASK_NINFA_SYSTEM_INSTRUCTIONS
 
 
 def test_engine_calculates_ai_explains_semantics_are_stated() -> None:

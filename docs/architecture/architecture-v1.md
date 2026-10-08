@@ -71,7 +71,8 @@ UI: [decision-detail-ui-v1.md](decision-detail-ui-v1.md). Recommendation Engine:
 [recommendation-ui-v1.md](recommendation-ui-v1.md). Ask NINFA Core:
 [ask-ninfa-v1.md](ask-ninfa-v1.md). Anthropic Provider:
 [anthropic-provider-v1.md](anthropic-provider-v1.md). Ask NINFA Language Hardening:
-[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md).
+[ask-ninfa-language-v1.md](ask-ninfa-language-v1.md). Home UI: [home-ui-v1.md](home-ui-v1.md).
+Mia Home: [ask-mia-home-v1.md](ask-mia-home-v1.md).
 
 ## Components
 
@@ -560,6 +561,16 @@ call. The system instructions (`ask-ninfa-v1.1`) gained eight new brevity/langua
 `MAX_ANSWER_CHARS` dropped from 1200 to 700. Expected, every detector, Priority, the Decision
 Layer, the Recommendation Engine, thresholds, formulas, confidence, and ranking are all untouched.
 Details: [ask-ninfa-language-v1.md](ask-ninfa-language-v1.md), ADR 0026.
+
+## Home UI V1 and Mia Home
+
+The Home ("Oggi") was redesigned as a decision-first screen in a sidebar shell, and gained a
+property-level assistant, **Mia**: `POST /properties/{id}/ask` answers questions about today's feed
+of one property, from a context built **only** from `DecisionMemoryService.get_feed()` - the
+decisions the engine already produced, coverage, and the factual last booking import. ENGINE
+CALCULATES, MIA EXPLAINS: no raw data, no new detection, no ranking, no CURRENT/STALE judgement. No
+migration and no new dependency. Details: [home-ui-v1.md](home-ui-v1.md),
+[ask-mia-home-v1.md](ask-mia-home-v1.md), ADR 0027, ADR 0028.
 
 ## Pilot readiness (Gate 21B)
 

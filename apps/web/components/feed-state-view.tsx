@@ -10,6 +10,8 @@ export interface FeedStateViewProps {
   /** The Property's own IANA timezone (Gate 23B) - the freshness line below is formatted in
    * THIS timezone, never the browser's own (see `lib/date/property-date.ts`). */
   timeZone: string;
+  /** `/decisioni` lists every triggered decision; the default keeps Gate 14's top-5 limit. */
+  showAllDecisions?: boolean;
 }
 
 /** Gate 22: the one qualifying line every feed state below may add under its own headline -
@@ -49,7 +51,7 @@ function freshnessNote(freshness: InputFreshness, timeZone: string): string {
  * copy can never leak between them. Gate 22's coverage note is additive within each branch, never
  * a fifth branch of its own.
  */
-export function FeedStateView({ feed, timeZone }: FeedStateViewProps) {
+export function FeedStateView({ feed, timeZone, showAllDecisions = false }: FeedStateViewProps) {
   const coverage = coverageNote(feed.analysis_coverage);
   const freshness = freshnessNote(feed.input_freshness, timeZone);
 
@@ -108,7 +110,11 @@ export function FeedStateView({ feed, timeZone }: FeedStateViewProps) {
     case "ACTION_REQUIRED":
       return (
         <section className="feed-state feed-state--action-required" data-feed-state="ACTION_REQUIRED">
-          <DecisionList items={feed.items} propertyId={feed.property_id} />
+          <DecisionList
+            items={feed.items}
+            propertyId={feed.property_id}
+            showAll={showAllDecisions}
+          />
           {coverage !== null ? <p className="feed-state__coverage">{coverage}</p> : null}
           <p className="feed-state__freshness">{freshness}</p>
         </section>

@@ -1,33 +1,57 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { PropertyAccess } from "@ninfa/contracts";
 
 import { copy } from "@/lib/copy";
 import { useSession } from "@/lib/session/session-context";
 
-import { PropertySelector } from "./property-selector";
+import { AppSidebar, type ShellSection } from "./app-sidebar";
+import { PropertyHeader } from "./property-header";
+import { ShellLogoContext, type ShellLogoControl } from "./shell-logo-context";
 
 export interface AppShellProps {
   properties: PropertyAccess[];
   selectedPropertyId: string;
   onSelectProperty: (propertyId: string) => void;
   onLoggedOut: () => void;
+  /** Which sidebar section is current (the Decision Detail passes "decisioni"). */
+  activeSection: ShellSection;
+  /** `"home"`: the full-bleed canvas of the Home; `"page"` (default): the centred reading column
+   * every other screen uses. */
+  variant?: "page" | "home";
+  /** `true` on the Home: the sidebar logo starts empty because the hero logo is the one on screen
+   * (the Home reveals it, through `useShellLogo()`, once the logo transition has landed). */
+  logoInitiallyHidden?: boolean;
   children: ReactNode;
 }
 
-/** The whole authenticated shell (Gate 14 spec, "App shell"): NINFA wordmark, property selector,
- * account email, logout. Deliberately nothing else - no Analytics/Revenue/Costi/Personale/
- * Settings/Notifications/Ask NINFA links to features that do not exist yet. */
+/**
+ * The whole authenticated shell (Home UI V1, replacing Gate 14's topbar): a sidebar with the logo
+ * slot, Oggi / Decisioni / Dati / Struttura and profile | settings; and, on the content side, the
+ * property header (name + local date) above the page. Dati, Struttura and Impostazioni do not exist
+ * yet and are never links (see `AppSidebar`). Logout is the profile menu's "Esci" - the same
+ * `logout()` Gate 14 wired, unchanged.
+ */
 export function AppShell({
   properties,
   selectedPropertyId,
   onSelectProperty,
   onLoggedOut,
+  activeSection,
+  variant = "page",
+  logoInitiallyHidden = false,
   children,
 }: AppShellProps) {
   const { session, logout } = useSession();
+  const [logoHidden, setLogoHidden] = useState(logoInitiallyHidden);
+  const logoSlotRef = useRef<HTMLDivElement>(null);
+
+  const logoControl = useMemo<ShellLogoControl>(
+    () => ({ slotRef: logoSlotRef, setHidden: setLogoHidden }),
+    [],
+  );
 
   async function handleLogout() {
     await logout();
@@ -35,22 +59,35 @@ export function AppShell({
   }
 
   return (
-    <div className="app-shell">
-      <header className="app-shell__topbar">
-        <span className="app-shell__wordmark">{copy.brand.wordmark}</span>
-        <PropertySelector
-          properties={properties}
+    <ShellLogoContext.Provider value={logoControl}>
+      <div className="app-shell">
+        <a className="skip-link" href="#main-content">
+          {copy.nav.skipToContent}
+        </a>
+        <AppSidebar
           selectedPropertyId={selectedPropertyId}
-          onSelect={onSelectProperty}
+          activeSection={activeSection}
+          logoHidden={logoHidden}
+          logoSlotRef={logoSlotRef}
+          displayName={session?.user.display_name ?? null}
+          email={session?.user.email ?? null}
+          onLogout={() => void handleLogout()}
         />
-        <div className="app-shell__account">
-          {session ? <span className="app-shell__email">{session.user.email}</span> : null}
-          <button type="button" onClick={() => void handleLogout()}>
-            {copy.shell.logout}
-          </button>
+        <div className="app-shell__content">
+          <PropertyHeader
+            properties={properties}
+            selectedPropertyId={selectedPropertyId}
+            onSelect={onSelectProperty}
+          />
+          <main
+            id="main-content"
+            tabIndex={-1}
+            className={`app-shell__main app-shell__main--${variant}`}
+          >
+            {children}
+          </main>
         </div>
-      </header>
-      <main className="app-shell__main">{children}</main>
-    </div>
+      </div>
+    </ShellLogoContext.Provider>
   );
 }

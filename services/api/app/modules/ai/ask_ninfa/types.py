@@ -27,7 +27,9 @@ MAX_HISTORY_OBSERVATIONS = 10
 # instructions' own brevity rules, never a token estimator added to this business-layer constant.
 MAX_ANSWER_CHARS = 700
 
-ASK_NINFA_INSTRUCTIONS_VERSION = "ask-ninfa-v1.2"
+# v1.3: the visible assistant is now called Mia (D5, Home UI V1) - persona line only, no rule
+# changed.
+ASK_NINFA_INSTRUCTIONS_VERSION = "ask-ninfa-v1.3"
 
 
 class AskStatus(StrEnum):

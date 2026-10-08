@@ -30,7 +30,8 @@ export const copy = {
     logout: "Esci",
   },
   property: {
-    selectorLabel: "Struttura",
+    // "Struttura attiva", not "Struttura": the sidebar has its own (future) "Struttura" section.
+    selectorLabel: "Struttura attiva",
     emptyStateTitle: "Nessuna struttura disponibile",
     emptyStateBody: "Il tuo account non è associato a nessuna struttura.",
   },
@@ -76,11 +77,50 @@ export const copy = {
     reliabilityLabel: "Affidabilità",
     rankLabel: "Priorità",
   },
+  // Home UI V1: the sidebar. Dati / Struttura / Impostazioni do not exist yet - they are shown in the
+  // approved layout, but never as a link to a page that is not there (see `AppSidebar`).
+  nav: {
+    skipToContent: "Vai al contenuto",
+    mainLabel: "Navigazione principale",
+    secondaryLabel: "Account e impostazioni",
+    today: "Oggi",
+    decisions: "Decisioni",
+    data: "Dati",
+    structure: "Struttura",
+    settings: "Impostazioni",
+    profile: "Profilo e account",
+    comingSoon: "In arrivo",
+    logoHome: "NINFA - vai a Oggi",
+  },
+  decisioni: {
+    heading: "Decisioni",
+  },
+  // Home UI V1: "Oggi" - the decision-first home. Every string here is a TEMPLATE: no property name,
+  // person, count, time or Decision text from the approved reference is ever hardcoded.
+  home: {
+    // `firstName === null` (no display name, or a blank one): "Ciao," - never derived from the email.
+    greeting: (firstName: string | null) => (firstName === null ? "Ciao," : `Ciao ${firstName},`),
+    decisionsRequireAttention: (count: number) =>
+      count === 1 ? "1 decisione richiede attenzione" : `${count} decisioni richiedono attenzione`,
+    // Gate 23B: a plain FACT about when NINFA finished an import - never "Dati aggiornati alle ...".
+    freshnessKnown: (formatted: string) => `Ultimo import prenotazioni: ${formatted}`,
+    freshnessUnknown: "Ultimo import prenotazioni non disponibile",
+    freshnessToday: (time: string) => `oggi alle ${time}`,
+    freshnessYesterday: (time: string) => `ieri alle ${time}`,
+    refresh: "Aggiorna analisi",
+    refreshing: "Aggiornamento in corso",
+    domainSummaryLabel: "Riepilogo per area",
+    // Tone words only for assistive tech: a tile never relies on its dot colour alone.
+    attention: (count: number) => (count === 1 ? "1 attenzione" : `${count} attenzioni`),
+    noAttention: "Nessuna attenzione",
+    partialAnalysis: "Analisi parziale",
+    unavailable: "Non disponibile",
+  },
   errors: {
     propertyNotFound: "La struttura selezionata non è più disponibile.",
   },
   detail: {
-    back: "← Oggi",
+    back: "← Decisioni",
     statusOpen: "Aperta",
     statusResolved: "Risolta",
     detectedOn: (date: string) => `Rilevata il ${date}`,
@@ -103,7 +143,7 @@ export const copy = {
     retry: "Riprova",
     notFoundTitle: "Decisione non disponibile",
     notFoundBody: "Questa decisione non è disponibile per la struttura selezionata.",
-    backToOggi: "Torna a Oggi",
+    backToDecisioni: "Torna alle Decisioni",
     historyEmpty: "Nessuna evoluzione disponibile.",
     historyLoadMore: "Mostra eventi precedenti",
     historyLoadingMore: "Caricamento…",
@@ -159,10 +199,21 @@ export const decisionTypeTitles: Record<DecisionType, string> = {
 };
 
 /** Plain-language labels for the four Gate 22 analysis domains - a client NEVER renders
- * `AnalysisDomain`'s own raw values ("REVENUE", "COSTS", ...) in the UI. */
+ * `AnalysisDomain`'s own raw values ("REVENUE", "COSTS", ...) in the UI. Home UI V1 renamed
+ * DISTRIBUTION from "Canali" to "Distribuzione" (the approved reference's own word). */
 export const analysisDomainLabels: Record<AnalysisDomain, string> = {
   REVENUE: "Ricavi",
-  DISTRIBUTION: "Canali",
+  DISTRIBUTION: "Distribuzione",
   COSTS: "Costi",
   LABOR: "Personale",
+};
+
+/** "Not analysed", agreeing with each domain's own grammatical gender/number (the approved Home
+ * reference itself writes "Non analizzati" under Costi and "Non analizzato" under Personale) - one
+ * string per domain, never a single reused form. */
+export const domainNotAnalyzedCopy: Record<AnalysisDomain, string> = {
+  REVENUE: "Non analizzati",
+  DISTRIBUTION: "Non analizzata",
+  COSTS: "Non analizzati",
+  LABOR: "Non analizzato",
 };

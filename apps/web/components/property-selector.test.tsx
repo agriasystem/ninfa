@@ -54,7 +54,7 @@ describe("PropertySelector", () => {
       />,
     );
 
-    const select = screen.getByLabelText("Struttura") as HTMLSelectElement;
+    const select = screen.getByLabelText("Struttura attiva") as HTMLSelectElement;
     expect(select.tagName).toBe("SELECT");
   });
 
@@ -69,7 +69,7 @@ describe("PropertySelector", () => {
       />,
     );
 
-    await user.selectOptions(screen.getByLabelText("Struttura"), "p2");
+    await user.selectOptions(screen.getByLabelText("Struttura attiva"), "p2");
 
     expect(onSelect).toHaveBeenCalledWith("p2");
   });

@@ -98,7 +98,7 @@ Additive only - no new page, card or section. `feed-state-view.tsx` adds one sub
 (never under `NOT_PROCESSED`, which is unchanged): nothing when coverage is `FULL`, "Non
 analizzati: <domains>." when `PARTIAL`, "Copertura dell'analisi non disponibile per questo run."
 when `UNKNOWN`. Domain names are always the plain-language labels in `lib/copy.ts`'s
-`analysisDomainLabels` (Ricavi/Canali/Costi/Personale) - the raw `AnalysisDomain` enum values
+`analysisDomainLabels` (Ricavi/Distribuzione/Costi/Personale - "Distribuzione" was "Canali" until Home UI V1) - the raw `AnalysisDomain` enum values
 never reach the UI.
 
 ### "Tutto sotto controllo" stays honest

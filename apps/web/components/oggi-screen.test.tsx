@@ -15,6 +15,7 @@ vi.mock("@/lib/session/session-context", () => ({
 vi.mock("@/lib/api/decisions", () => ({
   getDecisionFeed: (...args: unknown[]) => getDecisionFeedMock(...args),
 }));
+vi.mock("@/lib/api/ask-ninfa", () => ({ askMiaHome: vi.fn() }));
 
 function property(id: string, name: string, timezone = "Europe/Rome"): PropertyAccess {
   return { id, name, slug: name.toLowerCase().replace(/\s+/g, "-"), timezone };
@@ -74,7 +75,7 @@ describe("OggiScreen", () => {
       <OggiScreen requestedPropertyId={null} onSelectProperty={vi.fn()} onNavigateToLogin={vi.fn()} />,
     );
 
-    expect(screen.queryByLabelText("Struttura")).toBeNull();
+    expect(screen.queryByLabelText("Struttura attiva")).toBeNull();
     await waitFor(() => expect(getDecisionFeedMock).toHaveBeenCalledWith("p1", expect.any(String)));
   });
 
@@ -86,7 +87,7 @@ describe("OggiScreen", () => {
       <OggiScreen requestedPropertyId="p1" onSelectProperty={vi.fn()} onNavigateToLogin={vi.fn()} />,
     );
 
-    expect(screen.getByLabelText("Struttura")).not.toBeNull();
+    expect(screen.getByLabelText("Struttura attiva")).not.toBeNull();
   });
 
   it("switching property (via onSelectProperty) refetches the feed for the new property", async () => {
@@ -146,5 +147,26 @@ describe("OggiScreen", () => {
     await waitFor(() => expect(getDecisionFeedMock).toHaveBeenCalledWith("p2", "2026-09-25"));
 
     vi.useRealTimers();
+  });
+
+  it("is the Home inside the sidebar shell: 'Oggi' current, hero logo shown, small logo still empty", async () => {
+    const prop = property("p1", "Masseria Ninfa");
+    useSessionMock.mockReturnValue({
+      status: "authenticated",
+      session: session([prop]),
+      refresh: vi.fn(),
+      logout: vi.fn(),
+    });
+
+    const { container } = render(
+      <OggiScreen requestedPropertyId="p1" onSelectProperty={vi.fn()} onNavigateToLogin={vi.fn()} />,
+    );
+
+    expect(await screen.findByText("Tutto sotto controllo")).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Oggi", current: "page" })).not.toBeNull();
+    expect(screen.getByText("Masseria Ninfa")).not.toBeNull(); // the REAL property name, in the header
+    expect(container.querySelector(".home__logo")).not.toBeNull();
+    expect(container.querySelector(".app-sidebar__logo-slot")?.getAttribute("data-hidden")).toBe("true");
+    expect(screen.getByRole("textbox", { name: "La tua domanda per Mia" })).not.toBeNull();
   });
 });

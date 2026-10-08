@@ -59,6 +59,7 @@ function DecisionDetailScreenContent({
       selectedPropertyId={selected.id}
       onSelectProperty={onNavigateToOggi}
       onLoggedOut={onNavigateToLogin}
+      activeSection="decisioni"
     >
       <DecisionDetailView propertyId={selected.id} decisionId={decisionId} />
     </AppShell>
