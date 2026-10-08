@@ -31,6 +31,7 @@ from anthropic.types import (
 from app.modules.ai.ask_ninfa.types import GroundingRef
 from app.modules.ai.gateway.errors import LanguageModelUnavailableError
 from app.modules.ai.gateway.protocol import (
+    HistoryTurn,
     LanguageModelAnswer,
     LanguageModelRequest,
     ModelAnswerStatus,
@@ -113,15 +114,33 @@ def _max_tokens_for(request: LanguageModelRequest) -> int:
 _THINKING: ThinkingConfigAdaptiveParam = {"type": "adaptive", "display": "omitted"}
 
 
+def _history_block_text(history: tuple[HistoryTurn, ...]) -> str:
+    """The earlier turns of the page session, one JSON object per line (plain Italian keys). JSON
+    string escaping means a message can never close a tag or forge a neighbouring turn, whatever the
+    client sent. The label tells the model what this block is NOT: business truth."""
+    lines = "\n".join(
+        json.dumps(
+            {"chi": "utente" if turn.role == "user" else "mia", "testo": turn.content},
+            ensure_ascii=False,
+        )
+        for turn in history
+    )
+    return f"<conversation_history>\n{lines}\n</conversation_history>"
+
+
 def _content_blocks(request: LanguageModelRequest) -> list[TextBlockParam]:
-    """Context and question as two SEPARATE, deterministically-ordered content blocks - never
-    concatenated into one string, never interpolated into `system`. The XML-ish tags are plain
-    structural labels, not instructions - see ADR 0025, "why content blocks, not string
-    concatenation"."""
-    return [
-        {"type": "text", "text": f"<context>\n{request.context}\n</context>"},
-        {"type": "text", "text": f"<question>\n{request.question}\n</question>"},
+    """Context, (optional) conversation history and question as SEPARATE, deterministically-ordered
+    content blocks - never concatenated into one string, never interpolated into `system`. The
+    XML-ish tags are plain structural labels, not instructions - see ADR 0025, "why content blocks,
+    not string concatenation". The history block exists only for a request that carries history
+    (Mia Home follow-ups); every other request keeps exactly its two blocks."""
+    blocks: list[TextBlockParam] = [
+        {"type": "text", "text": f"<context>\n{request.context}\n</context>"}
     ]
+    if request.history:
+        blocks.append({"type": "text", "text": _history_block_text(request.history)})
+    blocks.append({"type": "text", "text": f"<question>\n{request.question}\n</question>"})
+    return blocks
 
 
 def _answer_from_message(message: Message) -> LanguageModelAnswer:

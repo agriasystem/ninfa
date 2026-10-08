@@ -277,7 +277,12 @@ def test_the_provider_gets_three_separate_fields_and_the_home_vocabulary(
     assert request.system_instructions == ASK_MIA_HOME_SYSTEM_INSTRUCTIONS
     assert request.question == "Quali dati ha usato NINFA oggi?"  # trimmed, nothing else
     assert request.max_answer_chars == MAX_HOME_ANSWER_CHARS
-    assert request.grounding_ref_values == tuple(ref.value for ref in HomeGroundingRef)
+    # the per-request vocabulary: the six base refs FIRST, then exactly the refs of this context
+    base = tuple(ref.value for ref in HomeGroundingRef)
+    assert request.grounding_ref_values is not None
+    assert request.grounding_ref_values[: len(base)] == base
+    assert "coverage:distribution" in request.grounding_ref_values
+    assert request.history == ()  # a first question carries no conversation
     context = json.loads(request.context)
     assert context["data di riferimento"] == "2026-08-01"
     assert context["numero di decisioni che richiedono attenzione"] == 5

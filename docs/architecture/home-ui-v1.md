@@ -147,21 +147,29 @@ backend is described in [ask-mia-home-v1.md](ask-mia-home-v1.md).
 - **The user's message** is right-aligned, softly tinted, readable width, Poppins - not a boxed form
   summary and not a chat bubble list. **Mia's reply** is open text under a small "Mia" label with the
   NINFA mark (an `<h2>`, small), no card; limitations, when present, stay as a small muted list.
-- **One exchange at a time, still not a chat.** The endpoint is stateless per question, so the Home
-  shows exactly the submitted question + Mia's answer; a new question **replaces** the exchange (no
-  history, because the model is never given one). Nothing is persisted.
+- **A short conversation, still not a chat page (Mia V2, ADR 0029).** The newest **4 exchanges** of
+  the page session (the one being asked included) stay visible in a **bounded, labelled area above the
+  bar** (`max-height: min(42vh, 400px)`, it scrolls inside itself - the operational Home is never
+  pushed away; the newest exchange starts at its top). They are also sent back as `history`
+  (complete earlier exchanges only, at most 3 from the UI) so a follow-up ("Perché?") can be
+  understood; a failed, refused or unavailable exchange is not part of it. Nothing is persisted: it is
+  lost on reload, on "Nuova conversazione" (disabled while Mia answers) or when the property / business
+  date changes (a late answer of the old one is ignored). Only the newest reply is the polite live
+  region.
 - **One request in flight**, enforced synchronously (a ref, not only state). While Mia answers, the
   input stays **enabled and focused** - focus is never taken from the user and a draft of the next
   question can be typed - but sending is blocked: the arrow turns into a disabled spinner
   (`aria-label="Mia sta elaborando…"`) and the form is `aria-busy`. When the answer arrives sending is
   available again. After a click on the arrow, or on "Riprova", the focus stays in (or returns to) the input.
-- **Enter sends.** The field is a single-line `<input>` (no multi-line mode), so Shift+Enter sends
-  too. Empty / whitespace-only never sends and shows no arrow.
+- **The composer** is an auto-growing `<textarea>` (1 to 4 lines, then it scrolls inside itself).
+  **Enter sends, Shift+Enter inserts a new line**; Enter during IME composition never sends. Empty /
+  whitespace-only never sends and shows no arrow. The arrow and the search icon stay on the last line.
 - **The suggested questions only fill** the input; the user confirms with Enter/the arrow, which then
   behaves exactly as for typed text.
 - **Every status renders in Mia's reply, under the sent question, which stays visible**: `ANSWERED`,
   `INSUFFICIENT_CONTEXT`, `UNAVAILABLE` (+ "Riprova"), `REFUSED`, network error (+ "Riprova"). A retry
-  **re-sends the submitted question** (no retyping) and never touches a draft in the bar.
+  **re-sends the submitted question with its original history** (no retyping) and never touches a
+  draft in the bar.
 - **Rich answers** (`ask-mia-home-v2`): the answer is plain text with line structure, rendered as short
   paragraphs and, for lines starting with `- `, a real bulleted list (`lib/ask-ninfa/format-answer.ts`).
   Nothing is interpreted as Markdown or HTML and no word is dropped. An `INSUFFICIENT_CONTEXT` reply

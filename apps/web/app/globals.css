@@ -990,15 +990,62 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   color: #2f6fe4;
 }
 
-/* The current exchange: the user's own message, then Mia's open reply (no boxed card). */
+/* The short conversation: the newest few exchanges (user's own message, then Mia's open reply - no
+   boxed cards) in a BOUNDED area above the bar. It scrolls inside itself, so a growing conversation
+   never pushes the operational Home away. */
 
-.mia__exchange {
+.mia__conversation {
   width: min(100%, 760px);
   margin-top: 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 4px;
   text-align: left;
+}
+
+.mia__conversation-tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mia__reset {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--home-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mia__reset:hover:not(:disabled) {
+  color: var(--home-ink);
+  background: rgba(214, 227, 252, 0.45);
+}
+
+.mia__reset:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mia__conversation-scroll {
+  position: relative; /* so the newest exchange's offsetTop is measured inside this area */
+  max-height: min(42vh, 400px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.mia__exchange {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 @keyframes mia-enter {
@@ -1170,17 +1217,17 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 /* The exchange gets a soft, blurred backdrop - feathered at BOTH ends, so there is no visible edge
    against the aurora or the bar - so a Home scrolled under the pinned dock never shows through Mia's
    text (the page can be taller than a short screen). The bar itself stays on the clear aurora. */
-.mia__exchange {
+.mia__conversation {
   position: relative;
   isolation: isolate;
 }
 
-.mia__exchange::before {
+.mia__conversation::before {
   content: "";
   position: absolute;
   z-index: -1;
   inset: -22px -100vw -14px;
-  background: rgba(251, 252, 254, 0.78);
+  background: rgba(251, 252, 254, 0.94);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   -webkit-mask-image: linear-gradient(transparent, #000 30px, #000 calc(100% - 22px), transparent);
@@ -1223,10 +1270,12 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   width: min(100%, 650px);
   min-height: 68px;
   display: flex;
-  align-items: center;
+  /* The composer grows to four lines: the icon and the arrow stay on the LAST line's baseline row. */
+  align-items: flex-end;
   gap: 14px;
   padding: 0 12px 0 24px;
-  border-radius: 999px;
+  /* half of the one-line height: a capsule at one line, a rounded block when it grows */
+  border-radius: 34px;
   background: var(--home-bar);
   color: #fff;
   box-shadow: 0 12px 34px rgba(26, 36, 80, 0.28);
@@ -1241,17 +1290,24 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   flex: none;
   width: 26px;
   height: 26px;
+  margin-bottom: 21px; /* centred on the first line of a one-line composer: (68 - 26) / 2 */
   color: #fff;
 }
 
+/* An auto-growing <textarea> (1-4 lines, then it scrolls inside itself - see `autosize`). */
 .mia__input {
   flex: 1;
   min-width: 0;
-  padding: 18px 0;
+  padding: 20px 0;
   border: 0;
   background: transparent;
   color: #fff;
+  font: inherit;
   font-size: 1.125rem;
+  line-height: 1.5; /* 27px: one line + the padding is the 68px bar */
+  resize: none;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .mia__input::placeholder {
@@ -1273,6 +1329,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   place-items: center;
   width: 46px;
   height: 46px;
+  margin-bottom: 11px; /* centred on the last line of a one-line composer: (68 - 46) / 2 */
   padding: 0;
   border-radius: 50%;
   border: 0;
@@ -1832,11 +1889,35 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   .mia__form {
     min-height: 60px;
     padding-left: 18px;
+    border-radius: 30px;
+  }
+
+  .mia__form-icon {
+    margin-bottom: 17px; /* (60 - 26) / 2 */
+  }
+
+  .mia__input {
+    padding: 16px 0; /* 60px bar with a 27px line */
+  }
+
+  .mia__send {
+    margin-bottom: 7px; /* (60 - 46) / 2 */
+  }
+
+  .mia__conversation {
+    margin-top: 12px;
+  }
+
+  .mia__conversation-scroll {
+    gap: 18px;
   }
 
   .mia__exchange {
-    margin-top: 12px;
     gap: 10px;
+  }
+
+  .mia__reset {
+    min-height: 40px;
   }
 
   .mia__user-message {

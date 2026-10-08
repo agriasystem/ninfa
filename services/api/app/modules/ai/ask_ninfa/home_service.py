@@ -11,23 +11,27 @@ differs is only the instructions, the context shape and the closed `grounding_re
 guess (see ADR 0028).
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.modules.ai.ask_ninfa.answer_validation import validate_model_answer_core
 from app.modules.ai.ask_ninfa.guardrails import REFUSAL_COPY, classify_refusal
+from app.modules.ai.ask_ninfa.home_history import HomeHistoryTurn
 from app.modules.ai.ask_ninfa.home_instructions import ASK_MIA_HOME_SYSTEM_INSTRUCTIONS
 from app.modules.ai.ask_ninfa.home_serialization import serialize_home_context
 from app.modules.ai.ask_ninfa.home_types import (
     MAX_HOME_ANSWER_CHARS,
     AskHomeContext,
-    HomeGroundingRef,
+    grounding_vocabulary,
 )
 from app.modules.ai.ask_ninfa.question import validate_question
 from app.modules.ai.ask_ninfa.types import AskStatus
 from app.modules.ai.gateway.errors import LanguageModelUnavailableError
-from app.modules.ai.gateway.protocol import LanguageModelProvider, LanguageModelRequest
-
-_HOME_GROUNDING_VOCABULARY = tuple(ref.value for ref in HomeGroundingRef)
+from app.modules.ai.gateway.protocol import (
+    HistoryTurn,
+    LanguageModelProvider,
+    LanguageModelRequest,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +54,12 @@ class AskHomeService:
     def __init__(self, provider: LanguageModelProvider) -> None:
         self._provider = provider
 
-    def ask(self, context: AskHomeContext, question: str) -> AskHomeResult:
+    def ask(
+        self,
+        context: AskHomeContext,
+        question: str,
+        history: Sequence[HomeHistoryTurn] = (),
+    ) -> AskHomeResult:
         cleaned_question = validate_question(question)
 
         refusal = classify_refusal(cleaned_question)
@@ -62,12 +71,15 @@ class AskHomeService:
                 limitations=(REFUSAL_COPY[refusal],),
             )
 
+        # Per-request closed vocabulary: the fixed base refs + exactly the refs of THIS context.
+        vocabulary = grounding_vocabulary(context)
         request = LanguageModelRequest(
             system_instructions=ASK_MIA_HOME_SYSTEM_INSTRUCTIONS,
             context=serialize_home_context(context),
             question=cleaned_question,
             max_answer_chars=MAX_HOME_ANSWER_CHARS,
-            grounding_ref_values=_HOME_GROUNDING_VOCABULARY,
+            grounding_ref_values=vocabulary,
+            history=tuple(HistoryTurn(turn.role.value, turn.content) for turn in history),
         )
 
         try:
@@ -78,7 +90,7 @@ class AskHomeService:
             return _UNAVAILABLE
 
         validated = validate_model_answer_core(
-            raw_answer, frozenset(_HOME_GROUNDING_VOCABULARY), MAX_HOME_ANSWER_CHARS
+            raw_answer, frozenset(vocabulary), MAX_HOME_ANSWER_CHARS
         )
         if validated is None:
             return _UNAVAILABLE

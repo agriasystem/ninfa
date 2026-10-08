@@ -26,7 +26,13 @@ describe("askMiaHome", () => {
     const body = { status: "ANSWERED", answer: "Una decisione.", grounding_refs: [], limitations: [] };
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(body));
 
-    const result = await askMiaHome("prop-1", "2026-10-08", "Qual è la priorità più urgente oggi?", fetchImpl);
+    const result = await askMiaHome(
+      "prop-1",
+      "2026-10-08",
+      "Qual è la priorità più urgente oggi?",
+      [],
+      fetchImpl,
+    );
 
     expect(result).toEqual({ ok: true, data: body });
     const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
@@ -46,10 +52,30 @@ describe("askMiaHome", () => {
       .fn()
       .mockResolvedValue(jsonResponse({ status: "ANSWERED", answer: "x", grounding_refs: [], limitations: [] }));
 
-    await askMiaHome("prop-1", "2026-10-08", "Ciao?", fetchImpl);
+    await askMiaHome("prop-1", "2026-10-08", "Ciao?", [], fetchImpl);
 
     const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
     expect(Object.keys(JSON.parse(init.body as string)).sort()).toEqual(["as_of_local_date", "question"]);
+  });
+
+  it("sends the short conversation history ONLY when there is one, as plain role/content pairs", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example");
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ status: "ANSWERED", answer: "x", grounding_refs: [], limitations: [] }));
+    const history = [
+      { role: "user", content: "Qual è la priorità più urgente?" },
+      { role: "assistant", content: "Le prenotazioni del 12 ottobre..." },
+    ] as const;
+
+    await askMiaHome("prop-1", "2026-10-08", "Perché?", [...history], fetchImpl);
+
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      question: "Perché?",
+      as_of_local_date: "2026-10-08",
+      history,
+    });
   });
 
   it("turns an API error into a typed failure, never a throw", async () => {
@@ -58,7 +84,7 @@ describe("askMiaHome", () => {
       jsonResponse({ error: { code: "INVALID_AS_OF_DATE", message: "bad", details: null, request_id: null } }, 400),
     );
 
-    const result = await askMiaHome("prop-1", "nope", "Ciao?", fetchImpl);
+    const result = await askMiaHome("prop-1", "nope", "Ciao?", [], fetchImpl);
 
     expect(result).toEqual({ ok: false, status: 400, code: "INVALID_AS_OF_DATE", message: "bad" });
   });

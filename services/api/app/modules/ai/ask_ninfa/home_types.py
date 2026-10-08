@@ -12,6 +12,7 @@ Nothing here is persisted: no conversation, no message (see ADR 0028).
 from dataclasses import dataclass
 from enum import StrEnum
 
+from app.modules.ai.ask_ninfa.home_facts import OperationalContext
 from app.modules.ai.ask_ninfa.types import AskDataPoint
 
 # A feed can carry more triggered candidates than a short, operative answer can usefully compare;
@@ -28,7 +29,7 @@ MAX_HOME_DECISIONS = 10
 # `home_instructions.py`.
 MAX_HOME_ANSWER_CHARS = 1800
 
-ASK_MIA_HOME_INSTRUCTIONS_VERSION = "ask-mia-home-v2"
+ASK_MIA_HOME_INSTRUCTIONS_VERSION = "ask-mia-home-v3"
 
 
 class HomeGroundingRef(StrEnum):
@@ -70,12 +71,16 @@ class AskHomeDecisionContext:
     facts: tuple[AskDataPoint, ...]
     impact_kind: str | None
     economic_impact: tuple[AskDataPoint, ...]
+    # The grounding ref naming this decision in structured response metadata ("decision:..."),
+    # never shown to the end user. Empty only for a hand-built test context.
+    ref: str = ""
 
 
 @dataclass(frozen=True, slots=True)
 class AskHomeAreaCoverage:
     area: str
     status_label: str
+    ref: str = ""  # "coverage:<area>", e.g. "coverage:distribution"
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +101,7 @@ class AskHomeFreshnessContext:
     local_date: str | None
     local_time: str | None
     relative_day: str | None
+    ref: str = "freshness:bookings"
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +126,30 @@ class AskHomeContext:
     coverage: AskHomeCoverageContext | None
     freshness: AskHomeFreshnessContext | None
     last_successful_analysis_date: str | None
+    # Deterministic facts fetched for THIS question on top of the feed (occupancy, OTA share, ...);
+    # `None` for a question that needs nothing beyond the feed.
+    operational: OperationalContext | None = None
+
+
+def grounding_vocabulary(context: AskHomeContext) -> tuple[str, ...]:
+    """The closed set of `grounding_refs` a model may name for THIS request: the fixed base refs
+    plus exactly the refs present in `context` (its decisions, covered areas, freshness and any
+    operational section). A ref the model invents is outside this set and is dropped by validation
+    - it can never smuggle a made-up source into the response metadata."""
+    refs: dict[str, None] = dict.fromkeys(ref.value for ref in HomeGroundingRef)
+    for decision in context.decisions:
+        if decision.ref:
+            refs.setdefault(decision.ref, None)
+    if context.coverage is not None:
+        for area in context.coverage.areas:
+            if area.ref:
+                refs.setdefault(area.ref, None)
+    if context.freshness is not None and context.freshness.ref:
+        refs.setdefault(context.freshness.ref, None)
+    if context.operational is not None:
+        for ref in context.operational.refs:
+            refs.setdefault(ref, None)
+    return tuple(refs)
 
 
 __all__ = [
@@ -132,4 +162,5 @@ __all__ = [
     "AskHomeDecisionContext",
     "AskHomeFreshnessContext",
     "HomeGroundingRef",
+    "grounding_vocabulary",
 ]

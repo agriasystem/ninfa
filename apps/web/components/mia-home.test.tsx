@@ -36,7 +36,7 @@ function renderMia(onFirstInput = vi.fn()) {
 }
 
 function input() {
-  return screen.getByRole("textbox", { name: "La tua domanda per Mia" }) as HTMLInputElement;
+  return screen.getByRole("textbox", { name: "La tua domanda per Mia" }) as HTMLTextAreaElement;
 }
 
 function form() {
@@ -133,7 +133,7 @@ describe("MiaHome - suggestions fill the input and NEVER submit", () => {
     await user.keyboard("{Enter}");
 
     expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", QUESTIONS[0]);
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", QUESTIONS[0], []);
     expect(input().value).toBe(""); // the bar is emptied...
     expect(userMessage(container)?.textContent).toContain(QUESTIONS[0]); // ...the question moved up
   });
@@ -145,7 +145,7 @@ describe("MiaHome - suggestions fill the input and NEVER submit", () => {
 
     await user.click(screen.getByRole("button", { name: "Invia la domanda a Mia" }));
 
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", QUESTIONS[3]);
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", QUESTIONS[3], []);
     expect(input().value).toBe("");
     expect(userMessage(container)?.textContent).toContain(QUESTIONS[3]);
   });
@@ -159,7 +159,7 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
     await user.type(input(), "   Quali dati ha usato NINFA oggi?   {Enter}");
 
     expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Quali dati ha usato NINFA oggi?");
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Quali dati ha usato NINFA oggi?", []);
   });
 
   it("the arrow button sends too", async () => {
@@ -170,7 +170,7 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
     await user.click(screen.getByRole("button", { name: "Invia la domanda a Mia" }));
 
     expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Ciao");
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Ciao", []);
   });
 
   it("an empty input sends nothing, and shows no arrow", async () => {
@@ -196,17 +196,132 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
     expect(screen.queryByRole("button", { name: "Invia la domanda a Mia" })).toBeNull();
   });
 
-  it("Enter sends in this single-line field (there is no multi-line mode; Shift+Enter sends too)", async () => {
+  it("the composer is a multi-line text area: Enter sends, Shift+Enter inserts a new line", async () => {
     const user = userEvent.setup();
     renderMia();
-    expect(input().tagName).toBe("INPUT");
-    expect((input() as HTMLInputElement).type).toBe("text");
+    expect(input().tagName).toBe("TEXTAREA");
 
-    await user.type(input(), "Una domanda{Shift>}{Enter}{/Shift}");
+    await user.type(input(), "Prima riga{Shift>}{Enter}{/Shift}Seconda riga");
+
+    expect(askMiaHomeMock).not.toHaveBeenCalled(); // Shift+Enter did NOT send
+    expect(input().value).toBe("Prima riga\nSeconda riga");
+
+    await user.keyboard("{Enter}");
 
     expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Una domanda");
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Prima riga\nSeconda riga", []);
+    expect(input().value).toBe(""); // the composer is emptied, no stray new line left behind
   });
+
+  it("Enter never inserts a new line, not even when it has nothing to send", async () => {
+    const user = userEvent.setup();
+    renderMia();
+
+    await user.type(input(), "{Enter}{Enter}");
+    expect(input().value).toBe("");
+    await user.type(input(), "   {Enter}");
+    expect(input().value).toBe("   ");
+    expect(askMiaHomeMock).not.toHaveBeenCalled();
+  });
+
+  it("Enter while composing text with an IME belongs to the composition and does not send", () => {
+    renderMia();
+    fireEvent.change(input(), { target: { value: "ciao" } });
+
+    fireEvent.keyDown(input(), { key: "Enter", isComposing: true });
+
+    expect(askMiaHomeMock).not.toHaveBeenCalled();
+    expect(input().value).toBe("ciao");
+  });
+
+  it("sends the multi-line text as the user wrote it (only the outer whitespace is trimmed)", async () => {
+    const user = userEvent.setup();
+    renderMia();
+
+    await user.type(input(), "  Prima{Shift>}{Enter}{/Shift}Seconda  ");
+    await user.click(screen.getByRole("button", { name: "Invia la domanda a Mia" }));
+
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Prima\nSeconda", []);
+  });
+});
+
+/** A stand-in for layout, which jsdom does not do: every line of the text is 24px tall. */
+function withLineLayout(run: () => Promise<void> | void) {
+  const original = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "scrollHeight");
+  Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", {
+    configurable: true,
+    get(this: HTMLTextAreaElement) {
+      return Math.max(1, this.value.split("\n").length) * 24;
+    },
+  });
+  return Promise.resolve(run()).finally(() => {
+    if (original) Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", original);
+    else delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+  });
+}
+
+describe("MiaHome - the composer grows from 1 to 4 lines, then scrolls", () => {
+  it("starts at one line and is a single row", () =>
+    withLineLayout(() => {
+      renderMia();
+      expect(input().rows).toBe(1);
+      expect(input().style.height).toBe("24px");
+    }));
+
+  it("grows line by line with Shift+Enter, up to four lines", () =>
+    withLineLayout(async () => {
+      const user = userEvent.setup();
+      renderMia();
+
+      await user.type(input(), "uno");
+      expect(input().style.height).toBe("24px");
+      await user.type(input(), "{Shift>}{Enter}{/Shift}due");
+      expect(input().style.height).toBe("48px");
+      await user.type(input(), "{Shift>}{Enter}{/Shift}tre");
+      expect(input().style.height).toBe("72px");
+      await user.type(input(), "{Shift>}{Enter}{/Shift}quattro");
+      expect(input().style.height).toBe("96px");
+      expect(input().style.overflowY).toBe("hidden"); // four lines still fit: no inner scroll yet
+    }));
+
+  it("stops at four lines and scrolls inside itself beyond that", () =>
+    withLineLayout(async () => {
+      const user = userEvent.setup();
+      renderMia();
+
+      await user.type(input(), "1{Shift>}{Enter}{/Shift}2{Shift>}{Enter}{/Shift}3{Shift>}{Enter}{/Shift}4");
+      await user.type(input(), "{Shift>}{Enter}{/Shift}5{Shift>}{Enter}{/Shift}6");
+
+      expect(input().style.height).toBe("96px"); // capped: four lines
+      expect(input().style.overflowY).toBe("auto"); // the rest scrolls inside the composer
+    }));
+
+  it("shrinks back to one line when it is emptied by sending", () =>
+    withLineLayout(async () => {
+      const user = userEvent.setup();
+      renderMia();
+      await user.type(input(), "uno{Shift>}{Enter}{/Shift}due{Shift>}{Enter}{/Shift}tre");
+      expect(input().style.height).toBe("72px");
+
+      await user.keyboard("{Enter}");
+
+      expect(input().value).toBe("");
+      expect(input().style.height).toBe("24px");
+    }));
+
+  it("a suggested question fills it without sending, and it is still a normal field afterwards", () =>
+    withLineLayout(async () => {
+      const user = userEvent.setup();
+      renderMia();
+
+      await user.click(screen.getByRole("button", { name: QUESTIONS[2] as string }));
+
+      expect(input().value).toBe(QUESTIONS[2]);
+      expect(askMiaHomeMock).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(input());
+      await user.type(input(), " e altro");
+      expect(input().value).toBe(`${QUESTIONS[2]} e altro`);
+    }));
 });
 
 describe("MiaHome - the question leaves the bar and becomes the user's message", () => {
@@ -263,7 +378,7 @@ describe("MiaHome - the question leaves the bar and becomes the user's message",
     await user.type(input(), "Prima domanda{Enter}");
     await user.type(input(), "bozza della prossima");
 
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Prima domanda");
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Prima domanda", []);
     expect(input().value).toBe("bozza della prossima");
   });
 });
@@ -360,7 +475,10 @@ describe("MiaHome - exactly one request in flight", () => {
     expect(arrow.disabled).toBe(false); // sending is available again
     await user.click(arrow);
     expect(askMiaHomeMock).toHaveBeenCalledTimes(2);
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "Seconda");
+    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "Seconda", [
+      { role: "user", content: "Prima" },
+      { role: "assistant", content: "Risposta alla prima." },
+    ]);
   });
 });
 
@@ -468,49 +586,267 @@ describe("MiaHome - Mia's reply", () => {
   });
 });
 
-describe("MiaHome - one exchange at a time (no history)", () => {
-  it("a NEW question REPLACES the previous exchange - question and answer", async () => {
-    askMiaHomeMock
-      .mockResolvedValueOnce(answered("Prima risposta."))
-      .mockResolvedValueOnce(answered("Seconda risposta."));
+describe("MiaHome - a short conversation, not a chat page", () => {
+  /** Sends `question` with Enter and waits for the (mocked) answer text to show. */
+  async function say(user: ReturnType<typeof userEvent.setup>, question: string, answer: string) {
+    askMiaHomeMock.mockResolvedValueOnce(answered(answer));
+    await user.type(input(), `${question}{Enter}`);
+    await screen.findByText(answer);
+  }
+
+  it("a NEW question is ADDED under the previous exchange, which stays visible", async () => {
     const user = userEvent.setup();
     const { container } = renderMia();
 
-    await user.type(input(), "Prima?{Enter}");
-    await screen.findByText("Prima risposta.");
-    await user.type(input(), "Seconda?{Enter}");
-    await screen.findByText("Seconda risposta.");
+    await say(user, "Prima?", "Prima risposta.");
+    await say(user, "Seconda?", "Seconda risposta.");
 
-    expect(screen.queryByText("Prima risposta.")).toBeNull();
-    expect(container.querySelectorAll(".mia__user-message")).toHaveLength(1);
-    expect(container.querySelectorAll(".mia__reply")).toHaveLength(1);
-    expect(userMessage(container)?.textContent).toContain("Seconda?");
-    expect(userMessage(container)?.textContent).not.toContain("Prima?");
-    expect(screen.getAllByRole("heading", { level: 2, name: "Mia" })).toHaveLength(1);
+    expect(screen.getByText("Prima risposta.")).not.toBeNull();
+    expect(screen.getByText("Seconda risposta.")).not.toBeNull();
+    const messages = Array.from(container.querySelectorAll(".mia__user-message"));
+    expect(messages.map((message) => message.textContent)).toEqual([
+      expect.stringContaining("Prima?"),
+      expect.stringContaining("Seconda?"),
+    ]);
+    expect(container.querySelectorAll(".mia__reply")).toHaveLength(2);
+    expect(before(messages[0] as Node, messages[1] as Node)).toBe(true); // oldest first
   });
 
-  it("while the new question runs, the old answer is already gone", async () => {
-    const second = pending();
-    askMiaHomeMock.mockResolvedValueOnce(answered("Prima risposta.")).mockReturnValueOnce(second.promise);
+  it("the first question carries no history; the next carries the exchange before it", async () => {
     const user = userEvent.setup();
     renderMia();
-    await user.type(input(), "Prima?{Enter}");
-    await screen.findByText("Prima risposta.");
+
+    await say(user, "Qual è la priorità più urgente?", "La prima nell'ordine di NINFA.");
+    expect(askMiaHomeMock).toHaveBeenLastCalledWith(
+      "prop-1",
+      "2026-10-08",
+      "Qual è la priorità più urgente?",
+      [],
+    );
+
+    await say(user, "Perché?", "Perché i dati mostrano un pickup basso.");
+
+    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "Perché?", [
+      { role: "user", content: "Qual è la priorità più urgente?" },
+      { role: "assistant", content: "La prima nell'ordine di NINFA." },
+    ]);
+  });
+
+  it("the history is the answers as Mia wrote them (not the rendered list), oldest first", async () => {
+    const user = userEvent.setup();
+    renderMia();
+    const listAnswer = "Sì, oltre alla prima:\n- Dipendenza OTA\n- Costo per camera";
+    askMiaHomeMock.mockResolvedValueOnce(answered(listAnswer));
+    await user.type(input(), "Altri problemi?{Enter}");
+    await screen.findByText("Dipendenza OTA");
+
+    await say(user, "Dimmi di più", "Ecco.");
+
+    const [, , , history] = askMiaHomeMock.mock.calls[1] as [string, string, string, unknown];
+    expect(history).toEqual([
+      { role: "user", content: "Altri problemi?" },
+      { role: "assistant", content: listAnswer },
+    ]);
+  });
+
+  it("an exchange that failed, was refused or was unavailable is never part of the history", async () => {
+    const user = userEvent.setup();
+    renderMia();
+    askMiaHomeMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    await user.type(input(), "Domanda persa{Enter}");
+    await screen.findByText("Non è stato possibile ottenere una risposta da Mia.");
+    askMiaHomeMock.mockResolvedValueOnce({
+      ok: true,
+      data: { status: "REFUSED", answer: null, grounding_refs: [], limitations: [] },
+    });
+    await user.type(input(), "Abbassa il prezzo{Enter}");
+    await screen.findByText("Mia non può rispondere a questa domanda.");
+
+    await say(user, "Una domanda buona", "Una risposta buona.");
+    await say(user, "E poi?", "Poi basta.");
+
+    expect(askMiaHomeMock).toHaveBeenNthCalledWith(3, "prop-1", "2026-10-08", "Una domanda buona", []);
+    expect(askMiaHomeMock).toHaveBeenNthCalledWith(4, "prop-1", "2026-10-08", "E poi?", [
+      { role: "user", content: "Una domanda buona" },
+      { role: "assistant", content: "Una risposta buona." },
+    ]);
+  });
+
+  it("keeps only the newest four exchanges, and the history is exactly what is still on screen", async () => {
+    const user = userEvent.setup();
+    const { container } = renderMia();
+
+    for (const index of [1, 2, 3, 4, 5]) await say(user, `D${index}?`, `R${index}.`);
+
+    const messages = Array.from(container.querySelectorAll(".mia__user-message")).map(
+      (message) => message.textContent,
+    );
+    expect(messages).toHaveLength(4);
+    expect(messages[0]).toContain("D2?");
+    expect(messages[3]).toContain("D5?");
+    expect(screen.queryByText("R1.")).toBeNull(); // the oldest left the screen...
+    const [, , , history] = askMiaHomeMock.mock.calls[4] as [string, string, string, unknown[]];
+    expect(history).toEqual([
+      { role: "user", content: "D2?" },
+      { role: "assistant", content: "R2." },
+      { role: "user", content: "D3?" },
+      { role: "assistant", content: "R3." },
+      { role: "user", content: "D4?" },
+      { role: "assistant", content: "R4." },
+    ]); // ...and out of what the model is told: three exchanges + the new question = four
+    expect(history.length).toBeLessThanOrEqual(6);
+  });
+
+  it("while the new question runs, the earlier answers stay and only the newest shows loading", async () => {
+    const user = userEvent.setup();
+    const { container } = renderMia();
+    await say(user, "Prima?", "Prima risposta.");
+    askMiaHomeMock.mockReturnValueOnce(new Promise(() => undefined));
 
     await user.type(input(), "Seconda?{Enter}");
 
-    expect(screen.queryByText("Prima risposta.")).toBeNull();
+    expect(screen.getByText("Prima risposta.")).not.toBeNull();
     expect(screen.getByRole("status").textContent).toContain("Mia sta elaborando…");
+    expect(container.querySelectorAll(".mia__thinking")).toHaveLength(1);
   });
 
-  it("keeps no message list, bubbles' history, roles or conversation markup anywhere", async () => {
+  it("only the newest reply is the polite live region", async () => {
     const user = userEvent.setup();
     const { container } = renderMia();
-    await user.type(input(), "Ciao{Enter}");
-    await screen.findByText("Una risposta fondata.");
+    await say(user, "Prima?", "Prima risposta.");
+    await say(user, "Seconda?", "Seconda risposta.");
 
-    expect(container.querySelector("[role='log'], .chat, .message, .messages, .history")).toBeNull();
-    expect(container.querySelectorAll("li:not(:has(button))")).toHaveLength(0);
+    const replies = Array.from(container.querySelectorAll(".mia__reply"));
+    expect(replies.map((region) => region.getAttribute("aria-live"))).toEqual([null, "polite"]);
+    expect(container.querySelectorAll("[aria-live='polite']")).toHaveLength(1);
+  });
+
+  it("lives in a bounded, labelled area above the bar - not a message log", async () => {
+    const user = userEvent.setup();
+    const { container } = renderMia();
+    await say(user, "Prima?", "Prima risposta.");
+
+    const conversation = screen.getByRole("region", { name: "Conversazione con Mia" });
+    expect(conversation.querySelector(".mia__conversation-scroll")).not.toBeNull(); // scrolls inside
+    expect(before(conversation, form())).toBe(true);
+    expect(container.querySelector("[role='log'], .chat, .messages, .history")).toBeNull();
+    expect(container.querySelectorAll("li:not(:has(button))")).toHaveLength(0); // no message list
+  });
+
+  it("starts the newest exchange at the top of the bounded area", async () => {
+    const user = userEvent.setup();
+    const { container } = renderMia();
+    await say(user, "Prima?", "Prima risposta.");
+    const area = container.querySelector(".mia__conversation-scroll") as HTMLElement;
+    let scrollTop = 0;
+    Object.defineProperty(area, "scrollTop", {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => {
+        scrollTop = value;
+      },
+    });
+    const offsetTop = vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockReturnValue(240);
+
+    try {
+      await say(user, "Seconda?", "Seconda risposta.");
+      expect(scrollTop).toBe(240); // the top of the newest exchange, not the end of its answer
+    } finally {
+      offsetTop.mockRestore();
+    }
+  });
+
+  it("a retry re-sends the SAME question with the history it originally had", async () => {
+    const user = userEvent.setup();
+    renderMia();
+    await say(user, "Prima?", "Prima risposta.");
+    askMiaHomeMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    await user.type(input(), "Seconda?{Enter}");
+    await screen.findByText("Non è stato possibile ottenere una risposta da Mia.");
+    askMiaHomeMock.mockResolvedValueOnce(answered("Seconda risposta."));
+
+    await user.click(screen.getByRole("button", { name: "Riprova" }));
+
+    await screen.findByText("Seconda risposta.");
+    const expectedHistory = [
+      { role: "user", content: "Prima?" },
+      { role: "assistant", content: "Prima risposta." },
+    ];
+    expect(askMiaHomeMock).toHaveBeenNthCalledWith(2, "prop-1", "2026-10-08", "Seconda?", expectedHistory);
+    expect(askMiaHomeMock).toHaveBeenNthCalledWith(3, "prop-1", "2026-10-08", "Seconda?", expectedHistory);
+  });
+
+  it("'Nuova conversazione' clears the exchanges and the next question carries no history", async () => {
+    const user = userEvent.setup();
+    const { container } = renderMia();
+    await say(user, "Prima?", "Prima risposta.");
+
+    await user.click(screen.getByRole("button", { name: "Nuova conversazione" }));
+
+    expect(container.querySelectorAll(".mia__exchange")).toHaveLength(0);
+    expect(screen.queryByRole("region", { name: "Conversazione con Mia" })).toBeNull();
+    expect(container.querySelector(".mia")?.getAttribute("data-answering")).toBe("false");
+    expect(document.activeElement).toBe(input());
+    await say(user, "Nuova?", "Nuova risposta.");
+    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "Nuova?", []);
+  });
+
+  it("'Nuova conversazione' is not available while Mia is answering", async () => {
+    const user = userEvent.setup();
+    renderMia();
+    askMiaHomeMock.mockReturnValueOnce(new Promise(() => undefined));
+    await user.type(input(), "Ciao{Enter}");
+
+    expect((screen.getByRole("button", { name: "Nuova conversazione" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+  });
+
+  it("a different property or business date starts a different conversation", async () => {
+    const user = userEvent.setup();
+    const { container, rerender, onFirstInput } = renderMia();
+    await say(user, "Prima?", "Prima risposta.");
+    expect(container.querySelectorAll(".mia__exchange")).toHaveLength(1);
+
+    rerender(<MiaHome propertyId="prop-2" asOfLocalDate="2026-10-08" onFirstInput={onFirstInput} />);
+
+    expect(container.querySelectorAll(".mia__exchange")).toHaveLength(0);
+    askMiaHomeMock.mockResolvedValueOnce(answered("Risposta nuova."));
+    await user.type(input(), "Altra?{Enter}");
+    await screen.findByText("Risposta nuova.");
+    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-2", "2026-10-08", "Altra?", []);
+  });
+
+  it("an answer that lands after the conversation was reset is ignored", async () => {
+    const stale = pending();
+    askMiaHomeMock.mockReturnValueOnce(stale.promise);
+    const user = userEvent.setup();
+    const { container, rerender, onFirstInput } = renderMia();
+    await user.type(input(), "Lenta?{Enter}");
+
+    rerender(<MiaHome propertyId="prop-2" asOfLocalDate="2026-10-08" onFirstInput={onFirstInput} />);
+    stale.resolve(answered("Risposta tardiva della proprietà vecchia."));
+    await act(async () => undefined);
+
+    expect(screen.queryByText("Risposta tardiva della proprietà vecchia.")).toBeNull();
+    expect(container.querySelectorAll(".mia__exchange")).toHaveLength(0);
+    // and the new property is not blocked by the stale request
+    askMiaHomeMock.mockResolvedValueOnce(answered("Subito."));
+    await user.type(input(), "Ora?{Enter}");
+    await screen.findByText("Subito.");
+  });
+
+  it("still sends one request at a time, however many exchanges there are", async () => {
+    const user = userEvent.setup();
+    renderMia();
+    await say(user, "Prima?", "Prima risposta.");
+    askMiaHomeMock.mockReturnValueOnce(new Promise(() => undefined));
+    await user.type(input(), "Seconda?{Enter}");
+
+    await user.type(input(), "Terza?{Enter}");
+
+    expect(askMiaHomeMock).toHaveBeenCalledTimes(2);
+    expect(input().value).toBe("Terza?");
   });
 });
 
@@ -685,7 +1021,7 @@ describe("MiaHome - retry", () => {
 
     expect(await screen.findByText("Ora funziona.")).not.toBeNull();
     expect(askMiaHomeMock).toHaveBeenCalledTimes(2);
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "La mia domanda");
+    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "La mia domanda", []);
     expect(screen.queryByText("Non è stato possibile ottenere una risposta da Mia.")).toBeNull();
     expect(container.querySelectorAll(".mia__user-message")).toHaveLength(1);
   });
@@ -701,7 +1037,7 @@ describe("MiaHome - retry", () => {
     await user.click(screen.getByRole("button", { name: "Riprova" }));
 
     await screen.findByText("Una risposta fondata.");
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "La mia domanda");
+    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "La mia domanda", []);
     expect(input().value).toBe("una bozza");
   });
 

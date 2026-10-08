@@ -293,14 +293,28 @@ class AskRequest(BaseModel):
     question: str
 
 
+class AskHomeHistoryMessage(BaseModel):
+    """One earlier message of the CURRENT page session: `role` is "user" or "assistant". Nothing
+    here is persisted or trusted - see `app.modules.ai.ask_ninfa.home_history`."""
+
+    role: str
+    content: str
+
+
 class AskHomeRequest(BaseModel):
     """Mia Home (property-level Ask): the question AND the explicit business date of the feed it is
     about - the SAME property-local `YYYY-MM-DD` the Decision Feed endpoint requires, never a server
     clock. Both are validated explicitly in the route (`question` length, `as_of_local_date` ISO
-    parse), never assumed from the type annotation alone."""
+    parse), never assumed from the type annotation alone.
+
+    `history` (Mia V2) is the short conversation of the page session, oldest first, sent explicitly
+    with every question: at most 4 complete user/assistant exchanges, validated and bounded by
+    `validate_history` in the route (a violation is a 400 `INVALID_ASK_HISTORY`). It is referential
+    context only - never business truth - and absent/empty for a first question."""
 
     question: str
     as_of_local_date: str
+    history: list[AskHomeHistoryMessage] = Field(default_factory=list)
 
 
 class AskResponse(BaseModel):
@@ -317,6 +331,7 @@ class AskResponse(BaseModel):
 
 __all__ = [
     "AnalysisCoverageResponse",
+    "AskHomeHistoryMessage",
     "AskHomeRequest",
     "AskRequest",
     "AskResponse",

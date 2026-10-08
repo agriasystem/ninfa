@@ -570,7 +570,8 @@ of one property, from a context built **only** from `DecisionMemoryService.get_f
 decisions the engine already produced, coverage, and the factual last booking import. ENGINE
 CALCULATES, MIA EXPLAINS: no raw data, no new detection, no ranking, no CURRENT/STALE judgement. No
 migration and no new dependency. Details: [home-ui-v1.md](home-ui-v1.md),
-[ask-mia-home-v1.md](ask-mia-home-v1.md), ADR 0027, ADR 0028.
+[ask-mia-home-v1.md](ask-mia-home-v1.md), ADR 0027, ADR 0028. Mia V2 (operational data through a safe
+semantic layer + a short conversation): [mia-operational-data-v2.md](mia-operational-data-v2.md), ADR 0029.
 
 ## Pilot readiness (Gate 21B)
 

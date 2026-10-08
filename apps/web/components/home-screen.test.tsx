@@ -590,7 +590,7 @@ describe("Home - Mia is wired to the Home context", () => {
 
     await user.type(screen.getByRole("textbox", { name: "La tua domanda per Mia" }), "Quali dati ha usato NINFA oggi?{Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", TODAY, "Quali dati ha usato NINFA oggi?");
+    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", TODAY, "Quali dati ha usato NINFA oggi?", []);
     expect(await screen.findByText("Una decisione.")).not.toBeNull();
   });
 

@@ -1,9 +1,20 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
+
+import type { AskHomeHistoryMessage } from "@ninfa/contracts";
 
 import { askMiaHome } from "@/lib/api/ask-ninfa";
 import { miaHomeCopy } from "@/lib/ask-ninfa/copy";
+import { historyOf, retainRecent, type Exchange } from "@/lib/ask-ninfa/conversation";
 import { answerBlocksOf } from "@/lib/ask-ninfa/format-answer";
 import { MAX_QUESTION_LENGTH, stateFromResponse, type AskState } from "@/lib/ask-ninfa/state";
 
@@ -19,6 +30,11 @@ import { NinfaLogo } from "./ninfa-logo";
 
 const SUGGESTION_ICONS = [SearchIcon, ListIcon, TrendIcon, DatabaseIcon] as const;
 
+/** The composer grows with the text up to this many lines, then scrolls inside itself. */
+const MAX_COMPOSER_LINES = 4;
+/** Used when the browser reports no usable computed line height (`normal`, or jsdom). */
+const FALLBACK_LINE_HEIGHT_PX = 24;
+
 export interface MiaHomeProps {
   propertyId: string;
   /** The property-local business date (`YYYY-MM-DD`) of the feed on screen - sent verbatim to the
@@ -31,76 +47,143 @@ export interface MiaHomeProps {
 }
 
 /**
- * "Chiedi a Mia..." on the Home: the suggested questions, the exchange and the dark input bar.
+ * "Chiedi a Mia..." on the Home: the suggested questions, a short conversation and the dark composer.
  *
- * SEND EXPERIENCE (like a modern assistant): pressing Enter or the arrow acquires the text as the
- * submitted question, EMPTIES the input immediately, shows the question above the bar as the user's
- * own message and, under it, Mia's reply (a discreet "Mia sta elaborando…" while the request runs).
- * The message never stays in the bar.
+ * SEND EXPERIENCE (like a modern assistant): Enter (or the arrow) acquires the text as the submitted
+ * question, EMPTIES the composer immediately, shows the question above the bar as the user's own
+ * message and, under it, Mia's reply (a discreet "Mia sta elaborando…" while the request runs).
  *
- * STILL NOT A CHAT: the endpoint is stateless per question, so the Home shows exactly ONE exchange
- * (the submitted question + Mia's answer); sending a new question REPLACES it - there is no
- * history, because the model is never given one (a list of past messages would be a false
- * affordance). Nothing is persisted. Exactly one request may be in flight (guarded synchronously,
- * not just through state); a retry re-sends the SAME submitted question as a fresh, explicit call.
+ * A SMALL CONVERSATION, not a chat page (Mia V2): the newest few exchanges of this page session stay
+ * visible in a bounded area above the bar (it scrolls inside itself, so the operational Home is never
+ * pushed away) and are sent back with each new question as `history`, so a follow-up such as
+ * "Perché?" can be understood. The history is referential context only - the backend rebuilds every
+ * fact fresh for each question. Nothing is persisted: it is lost on reload (or "Nuova conversazione").
+ * Exactly one request may be in flight (guarded synchronously, not just through state); a retry
+ * re-sends the SAME submitted question with the history it originally had.
  *
- * Suggested questions only ever FILL the input - the user confirms with Enter / the arrow. The
- * input is a single-line `<input>`: Enter sends (there is no multi-line mode, so Shift+Enter sends
- * too). The input is NEVER disabled while Mia answers - focus must not be taken away from the user -
- * only sending is blocked until the request ends (the arrow turns into a spinner), and a draft of
- * the next question can already be typed. There is no microphone: no voice feature exists.
+ * Suggested questions only ever FILL the composer - the user confirms with Enter / the arrow. The
+ * composer is an auto-growing `<textarea>` (1 to 4 lines, then it scrolls): Enter sends, Shift+Enter
+ * inserts a new line (and Enter during IME composition never sends). It is NEVER disabled while Mia
+ * answers - focus must not be taken away from the user - only sending is blocked until the request
+ * ends (the arrow turns into a spinner), and a draft of the next question can already be typed.
+ * There is no microphone: no voice feature exists.
  *
- * ENGINE CALCULATES, MIA EXPLAINS: this component sends the question and the business date and renders
- * the answer; the context Mia answers from is built server-side, only from what the Decision Engine
- * already decided for that property and date.
+ * ENGINE CALCULATES, MIA EXPLAINS: this component sends the question, the business date and the short
+ * history, and renders the answer; the facts Mia answers from are built server-side, only from what
+ * NINFA already decided or calculated for that property and date.
  */
 export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProps) {
   const [question, setQuestion] = useState("");
-  const [asked, setAsked] = useState<string | null>(null);
-  const [exchangeId, setExchangeId] = useState(0);
-  const [state, setState] = useState<AskState>({ kind: "idle" });
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const inFlightRef = useRef(false);
+  const tokenRef = useRef(0);
+  const exchangesRef = useRef<Exchange[]>([]);
+  const nextIdRef = useRef(0);
   const inputId = useId();
 
-  const submitting = state.kind === "loading";
+  const latest = exchanges[exchanges.length - 1];
+  const submitting = latest?.state.kind === "loading";
   const hasText = question.trim().length > 0;
   const canSubmit = !submitting && hasText;
+
+  function commit(next: Exchange[]) {
+    exchangesRef.current = next;
+    setExchanges(next);
+  }
+
+  // A different property or business date is a different analysis: the conversation does not carry
+  // over (and a late answer of the old one is ignored - see `settle`).
+  const scopeRef = useRef(`${propertyId}|${asOfLocalDate}`);
+  useEffect(() => {
+    const scope = `${propertyId}|${asOfLocalDate}`;
+    if (scopeRef.current === scope) return;
+    scopeRef.current = scope;
+    // The old analysis' request (if any) can no longer block, nor land on, the new conversation.
+    tokenRef.current += 1;
+    inFlightRef.current = false;
+    commit([]);
+  }, [propertyId, asOfLocalDate]);
+
+  // The composer grows with its content (1-4 lines), and shrinks back when it is emptied.
+  useLayoutEffect(() => {
+    const element = inputRef.current;
+    if (element !== null) autosize(element);
+  }, [question]);
+
+  // The newest exchange starts at the top of the bounded area: its question is visible, and a long
+  // answer is read from its beginning rather than from its end.
+  const latestKey = latest === undefined ? "" : `${latest.id}:${latest.state.kind}`;
+  useEffect(() => {
+    const area = scrollRef.current;
+    const last = area?.lastElementChild;
+    if (area && last instanceof HTMLElement) area.scrollTop = last.offsetTop;
+  }, [latestKey]);
 
   function changeQuestion(value: string) {
     setQuestion(value);
     if (value.trim().length > 0) onFirstInput();
   }
 
-  /** `fromInput`: a NEW question typed in the bar (the bar is emptied and a fresh exchange begins).
-   * Not for a retry, which re-sends the already-submitted question and leaves any draft untouched. */
-  async function send(text: string, fromInput: boolean) {
+  /** Sets the state of exchange `id`, unless it is gone (reset, or pushed out of the newest few). */
+  function settle(id: number, state: AskState, scope: string) {
+    if (scope !== scopeRef.current) return;
+    commit(
+      exchangesRef.current.map((exchange) => (exchange.id === id ? { ...exchange, state } : exchange)),
+    );
+  }
+
+  /** `retryOf`: the id of an exchange whose question is re-sent as it was (same history, any draft in
+   * the composer untouched). Otherwise `text` is a NEW question typed in the composer: it is emptied
+   * and a fresh exchange begins. */
+  async function send(text: string, retryOf?: number) {
     if (inFlightRef.current) return; // blocks a double submit synchronously (Enter + click, key repeat)
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
     inFlightRef.current = true;
-
+    const token = ++tokenRef.current;
     onFirstInput();
-    if (fromInput) {
+
+    const scope = scopeRef.current;
+    let id: number;
+    let history: AskHomeHistoryMessage[];
+    if (retryOf === undefined) {
+      id = nextIdRef.current++;
+      const fresh: Exchange = { id, question: trimmed, state: { kind: "loading" } };
+      const retained = retainRecent([...exchangesRef.current, fresh]);
+      // What the model is told is exactly what is on screen BEFORE this question.
+      history = historyOf(retained.slice(0, -1));
+      commit(retained);
       setQuestion("");
-      setExchangeId((id) => id + 1);
+    } else {
+      id = retryOf;
+      const position = exchangesRef.current.findIndex((exchange) => exchange.id === id);
+      history = historyOf(exchangesRef.current.slice(0, Math.max(position, 0)));
+      settle(id, { kind: "loading" }, scope);
     }
-    setAsked(trimmed);
-    setState({ kind: "loading" });
+
     try {
-      const result = await askMiaHome(propertyId, asOfLocalDate, trimmed);
-      setState(result.ok ? stateFromResponse(result.data) : { kind: "error" });
+      const result = await askMiaHome(propertyId, asOfLocalDate, trimmed, history);
+      settle(id, result.ok ? stateFromResponse(result.data) : { kind: "error" }, scope);
     } finally {
-      inFlightRef.current = false;
+      if (tokenRef.current === token) inFlightRef.current = false;
     }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void send(question, true);
+    void send(question);
     // The user stays in the field they were typing in - also when the arrow (a button that is about
     // to turn into a spinner) was what they pressed - so the keyboard is never lost after sending.
     inputRef.current?.focus();
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    // Enter sends; Shift+Enter is a new line. Enter while composing (IME) belongs to the composition.
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    void send(question);
   }
 
   function pickSuggestedQuestion(text: string) {
@@ -108,10 +191,16 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
     inputRef.current?.focus();
   }
 
+  function startOver() {
+    if (inFlightRef.current) return;
+    commit([]);
+    inputRef.current?.focus();
+  }
+
   return (
     <div
       className="mia"
-      data-answering={state.kind !== "idle" ? "true" : "false"}
+      data-answering={exchanges.length > 0 ? "true" : "false"}
       data-has-text={hasText ? "true" : "false"}
     >
       <div className="mia__dock">
@@ -137,16 +226,33 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
           </ul>
         </div>
 
-        {asked !== null ? (
-          <MiaExchange
-            key={exchangeId}
-            asked={asked}
-            state={state}
-            onRetry={() => {
-              void send(asked, false);
-              inputRef.current?.focus();
-            }}
-          />
+        {exchanges.length > 0 ? (
+          <section className="mia__conversation" aria-label={miaHomeCopy.conversationLabel}>
+            <div className="mia__conversation-tools">
+              <button
+                type="button"
+                className="mia__reset"
+                disabled={submitting}
+                onClick={startOver}
+              >
+                {miaHomeCopy.newConversation}
+              </button>
+            </div>
+            <div className="mia__conversation-scroll" ref={scrollRef}>
+              {exchanges.map((exchange, index) => (
+                <MiaExchange
+                  key={exchange.id}
+                  asked={exchange.question}
+                  state={exchange.state}
+                  isLatest={index === exchanges.length - 1}
+                  onRetry={() => {
+                    void send(exchange.question, exchange.id);
+                    inputRef.current?.focus();
+                  }}
+                />
+              ))}
+            </div>
+          </section>
         ) : null}
 
         <form
@@ -161,10 +267,10 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
             {miaHomeCopy.inputLabel}
           </label>
           <SearchIcon className="mia__form-icon" />
-          <input
+          <textarea
             id={inputId}
             ref={inputRef}
-            type="text"
+            rows={1}
             className="mia__input"
             placeholder={miaHomeCopy.placeholder}
             value={question}
@@ -172,6 +278,7 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
             autoComplete="off"
             enterKeyHint="send"
             onChange={(event) => changeQuestion(event.target.value)}
+            onKeyDown={handleKeyDown}
           />
           {hasText || submitting ? (
             <button
@@ -191,23 +298,38 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
   );
 }
 
+/** Grows the composer to its content, capped at `MAX_COMPOSER_LINES` lines (then it scrolls). */
+function autosize(element: HTMLTextAreaElement) {
+  const style = window.getComputedStyle(element);
+  const lineHeight = Number.parseFloat(style.lineHeight) || FALLBACK_LINE_HEIGHT_PX;
+  const padding =
+    (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+  const maxHeight = lineHeight * MAX_COMPOSER_LINES + padding;
+  element.style.height = "auto";
+  const contentHeight = element.scrollHeight;
+  element.style.height = `${Math.min(contentHeight, maxHeight)}px`;
+  element.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
+}
+
 /**
- * The single, current exchange: the user's own message (right-aligned, softly tinted - clearly "mine",
- * never a boxed form summary) and, under it, Mia's reply (open text under her name, no card). The
- * reply region is the polite live region: loading and the answer are announced, the question and the
- * rest of the Home are not read again. It is keyed by the exchange so a NEW question enters afresh.
+ * One exchange: the user's own message (right-aligned, softly tinted - clearly "mine", never a boxed
+ * form summary) and, under it, Mia's reply (open text under her name, no card). Only the NEWEST
+ * exchange's reply is the polite live region: loading and the answer are announced, older replies
+ * and the rest of the Home are not read again.
  */
 function MiaExchange({
   asked,
   state,
+  isLatest,
   onRetry,
 }: {
   asked: string;
   state: AskState;
+  isLatest: boolean;
   onRetry: () => void;
 }) {
   return (
-    <div className="mia__exchange">
+    <div className="mia__exchange" data-latest={isLatest ? "true" : "false"}>
       <p className="mia__user-message">
         <span className="visually-hidden">{miaHomeCopy.askedPrefix} </span>
         {asked}
@@ -215,8 +337,8 @@ function MiaExchange({
 
       <section
         className="mia__reply"
-        aria-live="polite"
-        aria-atomic="false"
+        aria-live={isLatest ? "polite" : undefined}
+        aria-atomic={isLatest ? "false" : undefined}
         aria-busy={state.kind === "loading"}
       >
         <div className="mia__reply-header">

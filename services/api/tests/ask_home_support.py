@@ -6,7 +6,9 @@ shape: every context a test inspects here comes from a real persisted run read b
 real `DecisionMemoryService.get_feed()`, exactly like production.
 """
 
+from collections.abc import Mapping
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
@@ -33,6 +35,7 @@ from tests.decision_support import (
     revenue_evaluation,
     sync_run,
 )
+from tests.expected_support import add_snapshots, snapshot_row
 from tests.support import BookingFactory, Tenant
 
 D1 = date(2026, 8, 1)
@@ -134,6 +137,43 @@ def known_provenance(finished_at: datetime) -> RunInputProvenance:
     )
 
 
+def provenance_for(tenant: Tenant, finished_at: datetime) -> RunInputProvenance:
+    """Provenance naming the tenant's REAL booking data source - the one `HomeDataService` reads the
+    stored snapshots of (`known_provenance` names a random one, enough for freshness-only tests)."""
+    return RunInputProvenance(
+        bookings=BookingProvenance(
+            data_source_id=tenant.data_source.id,
+            import_job_id=tenant.import_job.id,  # both-set-or-both-None (Gate 23B)
+            last_successful_import_finished_at=finished_at,
+        )
+    )
+
+
+def seed_night_snapshots(
+    db_session: Session,
+    tenant: Tenant,
+    as_of: date,
+    nights: Mapping[date, tuple[int, int | None]],
+    *,
+    revenue_per_room: Decimal = Decimal("100.00"),
+) -> None:
+    """OBSERVED snapshot rows of the analysis day `as_of`: `{stay night: (rooms on books, rooms
+    available or None for an unknown capacity)}`. Every CHECK constraint stays satisfied."""
+    rows = []
+    for stay_date, (rooms, available) in nights.items():
+        row = snapshot_row(tenant, as_of, stay_date, rooms=rooms)
+        row["booking_count_on_books"] = 0 if rooms == 0 else max(1, rooms // 2)
+        row["allocated_room_revenue_on_books"] = revenue_per_room * rooms
+        row["adr_on_books"] = revenue_per_room if rooms > 0 else None
+        if available is not None and available > 0:
+            row["rooms_available"] = available
+            row["occupancy_on_books"] = (Decimal(rooms) * 100 / Decimal(available)).quantize(
+                Decimal("0.01")
+            )
+        rows.append(row)
+    add_snapshots(db_session, tenant, rows)
+
+
 def unknown_provenance() -> RunInputProvenance:
     return RunInputProvenance(
         bookings=BookingProvenance(
@@ -169,6 +209,8 @@ __all__ = [
     "five_triggered_evaluations",
     "full_coverage",
     "known_provenance",
+    "provenance_for",
+    "seed_night_snapshots",
     "sync_feed",
     "unknown_provenance",
     "utc",

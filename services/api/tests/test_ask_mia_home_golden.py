@@ -51,6 +51,7 @@ _TOP_LEVEL_KEYS = {
     "copertura dell'analisi",
     "dati usati dall'analisi",
     "data dell'ultima analisi completata",
+    "dati operativi richiesti",
 }
 
 

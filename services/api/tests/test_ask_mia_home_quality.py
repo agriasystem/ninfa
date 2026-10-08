@@ -491,7 +491,7 @@ def test_8_no_decision_in_an_analysed_area_is_said_but_an_unanalysed_area_is_nev
     assert "nessuna decisione" not in unanalysed["answer"]
 
 
-def test_9_a_bare_why_is_answered_with_a_request_for_a_clearer_question_statelessly(
+def test_9_a_bare_why_without_history_is_flagged_as_needing_a_clearer_question(
     api_client: TestClient,
     app: FastAPI,
     factory: BookingFactory,
@@ -499,18 +499,56 @@ def test_9_a_bare_why_is_answered_with_a_request_for_a_clearer_question_stateles
     db_session: Session,
 ) -> None:
     at = _seed_three(factory, authenticated_as, db_session)
-    _ask(api_client, app, at, Q_PRIORITY)  # an earlier question...
     body, provider, context = _ask(api_client, app, at, Q_WHY)
 
-    # ...leaves no trace: the request holds ONLY this question, and the same single-turn context
+    # No history was sent, so nothing is remembered server-side: the request holds ONLY this
+    # question, and the context itself says the follow-up cannot be resolved.
     request = provider.last_request
     assert request.question == Q_WHY
-    assert not hasattr(request, "history") and not hasattr(request, "messages")
-    assert Q_PRIORITY not in request.context and Q_PRIORITY not in request.question
+    assert request.history == ()
+    assert context["numero di decisioni che richiedono attenzione"] == 3
+    operational = context["dati operativi richiesti"]
+    assert any(
+        "richiama una conversazione precedente" in n
+        for n in operational["cosa NINFA non può determinare"]
+    )
+    assert operational["argomento ripreso dalla domanda precedente"] is False
     assert body["status"] == "INSUFFICIENT_CONTEXT"
     assert "Non ho memoria delle domande precedenti" in body["answer"]
     assert "riformularla" in body["answer"]
-    assert context["numero di decisioni che richiedono attenzione"] == 3
+
+
+def test_9_a_bare_why_with_the_previous_exchange_is_resolved_from_the_users_own_question(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = _seed_three(factory, authenticated_as, db_session)
+    provider = ContextReadingProvider()
+    with_fake_provider(app)(provider)
+    response = api_client.post(
+        ask_home_url(at.tenant.property.id),
+        json={
+            "question": Q_WHY,
+            "as_of_local_date": "2026-08-01",
+            "history": [
+                {"role": "user", "content": Q_PRIORITY},
+                {"role": "assistant", "content": "La più prioritaria per NINFA è la prima."},
+            ],
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    request = provider.last_request
+    assert [turn.role for turn in request.history] == ["user", "assistant"]
+    assert request.history[0].content == Q_PRIORITY
+    context = json.loads(request.context)
+    assert context["dati operativi richiesti"]["argomento ripreso dalla domanda precedente"] is True
+    # the history text itself is NOT part of the fact context: facts are always rebuilt fresh
+    assert Q_PRIORITY not in request.context
+    assert "La più prioritaria per NINFA è la prima." not in request.context
 
 
 # --- a rich answer travels the whole pipeline intact ---------------------------------------------

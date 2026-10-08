@@ -31,6 +31,7 @@ from app.modules.ai.ask_ninfa.home_types import (
     AskHomeDecisionContext,
     AskHomeFreshnessContext,
 )
+from app.modules.ai.ask_ninfa.home_vocabulary import normalize_text
 from app.modules.ai.ask_ninfa.types import AskDataPoint
 from app.modules.decision_memory.types import FeedItem, FeedResult, FeedState
 from app.modules.decisions.coverage import (
@@ -172,6 +173,36 @@ _TARGET_KEY_LABELS: dict[str, str] = {
 }
 
 
+# The semantic slug each decision type carries in its grounding ref ("decision:pickup:2026-10-05"):
+# hyphenated on purpose - an underscore would make a ref echoed by a model look like a technical
+# identifier to the leak check.
+_DECISION_REF_SLUGS: dict[PriorityDecisionType, str] = {
+    PriorityDecisionType.REV_PICKUP_LOW: "pickup",
+    PriorityDecisionType.REV_OCCUPANCY_RISK: "occupancy-risk",
+    PriorityDecisionType.REV_OTA_DEPENDENCY: "ota-dependency",
+    PriorityDecisionType.COST_CPOR_ANOMALY: "cost-per-room",
+    PriorityDecisionType.LABOR_OVERSTAFFING: "labor-hours",
+}
+_REF_TARGET_KEYS = ("stay_date", "period_start", "work_date", "cost_category", "labor_category")
+
+# "coverage:<area>": the ref naming an analysed (or skipped) area in structured response metadata.
+COVERAGE_REF_OF_DOMAIN: dict[AnalysisDomain, str] = {
+    AnalysisDomain.REVENUE: "coverage:revenue",
+    AnalysisDomain.DISTRIBUTION: "coverage:distribution",
+    AnalysisDomain.COSTS: "coverage:costs",
+    AnalysisDomain.LABOR: "coverage:labor",
+}
+
+
+def _decision_ref(decision: Decision) -> str:
+    raw = _target_context_of(decision)
+    parts = [_DECISION_REF_SLUGS[decision.decision_type]]
+    parts.extend(
+        "-".join(normalize_text(raw[key]).split()) for key in _REF_TARGET_KEYS if key in raw
+    )
+    return "decision:" + ":".join(parts)
+
+
 def _target_of(decision: Decision) -> dict[str, str]:
     return {
         _TARGET_KEY_LABELS[key]: value
@@ -231,6 +262,7 @@ def _decision_context_of(index: int, item: FeedItem) -> AskHomeDecisionContext:
         # No estimate recorded -> no kind either: an empty list never claims to be "of" anything.
         impact_kind=_IMPACT_KINDS[decision_type] if economic_impact else None,
         economic_impact=economic_impact,
+        ref=_decision_ref(decision),
     )
 
 
@@ -246,7 +278,9 @@ def _coverage_context_of(run: DecisionRun) -> AskHomeCoverageContext:
         summary_label=_COVERAGE_SUMMARY_LABELS[coverage.summary],
         areas=tuple(
             AskHomeAreaCoverage(
-                area=_DOMAIN_LABELS[item.domain], status_label=_DOMAIN_STATUS_LABELS[item.status]
+                area=_DOMAIN_LABELS[item.domain],
+                status_label=_DOMAIN_STATUS_LABELS[item.status],
+                ref=COVERAGE_REF_OF_DOMAIN[item.domain],
             )
             for item in coverage.domains
         ),
@@ -305,4 +339,4 @@ class AskHomeContextBuilder:
         )
 
 
-__all__ = ["DOMAIN_OF_DECISION_TYPE", "AskHomeContextBuilder"]
+__all__ = ["COVERAGE_REF_OF_DOMAIN", "DOMAIN_OF_DECISION_TYPE", "AskHomeContextBuilder"]

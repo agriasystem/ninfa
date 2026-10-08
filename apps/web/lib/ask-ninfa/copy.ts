@@ -68,6 +68,9 @@ export const miaHomeCopy = {
   // reader (visually hidden - sighted users read it as the user's own message).
   assistantName: "Mia",
   askedPrefix: "Hai chiesto:",
+  // The short conversation (Mia V2): the exchanges of this page session, and the way to start over.
+  conversationLabel: "Conversazione con Mia",
+  newConversation: "Nuova conversazione",
   limitationsHeading: "Da tenere presente",
   insufficientContextHeading:
     "Mia non ha abbastanza informazioni per rispondere con affidabilità a questa domanda.",

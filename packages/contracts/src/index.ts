@@ -365,6 +365,17 @@ export interface AskHomeRequest {
   question: string;
   /** ISO date (YYYY-MM-DD). */
   as_of_local_date: string;
+  /** The short conversation of the CURRENT page session (Mia V2), oldest first: complete
+   * user/assistant exchanges only, at most 4, sent explicitly with every question (nothing is
+   * stored server-side). Referential context for follow-ups such as "Perché?" - never business
+   * truth: every fact is rebuilt fresh by the backend. Omitted for a first question. */
+  history?: AskHomeHistoryMessage[];
+}
+
+/** One earlier message of the page session, as sent back with the next question. */
+export interface AskHomeHistoryMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 /** POST .../ask response (Gate 18). `answer`/`limitations` carry real content only for

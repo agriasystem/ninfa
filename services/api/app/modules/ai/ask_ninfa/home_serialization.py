@@ -13,6 +13,7 @@ run/analysis does not exist, and the instructions say so explicitly.
 
 import json
 
+from app.modules.ai.ask_ninfa.home_facts import OperationalContext, OperationalSection
 from app.modules.ai.ask_ninfa.home_types import (
     AskHomeContext,
     AskHomeCoverageContext,
@@ -40,13 +41,17 @@ def _decision_dict(decision: AskHomeDecisionContext) -> dict[str, object]:
         "dati": [_data_point_dict(point) for point in decision.facts],
         "tipo di impatto economico": decision.impact_kind,
         "impatto economico": [_data_point_dict(point) for point in decision.economic_impact],
+        "riferimento": decision.ref,
     }
 
 
 def _coverage_dict(coverage: AskHomeCoverageContext) -> dict[str, object]:
     return {
         "sintesi": coverage.summary_label,
-        "aree": [{"area": item.area, "stato": item.status_label} for item in coverage.areas],
+        "aree": [
+            {"area": item.area, "stato": item.status_label, "riferimento": item.ref}
+            for item in coverage.areas
+        ],
     }
 
 
@@ -58,8 +63,32 @@ def _freshness_dict(freshness: AskHomeFreshnessContext) -> dict[str, object]:
             "data": freshness.local_date,
             "ora locale della struttura": freshness.local_time,
             "giorno rispetto alla data di riferimento": freshness.relative_day,
-        }
+        },
+        "riferimento": freshness.ref,
     }
+
+
+def _section_dict(section: OperationalSection) -> dict[str, object]:
+    return {
+        "riferimento": section.ref,
+        "titolo": section.title,
+        "periodo": section.period,
+        "dati": [_data_point_dict(point) for point in section.data],
+        "righe": [dict(row) for row in section.rows],
+        "nota": section.note,
+    }
+
+
+def _operational_dict(operational: OperationalContext) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "argomenti riconosciuti nella domanda": list(operational.topics),
+        "argomento ripreso dalla domanda precedente": operational.from_previous_question,
+        "sezioni": [_section_dict(section) for section in operational.sections],
+        "cosa NINFA non può determinare": list(operational.not_available),
+    }
+    if operational.supported_topics:
+        payload["cosa NINFA sa spiegare"] = list(operational.supported_topics)
+    return payload
 
 
 def home_context_to_dict(context: AskHomeContext) -> dict[str, object]:
@@ -80,6 +109,9 @@ def home_context_to_dict(context: AskHomeContext) -> dict[str, object]:
             None if context.freshness is None else _freshness_dict(context.freshness)
         ),
         "data dell'ultima analisi completata": context.last_successful_analysis_date,
+        "dati operativi richiesti": (
+            None if context.operational is None else _operational_dict(context.operational)
+        ),
     }
 
 
