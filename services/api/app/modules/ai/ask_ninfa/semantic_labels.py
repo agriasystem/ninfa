@@ -43,6 +43,33 @@ def decision_label_of(decision_type: PriorityDecisionType) -> str:
     return DECISION_TYPE_LABELS[decision_type]
 
 
+# --- decision_type -> one plain sentence saying what NINFA checked -----------------------------
+# The SAME wording `apps/web/lib/home/hero-copy.ts` already ships for the Home's hero sentence
+# (without the stay date, which the decision's own target carries) - no number, no judgement beyond
+# the Engine's own "sotto/sopra il livello atteso", no recommendation. Mia Home reads these to
+# explain a decision concretely instead of repeating only its title.
+DECISION_TYPE_DESCRIPTIONS: dict[PriorityDecisionType, str] = {
+    PriorityDecisionType.REV_PICKUP_LOW: (
+        "Le prenotazioni per il giorno di soggiorno indicato stanno arrivando "
+        "sotto il ritmo atteso."
+    ),
+    PriorityDecisionType.REV_OCCUPANCY_RISK: (
+        "L'occupazione prevista per il giorno di soggiorno indicato è sotto il livello atteso."
+    ),
+    PriorityDecisionType.REV_OTA_DEPENDENCY: (
+        "La quota di prenotazioni da OTA è sopra il livello atteso."
+    ),
+    PriorityDecisionType.COST_CPOR_ANOMALY: "Il costo per camera è sopra il livello atteso.",
+    PriorityDecisionType.LABOR_OVERSTAFFING: (
+        "Le ore di personale programmate sono sopra il livello atteso."
+    ),
+}
+
+
+def decision_description_of(decision_type: PriorityDecisionType) -> str:
+    return DECISION_TYPE_DESCRIPTIONS[decision_type]
+
+
 # --- Decision.status -> Italian ---------------------------------------------------------------
 # The SAME wording `apps/web/lib/copy.ts`'s `decisionStatusCopy` already ships.
 _DECISION_STATUS_LABELS: dict[DecisionStatus, str] = {
@@ -323,11 +350,13 @@ def data_points_of(
 
 
 __all__ = [
+    "DECISION_TYPE_DESCRIPTIONS",
     "DECISION_TYPE_LABELS",
     "EVIDENCE_LABELS",
     "FACT_LABELS",
     "cost_category_label_of",
     "data_points_of",
+    "decision_description_of",
     "decision_label_of",
     "decision_status_label_of",
     "labor_category_label_of",

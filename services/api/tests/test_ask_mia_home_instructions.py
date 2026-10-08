@@ -15,7 +15,7 @@ LOWER = TEXT.lower()
 
 
 def test_version_is_the_documented_home_string() -> None:
-    assert ASK_MIA_HOME_INSTRUCTIONS_VERSION == "ask-mia-home-v1"
+    assert ASK_MIA_HOME_INSTRUCTIONS_VERSION == "ask-mia-home-v2"
 
 
 def test_the_assistant_is_mia_and_the_principle_is_stated() -> None:
@@ -83,7 +83,8 @@ def test_no_autonomous_action_is_proposed() -> None:
 def test_language_quality_rules_are_kept() -> None:
     assert "snake_case" in TEXT
     assert "lingua italiana" in LOWER
-    assert "700" in TEXT
+    assert "non menzionare mai codici, sigle o valori enum tecnici" in LOWER
+    assert 'preferisci "affidabilità" a "confidence"' in LOWER
 
 
 def test_context_is_data_and_the_question_is_untrusted() -> None:
@@ -106,3 +107,163 @@ def test_every_home_grounding_ref_is_named_in_the_output_contract() -> None:
 def test_the_decision_ask_vocabulary_is_not_leaked_into_the_home_contract() -> None:
     for decision_only_ref in ("LATEST_FACTS", "LATEST_EVIDENCE", "RECOMMENDATION", "HISTORY"):
         assert decision_only_ref not in TEXT, decision_only_ref
+
+
+# --- v2: response quality - grounded does not mean vague ------------------------------------
+
+
+def test_being_grounded_does_not_mean_being_vague() -> None:
+    assert "essere fondati sui dati non significa essere vaghi" in LOWER
+    assert "dai una risposta concreta" in LOWER
+
+
+def test_a_concrete_available_answer_is_never_replaced_by_a_generic_limitation() -> None:
+    assert "non sostituire mai una risposta concreta" in LOWER
+    assert "generica sui tuoi limiti" in LOWER
+    assert "se la risposta è nel context, dalla" in LOWER
+
+
+def test_no_generic_opening_disclaimer_is_allowed() -> None:
+    assert "niente avvertenze generiche" in LOWER
+    assert "non aprire mai con frasi come" in LOWER
+    for disclaimer in (
+        "posso basarmi solo sui dati",
+        "non ho accesso a",
+        "in base alle informazioni",
+    ):
+        assert disclaimer in LOWER, disclaimer
+    # a limit is said once, specifically, in the dedicated field - not as the answer's opening
+    assert 'nel campo "limitations"' in LOWER
+
+
+def test_the_answer_shape_is_direct_answer_then_details_then_an_optional_limit() -> None:
+    assert "la prima frase risponde direttamente alla domanda" in LOWER
+    assert "i dettagli concreti del context" in LOWER
+    assert "solo se serve davvero, un limite" in LOWER
+
+
+def test_insufficient_context_is_reserved_for_a_context_that_really_lacks_the_answer() -> None:
+    assert "solo quando il context non contiene davvero ciò che serve" in LOWER
+    assert 'lo status è "answered"' in LOWER  # a partial answer from the context is still ANSWERED
+
+
+def test_length_targets_and_the_hard_cap_are_stated_in_words() -> None:
+    assert "60-160 parole" in LOWER
+    assert "220 parole" in LOWER
+    assert "una risposta più lunga viene scartata" in LOWER
+    # the old v1 "300-500 characters, never more than 700" target is gone
+    assert "700" not in TEXT
+    assert "300-500" not in TEXT
+
+
+def test_all_relevant_decisions_are_enumerated_not_just_the_first() -> None:
+    assert "elenca tutte quelle rilevanti" in LOWER
+    assert "non solo la prima" in LOWER
+    assert "decisioni non mostrate" in LOWER
+
+
+def test_plain_text_form_is_requested_with_one_line_per_decision() -> None:
+    assert "una riga per decisione" in LOWER
+    assert "niente markdown" in LOWER
+
+
+def test_other_problems_question_answers_yes_or_no_and_lists_every_other_decision() -> None:
+    assert '"ci sono altri problemi oltre a questo?"' in LOWER
+    assert 'comincia con "sì"' in LOWER
+    assert "elenca tutte le altre, nell'ordine di ninfa" in LOWER
+    assert 'comincia con "no"' in LOWER
+    assert "non ha rilevato altre decisioni" in LOWER
+
+
+def test_priority_question_names_the_first_decision_and_explains_it_without_inventing_why() -> None:
+    assert '"qual è la priorità più urgente oggi?"' in LOWER
+    assert "nomina la decisione" in LOWER
+    assert "non inventare il motivo per cui ninfa ha messo una decisione prima" in LOWER
+
+
+def test_impact_question_compares_only_same_kind_estimates_and_says_when_not_comparable() -> None:
+    assert '"quale decisione ha l\'impatto economico più alto?"' in LOWER
+    assert 'stesso "tipo di impatto economico"' in LOWER
+    assert "non sono direttamente confrontabili" in LOWER
+    assert "stime indicative, non perdite certe" in LOWER
+    assert "il motore non ne ha registrate" in LOWER
+
+
+def test_data_question_covers_coverage_checks_and_the_last_import_as_a_fact() -> None:
+    assert '"quali dati ha usato ninfa oggi?"' in LOWER
+    assert "quali aree sono state analizzate e quali no" in LOWER
+    assert "ultimo import delle prenotazioni" in LOWER
+    assert "non descrivere righe o contenuti dei dati" in LOWER
+
+
+def test_every_feed_state_has_its_own_answering_rule() -> None:
+    assert 'se lo stato è "nessuna decisione richiede attenzione"' in LOWER
+    assert "se l'analisi è parziale" in LOWER
+    assert "non dire mai che va tutto bene" in LOWER
+    assert "se l'analisi di oggi non è ancora disponibile" in LOWER
+    assert "data dell'ultima analisi completata" in LOWER
+
+
+def test_free_text_and_vague_questions_are_handled_statelessly() -> None:
+    assert "domanda libera" in LOWER
+    assert "solo se quell'area risulta analizzata" in LOWER
+    # "Perché?" alone: no memory of earlier questions, ask for a clearer one
+    assert '"perché?"' in LOWER
+    assert "non hai memoria delle domande precedenti" in LOWER
+    assert "chiedi in una frase di riformulare" in LOWER
+
+
+def test_dates_numbers_and_confidence_are_written_naturally_without_changing_values() -> None:
+    assert "senza cambiare il valore" in LOWER
+    assert "78 su 100" in TEXT
+    assert "confrontare due valori già presenti è consentito" in LOWER
+
+
+def test_the_context_keys_the_new_rules_refer_to_exist_in_the_serialization() -> None:
+    """The instructions name context keys in quotes ("tipo di impatto economico", "decisioni non
+    mostrate", "unità"...): each must be a key the serialization really emits, or the rule would
+    point at nothing."""
+    from app.modules.ai.ask_ninfa.home_serialization import (
+        _decision_dict,
+        home_context_to_dict,
+    )
+    from app.modules.ai.ask_ninfa.home_types import AskHomeContext, AskHomeDecisionContext
+    from app.modules.ai.ask_ninfa.types import AskDataPoint
+
+    decision = AskHomeDecisionContext(
+        position="prima",
+        decision_label="x",
+        description="x",
+        area="x",
+        status_label="x",
+        target={},
+        confidence="1",
+        first_seen_local_date="2026-08-01",
+        episode_count=1,
+        facts=(),
+        impact_kind="costi",
+        economic_impact=(AskDataPoint(label="x", value="1", unit=None),),
+    )
+    context = AskHomeContext(
+        business_date="2026-08-01",
+        analysis_state="x",
+        decisions_total=1,
+        decisions=(decision,),
+        decisions_omitted=0,
+        insufficient_checks=None,
+        low_confidence_checks=None,
+        coverage=None,
+        freshness=None,
+        last_successful_analysis_date=None,
+    )
+    keys = set(_decision_dict(decision)) | set(home_context_to_dict(context))
+    keys |= {"unità"}  # the data point's own unit key
+    for quoted in (
+        "tipo di impatto economico",
+        "impatto economico",
+        "decisioni non mostrate",
+        "decisioni in ordine di priorità",
+        "unità",
+    ):
+        assert f'"{quoted}"' in TEXT, quoted
+        assert quoted in keys, quoted

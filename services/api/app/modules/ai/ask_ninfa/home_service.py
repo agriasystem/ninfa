@@ -17,9 +17,13 @@ from app.modules.ai.ask_ninfa.answer_validation import validate_model_answer_cor
 from app.modules.ai.ask_ninfa.guardrails import REFUSAL_COPY, classify_refusal
 from app.modules.ai.ask_ninfa.home_instructions import ASK_MIA_HOME_SYSTEM_INSTRUCTIONS
 from app.modules.ai.ask_ninfa.home_serialization import serialize_home_context
-from app.modules.ai.ask_ninfa.home_types import AskHomeContext, HomeGroundingRef
+from app.modules.ai.ask_ninfa.home_types import (
+    MAX_HOME_ANSWER_CHARS,
+    AskHomeContext,
+    HomeGroundingRef,
+)
 from app.modules.ai.ask_ninfa.question import validate_question
-from app.modules.ai.ask_ninfa.types import MAX_ANSWER_CHARS, AskStatus
+from app.modules.ai.ask_ninfa.types import AskStatus
 from app.modules.ai.gateway.errors import LanguageModelUnavailableError
 from app.modules.ai.gateway.protocol import LanguageModelProvider, LanguageModelRequest
 
@@ -62,7 +66,7 @@ class AskHomeService:
             system_instructions=ASK_MIA_HOME_SYSTEM_INSTRUCTIONS,
             context=serialize_home_context(context),
             question=cleaned_question,
-            max_answer_chars=MAX_ANSWER_CHARS,
+            max_answer_chars=MAX_HOME_ANSWER_CHARS,
             grounding_ref_values=_HOME_GROUNDING_VOCABULARY,
         )
 
@@ -73,7 +77,9 @@ class AskHomeService:
         except Exception:  # defense in depth: ANY unexpected provider failure fails closed too
             return _UNAVAILABLE
 
-        validated = validate_model_answer_core(raw_answer, frozenset(_HOME_GROUNDING_VOCABULARY))
+        validated = validate_model_answer_core(
+            raw_answer, frozenset(_HOME_GROUNDING_VOCABULARY), MAX_HOME_ANSWER_CHARS
+        )
         if validated is None:
             return _UNAVAILABLE
 

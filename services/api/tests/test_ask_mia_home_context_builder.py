@@ -445,3 +445,98 @@ def test_the_target_uses_plain_italian_keys_never_the_engines_own_identifiers(
         "reparto",
     }
     assert by_label["Dipendenza OTA"].target == {}
+
+
+# --- v2: what Mia needs to answer concretely - a description and the KIND of each estimate ------
+
+
+def test_every_decision_type_has_a_plain_description_and_an_impact_kind() -> None:
+    from app.modules.ai.ask_ninfa.home_context_builder import _IMPACT_KINDS
+    from app.modules.ai.ask_ninfa.semantic_labels import DECISION_TYPE_DESCRIPTIONS
+
+    assert set(DECISION_TYPE_DESCRIPTIONS) == set(PriorityDecisionType)
+    assert set(_IMPACT_KINDS) == set(PriorityDecisionType)
+    for description in DECISION_TYPE_DESCRIPTIONS.values():
+        assert description.endswith(".")
+        assert not any(character.isdigit() for character in description)  # no number to misquote
+        assert "_" not in description  # no technical token a model could echo
+        assert description == description.strip()
+
+
+def test_the_descriptions_state_no_recommendation_and_no_judgement_beyond_the_engines() -> None:
+    from app.modules.ai.ask_ninfa.semantic_labels import DECISION_TYPE_DESCRIPTIONS
+
+    for description in DECISION_TYPE_DESCRIPTIONS.values():
+        lowered = description.lower()
+        for forbidden in ("dovresti", "abbassa", "alza", "consigl", "urgente", "perdita", "grave"):
+            assert forbidden not in lowered, (description, forbidden)
+        assert "atteso" in lowered  # only the Engine's own "below/above the expected level"
+
+
+def test_each_decision_carries_its_description_in_the_context(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = factory.tenant()
+    sync_feed(db_session, tenant, five_triggered_evaluations(factory, tenant))
+    context = _context(db_session, tenant)
+
+    by_label = {item.decision_label: item for item in context.decisions}
+    assert by_label["Pickup sotto le attese"].description == (
+        "Le prenotazioni per il giorno di soggiorno indicato stanno arrivando "
+        "sotto il ritmo atteso."
+    )
+    assert by_label["Dipendenza OTA"].description == (
+        "La quota di prenotazioni da OTA è sopra il livello atteso."
+    )
+    assert len({item.description for item in context.decisions}) == 5
+    serialized = json.loads(serialize_home_context(context))
+    for payload in serialized["decisioni in ordine di priorità"]:
+        assert payload["descrizione"]
+
+
+def test_the_kind_of_an_estimate_is_named_only_where_an_estimate_exists(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = factory.tenant()
+    sync_feed(db_session, tenant, five_triggered_evaluations(factory, tenant))
+    context = _context(db_session, tenant)
+
+    by_label = {item.decision_label: item for item in context.decisions}
+    # Revenue and cost estimates are recorded for these fixtures; the OTA and labour fixtures record
+    # none, and a decision without an estimate claims no kind of estimate either.
+    assert by_label["Pickup sotto le attese"].impact_kind == "ricavi"
+    assert by_label["Rischio occupazione"].impact_kind == "ricavi"
+    assert by_label["Costo per camera anomalo"].impact_kind == "costi"
+    for item in context.decisions:
+        assert (item.impact_kind is None) == (item.economic_impact == ())
+
+
+def test_revenue_cost_and_ota_estimates_are_of_three_different_kinds() -> None:
+    from app.modules.ai.ask_ninfa.home_context_builder import _IMPACT_KINDS
+
+    assert (
+        _IMPACT_KINDS[PriorityDecisionType.REV_PICKUP_LOW]
+        == (_IMPACT_KINDS[PriorityDecisionType.REV_OCCUPANCY_RISK])
+    )
+    assert (
+        _IMPACT_KINDS[PriorityDecisionType.COST_CPOR_ANOMALY]
+        == (_IMPACT_KINDS[PriorityDecisionType.LABOR_OVERSTAFFING])
+    )
+    assert len(set(_IMPACT_KINDS.values())) == 3  # ricavi / ricavo esposto su OTA / costi
+
+
+def test_the_new_keys_are_plain_italian_and_serialized_per_decision(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = factory.tenant()
+    sync_feed(db_session, tenant, five_triggered_evaluations(factory, tenant))
+    decisions = json.loads(serialize_home_context(_context(db_session, tenant)))[
+        "decisioni in ordine di priorità"
+    ]
+    for decision in decisions:
+        assert "descrizione" in decision
+        assert "tipo di impatto economico" in decision
+        # an estimate list and its kind are always present together or absent together
+        assert (decision["tipo di impatto economico"] is None) == (
+            decision["impatto economico"] == []
+        )

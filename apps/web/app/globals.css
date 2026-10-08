@@ -1071,6 +1071,26 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   color: var(--home-ink);
 }
 
+/* A rich answer is a few short paragraphs and, to list several decisions, one real list. */
+.mia__reply-text + .mia__reply-text,
+.mia__reply-text + .mia__reply-list,
+.mia__reply-list + .mia__reply-text,
+.mia__reply-text + .mia__note,
+.mia__reply-list + .mia__note {
+  margin-top: 10px;
+}
+
+.mia__reply-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--home-ink);
+}
+
 .mia__note {
   font-size: 0.9375rem;
   color: var(--home-muted);

@@ -79,10 +79,14 @@ def _valid_limitations(raw_limitations: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def validate_model_answer_core(
-    raw: LanguageModelAnswer, vocabulary: frozenset[str]
+    raw: LanguageModelAnswer,
+    vocabulary: frozenset[str],
+    max_chars: int = MAX_ANSWER_CHARS,
 ) -> ValidatedCore | None:
     """The one shape/length/technical-leak validation every Ask-family answer goes through
-    (Decision Ask and Mia Home alike) - only the closed `grounding_refs` vocabulary differs."""
+    (Decision Ask and Mia Home alike) - only the closed `grounding_refs` vocabulary and the hard
+    length ceiling differ (`max_chars`: the Decision Ask's 700 by default, Mia Home's own
+    `MAX_HOME_ANSWER_CHARS` when it names it)."""
     status = _STATUS_MAP.get(raw.status)
     if status is None:
         return None  # defensive: unreachable while ModelAnswerStatus stays a 2-value StrEnum
@@ -91,7 +95,7 @@ def validate_model_answer_core(
     if not answer:
         return None
 
-    if len(answer) > MAX_ANSWER_CHARS:
+    if len(answer) > max_chars:
         # Gate 19.1b: fail closed, never truncate - a character-count slice can (and did, live)
         # land mid-number/mid-word, which reads as a wrong or incomplete fact, worse than an
         # honest UNAVAILABLE (see this module's own docstring, "why an overlong answer now fails

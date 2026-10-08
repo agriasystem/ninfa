@@ -16,9 +16,8 @@ from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
 from app.modules.ai.ask_ninfa.home_instructions import ASK_MIA_HOME_SYSTEM_INSTRUCTIONS
-from app.modules.ai.ask_ninfa.home_types import HomeGroundingRef
+from app.modules.ai.ask_ninfa.home_types import MAX_HOME_ANSWER_CHARS, HomeGroundingRef
 from app.modules.ai.ask_ninfa.instructions import ASK_NINFA_SYSTEM_INSTRUCTIONS
-from app.modules.ai.ask_ninfa.types import MAX_ANSWER_CHARS
 from app.modules.ai.gateway.errors import LanguageModelUnavailableError
 from app.modules.ai.gateway.protocol import LanguageModelAnswer, ModelAnswerStatus
 from app.modules.decision_memory.service import DecisionMemoryService
@@ -244,7 +243,7 @@ def test_an_overlong_or_empty_answer_fails_closed_never_truncated(
 ) -> None:
     at = authed_tenant(factory, authenticated_as)
     url = ask_home_url(at.tenant.property.id)
-    for bad in ("a" * (MAX_ANSWER_CHARS + 1), "   "):
+    for bad in ("a" * (MAX_HOME_ANSWER_CHARS + 1), "   "):
         with_fake_provider(app)(answered_provider(bad))
         assert api_client.post(url, json=_body()).json()["status"] == "UNAVAILABLE"
 
@@ -277,7 +276,7 @@ def test_the_provider_gets_three_separate_fields_and_the_home_vocabulary(
     [request] = provider.requests
     assert request.system_instructions == ASK_MIA_HOME_SYSTEM_INSTRUCTIONS
     assert request.question == "Quali dati ha usato NINFA oggi?"  # trimmed, nothing else
-    assert request.max_answer_chars == MAX_ANSWER_CHARS
+    assert request.max_answer_chars == MAX_HOME_ANSWER_CHARS
     assert request.grounding_ref_values == tuple(ref.value for ref in HomeGroundingRef)
     context = json.loads(request.context)
     assert context["data di riferimento"] == "2026-08-01"

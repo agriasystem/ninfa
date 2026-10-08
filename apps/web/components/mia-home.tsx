@@ -4,6 +4,7 @@ import { useId, useRef, useState, type FormEvent } from "react";
 
 import { askMiaHome } from "@/lib/api/ask-ninfa";
 import { miaHomeCopy } from "@/lib/ask-ninfa/copy";
+import { answerBlocksOf } from "@/lib/ask-ninfa/format-answer";
 import { MAX_QUESTION_LENGTH, stateFromResponse, type AskState } from "@/lib/ask-ninfa/state";
 
 import {
@@ -250,22 +251,33 @@ function MiaReplyBody({ state, onRetry }: { state: AskState; onRetry: () => void
     case "answered":
       return (
         <>
-          <p className="mia__reply-text">{state.answer}</p>
+          <AnswerText text={state.answer} />
           <Limitations items={state.limitations} />
         </>
       );
 
-    case "insufficientContext":
+    case "insufficientContext": {
+      // Mia's own explanation of what she cannot say IS the answer: it stands alone, with her
+      // specific limits underneath. The generic "non ha abbastanza informazioni" lead and its
+      // "riformula la domanda" hint are only the fallback for a reply that carries no text - they
+      // are never put around a concrete explanation (that would be a generic disclaimer wrapped
+      // around the real answer).
+      if (state.answer !== null && state.answer.trim().length > 0) {
+        return (
+          <>
+            <AnswerText text={state.answer} />
+            <Limitations items={state.limitations} />
+          </>
+        );
+      }
       return (
         <>
           <p className="mia__reply-lead">{miaHomeCopy.insufficientContextHeading}</p>
-          {state.answer !== null && state.answer.length > 0 ? (
-            <p className="mia__reply-text">{state.answer}</p>
-          ) : null}
           <p className="mia__note">{miaHomeCopy.insufficientContextSupporting}</p>
           <Limitations items={state.limitations} />
         </>
       );
+    }
 
     case "refused":
       return (
@@ -295,6 +307,28 @@ function MiaReplyBody({ state, onRetry }: { state: AskState; onRetry: () => void
         </div>
       );
   }
+}
+
+/** Mia's answer as short paragraphs and, when she lists several decisions, a real list. Plain text
+ * with line structure only - see `answerBlocksOf` (nothing is interpreted as Markdown or HTML). */
+function AnswerText({ text }: { text: string }) {
+  return (
+    <>
+      {answerBlocksOf(text).map((block, index) =>
+        block.kind === "paragraph" ? (
+          <p className="mia__reply-text" key={index}>
+            {block.text}
+          </p>
+        ) : (
+          <ul className="mia__reply-list" key={index}>
+            {block.items.map((item, itemIndex) => (
+              <li key={itemIndex}>{item}</li>
+            ))}
+          </ul>
+        ),
+      )}
+    </>
+  );
 }
 
 function Limitations({ items }: { items: string[] }) {

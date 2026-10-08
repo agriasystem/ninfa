@@ -19,7 +19,16 @@ from app.modules.ai.ask_ninfa.types import AskDataPoint
 # (`decisions_omitted`) so the model can say so instead of implying completeness.
 MAX_HOME_DECISIONS = 10
 
-ASK_MIA_HOME_INSTRUCTIONS_VERSION = "ask-mia-home-v1"
+# The Home's own answer ceiling. The Decision Ask's `MAX_ANSWER_CHARS` (700) fits ONE Decision; a
+# useful Home answer ("ci sono altri problemi?", "quale ha l'impatto più alto?") names several
+# decisions with their area, target and impact, ~60-160 words by default and up to ~220 when it
+# compares them. 1800 characters is that upper bound plus headroom for Italian's longer words and a
+# few line breaks - a HARD fail-closed ceiling exactly like the Decision Ask's (an overlong answer
+# is UNAVAILABLE, never truncated), never a style target: the length the model aims for lives in
+# `home_instructions.py`.
+MAX_HOME_ANSWER_CHARS = 1800
+
+ASK_MIA_HOME_INSTRUCTIONS_VERSION = "ask-mia-home-v2"
 
 
 class HomeGroundingRef(StrEnum):
@@ -41,11 +50,17 @@ class AskHomeDecisionContext:
     Italian ordinal word ("prima", "seconda", ...) - never a bare rank number, never a score: the
     list ORDER is NINFA's own priority order and `position` only names it in words (see ADR 0026,
     "why priority is not verbalised", kept for the Home on purpose). `area` is the user-facing
-    analysis domain ("Ricavi", "Distribuzione", "Costi", "Personale"). `economic_impact` carries
-    only proxies the Engine already recorded, each labelled as an indicative estimate."""
+    analysis domain ("Ricavi", "Distribuzione", "Costi", "Personale"). `description` is one fixed
+    plain-Italian sentence per decision TYPE saying what NINFA checked (the same wording the Home's
+    hero already ships - no number, no judgement, nothing the Engine did not decide).
+    `economic_impact` carries only proxies the Engine already recorded, each labelled as an
+    indicative estimate; `impact_kind` names WHAT KIND of estimate that is ("ricavi", "ricavo
+    esposto su OTA", "costi") so Mia can compare two estimates only when they are of the same kind
+    - `None` exactly when `economic_impact` is empty."""
 
     position: str
     decision_label: str
+    description: str
     area: str
     status_label: str
     target: dict[str, str]
@@ -53,6 +68,7 @@ class AskHomeDecisionContext:
     first_seen_local_date: str
     episode_count: int
     facts: tuple[AskDataPoint, ...]
+    impact_kind: str | None
     economic_impact: tuple[AskDataPoint, ...]
 
 
@@ -108,6 +124,7 @@ class AskHomeContext:
 
 __all__ = [
     "ASK_MIA_HOME_INSTRUCTIONS_VERSION",
+    "MAX_HOME_ANSWER_CHARS",
     "MAX_HOME_DECISIONS",
     "AskHomeAreaCoverage",
     "AskHomeContext",

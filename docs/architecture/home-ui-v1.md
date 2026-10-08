@@ -162,6 +162,12 @@ backend is described in [ask-mia-home-v1.md](ask-mia-home-v1.md).
 - **Every status renders in Mia's reply, under the sent question, which stays visible**: `ANSWERED`,
   `INSUFFICIENT_CONTEXT`, `UNAVAILABLE` (+ "Riprova"), `REFUSED`, network error (+ "Riprova"). A retry
   **re-sends the submitted question** (no retyping) and never touches a draft in the bar.
+- **Rich answers** (`ask-mia-home-v2`): the answer is plain text with line structure, rendered as short
+  paragraphs and, for lines starting with `- `, a real bulleted list (`lib/ask-ninfa/format-answer.ts`).
+  Nothing is interpreted as Markdown or HTML and no word is dropped. An `INSUFFICIENT_CONTEXT` reply
+  that carries Mia's own explanation shows it alone (with her specific limits under "Da tenere
+  presente"); the generic "Mia non ha abbastanza informazioni..." lead and its "riformula" hint appear
+  only when the reply has no text at all.
 - **Accessibility:** Mia's reply region is the polite live region (`aria-live="polite"`), so loading and
   the answer are announced without re-reading the Home or the question; the question carries a
   visually hidden "Hai chiesto:" for screen readers; errors keep `role="alert"`.

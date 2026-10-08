@@ -65,6 +65,23 @@ analyst of raw data.
 10. **Bounded and honest about size.** At most 10 decisions are in the context, with the total and
     the omitted count stated, so Mia says "ce ne sono altre" instead of implying completeness.
 
+11. **Response quality: grounded is not vague (`ask-mia-home-v2`).** The first live-style review of
+    v1 showed answers that were safe but thin - a generic limitation where the context allowed a
+    concrete answer. v2 changes *how well Mia explains*, never *what she may do*: the instructions
+    gain an answer shape (direct answer, concrete details from the context, a limit only if it
+    matters), a ban on generic opening disclaimers, an explicit "never replace a concrete answer with
+    a statement about your limits", `INSUFFICIENT_CONTEXT` only for a context that truly lacks the
+    answer, "enumerate all relevant decisions", length targets (~60-160 words, up to ~220 to list or
+    compare) and one rule per suggested question and feed state. Two context fields make that
+    possible without inventing anything: a fixed one-sentence **description** per decision type (the
+    hero's own wording) and the **kind** of each economic estimate (revenue / OTA exposure / cost), so
+    comparison is allowed exactly within one kind. The answer ceiling for Mia Home is therefore its
+    own constant (1800 characters, still fail-closed, never truncated) and the Anthropic output
+    budget grows for such requests only; the Decision Ask keeps 700 characters and 1024 tokens. The
+    UI renders paragraphs and a real list from the plain-text answer, and shows Mia's own
+    `INSUFFICIENT_CONTEXT` explanation alone instead of behind a generic lead. None of this is
+    proven to work on a real model by the automated suite: that needs the real-provider smoke test.
+
 ## Consequences
 
 - No migration, no new dependency, no write: the route is read-only despite being a POST.

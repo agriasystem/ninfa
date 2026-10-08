@@ -48,6 +48,15 @@ _TIMEOUT_SECONDS = 15.0
 _MAX_OUTPUT_TOKENS = 1024
 _MAX_RETRIES = 0
 
+# A request that allows a LONGER answer (Mia Home: up to 1800 characters of Italian, ~550 tokens,
+# on top of the JSON envelope, the grounding refs, up to five limitations and the adaptive-thinking
+# tokens, which count against `max_tokens`) needs a larger - still fixed, still bounded - output
+# budget, or a perfectly good answer would be cut off by the vendor mid-JSON and fail closed as
+# UNAVAILABLE. Requests at or below `_STANDARD_ANSWER_CHARS` (every Decision Ask request) keep
+# `_MAX_OUTPUT_TOKENS` exactly as before.
+_STANDARD_ANSWER_CHARS = 1200
+_MAX_OUTPUT_TOKENS_LONG_ANSWER = 2048
+
 # Ask NINFA is explanation, not frontier reasoning (ADR 0025, "why low effort, why no sampling
 # params") - Claude Sonnet 5's Messages API exposes no temperature/top_p/top_k at all in this SDK
 # version; `effort` is the one inference-shape knob `output_config` offers.
@@ -89,6 +98,12 @@ def _output_schema_for(request: LanguageModelRequest) -> dict[str, Any]:
     schema = copy.deepcopy(_OUTPUT_SCHEMA)
     schema["properties"]["grounding_refs"]["items"]["enum"] = list(request.grounding_ref_values)
     return schema
+
+
+def _max_tokens_for(request: LanguageModelRequest) -> int:
+    if request.max_answer_chars > _STANDARD_ANSWER_CHARS:
+        return _MAX_OUTPUT_TOKENS_LONG_ANSWER
+    return _MAX_OUTPUT_TOKENS
 
 
 # Fixed, deterministic: adaptive thinking (Sonnet 5's own default reasoning mode), but never
@@ -168,7 +183,7 @@ class AnthropicLanguageModelProvider:
         try:
             message = self._client.messages.create(
                 model=ANTHROPIC_MODEL,
-                max_tokens=_MAX_OUTPUT_TOKENS,
+                max_tokens=_max_tokens_for(request),
                 system=request.system_instructions,
                 messages=messages,
                 thinking=_THINKING,

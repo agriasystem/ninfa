@@ -541,12 +541,14 @@ describe("MiaHome - every answer status keeps the sent question visible", () => 
       },
     });
 
+    // Mia's own, specific explanation is the answer: it stands alone, with no generic
+    // "non ha abbastanza informazioni" line put in front of it.
+    expect(await screen.findByText("L'analisi di oggi non è ancora disponibile.")).not.toBeNull();
     expect(
-      await screen.findByText(
+      screen.queryByText(
         "Mia non ha abbastanza informazioni per rispondere con affidabilità a questa domanda.",
       ),
-    ).not.toBeNull();
-    expect(screen.getByText("L'analisi di oggi non è ancora disponibile.")).not.toBeNull();
+    ).toBeNull();
     expect(screen.getByText("Nessuna analisi completata per oggi.")).not.toBeNull();
     expect(userMessage(container)?.textContent).toContain("La mia domanda");
   });
@@ -561,6 +563,62 @@ describe("MiaHome - every answer status keeps the sent question visible", () => 
         "Mia non ha abbastanza informazioni per rispondere con affidabilità a questa domanda.",
       ),
     ).not.toBeNull();
+    // the generic hint belongs to this fallback only
+    expect(
+      screen.getByText(
+        "Prova a formulare la domanda in modo diverso oppure apri le decisioni di oggi per i dettagli.",
+      ),
+    ).not.toBeNull();
+  });
+
+  it("ANSWERED renders short paragraphs and a real list for several decisions", async () => {
+    const { container } = await ask(
+      answered(
+        [
+          "Sì, oltre alla prima NINFA ha rilevato anche:",
+          "- Rischio occupazione (Ricavi), data del soggiorno 22 agosto",
+          "- Dipendenza OTA (Distribuzione)",
+          "",
+          "Non sono state analizzate le aree: Costi, Personale.",
+        ].join("\n"),
+      ),
+    );
+
+    expect(await screen.findByText("Sì, oltre alla prima NINFA ha rilevato anche:")).not.toBeNull();
+    const items = Array.from(reply(container)?.querySelectorAll(".mia__reply-list > li") ?? []);
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Rischio occupazione (Ricavi), data del soggiorno 22 agosto",
+      "Dipendenza OTA (Distribuzione)",
+    ]);
+    expect(reply(container)?.querySelectorAll("p.mia__reply-text")).toHaveLength(2);
+    // the bullet marker is structure, never shown as a literal dash
+    expect(reply(container)?.textContent).not.toContain("- Rischio");
+  });
+
+  it("a rich answer is shown whole - no word dropped, nothing interpreted as markup", async () => {
+    const text = "**Non** è grassetto <b>né html</b>.\n\nSeconda parte con 7,50 camere.";
+    const { container } = await ask(answered(text));
+
+    await screen.findByText("Seconda parte con 7,50 camere.");
+    expect(reply(container)?.querySelector("b, strong, em, a")).toBeNull();
+    expect(reply(container)?.textContent).toContain("**Non** è grassetto <b>né html</b>.");
+  });
+
+  it("INSUFFICIENT_CONTEXT with an explanation shows it alone - no generic lead or hint around it", async () => {
+    const { container } = await ask({
+      ok: true,
+      data: {
+        status: "INSUFFICIENT_CONTEXT",
+        answer: "Posso spiegarti:\n- la priorità di oggi\n- le altre decisioni",
+        grounding_refs: [],
+        limitations: [],
+      },
+    });
+
+    await screen.findByText("Posso spiegarti:");
+    expect(reply(container)?.querySelectorAll(".mia__reply-list > li")).toHaveLength(2);
+    expect(reply(container)?.querySelector(".mia__reply-lead")).toBeNull();
+    expect(reply(container)?.querySelector(".mia__note")).toBeNull();
   });
 
   it("REFUSED", async () => {

@@ -141,6 +141,21 @@ _IMPACT_SPECS: dict[PriorityDecisionType, tuple[str, str, str | None, str]] = {
     ),
 }
 
+# WHAT KIND of estimate each proxy is. Two estimates are only comparable when their kind matches: a
+# revenue gap, the revenue exposed on OTAs and a cost excess are three different things (and the
+# first two carry no currency in the engine at all), so Mia is told the kind next to every estimate
+# instead of being left to guess whether "540.00" and "482.30" can be set side by side.
+_IMPACT_KIND_REVENUE = "ricavi"
+_IMPACT_KIND_OTA_EXPOSURE = "ricavo esposto su OTA"
+_IMPACT_KIND_COSTS = "costi"
+_IMPACT_KINDS: dict[PriorityDecisionType, str] = {
+    PriorityDecisionType.REV_PICKUP_LOW: _IMPACT_KIND_REVENUE,
+    PriorityDecisionType.REV_OCCUPANCY_RISK: _IMPACT_KIND_REVENUE,
+    PriorityDecisionType.REV_OTA_DEPENDENCY: _IMPACT_KIND_OTA_EXPOSURE,
+    PriorityDecisionType.COST_CPOR_ANOMALY: _IMPACT_KIND_COSTS,
+    PriorityDecisionType.LABOR_OVERSTAFFING: _IMPACT_KIND_COSTS,
+}
+
 _CURRENCY_WORDS = {"EUR": "euro"}
 
 # The keys `_target_context_of` (shared with the Decision Ask) returns are snake_case identifiers; a
@@ -199,9 +214,11 @@ def _decision_context_of(index: int, item: FeedItem) -> AskHomeDecisionContext:
     )
     confidence = canonical_text(observation.confidence_score)
     assert confidence is not None  # NOT NULL on DecisionObservation, see context_builder.py
+    economic_impact = _economic_impact_of(decision_type, all_facts, all_evidence)
     return AskHomeDecisionContext(
         position=_ORDINALS[index],
         decision_label=semantic_labels.decision_label_of(decision_type),
+        description=semantic_labels.decision_description_of(decision_type),
         area=_DOMAIN_LABELS[DOMAIN_OF_DECISION_TYPE[decision_type]],
         status_label=semantic_labels.observation_status_label_of(
             observation.lifecycle_transition, observation.source_status
@@ -211,7 +228,9 @@ def _decision_context_of(index: int, item: FeedItem) -> AskHomeDecisionContext:
         first_seen_local_date=decision.first_seen_local_date.isoformat(),
         episode_count=decision.episode_count,
         facts=semantic_facts,
-        economic_impact=_economic_impact_of(decision_type, all_facts, all_evidence),
+        # No estimate recorded -> no kind either: an empty list never claims to be "of" anything.
+        impact_kind=_IMPACT_KINDS[decision_type] if economic_impact else None,
+        economic_impact=economic_impact,
     )
 
 

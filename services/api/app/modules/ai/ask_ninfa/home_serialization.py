@@ -30,6 +30,7 @@ def _decision_dict(decision: AskHomeDecisionContext) -> dict[str, object]:
     return {
         "posizione nell'ordine di NINFA": decision.position,
         "decisione": decision.decision_label,
+        "descrizione": decision.description,
         "area": decision.area,
         "stato": decision.status_label,
         "riguarda": dict(decision.target),
@@ -37,6 +38,7 @@ def _decision_dict(decision: AskHomeDecisionContext) -> dict[str, object]:
         "rilevata per la prima volta il": decision.first_seen_local_date,
         "episodi": decision.episode_count,
         "dati": [_data_point_dict(point) for point in decision.facts],
+        "tipo di impatto economico": decision.impact_kind,
         "impatto economico": [_data_point_dict(point) for point in decision.economic_impact],
     }
 
