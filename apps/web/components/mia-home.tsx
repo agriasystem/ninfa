@@ -6,7 +6,15 @@ import { askMiaHome } from "@/lib/api/ask-ninfa";
 import { miaHomeCopy } from "@/lib/ask-ninfa/copy";
 import { MAX_QUESTION_LENGTH, stateFromResponse, type AskState } from "@/lib/ask-ninfa/state";
 
-import { ArrowUpIcon, DatabaseIcon, ListIcon, SearchIcon, TrendIcon } from "./icons";
+import {
+  ArrowUpIcon,
+  DatabaseIcon,
+  ListIcon,
+  SearchIcon,
+  SpinnerIcon,
+  TrendIcon,
+} from "./icons";
+import { NinfaLogo } from "./ninfa-logo";
 
 const SUGGESTION_ICONS = [SearchIcon, ListIcon, TrendIcon, DatabaseIcon] as const;
 
@@ -16,55 +24,82 @@ export interface MiaHomeProps {
    * backend, so Mia explains the SAME analysis the user is looking at. */
   asOfLocalDate: string;
   /** Called whenever the input holds REAL (non-whitespace) text - typed, pasted or filled from a
-   * suggestion. NEVER on focus alone. The caller makes it idempotent (the logo transition runs once). */
+   * suggestion - and when a question is sent. NEVER on focus alone. The caller makes it idempotent
+   * (the logo transition runs once). */
   onFirstInput: () => void;
 }
 
 /**
- * "Chiedi a Mia..." on the Home (Home UI V1): the suggested questions, the answer surface and the
- * dark input bar. Deliberately NOT a chat: ONE question in, ONE answer surface out (a new question
- * REPLACES the previous answer - there is no message list, no bubbles, no history, nothing
- * persisted); exactly one request in flight at a time; a retry after `unavailable`/`error` is
- * always a fresh, explicit, user-triggered call.
+ * "Chiedi a Mia..." on the Home: the suggested questions, the exchange and the dark input bar.
  *
- * Suggested questions only ever FILL the input (the user confirms with Enter / the send button,
- * exactly like the Decision Detail's own chips) - they never submit. There is no microphone: no
- * voice feature exists, and a control that does nothing is never drawn.
+ * SEND EXPERIENCE (like a modern assistant): pressing Enter or the arrow acquires the text as the
+ * submitted question, EMPTIES the input immediately, shows the question above the bar as the user's
+ * own message and, under it, Mia's reply (a discreet "Mia sta elaborando…" while the request runs).
+ * The message never stays in the bar.
  *
- * ENGINE CALCULATES, MIA EXPLAINS: this component sends the question and the business date, and
- * renders the answer; the context Mia answers from is built server-side, only from what the
- * Decision Engine already decided for that property and date.
+ * STILL NOT A CHAT: the endpoint is stateless per question, so the Home shows exactly ONE exchange
+ * (the submitted question + Mia's answer); sending a new question REPLACES it - there is no
+ * history, because the model is never given one (a list of past messages would be a false
+ * affordance). Nothing is persisted. Exactly one request may be in flight (guarded synchronously,
+ * not just through state); a retry re-sends the SAME submitted question as a fresh, explicit call.
+ *
+ * Suggested questions only ever FILL the input - the user confirms with Enter / the arrow. The
+ * input is a single-line `<input>`: Enter sends (there is no multi-line mode, so Shift+Enter sends
+ * too). The input is NEVER disabled while Mia answers - focus must not be taken away from the user -
+ * only sending is blocked until the request ends (the arrow turns into a spinner), and a draft of
+ * the next question can already be typed. There is no microphone: no voice feature exists.
+ *
+ * ENGINE CALCULATES, MIA EXPLAINS: this component sends the question and the business date and renders
+ * the answer; the context Mia answers from is built server-side, only from what the Decision Engine
+ * already decided for that property and date.
  */
 export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProps) {
   const [question, setQuestion] = useState("");
   const [asked, setAsked] = useState<string | null>(null);
+  const [exchangeId, setExchangeId] = useState(0);
   const [state, setState] = useState<AskState>({ kind: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
+  const inFlightRef = useRef(false);
   const inputId = useId();
 
   const submitting = state.kind === "loading";
-  const canSubmit = !submitting && question.trim().length > 0;
+  const hasText = question.trim().length > 0;
+  const canSubmit = !submitting && hasText;
 
   function changeQuestion(value: string) {
     setQuestion(value);
     if (value.trim().length > 0) onFirstInput();
   }
 
-  async function submit(text: string) {
-    if (submitting) return; // blocks a double submit (e.g. Enter + click mid-flight)
+  /** `fromInput`: a NEW question typed in the bar (the bar is emptied and a fresh exchange begins).
+   * Not for a retry, which re-sends the already-submitted question and leaves any draft untouched. */
+  async function send(text: string, fromInput: boolean) {
+    if (inFlightRef.current) return; // blocks a double submit synchronously (Enter + click, key repeat)
     const trimmed = text.trim();
     if (trimmed.length === 0) return;
+    inFlightRef.current = true;
 
     onFirstInput();
+    if (fromInput) {
+      setQuestion("");
+      setExchangeId((id) => id + 1);
+    }
     setAsked(trimmed);
     setState({ kind: "loading" });
-    const result = await askMiaHome(propertyId, asOfLocalDate, trimmed);
-    setState(result.ok ? stateFromResponse(result.data) : { kind: "error" });
+    try {
+      const result = await askMiaHome(propertyId, asOfLocalDate, trimmed);
+      setState(result.ok ? stateFromResponse(result.data) : { kind: "error" });
+    } finally {
+      inFlightRef.current = false;
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void submit(question);
+    void send(question, true);
+    // The user stays in the field they were typing in - also when the arrow (a button that is about
+    // to turn into a spinner) was what they pressed - so the keyboard is never lost after sending.
+    inputRef.current?.focus();
   }
 
   function pickSuggestedQuestion(text: string) {
@@ -76,7 +111,7 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
     <div
       className="mia"
       data-answering={state.kind !== "idle" ? "true" : "false"}
-      data-has-text={question.trim().length > 0 ? "true" : "false"}
+      data-has-text={hasText ? "true" : "false"}
     >
       <div className="mia__dock">
         <div className="mia__suggest">
@@ -101,11 +136,23 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
           </ul>
         </div>
 
-        <MiaAnswer state={state} asked={asked} onRetry={() => void submit(asked ?? "")} />
+        {asked !== null ? (
+          <MiaExchange
+            key={exchangeId}
+            asked={asked}
+            state={state}
+            onRetry={() => {
+              void send(asked, false);
+              inputRef.current?.focus();
+            }}
+          />
+        ) : null}
 
         <form
           className="mia__form"
           aria-label={miaHomeCopy.formLabel}
+          aria-busy={submitting}
+          data-busy={submitting ? "true" : "false"}
           onSubmit={handleSubmit}
           noValidate
         >
@@ -123,17 +170,18 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
             maxLength={MAX_QUESTION_LENGTH}
             autoComplete="off"
             enterKeyHint="send"
-            disabled={submitting}
             onChange={(event) => changeQuestion(event.target.value)}
           />
-          {question.trim().length > 0 ? (
+          {hasText || submitting ? (
             <button
               type="submit"
               className="mia__send"
-              aria-label={miaHomeCopy.submit}
+              aria-label={submitting ? miaHomeCopy.submitting : miaHomeCopy.submit}
               disabled={!canSubmit}
+              // A mouse/touch press must not pull focus (and the on-screen keyboard) out of the input.
+              onMouseDown={(event) => event.preventDefault()}
             >
-              <ArrowUpIcon />
+              {submitting ? <SpinnerIcon className="mia__send-spinner" /> : <ArrowUpIcon />}
             </button>
           ) : null}
         </form>
@@ -142,77 +190,111 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
   );
 }
 
-function MiaAnswer({
-  state,
+/**
+ * The single, current exchange: the user's own message (right-aligned, softly tinted - clearly "mine",
+ * never a boxed form summary) and, under it, Mia's reply (open text under her name, no card). The
+ * reply region is the polite live region: loading and the answer are announced, the question and the
+ * rest of the Home are not read again. It is keyed by the exchange so a NEW question enters afresh.
+ */
+function MiaExchange({
   asked,
+  state,
   onRetry,
 }: {
+  asked: string;
   state: AskState;
-  asked: string | null;
   onRetry: () => void;
 }) {
-  if (state.kind === "idle") return null;
-
   return (
-    <div className="mia__answer" aria-live="polite" aria-atomic="false">
-      {asked !== null ? (
-        <p className="mia__asked">
-          <span className="mia__asked-label">{miaHomeCopy.yourQuestion}</span>
-          <span className="mia__asked-text">{asked}</span>
-        </p>
-      ) : null}
+    <div className="mia__exchange">
+      <p className="mia__user-message">
+        <span className="visually-hidden">{miaHomeCopy.askedPrefix} </span>
+        {asked}
+      </p>
 
-      {state.kind === "loading" ? (
-        <p className="mia__loading" role="status">
-          {miaHomeCopy.submitting}
-        </p>
-      ) : null}
-
-      {state.kind === "answered" ? (
-        <div className="mia__result">
-          <h2 className="mia__answer-heading">{miaHomeCopy.answerHeading}</h2>
-          <p className="mia__answer-text">{state.answer}</p>
-          <Limitations items={state.limitations} />
+      <section
+        className="mia__reply"
+        aria-live="polite"
+        aria-atomic="false"
+        aria-busy={state.kind === "loading"}
+      >
+        <div className="mia__reply-header">
+          <NinfaLogo className="mia__reply-logo" />
+          <h2 className="mia__reply-name">{miaHomeCopy.assistantName}</h2>
         </div>
-      ) : null}
+        <div className="mia__reply-body" key={state.kind}>
+          <MiaReplyBody state={state} onRetry={onRetry} />
+        </div>
+      </section>
+    </div>
+  );
+}
 
-      {state.kind === "insufficientContext" ? (
-        <div className="mia__result">
-          <p className="mia__answer-heading">{miaHomeCopy.insufficientContextHeading}</p>
+function MiaReplyBody({ state, onRetry }: { state: AskState; onRetry: () => void }) {
+  switch (state.kind) {
+    case "idle":
+      return null;
+
+    case "loading":
+      return (
+        <p className="mia__thinking" role="status">
+          <span>{miaHomeCopy.submitting}</span>
+          <span className="mia__thinking-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        </p>
+      );
+
+    case "answered":
+      return (
+        <>
+          <p className="mia__reply-text">{state.answer}</p>
+          <Limitations items={state.limitations} />
+        </>
+      );
+
+    case "insufficientContext":
+      return (
+        <>
+          <p className="mia__reply-lead">{miaHomeCopy.insufficientContextHeading}</p>
           {state.answer !== null && state.answer.length > 0 ? (
-            <p className="mia__answer-text">{state.answer}</p>
+            <p className="mia__reply-text">{state.answer}</p>
           ) : null}
           <p className="mia__note">{miaHomeCopy.insufficientContextSupporting}</p>
           <Limitations items={state.limitations} />
-        </div>
-      ) : null}
+        </>
+      );
 
-      {state.kind === "refused" ? (
-        <p className="mia__note" role="status">
+    case "refused":
+      return (
+        <p className="mia__reply-text" role="status">
           {miaHomeCopy.refused}
         </p>
-      ) : null}
+      );
 
-      {state.kind === "unavailable" ? (
-        <div className="mia__result" role="alert">
-          <p className="mia__answer-heading">{miaHomeCopy.unavailableHeading}</p>
+    case "unavailable":
+      return (
+        <div role="alert">
+          <p className="mia__reply-lead">{miaHomeCopy.unavailableHeading}</p>
           <p className="mia__note">{miaHomeCopy.unavailableSupporting}</p>
           <button type="button" className="mia__retry" onClick={onRetry}>
             {miaHomeCopy.retry}
           </button>
         </div>
-      ) : null}
+      );
 
-      {state.kind === "error" ? (
-        <div className="mia__result" role="alert">
-          <p className="mia__answer-heading">{miaHomeCopy.networkError}</p>
+    case "error":
+      return (
+        <div role="alert">
+          <p className="mia__reply-lead">{miaHomeCopy.networkError}</p>
           <button type="button" className="mia__retry" onClick={onRetry}>
             {miaHomeCopy.retry}
           </button>
         </div>
-      ) : null}
-    </div>
-  );
+      );
+  }
 }
 
 function Limitations({ items }: { items: string[] }) {

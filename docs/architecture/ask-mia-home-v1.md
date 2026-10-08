@@ -89,3 +89,10 @@ isolation, explicit `as_of`, feed-only context (multiple decisions, coverage, fr
 time, no fabricated state per feed state), no raw data / ids / snake_case keys, the four statuses,
 provider errors, technical-code and overlong-answer rejection, no tools/web, read-only, the
 Decision Ask unaffected, and golden contexts for the four suggested questions.
+
+## Home presentation (Mia conversational send UX)
+
+The API contract above is unchanged by the Home's conversational send experience; the UI sends the
+submitted question, empties the bar and renders ONE exchange (the question + Mia's reply) at a time,
+because the endpoint is stateless per question and the model never receives a history. See
+[home-ui-v1.md](home-ui-v1.md), "Mia on the Home".

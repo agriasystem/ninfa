@@ -138,12 +138,40 @@ greet "Rossi"; the pilot onboarding asks for "Nome Cognome".)
 The bar, the four suggested questions and the answer surface are `components/mia-home.tsx`; the
 backend is described in [ask-mia-home-v1.md](ask-mia-home-v1.md).
 
-- The suggested questions only **fill** the input; the user confirms with Enter/the send button.
-- One question, one answer: a new question **replaces** the previous answer (no bubbles, no history,
-  nothing persisted); one request in flight; retry is always manual; the answer surface sits right
-  above the bar and the Home keeps its hero context.
+- **Send experience** (like a modern assistant): Enter or the arrow acquires the text as the submitted
+  question, **empties the input immediately** (the placeholder "Chiedi a Mia..." is back), shows the
+  question above the bar as the user's own message, and starts the request. Under it, Mia's reply
+  appears: a discreet "Mia sta elaborando…" (with three quiet dots) while the request runs, then the
+  answer. The message never stays in the bar. The former "LA TUA DOMANDA" / "Risposta di Mia" card is
+  gone.
+- **The user's message** is right-aligned, softly tinted, readable width, Poppins - not a boxed form
+  summary and not a chat bubble list. **Mia's reply** is open text under a small "Mia" label with the
+  NINFA mark (an `<h2>`, small), no card; limitations, when present, stay as a small muted list.
+- **One exchange at a time, still not a chat.** The endpoint is stateless per question, so the Home
+  shows exactly the submitted question + Mia's answer; a new question **replaces** the exchange (no
+  history, because the model is never given one). Nothing is persisted.
+- **One request in flight**, enforced synchronously (a ref, not only state). While Mia answers, the
+  input stays **enabled and focused** - focus is never taken from the user and a draft of the next
+  question can be typed - but sending is blocked: the arrow turns into a disabled spinner
+  (`aria-label="Mia sta elaborando…"`) and the form is `aria-busy`. When the answer arrives sending is
+  available again. After a click on the arrow, or on "Riprova", the focus stays in (or returns to) the input.
+- **Enter sends.** The field is a single-line `<input>` (no multi-line mode), so Shift+Enter sends
+  too. Empty / whitespace-only never sends and shows no arrow.
+- **The suggested questions only fill** the input; the user confirms with Enter/the arrow, which then
+  behaves exactly as for typed text.
+- **Every status renders in Mia's reply, under the sent question, which stays visible**: `ANSWERED`,
+  `INSUFFICIENT_CONTEXT`, `UNAVAILABLE` (+ "Riprova"), `REFUSED`, network error (+ "Riprova"). A retry
+  **re-sends the submitted question** (no retyping) and never touches a draft in the bar.
+- **Accessibility:** Mia's reply region is the polite live region (`aria-live="polite"`), so loading and
+  the answer are announced without re-reading the Home or the question; the question carries a
+  visually hidden "Hai chiesto:" for screen readers; errors keep `role="alert"`.
+- **Layout:** the reply sits immediately above the bar inside a sticky "dock" (so the bar is never
+  pushed off a short screen), on a feathered blurred backdrop so a scrolled-under Home never shows
+  through Mia's text. While an exchange is open the suggested questions step aside and the hero
+  tightens a little (spacing and the headline size animate - no jump). The new exchange enters with a
+  ~180-200 ms fade + 6 px translate (none under `prefers-reduced-motion`; no bounce, no dependency).
 - There is **no microphone**: no voice feature exists, so no inert control is drawn.
-- Placement follows the screen: where the whole Home fits (>= 881 px tall and > 1100 px wide - the
+- Placement of the suggestions follows the screen: where the whole Home fits (>= 881 px tall and > 1100 px wide - the
   reference desktop) the suggestions are visible at rest as in the reference; on shorter/narrower
   screens they appear as a panel above the bar when the user interacts with it (and step aside once
   there is text or an answer). While a question or answer is on screen the suggestions are hidden.

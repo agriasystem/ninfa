@@ -596,6 +596,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 }
 
 .home__hero {
+  margin-bottom: var(--space-6);
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -907,18 +908,19 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 
 /* --- Mia ("Chiedi a Mia...") --------------------------------------------------------------------- */
 
+/* `.mia` only carries state attributes for the stylesheet; it generates no box of its own, so the
+   dock below is a direct child of `.home__layout`. That matters for `position: sticky`: a sticky
+   element can only travel inside its containing block, and `.home__layout` (hero + dock) is tall,
+   whereas a wrapper exactly as tall as the dock would pin nothing - the bar would then fall below
+   the fold whenever the page (hero + an open exchange) is taller than the viewport. */
 .mia {
-  margin-top: auto;
-  padding-top: var(--space-6);
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: contents;
 }
 
 /* The dock keeps the bar reachable when the page is taller than the viewport (a sticky composer);
    on a page that fits (the desktop reference) it is just the normal bottom of the Home. */
 .mia__dock {
+  margin-top: auto;
   position: sticky;
   bottom: clamp(12px, 2.4vh, 24px);
   width: 100%;
@@ -988,59 +990,130 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   color: #2f6fe4;
 }
 
-.mia__answer {
-  margin-top: 18px;
+/* The current exchange: the user's own message, then Mia's open reply (no boxed card). */
+
+.mia__exchange {
   width: min(100%, 760px);
-  padding: 18px 24px;
-  border-radius: 24px;
-  border: 1px solid #dfe7f6;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 8px 28px rgba(40, 70, 140, 0.1);
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   text-align: left;
+}
+
+@keyframes mia-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The sent question: right-aligned, softly tinted, clearly the user's - never a form summary. */
+.mia__user-message {
+  align-self: flex-end;
+  max-width: min(78%, 560px);
+  padding: 10px 18px;
+  border-radius: 20px 20px 6px 20px;
+  background: rgba(214, 227, 252, 0.55);
+  color: var(--home-ink);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  animation: mia-enter 0.18s ease-out both;
+}
+
+.mia__reply {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: mia-enter 0.2s ease-out 0.06s both;
+}
+
+.mia__reply-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mia__reply-logo {
+  height: 22px;
+  width: auto;
+  user-select: none;
+}
+
+.mia__reply-name {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--home-ink);
 }
 
-.mia__asked {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-bottom: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--home-hairline);
+.mia__reply-body {
+  animation: mia-enter 0.16s ease-out both;
 }
 
-.mia__asked-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--home-muted);
-}
-
-.mia__asked-text {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 0.9375rem;
-  color: var(--home-greeting);
-}
-
-.mia__answer-heading {
+.mia__reply-lead {
   margin: 0 0 6px;
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-
-.mia__answer-text {
   font-size: 1rem;
-  line-height: 1.6;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--home-ink);
 }
 
-.mia__note,
-.mia__loading {
+.mia__reply-text {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--home-ink);
+}
+
+.mia__note {
   font-size: 0.9375rem;
   color: var(--home-muted);
+}
+
+.mia__thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9375rem;
+  color: var(--home-muted);
+}
+
+.mia__thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.mia__thinking-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: mia-dot 1.1s ease-in-out infinite;
+}
+
+.mia__thinking-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.mia__thinking-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes mia-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
 }
 
 .mia__limitations {
@@ -1074,6 +1147,57 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   background: var(--home-link);
 }
 
+/* The exchange gets a soft, blurred backdrop - feathered at BOTH ends, so there is no visible edge
+   against the aurora or the bar - so a Home scrolled under the pinned dock never shows through Mia's
+   text (the page can be taller than a short screen). The bar itself stays on the clear aurora. */
+.mia__exchange {
+  position: relative;
+  isolation: isolate;
+}
+
+.mia__exchange::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -22px -100vw -14px;
+  background: rgba(251, 252, 254, 0.78);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  -webkit-mask-image: linear-gradient(transparent, #000 30px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(transparent, #000 30px, #000 calc(100% - 22px), transparent);
+  pointer-events: none;
+}
+
+/* ...and the hero tightens a little (no abrupt jump: the spacing animates). */
+.home__greeting,
+.home__message,
+.home__status,
+.domain-summary {
+  transition: margin 0.25s ease, font-size 0.25s ease;
+}
+
+.home:has(.mia[data-answering="true"]) .home__greeting {
+  margin-top: 10px;
+}
+
+.home:has(.mia[data-answering="true"]) .home__message {
+  margin-top: 8px;
+  font-size: clamp(1.5rem, 1rem + 1.4vw, 2.5rem);
+}
+
+.home:has(.mia[data-answering="true"]) .home__status {
+  margin-top: 10px;
+}
+
+.home:has(.mia[data-answering="true"]) .domain-summary {
+  margin-top: 14px;
+}
+
+.home:has(.mia[data-answering="true"]) .domain-tile {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
 .mia__form {
   margin-top: clamp(18px, 3.2vh, 34px);
   width: min(100%, 650px);
@@ -1086,10 +1210,6 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   background: var(--home-bar);
   color: #fff;
   box-shadow: 0 12px 34px rgba(26, 36, 80, 0.28);
-}
-
-.mia__answer + .mia__form {
-  margin-top: 16px;
 }
 
 .mia__form:focus-within {
@@ -1150,6 +1270,15 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   height: 22px;
 }
 
+/* While Mia answers, the arrow becomes a quiet spinner and sending is blocked; the field stays usable. */
+.mia__send:disabled {
+  opacity: 0.85;
+}
+
+.mia__send-spinner {
+  animation: refresh-spin 0.9s linear infinite;
+}
+
 /* Short or narrow screens (laptops, phones): the page cannot show the suggestions AND the bar
    without scrolling, so - exactly as the brief describes - the suggested questions appear when the
    user interacts with the bar, as a panel above it, never over an answer. The reference desktop
@@ -1189,8 +1318,8 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
     min-height: 60px;
   }
 
-  .mia {
-    padding-top: var(--space-2);
+  .home__hero {
+    margin-bottom: var(--space-2);
   }
 
   .mia__form {
@@ -1685,8 +1814,13 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
     padding-left: 18px;
   }
 
-  .mia__answer {
-    padding: 16px 18px;
+  .mia__exchange {
+    margin-top: 12px;
+    gap: 10px;
+  }
+
+  .mia__user-message {
+    max-width: 88%;
   }
 
   .decision-card__facts {
@@ -1703,8 +1837,20 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   }
 
   .refresh-button[aria-busy="true"] .refresh-button__icon,
-  .home__skeleton-line {
+  .home__skeleton-line,
+  .mia__user-message,
+  .mia__reply,
+  .mia__reply-body,
+  .mia__thinking-dots i,
+  .mia__send-spinner {
     animation: none;
+  }
+
+  .home__greeting,
+  .home__message,
+  .home__status,
+  .domain-summary {
+    transition: none;
   }
 }
 

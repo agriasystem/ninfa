@@ -62,9 +62,12 @@ export const miaHomeCopy = {
     "Quali dati ha usato NINFA oggi?",
   ] as const,
   submit: "Invia la domanda a Mia",
-  submitting: "Mia sta analizzando la situazione di oggi…",
-  yourQuestion: "La tua domanda",
-  answerHeading: "Risposta di Mia",
+  // Shown (and announced) while the one request in flight is running.
+  submitting: "Mia sta elaborando…",
+  // The assistant's own name above her reply; the sent question reads "Hai chiesto: ..." to a screen
+  // reader (visually hidden - sighted users read it as the user's own message).
+  assistantName: "Mia",
+  askedPrefix: "Hai chiesto:",
   limitationsHeading: "Da tenere presente",
   insufficientContextHeading:
     "Mia non ha abbastanza informazioni per rispondere con affidabilità a questa domanda.",
