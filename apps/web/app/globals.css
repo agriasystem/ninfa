@@ -29,7 +29,6 @@
   --home-greeting: #5d6279;
   --home-muted: #6b7287;
   --home-link: #1550e8;
-  --home-sky: #1b9ef5;
   --home-attention: #f2840c;
   --home-attention-text: #b4530a;
   --home-neutral: #8a91a3;
@@ -39,7 +38,6 @@
   --home-active-pill: #e4ecfd;
   --home-active-ink: #1049e6;
   --home-chip: rgba(226, 235, 252, 0.72);
-  --home-bar: #2b313b;
   --home-focus: #1550e8;
   --sidebar-width: 240px;
   --sidebar-pad: 13px;
@@ -667,7 +665,8 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 
 .hero-fragment--accent {
   font-weight: 500;
-  color: var(--home-sky);
+  /* The SAME blue as the "N decisioni richiedono attenzione" link (.home__decisions-link). */
+  color: var(--home-link);
 }
 
 .home__supporting {
@@ -1276,9 +1275,13 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   padding: 0 12px 0 24px;
   /* half of the one-line height: a capsule at one line, a rounded block when it grows */
   border-radius: 34px;
-  background: var(--home-bar);
-  color: #fff;
-  box-shadow: 0 12px 34px rgba(26, 36, 80, 0.28);
+  background: #fff;
+  color: var(--home-ink);
+  /* The hairline is an inset ring (not a `border`) so the bar keeps its exact size and the icon, the
+     field and the arrow keep their positions; the light drop shadow separates it from the aurora. */
+  box-shadow:
+    inset 0 0 0 1px rgba(16, 25, 54, 0.12),
+    0 10px 30px rgba(26, 36, 80, 0.14);
 }
 
 .mia__form:focus-within {
@@ -1291,7 +1294,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   width: 26px;
   height: 26px;
   margin-bottom: 21px; /* centred on the first line of a one-line composer: (68 - 26) / 2 */
-  color: #fff;
+  color: var(--home-link);
 }
 
 /* An auto-growing <textarea> (1-4 lines, then it scrolls inside itself - see `autosize`). */
@@ -1301,7 +1304,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   padding: 20px 0;
   border: 0;
   background: transparent;
-  color: #fff;
+  color: var(--home-ink);
   font: inherit;
   font-size: 1.125rem;
   line-height: 1.5; /* 27px: one line + the padding is the 68px bar */
@@ -1311,7 +1314,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 }
 
 .mia__input::placeholder {
-  color: #c4c9d6;
+  color: var(--home-muted);
   opacity: 1;
 }
 
@@ -1333,13 +1336,14 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   padding: 0;
   border-radius: 50%;
   border: 0;
-  background: #fff;
-  color: var(--home-bar);
+  /* A white arrow on the brand blue: the bar itself is white now, so a white disc would vanish. */
+  background: var(--home-link);
+  color: #fff;
 }
 
 .mia__send:hover:not(:disabled) {
   opacity: 1;
-  background: #e8efff;
+  background: var(--home-ink);
 }
 
 .mia__send svg {
