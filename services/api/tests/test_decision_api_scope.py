@@ -13,6 +13,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from app.api.v1.decisions.router import (
+    ask_mia_home,
     ask_ninfa,
     get_decision_detail,
     get_decision_feed,
@@ -23,6 +24,7 @@ from app.api.v1.health import health
 from app.core.auth import get_current_principal
 
 _ASK_PATH = "/api/v1/properties/{property_id}/decisions/{decision_id}/ask"
+_HOME_ASK_PATH = "/api/v1/properties/{property_id}/ask"
 
 _GET_ONLY_DECISION_PATHS = {
     "/api/v1/properties/{property_id}/decision-feed",
@@ -31,14 +33,15 @@ _GET_ONLY_DECISION_PATHS = {
     "/api/v1/properties/{property_id}/decisions/{decision_id}/history",
 }
 
-_DECISION_PATHS = _GET_ONLY_DECISION_PATHS | {_ASK_PATH}
+_DECISION_PATHS = _GET_ONLY_DECISION_PATHS | {_ASK_PATH, _HOME_ASK_PATH}
 
 
-def test_openapi_still_exposes_the_five_decision_routes(client: TestClient) -> None:
+def test_openapi_exposes_the_decision_routes_and_the_two_ask_posts(client: TestClient) -> None:
     """The EXACT full-surface guard (health + auth + decisions, nothing else) now lives in
     `test_auth_scope.py`, which supersedes this one now that Gate 13 legitimately adds three
     `/auth/*` routes - this file keeps the narrower, still-true claim that is actually its own
-    scope: the decision routes are still exactly these five (four GET, one POST `/ask`)."""
+    scope: the decision routes are exactly these six (four GET, plus the Decision Ask POST and the
+    property-level Mia Home POST)."""
     schema = client.get("/openapi.json").json()
     paths = set(schema["paths"])
     assert paths >= _DECISION_PATHS
@@ -61,7 +64,7 @@ def test_every_decision_route_is_get_only_except_the_one_ask_post(client: TestCl
     for path, methods in schema["paths"].items():
         if not path.startswith("/api/v1/properties/"):
             continue
-        if path == _ASK_PATH:
+        if path in (_ASK_PATH, _HOME_ASK_PATH):
             assert set(methods) == {"post"}, path
             for forbidden in ("get", "put", "patch", "delete"):
                 assert forbidden not in methods, (path, forbidden)
@@ -104,7 +107,7 @@ def test_no_debug_or_analyze_or_sync_endpoint_exists(client: TestClient) -> None
 # --- Gate 18 (Ask NINFA Core V1, review items 64-69): exactly ONE new route, POST, read-only -----
 
 
-def test_decision_paths_are_exactly_the_historical_four_plus_gate_18s_one_ask_route(
+def test_decision_paths_are_exactly_the_historical_four_plus_the_two_ask_routes(
     client: TestClient,
 ) -> None:
     """Supersedes the old Gate-16-era claim ("still exactly the same four") now that Gate 18
@@ -113,8 +116,9 @@ def test_decision_paths_are_exactly_the_historical_four_plus_gate_18s_one_ask_ro
     GET-history-of-conversations, never a conversation-management route of any kind."""
     schema = client.get("/openapi.json").json()
     paths = {p for p in schema["paths"] if p.startswith("/api/v1/properties/")}
-    assert paths == _GET_ONLY_DECISION_PATHS | {_ASK_PATH}
+    assert paths == _GET_ONLY_DECISION_PATHS | {_ASK_PATH, _HOME_ASK_PATH}
     assert _ASK_PATH in paths
+    assert _HOME_ASK_PATH in paths
     for forbidden_conversation_path in (
         "/api/v1/properties/{property_id}/decisions/{decision_id}/conversations",
         "/api/v1/properties/{property_id}/decisions/{decision_id}/messages",
@@ -184,11 +188,12 @@ def test_every_decision_route_depends_on_get_current_principal(app: FastAPI) -> 
         get_decision_detail,
         get_decision_history,
         ask_ninfa,
+        ask_mia_home,
     }
     decision_routes = [
         route for route in _all_api_routes(app.routes) if route.endpoint in decision_endpoints
     ]
-    assert len(decision_routes) == 5
+    assert len(decision_routes) == 6
     for route in decision_routes:
         closure = _dependency_closure(route.dependant)
         assert get_current_principal in closure, route.path

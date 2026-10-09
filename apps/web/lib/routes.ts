@@ -19,3 +19,10 @@ export function oggiRoute(propertyId?: string): string {
 export function decisionDetailRoute(propertyId: string, decisionId: string): string {
   return `/oggi/decisioni/${decisionId}?${PROPERTY_QUERY_PARAM}=${propertyId}`;
 }
+
+/** "/decisioni", optionally scoped to a property - the list of TODAY'S actionable Decisions (Home
+ * UI V1): exactly the feed the Home's "N decisioni richiedono attenzione" count is taken from, so
+ * the number a user clicks and the list they land on can never disagree. */
+export function decisioniRoute(propertyId?: string): string {
+  return propertyId ? `/decisioni?${PROPERTY_QUERY_PARAM}=${propertyId}` : "/decisioni";
+}

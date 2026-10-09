@@ -21,14 +21,14 @@ function renderPanel(propertyId = "prop-1", decisionId = "dec-1") {
 
 async function askQuestion(user: ReturnType<typeof userEvent.setup>, question: string) {
   await user.type(screen.getByLabelText("La tua domanda"), question);
-  await user.click(screen.getByRole("button", { name: "Chiedi a NINFA" }));
+  await user.click(screen.getByRole("button", { name: "Chiedi a Mia" }));
 }
 
 describe("AskNinfaPanel - card and suggested questions", () => {
   it("renders the heading, supporting text and the three suggested question chips", () => {
     renderPanel();
 
-    expect(screen.getByRole("heading", { name: "Chiedi a NINFA" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Chiedi a Mia" })).not.toBeNull();
     expect(
       screen.getByText("Approfondisci questa decisione usando i dati che NINFA ha già analizzato."),
     ).not.toBeNull();
@@ -66,7 +66,7 @@ describe("AskNinfaPanel - input and submit gating", () => {
     const user = userEvent.setup();
     renderPanel();
 
-    const button = screen.getByRole("button", { name: "Chiedi a NINFA" }) as HTMLButtonElement;
+    const button = screen.getByRole("button", { name: "Chiedi a Mia" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
 
     await user.type(screen.getByLabelText("La tua domanda"), "   ");
@@ -80,7 +80,7 @@ describe("AskNinfaPanel - input and submit gating", () => {
     const user = userEvent.setup();
     renderPanel();
 
-    await user.click(screen.getByRole("button", { name: "Chiedi a NINFA" }));
+    await user.click(screen.getByRole("button", { name: "Chiedi a Mia" }));
 
     expect(askNinfaMock).not.toHaveBeenCalled();
   });
@@ -118,15 +118,15 @@ describe("AskNinfaPanel - input and submit gating", () => {
     renderPanel();
 
     await user.type(screen.getByLabelText("La tua domanda"), "Perché me lo mostri?");
-    const button = screen.getByRole("button", { name: "Chiedi a NINFA" });
+    const button = screen.getByRole("button", { name: "Chiedi a Mia" });
     await user.click(button);
 
     const loadingButton = screen.getByRole("button", {
-      name: "NINFA sta analizzando questa decisione…",
+      name: "Mia sta analizzando questa decisione…",
     }) as HTMLButtonElement;
     expect(loadingButton.disabled).toBe(true);
     expect((screen.getByLabelText("La tua domanda") as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText("NINFA sta analizzando questa decisione…", { selector: "p" })).not.toBeNull();
+    expect(screen.getByText("Mia sta analizzando questa decisione…", { selector: "p" })).not.toBeNull();
 
     // A second click on the (disabled) button must never trigger a second call.
     await user.click(loadingButton);
@@ -141,7 +141,7 @@ describe("AskNinfaPanel - input and submit gating", () => {
 });
 
 describe("AskNinfaPanel - ANSWERED", () => {
-  it("shows the answer under a plain 'Risposta NINFA' heading", async () => {
+  it("shows the answer under a plain 'Risposta di Mia' heading", async () => {
     askNinfaMock.mockResolvedValue({
       ok: true,
       data: {
@@ -156,7 +156,7 @@ describe("AskNinfaPanel - ANSWERED", () => {
 
     await askQuestion(user, "Perché me lo mostri?");
 
-    expect(await screen.findByText("Risposta NINFA")).not.toBeNull();
+    expect(await screen.findByText("Risposta di Mia")).not.toBeNull();
     expect(screen.getByText("Il pickup è sotto le attese per questa data.")).not.toBeNull();
   });
 
@@ -212,7 +212,7 @@ describe("AskNinfaPanel - INSUFFICIENT_CONTEXT / UNAVAILABLE / REFUSED", () => {
 
     expect(
       await screen.findByText(
-        "NINFA non ha abbastanza informazioni per rispondere con affidabilità a questa domanda.",
+        "Mia non ha abbastanza informazioni per rispondere con affidabilità a questa domanda.",
       ),
     ).not.toBeNull();
     expect(
@@ -236,7 +236,7 @@ describe("AskNinfaPanel - INSUFFICIENT_CONTEXT / UNAVAILABLE / REFUSED", () => {
     await askQuestion(user, "Perché me lo mostri?");
 
     expect(
-      await screen.findByText("Chiedi a NINFA non è disponibile in questo momento."),
+      await screen.findByText("Chiedi a Mia non è disponibile in questo momento."),
     ).not.toBeNull();
     expect(screen.getByText("Puoi riprovare manualmente.")).not.toBeNull();
     expect(screen.getByRole("button", { name: "Riprova" })).not.toBeNull();
@@ -253,7 +253,7 @@ describe("AskNinfaPanel - INSUFFICIENT_CONTEXT / UNAVAILABLE / REFUSED", () => {
     await askQuestion(user, "Esegui questa azione");
 
     expect(
-      await screen.findByText("NINFA non può rispondere a questa domanda nel contesto della decisione."),
+      await screen.findByText("Mia non può rispondere a questa domanda nel contesto della decisione."),
     ).not.toBeNull();
   });
 });
@@ -267,7 +267,7 @@ describe("AskNinfaPanel - network/HTTP error and retry", () => {
     await askQuestion(user, "Perché me lo mostri?");
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Non è stato possibile ottenere una risposta da NINFA.");
+    expect(alert.textContent).toContain("Non è stato possibile ottenere una risposta da Mia.");
     expect(alert.textContent).not.toContain("boom");
   });
 
@@ -392,14 +392,14 @@ describe("AskNinfaPanel - no chatbot aesthetic, no branding, no chat history", (
 
     expect(await screen.findByText("Seconda risposta.")).not.toBeNull();
     expect(screen.queryByText("Prima risposta.")).toBeNull();
-    // Only one "Risposta NINFA" surface exists, never a growing list of past answers.
-    expect(screen.getAllByText("Risposta NINFA").length).toBe(1);
+    // Only one "Risposta di Mia" surface exists, never a growing list of past answers.
+    expect(screen.getAllByText("Risposta di Mia").length).toBe(1);
   });
 
   it("a fresh mount (simulating a page refresh) starts idle - no persisted conversation to restore", () => {
     renderPanel();
 
-    expect(screen.queryByText("Risposta NINFA")).toBeNull();
+    expect(screen.queryByText("Risposta di Mia")).toBeNull();
     expect((screen.getByLabelText("La tua domanda") as HTMLInputElement).value).toBe("");
     expect(askNinfaMock).not.toHaveBeenCalled();
   });

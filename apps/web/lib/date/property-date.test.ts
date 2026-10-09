@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   formatBusinessDateItalian,
   formatPropertyLocalDateItalian,
+  formatPropertyLocalDateLongItalian,
   formatPropertyLocalDateTimeItalian,
+  formatPropertyLocalTimeItalian,
+  previousBusinessDate,
   propertyLocalDate,
 } from "./property-date";
 
@@ -136,5 +139,74 @@ describe("formatBusinessDateItalian", () => {
   it("is independent of the property's own timezone too - a bare business date has none", () => {
     // formatBusinessDateItalian deliberately takes no timeZone parameter at all.
     expect(formatBusinessDateItalian("2026-10-01")).toBe("1 ottobre");
+  });
+});
+
+describe("formatPropertyLocalDateLongItalian (Home header: day, month, YEAR - no weekday)", () => {
+  it("renders the property-local calendar date with the year", () => {
+    expect(formatPropertyLocalDateLongItalian(new Date("2026-10-08T10:00:00Z"), "Europe/Rome")).toBe(
+      "8 ottobre 2026",
+    );
+  });
+
+  it("uses the property's own timezone at the UTC day boundary, in both directions", () => {
+    // 22:30 UTC on 7 October: already 8 October in Rome (UTC+2), still 7 October in Honolulu.
+    const instant = new Date("2026-10-07T22:30:00Z");
+    expect(formatPropertyLocalDateLongItalian(instant, "Europe/Rome")).toBe("8 ottobre 2026");
+    expect(formatPropertyLocalDateLongItalian(instant, "Pacific/Honolulu")).toBe("7 ottobre 2026");
+  });
+
+  it("agrees with propertyLocalDate for the same (now, timeZone) pair - one clock, one day", () => {
+    const instant = new Date("2026-12-31T23:30:00Z"); // 1 January 2027 in Rome (UTC+1)
+    expect(propertyLocalDate(instant, "Europe/Rome")).toBe("2027-01-01");
+    expect(formatPropertyLocalDateLongItalian(instant, "Europe/Rome")).toBe("1 gennaio 2027");
+  });
+
+  it("has no weekday and no capitalised first letter (unlike the Gate 14 formatter)", () => {
+    const text = formatPropertyLocalDateLongItalian(new Date("2026-10-08T10:00:00Z"), "Europe/Rome");
+    expect(text).not.toMatch(/gioved/iu);
+    expect(formatPropertyLocalDateItalian(new Date("2026-10-08T10:00:00Z"), "Europe/Rome")).toMatch(
+      /^Gioved/u,
+    );
+  });
+});
+
+describe("formatPropertyLocalTimeItalian", () => {
+  it("renders a 24-hour HH:MM wall clock in the property's own timezone", () => {
+    expect(formatPropertyLocalTimeItalian(new Date("2026-10-08T07:31:00Z"), "Europe/Rome")).toBe("09:31");
+    expect(formatPropertyLocalTimeItalian(new Date("2026-10-08T07:31:00Z"), "Pacific/Honolulu")).toBe(
+      "21:31",
+    );
+  });
+
+  it("writes midnight as 00:xx (never 24:xx) and zero-pads the hour", () => {
+    expect(formatPropertyLocalTimeItalian(new Date("2026-10-07T22:05:00Z"), "Europe/Rome")).toBe("00:05");
+    expect(formatPropertyLocalTimeItalian(new Date("2026-10-08T03:07:00Z"), "Europe/Rome")).toBe("05:07");
+  });
+
+  it("applies the real offset of that day (DST), never a fixed one", () => {
+    expect(formatPropertyLocalTimeItalian(new Date("2026-01-15T08:31:00Z"), "Europe/Rome")).toBe("09:31");
+    expect(formatPropertyLocalTimeItalian(new Date("2026-07-15T08:31:00Z"), "Europe/Rome")).toBe("10:31");
+  });
+});
+
+describe("previousBusinessDate", () => {
+  it("steps back one calendar day, across month, year and leap-day boundaries", () => {
+    expect(previousBusinessDate("2026-10-08")).toBe("2026-10-07");
+    expect(previousBusinessDate("2026-10-01")).toBe("2026-09-30");
+    expect(previousBusinessDate("2027-01-01")).toBe("2026-12-31");
+    expect(previousBusinessDate("2028-03-01")).toBe("2028-02-29");
+    expect(previousBusinessDate("2027-03-01")).toBe("2027-02-28");
+  });
+
+  it("is independent of the runtime's own timezone (pure calendar arithmetic)", () => {
+    process.env.TZ = "Pacific/Honolulu";
+    expect(previousBusinessDate("2026-10-01")).toBe("2026-09-30");
+    process.env.TZ = "Pacific/Kiritimati";
+    expect(previousBusinessDate("2026-10-01")).toBe("2026-09-30");
+  });
+
+  it("rejects a malformed input rather than guessing", () => {
+    expect(() => previousBusinessDate("not-a-date")).toThrow();
   });
 });

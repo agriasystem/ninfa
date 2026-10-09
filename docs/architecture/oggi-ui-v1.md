@@ -4,6 +4,14 @@ The first real, visible product surface of NINFA: an authenticated shell around 
 question - "what deserves my attention today?" - answered by the Decision API (Gate 12) through
 a real session (Gate 13). Complexity stays inside the backend; the UI stays deliberately narrow.
 
+> **Update (Home UI V1, ADR 0027/0028):** the screen described below was redesigned. The topbar shell
+> became a sidebar shell, `/oggi` is now the decision-first Home (hero, "N decisioni richiedono
+> attenzione", factual freshness, four-area strip, Mia), and the list of decision cards moved to
+> `/decisioni` (every decision, no top-5 cap). The feed-state semantics, the property/timezone/`as_of`
+> rules, the API client, auth handling, error handling and the Decision Detail below are **unchanged**.
+> See [home-ui-v1.md](home-ui-v1.md) for the current screen; the sections that no longer describe it
+> are marked "(superseded)".
+
 ## Philosophy
 
 Everything Gate 0-13 built (DATA → EXPECTED → DETECT → CONFIDENCE → PRIORITY → DECISION MEMORY →
@@ -12,7 +20,7 @@ nothing to that decision: it is a rendering and authentication layer only. NINFA
 like a PMS, a BI dashboard, an admin panel or a spreadsheet - the user never interprets a chart to
 understand what is happening. The MVP keeps the choice made from the start: **zero graphs**.
 
-## Authenticated shell
+## Authenticated shell (superseded by the sidebar shell - see home-ui-v1.md)
 
 `components/app-shell.tsx` is the whole authenticated frame: the `NINFA` wordmark (a plain
 typographic mark - no logo asset exists yet, see "Limitations"), the property selector, the
@@ -113,7 +121,7 @@ The golden test suite (`golden/oggi-golden.test.tsx`) renders all four states fr
 fixtures and asserts this mutual exclusivity directly, plus the "Tutto sotto controllo" placement
 rule specifically.
 
-## Top-5 presentation
+## Top-5 presentation (applies to the card list when the cap is kept; `/decisioni` lifts it)
 
 The API already returns every triggered candidate, ordered `priority_rank ASC`
 (`DecisionRepository.feed_rows()`, Gate 12). `components/decision-list.tsx` does exactly one
@@ -155,8 +163,13 @@ personale" and similar phrasing are explicitly checked absent by tests.
 
 ## No graphs
 
-No chart library, no `<svg>`/`<canvas>` element, anywhere in this Gate's components - checked
-directly by component tests (`decision-card.test.tsx`, the golden suite).
+No chart library and no analytical graph of any kind, in this Gate and in Home UI V1 - the Home and
+`/decisioni` show text and status only. (Gate 14 enforced this as "no `<svg>`/`<canvas>` anywhere in
+this Gate's components"; that wording was broader than the intent. Since Home UI V1, icons, the logo
+and the Home's temporary canvas motion are allowed as **presentation** in the shell and the Home -
+see [home-ui-v1.md](home-ui-v1.md), "No graphs". The component tests that forbid `svg`/`canvas` in the
+decision cards, feed states, Decision Detail and Ask panel are unchanged: those render content, not
+the shell.)
 
 ## API client
 
@@ -235,8 +248,8 @@ an icon-free but distinct visual treatment).
 - No i18n framework - copy is centralised (`lib/copy.ts`) but hardcoded to Italian.
 - No dedicated E2E/browser-automation suite (Playwright or similar) - visual acceptance at the
   three target viewports is a manual checklist plus component/CSS-level tests.
-- No real NINFA logo asset - the shell uses a plain typographic wordmark until a brand asset is
-  frozen in the repository.
+- ~~No real NINFA logo asset~~ - resolved by Home UI V1: the official brand PNG is
+  `public/brand/ninfa-logo.png` (a brand-exact SVG is still deferred).
 - `lib/health.ts`/`components/health-status.tsx` (Gate 0) are no longer wired into any page (the
   root route now redirects based on auth state) but were left in place, untouched and still
   tested, rather than deleted - they are not part of this gate's scope either way.

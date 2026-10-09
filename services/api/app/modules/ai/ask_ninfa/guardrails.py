@@ -76,17 +76,19 @@ def classify_refusal(question: str) -> RefusalReason | None:
     return None
 
 
+# User-facing copy: the visible assistant is called Mia (D5, Home UI V1); NINFA stays the product.
+# Shared by the Decision Ask and Mia Home - a refusal reads the same wherever it was asked.
 REFUSAL_COPY: dict[RefusalReason, str] = {
     RefusalReason.EXECUTION_REQUEST: (
-        "Ask NINFA può spiegare una Decision, ma non può eseguire azioni: non modifica prezzi, "
+        "Mia può spiegare le Decisioni di NINFA, ma non può eseguire azioni: non modifica prezzi, "
         "personale, distribuzione o prenotazioni."
     ),
     RefusalReason.PII_REQUEST: (
-        "Ask NINFA non fornisce dati personali di ospiti o dipendenti: può spiegare solo i dati "
-        "già presenti nella Decision, che non contengono identità individuali."
+        "Mia non fornisce dati personali di ospiti o dipendenti: può spiegare solo i dati "
+        "già presenti nelle Decisioni, che non contengono identità individuali."
     ),
     RefusalReason.INJECTION_ATTEMPT: (
-        "Ask NINFA segue sempre le proprie regole di funzionamento, indipendentemente da come è "
+        "Mia segue sempre le proprie regole di funzionamento, indipendentemente da come è "
         "formulata la domanda."
     ),
 }

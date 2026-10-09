@@ -15,7 +15,7 @@ import { evidenceRows } from "@/lib/decisions/evidence-rows";
 import { formatMoney } from "@/lib/decisions/format";
 import { whySentence } from "@/lib/decisions/why-copy";
 import { formatLocalDateItalian } from "@/lib/date/local-date";
-import { oggiRoute } from "@/lib/routes";
+import { decisioniRoute } from "@/lib/routes";
 
 import { AskNinfaPanel } from "./ask-ninfa-panel";
 import { DecisionTimeline } from "./decision-timeline";
@@ -143,7 +143,7 @@ export function DecisionDetailView({ propertyId, decisionId }: DecisionDetailVie
   return (
     <div className="decision-detail">
       <p className="decision-detail__back">
-        <Link href={oggiRoute(propertyId)}>{copy.detail.back}</Link>
+        <Link href={decisioniRoute(propertyId)}>{copy.detail.back}</Link>
       </p>
 
       {detailBusy ? (
@@ -156,7 +156,7 @@ export function DecisionDetailView({ propertyId, decisionId }: DecisionDetailVie
         <div className="decision-detail__not-found">
           <h1>{copy.detail.notFoundTitle}</h1>
           <p>{copy.detail.notFoundBody}</p>
-          <Link href={oggiRoute(propertyId)}>{copy.detail.backToOggi}</Link>
+          <Link href={decisioniRoute(propertyId)}>{copy.detail.backToDecisioni}</Link>
         </div>
       ) : detailState.kind === "error" ? (
         <div className="decision-detail__error" role="alert">
@@ -169,7 +169,7 @@ export function DecisionDetailView({ propertyId, decisionId }: DecisionDetailVie
         <DecisionDetailContent detail={detailState.detail} />
       )}
 
-      {/* "Chiedi a NINFA" (Gate 20): always after the recommendation, before Evoluzione. Lives
+      {/* "Chiedi a Mia" (Gate 20): always after the recommendation, before Evoluzione. Lives
           outside DecisionDetailContent on purpose - that function stays a PURE renderer of an
           already-fetched detail (golden fixtures render it directly, with no fetch mock at all),
           while this panel owns its own, separate, submit-triggered network call. */}

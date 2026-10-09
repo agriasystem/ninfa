@@ -17,7 +17,16 @@ from tests.support import BookingFactory, Rejects, Tenant, alembic_config, make_
 
 @pytest.fixture
 def settings() -> Settings:
-    """The real settings, with ONE test-only override: `session_cookie_secure=False`.
+    """The real settings, with two test-only overrides: `session_cookie_secure=False` and a
+    guaranteed UNCONFIGURED language-model provider.
+
+    The provider override keeps the suite hermetic: a developer who has configured a real
+    `ASK_NINFA_PROVIDER=anthropic` + key in the root `.env` (to run a real-model smoke test) must
+    never have the ordinary tests reach the network - "no provider override: the real default" tests
+    mean the unconfigured default. Tests that exercise the Anthropic adapter build their own
+    settings with a fake key.
+
+    On `session_cookie_secure`:
 
     `TestClient` talks to `http://testserver` (plain HTTP, by construction - there is no TLS in
     an in-process test). A `Secure` cookie is never resent by ANY spec-compliant HTTP client
@@ -27,7 +36,13 @@ def settings() -> Settings:
     weakening of the real (still `Secure=True`) default `test_auth_login.py::
     test_default_prefers_secure_true` itself verifies.
     """
-    return get_settings().model_copy(update={"session_cookie_secure": False})
+    return get_settings().model_copy(
+        update={
+            "session_cookie_secure": False,
+            "ask_ninfa_provider": "unconfigured",
+            "anthropic_api_key": None,
+        }
+    )
 
 
 @pytest.fixture

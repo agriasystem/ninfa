@@ -12,6 +12,7 @@ given (`_answer_from_message` re-validates it byte for byte) - Gate 18's own
 `answer_validation.py` is the second, independent layer of distrust on top of this one.
 """
 
+import copy
 import json
 import logging
 import time
@@ -30,6 +31,7 @@ from anthropic.types import (
 from app.modules.ai.ask_ninfa.types import GroundingRef
 from app.modules.ai.gateway.errors import LanguageModelUnavailableError
 from app.modules.ai.gateway.protocol import (
+    HistoryTurn,
     LanguageModelAnswer,
     LanguageModelRequest,
     ModelAnswerStatus,
@@ -46,6 +48,15 @@ ANTHROPIC_MODEL = "claude-sonnet-5"
 _TIMEOUT_SECONDS = 15.0
 _MAX_OUTPUT_TOKENS = 1024
 _MAX_RETRIES = 0
+
+# A request that allows a LONGER answer (Mia Home: up to 1800 characters of Italian, ~550 tokens,
+# on top of the JSON envelope, the grounding refs, up to five limitations and the adaptive-thinking
+# tokens, which count against `max_tokens`) needs a larger - still fixed, still bounded - output
+# budget, or a perfectly good answer would be cut off by the vendor mid-JSON and fail closed as
+# UNAVAILABLE. Requests at or below `_STANDARD_ANSWER_CHARS` (every Decision Ask request) keep
+# `_MAX_OUTPUT_TOKENS` exactly as before.
+_STANDARD_ANSWER_CHARS = 1200
+_MAX_OUTPUT_TOKENS_LONG_ANSWER = 2048
 
 # Ask NINFA is explanation, not frontier reasoning (ADR 0025, "why low effort, why no sampling
 # params") - Claude Sonnet 5's Messages API exposes no temperature/top_p/top_k at all in this SDK
@@ -78,6 +89,24 @@ _OUTPUT_SCHEMA: dict[str, Any] = {
 
 _EXPECTED_KEYS = frozenset(_OUTPUT_SCHEMA["required"])
 
+
+def _output_schema_for(request: LanguageModelRequest) -> dict[str, Any]:
+    """The default Decision Ask schema itself (the SAME object, so nothing about that path
+    changes) unless the request names its own closed `grounding_refs` vocabulary - then a deep
+    copy whose `items.enum` is exactly that vocabulary, never a mutation of the shared constant."""
+    if request.grounding_ref_values is None:
+        return _OUTPUT_SCHEMA
+    schema = copy.deepcopy(_OUTPUT_SCHEMA)
+    schema["properties"]["grounding_refs"]["items"]["enum"] = list(request.grounding_ref_values)
+    return schema
+
+
+def _max_tokens_for(request: LanguageModelRequest) -> int:
+    if request.max_answer_chars > _STANDARD_ANSWER_CHARS:
+        return _MAX_OUTPUT_TOKENS_LONG_ANSWER
+    return _MAX_OUTPUT_TOKENS
+
+
 # Fixed, deterministic: adaptive thinking (Sonnet 5's own default reasoning mode), but never
 # exposed - `display: "omitted"` redacts the content itself at the API level, so there is nothing
 # for `_answer_from_message` to filter out even before its own defensive text-block scan runs (see
@@ -85,15 +114,33 @@ _EXPECTED_KEYS = frozenset(_OUTPUT_SCHEMA["required"])
 _THINKING: ThinkingConfigAdaptiveParam = {"type": "adaptive", "display": "omitted"}
 
 
+def _history_block_text(history: tuple[HistoryTurn, ...]) -> str:
+    """The earlier turns of the page session, one JSON object per line (plain Italian keys). JSON
+    string escaping means a message can never close a tag or forge a neighbouring turn, whatever the
+    client sent. The label tells the model what this block is NOT: business truth."""
+    lines = "\n".join(
+        json.dumps(
+            {"chi": "utente" if turn.role == "user" else "mia", "testo": turn.content},
+            ensure_ascii=False,
+        )
+        for turn in history
+    )
+    return f"<conversation_history>\n{lines}\n</conversation_history>"
+
+
 def _content_blocks(request: LanguageModelRequest) -> list[TextBlockParam]:
-    """Context and question as two SEPARATE, deterministically-ordered content blocks - never
-    concatenated into one string, never interpolated into `system`. The XML-ish tags are plain
-    structural labels, not instructions - see ADR 0025, "why content blocks, not string
-    concatenation"."""
-    return [
-        {"type": "text", "text": f"<context>\n{request.context}\n</context>"},
-        {"type": "text", "text": f"<question>\n{request.question}\n</question>"},
+    """Context, (optional) conversation history and question as SEPARATE, deterministically-ordered
+    content blocks - never concatenated into one string, never interpolated into `system`. The
+    XML-ish tags are plain structural labels, not instructions - see ADR 0025, "why content blocks,
+    not string concatenation". The history block exists only for a request that carries history
+    (Mia Home follow-ups); every other request keeps exactly its two blocks."""
+    blocks: list[TextBlockParam] = [
+        {"type": "text", "text": f"<context>\n{request.context}\n</context>"}
     ]
+    if request.history:
+        blocks.append({"type": "text", "text": _history_block_text(request.history)})
+    blocks.append({"type": "text", "text": f"<question>\n{request.question}\n</question>"})
+    return blocks
 
 
 def _answer_from_message(message: Message) -> LanguageModelAnswer:
@@ -146,13 +193,16 @@ class AnthropicLanguageModelProvider:
 
     def generate(self, request: LanguageModelRequest) -> LanguageModelAnswer:
         started = time.monotonic()
-        output_format: JSONOutputFormatParam = {"type": "json_schema", "schema": _OUTPUT_SCHEMA}
+        output_format: JSONOutputFormatParam = {
+            "type": "json_schema",
+            "schema": _output_schema_for(request),
+        }
         output_config: OutputConfigParam = {"effort": _EFFORT, "format": output_format}
         messages: list[MessageParam] = [{"role": "user", "content": _content_blocks(request)}]
         try:
             message = self._client.messages.create(
                 model=ANTHROPIC_MODEL,
-                max_tokens=_MAX_OUTPUT_TOKENS,
+                max_tokens=_max_tokens_for(request),
                 system=request.system_instructions,
                 messages=messages,
                 thinking=_THINKING,

@@ -14,4 +14,20 @@ class InvalidAskQuestionError(AppError):
         )
 
 
-__all__ = ["InvalidAskQuestionError"]
+class InvalidAskHistoryError(AppError):
+    """The conversation history sent with a Mia Home question is malformed or out of bounds (too
+    many exchanges, a message outside its length bound, roles that do not alternate user/assistant,
+    or a user message that the deterministic guardrail would itself have refused). A semantic 400,
+    exactly like `InvalidAskQuestionError`. `reason` is a short, static, safe label - never the
+    offending text."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            "INVALID_ASK_HISTORY",
+            "history must be at most 4 complete user/assistant exchanges within the length bounds",
+            status_code=400,
+            details={"reason": reason},
+        )
+
+
+__all__ = ["InvalidAskHistoryError", "InvalidAskQuestionError"]

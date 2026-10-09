@@ -30,6 +30,17 @@ class ModelAnswerStatus(StrEnum):
 
 
 @dataclass(frozen=True, slots=True)
+class HistoryTurn:
+    """One earlier message of the CURRENT page session (Mia Home only), exactly as the client sent
+    it. `role` is "user" or "assistant". Referential context only - never business truth: the
+    adapter hands it to the model in its own, clearly labelled block, apart from the NINFA context
+    (which is always authoritative)."""
+
+    role: str
+    content: str
+
+
+@dataclass(frozen=True, slots=True)
 class LanguageModelRequest:
     """`max_answer_chars` bounds the provider's OWN output budget; `AskNinfaService` still
     validates/truncates the response independently - a well-behaved provider respecting this field
@@ -39,6 +50,15 @@ class LanguageModelRequest:
     context: str
     question: str
     max_answer_chars: int
+    # The closed set of `grounding_refs` values the provider's structured output may name. `None`
+    # (the default) keeps the Decision Ask vocabulary (`GroundingRef`) every pre-Mia-Home caller
+    # already relies on; the property-level Mia Home request (`AskHomeService`) passes its own,
+    # separate vocabulary instead - never a widened union that would let a Decision answer name a
+    # Home-only area (and vice versa).
+    grounding_ref_values: tuple[str, ...] | None = None
+    # The short conversation before `question` (oldest first), empty for every single-turn caller
+    # (the Decision Ask). Never trusted as fact: see `HistoryTurn`.
+    history: tuple[HistoryTurn, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +88,7 @@ class LanguageModelProvider(Protocol):
 
 
 __all__ = [
+    "HistoryTurn",
     "LanguageModelAnswer",
     "LanguageModelProvider",
     "LanguageModelRequest",

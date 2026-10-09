@@ -32,6 +32,8 @@ day 1. See [pilot expectations](pilot-expectations-v1.md).
    `ninfa-py -m app.cli.pilot create-property --workspace-slug <workspace-slug> --name "<Hotel name>" --slug <property-slug> --timezone Europe/Rome --currency EUR`
 3. **[OPERATOR] User.**
    `ninfa-py -m app.cli.pilot create-user --email <user@hotel> --display-name "<Name>"`
+   Write the display name as **"Nome Cognome"** (e.g. `"Giulia Rossi"`): the Home greets the user by
+   the first word of it ("Ciao Giulia,"); with no display name it just says "Ciao,".
 4. **[OPERATOR] Password.** `ninfa-py -m app.cli.auth set-password --email <user@hotel>`: the prompt
    asks twice and never echoes (14 to 128 characters). There is **no self-service password change or
    reset**: the operator sets it, hands it to the customer through a **different secure channel**,

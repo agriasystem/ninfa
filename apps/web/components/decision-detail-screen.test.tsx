@@ -196,10 +196,78 @@ describe("DecisionDetailScreen - switching property from the shell", () => {
     );
     await waitFor(() => expect(getDecisionDetailMock).toHaveBeenCalledWith("prop-1", "dec-1"));
 
-    await user.selectOptions(screen.getByLabelText("Struttura"), "prop-2");
+    await user.selectOptions(screen.getByLabelText("Struttura attiva"), "prop-2");
 
     expect(onNavigateToOggi).toHaveBeenCalledWith("prop-2");
     // Only the original property's decision was ever fetched - never prop-2/dec-1.
     expect(getDecisionDetailMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("DecisionDetailScreen - the sidebar shell (Home UI V1)", () => {
+  function renderDetail() {
+    useSessionMock.mockReturnValue({
+      status: "authenticated",
+      session: session([property("prop-1", "Masseria Ninfa")]),
+      logout: vi.fn(),
+    });
+    return render(
+      <DecisionDetailScreen
+        decisionId="dec-1"
+        requestedPropertyId="prop-1"
+        onNavigateToOggi={vi.fn()}
+        onNavigateToLogin={vi.fn()}
+      />,
+    );
+  }
+
+  it("still loads and shows the decision, now inside the sidebar shell", async () => {
+    renderDetail();
+
+    expect(await screen.findByText("Pickup sotto le attese")).not.toBeNull();
+    expect(getDecisionDetailMock).toHaveBeenCalledWith("prop-1", "dec-1");
+    expect(screen.getByRole("navigation", { name: "Navigazione principale" })).not.toBeNull();
+    expect(screen.getByRole("main")).not.toBeNull();
+  });
+
+  it("highlights 'Decisioni' - the section a Decision Detail belongs to - never 'Oggi'", async () => {
+    renderDetail();
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(screen.getByRole("link", { name: "Decisioni", current: "page" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("shows the small logo in the sidebar from the start (the hero logo is the Home's only)", async () => {
+    const { container } = renderDetail();
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(container.querySelector(".app-sidebar__logo-slot")?.getAttribute("data-hidden")).toBe("false");
+  });
+
+  it("goes back to the list of decisions, keeping the property context", async () => {
+    renderDetail();
+    await screen.findByText("Pickup sotto le attese");
+
+    const back = screen.getByRole("link", { name: "← Decisioni" });
+    expect(back.getAttribute("href")).toBe("/decisioni?property=prop-1");
+  });
+
+  it("calls the assistant Mia, not 'NINFA', in its Ask section", async () => {
+    renderDetail();
+    await screen.findByText("Pickup sotto le attese");
+
+    expect(screen.getByRole("heading", { name: "Chiedi a Mia" })).not.toBeNull();
+    expect(screen.queryByText("Chiedi a NINFA")).toBeNull();
+  });
+
+  it("keeps logout reachable through the profile menu", async () => {
+    const user = userEvent.setup();
+    renderDetail();
+    await screen.findByText("Pickup sotto le attese");
+
+    await user.click(screen.getByRole("button", { name: "Profilo e account" }));
+
+    expect(screen.getByRole("button", { name: "Esci" })).not.toBeNull();
   });
 });

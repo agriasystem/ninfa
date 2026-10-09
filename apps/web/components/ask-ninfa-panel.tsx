@@ -2,35 +2,9 @@
 
 import { useId, useRef, useState, type FormEvent } from "react";
 
-import type { AskResponse } from "@ninfa/contracts";
-
 import { askNinfa } from "@/lib/api/ask-ninfa";
 import { askNinfaCopy } from "@/lib/ask-ninfa/copy";
-
-type AskState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "answered"; answer: string; limitations: string[] }
-  | { kind: "insufficientContext"; answer: string | null; limitations: string[] }
-  | { kind: "unavailable" }
-  | { kind: "refused" }
-  | { kind: "error" };
-
-/** Maps the backend's own closed `AskStatus` (Gate 18) onto this panel's UI state - an exhaustive
- * `switch`, so a future fifth status value fails to compile here rather than silently falling
- * through to nothing. */
-function stateFromResponse(data: AskResponse): AskState {
-  switch (data.status) {
-    case "ANSWERED":
-      return { kind: "answered", answer: data.answer ?? "", limitations: data.limitations };
-    case "INSUFFICIENT_CONTEXT":
-      return { kind: "insufficientContext", answer: data.answer, limitations: data.limitations };
-    case "UNAVAILABLE":
-      return { kind: "unavailable" };
-    case "REFUSED":
-      return { kind: "refused" };
-  }
-}
+import { stateFromResponse, type AskState } from "@/lib/ask-ninfa/state";
 
 export interface AskNinfaPanelProps {
   propertyId: string;
@@ -38,7 +12,7 @@ export interface AskNinfaPanelProps {
 }
 
 /**
- * "Chiedi a NINFA" (Gate 20): a single, additive Decision Detail section, always rendered AFTER
+ * "Chiedi a Mia" (Gate 20): a single, additive Decision Detail section, always rendered AFTER
  * the recommendation and BEFORE Evoluzione. Deliberately NOT a chat: one question in, one answer
  * surface out, no message list, no thread, no history, no persistence anywhere (refreshing the
  * page returns this to `idle` - that is correct, not a bug, for V1). Exactly one request may be

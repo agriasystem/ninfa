@@ -10,8 +10,10 @@ runs), query semantics are validated here, and every actual read goes through
 `PriorityService` or a detector.
 """
 
+from dataclasses import replace
 from datetime import date
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
@@ -37,6 +39,7 @@ from app.api.v1.decisions.errors import (
     InvalidLimitError,
 )
 from app.api.v1.decisions.schemas import (
+    AskHomeRequest,
     AskRequest,
     AskResponse,
     DecisionDetailResponse,
@@ -56,6 +59,11 @@ from app.api.v1.decisions.serializers import (
 from app.db.session import get_session
 from app.modules.ai.ask_ninfa.context_builder import AskDecisionContextBuilder
 from app.modules.ai.ask_ninfa.guardrails import REFUSAL_COPY, classify_refusal
+from app.modules.ai.ask_ninfa.home_context_builder import AskHomeContextBuilder
+from app.modules.ai.ask_ninfa.home_data_service import HomeDataService
+from app.modules.ai.ask_ninfa.home_history import validate_history
+from app.modules.ai.ask_ninfa.home_intents import resolve_question
+from app.modules.ai.ask_ninfa.home_service import AskHomeService
 from app.modules.ai.ask_ninfa.question import validate_question
 from app.modules.ai.ask_ninfa.service import AskNinfaService
 from app.modules.ai.ask_ninfa.types import AskStatus
@@ -64,6 +72,7 @@ from app.modules.decision_memory.service import DecisionMemoryService
 from app.modules.decisions.models import Decision
 from app.modules.decisions.types import DecisionStatus
 from app.modules.intelligence.priority.types import PriorityDecisionType
+from app.modules.properties.models import Property
 from app.modules.recommendations.engine import RecommendationEngine
 
 router = APIRouter(prefix="/properties/{property_id}", tags=["decisions"])
@@ -304,6 +313,87 @@ def ask_ninfa(
         status=result.status.value,
         answer=result.answer,
         grounding_refs=[ref.value for ref in result.grounding_refs],
+        limitations=list(result.limitations),
+    )
+
+
+# --- endpoint 6: ask Mia on the Home (property level, Home UI V1) --------------------------------
+
+
+@router.post(
+    "/ask",
+    response_model=AskResponse,
+    summary="Ask Mia about today's analysis of one property",
+)
+def ask_mia_home(
+    payload: AskHomeRequest,
+    response: Response,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    session: Session = Depends(get_session),
+    provider: LanguageModelProvider = Depends(get_language_model_provider),
+) -> AskResponse:
+    """Grounded explanation over TODAY'S ANALYSIS of one property - never a general chat, never an
+    analysis of raw data. ENGINE CALCULATES, MIA EXPLAINS (ADR 0028, ADR 0029): the context is built
+    from `DecisionMemoryService.get_feed()` - exactly what the Decision Feed endpoint already
+    returns for the same `(property, as_of_local_date)` - plus, for the topics the question names,
+    a few deterministic facts from the safe semantic data layer (`HomeDataService`: stored
+    snapshots, the OTA evaluation, channel weights). Mia can never see, let alone find, anything a
+    detector did not already decide, and the model never queries anything itself.
+
+    A short, bounded conversation (`history`, at most 4 exchanges, sent by the client) lets a
+    follow-up such as "Perché?" be understood; it is referential context only and never overrides
+    the fresh facts.
+
+    Read-only despite being a POST, exactly like the Decision Ask: no `DecisionService.sync()`, no
+    `PriorityService`, no write, no persisted conversation, no Decision created or changed. The one
+    detector-side read is `OtaDependencyService.evaluate` (itself read-only) used by the semantic
+    data layer to give the OTA share when no decision fired. `Cache-Control: no-store` because a
+    question/answer pair is never safe to replay for a different question.
+    """
+    response.headers["Cache-Control"] = "no-store"
+
+    # Property-not-found (404) already happened inside `resolve_property_scope`, before this body.
+    as_of_date = _parse_as_of(payload.as_of_local_date)
+    cleaned_question = validate_question(payload.question)
+    # The short page-session history: bounded and checked BEFORE anything is read or called. It is
+    # referential context only (a forged assistant turn is exactly as (un)trusted as the user's own
+    # text) - every fact below is rebuilt fresh from NINFA.
+    history = validate_history([(message.role, message.content) for message in payload.history])
+
+    # A REFUSED question never reaches the provider AND never pays for the feed query below.
+    refusal = classify_refusal(cleaned_question)
+    if refusal is not None:
+        return AskResponse(
+            status=AskStatus.REFUSED.value,
+            answer=None,
+            grounding_refs=[],
+            limitations=[REFUSAL_COPY[refusal]],
+        )
+
+    memory = DecisionMemoryService(session, scope.tenant)
+    feed = memory.get_feed(scope.property_id, as_of_date)
+    prop = session.get(Property, scope.property_id)
+    assert prop is not None  # `resolve_property_scope` just loaded this exact row
+    timezone = ZoneInfo(prop.timezone)
+    context = AskHomeContextBuilder().build(feed, timezone)
+
+    # Question understanding (deterministic, closed vocabulary) -> the safe semantic data layer ->
+    # a few labelled facts. The language model never queries anything: it only receives these.
+    resolution = resolve_question(cleaned_question, history, as_of_date)
+    operational = HomeDataService(session, scope.tenant).collect(
+        resolution,
+        feed,
+        property_id=scope.property_id,
+        timezone=timezone,
+        currency=prop.currency,
+    )
+    context = replace(context, operational=operational)
+
+    result = AskHomeService(provider).ask(context, cleaned_question, history)
+    return AskResponse(
+        status=result.status.value,
+        answer=result.answer,
+        grounding_refs=list(result.grounding_refs),
         limitations=list(result.limitations),
     )
 
