@@ -43,6 +43,7 @@ from app.modules.intelligence.revenue.types import RevenueDecisionEvaluation
 from tests.ask_home_support import (
     D1,
     booking_only_coverage,
+    distribution_skipped_coverage,
     full_coverage,
     provenance_for,
     seed_night_snapshots,
@@ -549,7 +550,9 @@ def test_case_b_evaluated_without_a_decision_gives_the_observed_share_and_a_care
     assert metrics["Quota OTA sul totale OTA + diretto"] == "40.00"
     assert metrics["Quota diretta sul totale OTA + diretto"] == "60.00"
     assert metrics["Quota OTA di riferimento (livello atteso)"] == "50.00"
-    assert metrics["Periodo osservato"] == "dal 1 agosto al 30 agosto"
+    window = "i prossimi 30 giorni, dal 1 agosto al 30 agosto"
+    assert metrics["Periodo considerato"] == window
+    assert share.period == window
     assert "perfetta" in (_section(context, "coverage:distribution").note or "")
 
 
@@ -775,7 +778,8 @@ def test_the_weight_of_a_named_channel_is_a_share_of_all_certain_room_nights(
 
     mix = _section(context, "metric:channel-mix:2026-08-01")
     values = _values(mix)
-    assert values["Camere-notte prenotate nei 30 giorni (tutti i canali)"] == "100"
+    assert mix.period == "i prossimi 30 giorni, dal 1 agosto al 30 agosto"
+    assert values["Camere-notte prenotate nei prossimi 30 giorni (tutti i canali)"] == "100"
     assert values["Peso di Booking.com sul totale delle camere-notte prenotate"] == "60.00"
     rows = [dict(row) for row in mix.rows]
     assert [row["canale"] for row in rows] == ["Booking.com", "Direct", "Expedia"]
@@ -826,8 +830,194 @@ def test_uncertain_and_cancelled_bookings_are_not_counted_in_the_channel_weight(
     )
 
     values = _values(_section(context, "metric:channel-mix:2026-08-01"))
-    assert values["Camere-notte prenotate nei 30 giorni (tutti i canali)"] == "10"
+    assert values["Camere-notte prenotate nei prossimi 30 giorni (tutti i canali)"] == "10"
     assert values["Peso di Booking.com sul totale delle camere-notte prenotate"] == "50.00"
+
+
+# --- the OTA / channel window is the NEXT 30 nights, never a look-back ---------------------------
+
+
+def _every_text_of(context: OperationalContext) -> list[str]:
+    """Every string a section hands to the model, plus the not-determinable notes."""
+    texts: list[str] = list(context.not_available)
+    for section in context.sections:
+        texts += [section.title, section.period or "", section.note or ""]
+        for point in section.data:
+            texts += [point.label, point.value]
+        for row in section.rows:
+            texts += [label for label, _ in row] + [value for _, value in row]
+    return texts
+
+
+def test_no_generated_section_describes_the_forward_window_as_the_last_30_days(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    """The real model once read '30 notti dall'analisi' as 'ultimi 30 giorni' in 4 of 14 answers:
+    the OTA share and the channel mix are bookings for the NEXT 30 nights, said in words."""
+    tenant = _channel_world(db_session, factory)
+    _run(db_session, tenant, [_ota(tenant, CLEAR)])
+
+    for question in ("Gli OTA sono a posto?", "Quanto pesa Booking?", "Come vanno i canali?"):
+        context = _collect(db_session, tenant, question, evaluator=_Evaluator(_ota(tenant, CLEAR)))
+        texts = _every_text_of(context)
+        assert any("i prossimi 30 giorni, dal 1 agosto al 30 agosto" in text for text in texts)
+        blob = " ".join(texts).lower()
+        for look_back in ("ultimi 30", "ultimi trenta", "scorsi", "negli ultimi", "dall'analisi"):
+            assert look_back not in blob, (question, look_back)
+
+
+def test_the_insufficient_data_reasons_also_speak_of_the_next_30_days(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = factory.tenant()
+    _run(db_session, tenant, [_ota(tenant, CLEAR)])
+    insufficient = replace(
+        _ota(tenant, INSUFFICIENT),
+        reason_codes=(
+            ReasonCode.OTA_NO_ON_BOOKS_DEMAND,
+            ReasonCode.OTA_SNAPSHOT_WINDOW_INCOMPLETE,
+        ),
+        ota_share_exact=None,
+        direct_share_exact=None,
+        expected_ota_share_exact=None,
+    )
+
+    context = _collect(
+        db_session, tenant, "Gli OTA sono a posto?", evaluator=_Evaluator(insufficient)
+    )
+
+    outcome = _values(_section(context, "coverage:distribution"))["Esito"]
+    assert "nei prossimi 30 giorni non ci sono prenotazioni" in outcome
+    assert "dei prossimi 30 giorni sono incompleti" in outcome
+    assert "osservati" not in outcome
+
+
+# --- the channel-mix probe only supports a judgement NINFA made -----------------------------------
+
+
+def _refs(context: OperationalContext) -> list[str]:
+    return [section.ref for section in context.sections]
+
+
+def test_a_skipped_distribution_area_gets_the_coverage_limit_and_no_channel_mix(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    """'Gli OTA sono a posto?' with Distribution skipped: the coverage limitation ONLY - no channel
+    weights, no 'no certain bookings' note (an irrelevant second explanation)."""
+    tenant = _channel_world(db_session, factory)  # the bookings exist: a mix COULD be built
+    _run(db_session, tenant, [_revenue(tenant)], coverage=distribution_skipped_coverage())
+    evaluator = _Evaluator(_ota(tenant, CLEAR))
+
+    context = _collect(db_session, tenant, "Gli OTA sono a posto?", evaluator=evaluator)
+
+    assert _refs(context) == ["coverage:distribution"]
+    assert _values(_section(context, "coverage:distribution"))["Area analizzata oggi"] == (
+        "non analizzata"
+    )
+    assert context.not_available == ()
+    assert evaluator.calls == []
+
+
+def test_an_unknown_coverage_gets_the_coverage_limit_and_no_channel_mix(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = _channel_world(db_session, factory)
+    sync_feed(
+        db_session,
+        tenant,
+        [_ota(tenant, CLEAR)],
+        coverage=None,
+        provenance=provenance_for(tenant, utc(2026, 8, 1, 7, 31)),
+    )
+
+    context = _collect(
+        db_session, tenant, "Gli OTA sono a posto?", evaluator=_Evaluator(_ota(tenant))
+    )
+
+    assert _refs(context) == ["coverage:distribution"]
+    assert context.not_available == ()
+
+
+def test_no_analysis_for_today_gets_the_coverage_limit_and_no_channel_mix(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = _channel_world(db_session, factory)
+
+    context = _collect(
+        db_session, tenant, "Gli OTA sono a posto?", evaluator=_Evaluator(_ota(tenant))
+    )
+
+    assert _refs(context) == ["coverage:distribution"]
+    assert context.not_available == ()
+
+
+@pytest.mark.parametrize("status", [INSUFFICIENT, SUPPRESSED])
+def test_a_distribution_check_that_could_not_judge_gets_no_channel_mix(
+    db_session: Session, factory: BookingFactory, status: EvaluationStatus
+) -> None:
+    tenant = _channel_world(db_session, factory)
+    _run(db_session, tenant, [_ota(tenant, CLEAR)])
+
+    context = _collect(
+        db_session,
+        tenant,
+        "Gli OTA sono a posto?",
+        evaluator=_Evaluator(_ota(tenant, status)),
+    )
+
+    assert not [ref for ref in _refs(context) if ref.startswith("metric:channel-mix")]
+
+
+def test_a_judged_distribution_still_backs_the_judgement_with_the_channel_mix(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = _channel_world(db_session, factory)
+
+    _run(db_session, tenant, [_ota(tenant, TRIGGERED)])
+    with_decision = _collect(db_session, tenant, "Gli OTA sono a posto?")
+    assert "metric:channel-mix:2026-08-01" in _refs(with_decision)
+
+    clear = factory.tenant()
+    world = DistributionWorld(db_session, clear, factory)
+    booking = world.channel("Booking.com", channel_type=ChannelType.OTA, is_verified=True)
+    world.booking(booking, D1, D1 + timedelta(days=4), rooms=2)
+    _run(db_session, clear, [_ota(clear, CLEAR)])
+    evaluated = _collect(
+        db_session, clear, "Gli OTA sono a posto?", evaluator=_Evaluator(_ota(clear, CLEAR))
+    )
+    assert "metric:channel-mix:2026-08-01" in _refs(evaluated)
+
+
+def test_a_channel_the_question_names_is_an_independent_metric_even_without_a_judgement(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    """'Quanto pesa Booking?' asks for a channel weight of the stored bookings, which does not
+    depend on whether the Distribution area was analysed."""
+    tenant = _channel_world(db_session, factory)
+    _run(db_session, tenant, [_revenue(tenant)], coverage=distribution_skipped_coverage())
+
+    context = _collect(db_session, tenant, "Quanto pesa Booking?")
+
+    values = _values(_section(context, "metric:channel-mix:2026-08-01"))
+    assert values["Peso di Booking.com sul totale delle camere-notte prenotate"] == "60.00"
+    assert _values(_section(context, "coverage:distribution"))["Area analizzata oggi"] == (
+        "non analizzata"
+    )
+
+
+def test_a_named_channel_with_no_certain_bookings_says_so_in_the_next_30_days(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = factory.tenant()
+    _run(db_session, tenant, [_ota(tenant, CLEAR)])
+
+    context = _collect(
+        db_session, tenant, "Quanto pesa Booking?", evaluator=_Evaluator(_ota(tenant))
+    )
+
+    assert context.not_available == (
+        "nei prossimi 30 giorni non ci sono prenotazioni certe da cui ricavare il peso dei canali",
+    )
 
 
 # --- costs / labour / areas: state and decisions only ------------------------------------------
@@ -936,6 +1126,36 @@ def test_an_unplaced_question_hands_over_what_mia_can_explain(
     assert context.topics == ()
     assert context.sections == ()
     assert context.supported_topics  # so Mia says what NINFA CAN do, not a generic fallback
+
+
+def test_without_an_analysis_for_today_no_list_of_things_mia_can_explain_is_handed_over(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    """NOT_PROCESSED: there are no decisions, OTA status, coverage or import to explain. The
+    generic list ('decisioni di oggi', 'distribuzione', 'ultimo import'...) made the real model
+    OFFER exactly those, and then say the details were unavailable."""
+    from app.modules.decision_memory.types import FeedState
+
+    tenant = factory.tenant()  # no analysis run exists for the day
+    feed = DecisionMemoryService(db_session, tenant.context).get_feed(tenant.property.id, D1)
+    assert feed.state is FeedState.NOT_PROCESSED
+
+    for question in ("Come sta andando l'hotel oggi?", "Che tempo fa domani?"):
+        context = _collect(db_session, tenant, question)
+        assert context.topics == ()
+        assert context.supported_topics == (), question
+        assert context.sections == ()
+
+
+def test_a_placed_question_without_an_analysis_names_only_what_is_not_available(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = factory.tenant()
+
+    context = _collect(db_session, tenant, "Come stanno andando le prenotazioni?")
+
+    assert context.supported_topics == ()
+    assert any("analisi di oggi non è ancora disponibile" in n for n in context.not_available)
 
 
 def test_a_bare_follow_up_without_history_is_flagged_not_guessed(

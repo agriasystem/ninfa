@@ -14,7 +14,7 @@ reaches the model, and `reason_codes`/`priority_rank` are no longer collected at
 document's grounding/injection/status contracts below are otherwise unchanged.
 
 **Update (Home UI V1, ADR 0027/0028):** the visible assistant is now called **Mia** (user-facing copy,
-the refusal messages and one persona line of the instructions, `ask-ninfa-v1.3`); NINFA remains the
+the refusal messages and one persona line of the instructions, `ask-ninfa-v1.4`); NINFA remains the
 product, and every module/endpoint/class name below is unchanged. A **sibling** endpoint,
 `POST /properties/{id}/ask`, answers about today's feed of the whole property - see
 [ask-mia-home-v1.md](ask-mia-home-v1.md). This document keeps describing the single-Decision Ask,

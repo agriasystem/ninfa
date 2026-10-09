@@ -29,7 +29,8 @@ MAX_ANSWER_CHARS = 700
 
 # v1.3: the visible assistant is now called Mia (D5, Home UI V1) - persona line only, no rule
 # changed.
-ASK_NINFA_INSTRUCTIONS_VERSION = "ask-ninfa-v1.3"
+# v1.4: one language rule - the internal word "context" never reaches the user's Italian.
+ASK_NINFA_INSTRUCTIONS_VERSION = "ask-ninfa-v1.4"
 
 
 class AskStatus(StrEnum):

@@ -60,7 +60,7 @@ from app.modules.ai.ask_ninfa.home_vocabulary import HomeIntent
 from app.modules.ai.ask_ninfa.types import AskDataPoint
 from app.modules.bookings.models import BookingChannel
 from app.modules.bookings.repository import BookingChannelRepository
-from app.modules.decision_memory.types import FeedResult
+from app.modules.decision_memory.types import FeedResult, FeedState
 from app.modules.decisions.coverage import (
     AnalysisCoverage,
     AnalysisDomain,
@@ -120,7 +120,7 @@ _AREA_NAMES: dict[AnalysisDomain, str] = {
 
 # Why the OTA evaluation could not judge (an INSUFFICIENT_DATA outcome), in plain Italian.
 _OTA_REASON_PHRASES: dict[ReasonCode, str] = {
-    ReasonCode.OTA_NO_ON_BOOKS_DEMAND: "nei 30 giorni osservati non ci sono prenotazioni",
+    ReasonCode.OTA_NO_ON_BOOKS_DEMAND: "nei prossimi 30 giorni non ci sono prenotazioni",
     ReasonCode.OTA_BOOKING_VOLUME_LOW: (
         "le prenotazioni classificate come OTA o dirette nel periodo sono troppo poche"
     ),
@@ -128,7 +128,7 @@ _OTA_REASON_PHRASES: dict[ReasonCode, str] = {
         "troppe prenotazioni sono su canali che NINFA non sa classificare come OTA o diretti"
     ),
     ReasonCode.OTA_SNAPSHOT_WINDOW_INCOMPLETE: (
-        "i dati di prenotazione dei 30 giorni osservati sono incompleti"
+        "i dati di prenotazione dei prossimi 30 giorni sono incompleti"
     ),
     ReasonCode.OTA_SNAPSHOT_WINDOW_UNCERTAIN: (
         "alcune prenotazioni del periodo hanno uno stato incerto"
@@ -164,6 +164,17 @@ def describe_period(period: ResolvedPeriod) -> str:
             return f"{period.label} ({italian_weekday_day(period.start)})"
         return period.label
     return f"{period.label} (dal {italian_day(period.start)} al {italian_day(period.end)})"
+
+
+def forward_window_label(start: date, end: date | None = None) -> str:
+    """The forward stay window of the OTA / channel metrics, spelled out so it cannot be read as a
+    look-back: "i prossimi 30 giorni, dal 3 settembre al 2 ottobre". `end` defaults to the
+    window's own last night."""
+    last = end if end is not None else start + timedelta(days=FORWARD_STAY_WINDOW_DAYS - 1)
+    return (
+        f"i prossimi {FORWARD_STAY_WINDOW_DAYS} giorni, "
+        f"dal {italian_day(start)} al {italian_day(last)}"
+    )
 
 
 def _period_ref(kind: str, period: ResolvedPeriod) -> str:
@@ -267,12 +278,17 @@ class HomeDataService:
             )
 
         known = [INTENT_LABELS[intent] for intent in resolution.intents if intent in INTENT_LABELS]
+        # With no analysis for today there is nothing Mia could explain beyond what the request
+        # already carries (at most the date of the last completed analysis): the generic list of
+        # what NINFA "can explain" would promise decisions, OTA status or coverage that are not
+        # there.
+        offer_topics = resolution.is_unknown and feed.state is not FeedState.NOT_PROCESSED
         return OperationalContext(
             topics=tuple(known),
             from_previous_question=resolution.inherited,
             sections=tuple(sections),
             not_available=tuple(dict.fromkeys(not_available)),
-            supported_topics=SUPPORTED_TOPICS if resolution.is_unknown else (),
+            supported_topics=SUPPORTED_TOPICS if offer_topics else (),
         )
 
     # --- shared reads ----------------------------------------------------------------------------
@@ -681,6 +697,9 @@ class HomeDataService:
         status, decisions, outcome = self._area_outcome(AnalysisDomain.DISTRIBUTION, feed, coverage)
         evaluated_without_decision = status == "analizzata" and decisions == 0
         metrics: OperationalSection | None = None
+        # The channel mix only supports an OTA judgement NINFA actually made: a decision, or a
+        # clean evaluation. A skipped / unknown / non-assessable area has no judgement to support.
+        judged = status == "analizzata" and decisions > 0
 
         if evaluated_without_decision:
             if source_id is None:
@@ -691,6 +710,7 @@ class HomeDataService:
             else:
                 evaluation = self._safe_ota_evaluation(property_id, source_id, as_of)
                 outcome, metrics = self._ota_outcome(evaluation, as_of)
+                judged = evaluation is not None and evaluation.status is EvaluationStatus.CLEAR
 
         sections.append(
             OperationalSection(
@@ -713,14 +733,17 @@ class HomeDataService:
         if metrics is not None:
             sections.append(metrics)
 
-        if status != "non disponibile" and source_id is not None and feed.run is not None:
+        # A channel the question names ("Quanto pesa Booking?") is an independent, supported metric
+        # of the stored bookings; without one, the mix is read only to back a real OTA judgement.
+        names_a_channel = bool(resolution.channels)
+        if source_id is not None and feed.run is not None and (judged or names_a_channel):
             mix = self._channel_mix_section(resolution, property_id, source_id, as_of, timezone)
             if mix is not None:
                 sections.append(mix)
-            else:
+            elif names_a_channel:
                 not_available.append(
-                    "nessuna prenotazione certa nei prossimi 30 giorni da cui ricavare il peso dei "
-                    "canali"
+                    "nei prossimi 30 giorni non ci sono prenotazioni certe da cui ricavare il peso "
+                    "dei canali"
                 )
 
     def _safe_ota_evaluation(
@@ -808,11 +831,8 @@ class HomeDataService:
             )
         data.append(
             AskDataPoint(
-                label="Periodo osservato",
-                value=(
-                    f"dal {italian_day(evaluation.window_start)} "
-                    f"al {italian_day(evaluation.window_end)}"
-                ),
+                label="Periodo considerato",
+                value=forward_window_label(evaluation.window_start, evaluation.window_end),
                 unit=None,
             )
         )
@@ -827,7 +847,7 @@ class HomeDataService:
         return OperationalSection(
             ref=f"metric:ota-share:{as_of.isoformat()}",
             title="Quota OTA osservata",
-            period=f"{FORWARD_STAY_WINDOW_DAYS} notti dall'analisi",
+            period=forward_window_label(evaluation.window_start, evaluation.window_end),
             data=tuple(data),
             note=(
                 "la quota è calcolata sulle camere-notte classificate come OTA o dirette "
@@ -884,7 +904,7 @@ class HomeDataService:
             )
         data = [
             AskDataPoint(
-                label="Camere-notte prenotate nei 30 giorni (tutti i canali)",
+                label="Camere-notte prenotate nei prossimi 30 giorni (tutti i canali)",
                 value=str(total),
                 unit="camere-notte",
             )
@@ -894,7 +914,7 @@ class HomeDataService:
         return OperationalSection(
             ref=f"metric:channel-mix:{as_of.isoformat()}",
             title="Peso dei canali sulle prenotazioni",
-            period=f"{FORWARD_STAY_WINDOW_DAYS} notti dall'analisi",
+            period=forward_window_label(as_of),
             data=tuple(data),
             rows=tuple(rows),
             note=(

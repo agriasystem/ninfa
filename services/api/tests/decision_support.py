@@ -163,6 +163,20 @@ def revenue_evaluation(
 
 # --- REV_OTA_DEPENDENCY ---------------------------------------------------------------------------
 
+# The OTA / direct room-night counts must reproduce the share the same evaluation reports: a
+# fixture where 24 + 10 room-nights sit next to a 72.22 % share is two different stories. 10,000
+# classified room-nights make EVERY two-decimal percentage a whole number of room-nights
+# (72.22 % -> 7,222 OTA + 2,778 direct), so the counts and the share can never disagree.
+_OTA_CLASSIFIED_ROOM_NIGHTS = 10_000
+
+
+def _split_room_nights(ota_share: Decimal) -> tuple[int, int]:
+    ota = ota_share * _OTA_CLASSIFIED_ROOM_NIGHTS / 100
+    if ota != ota.to_integral_value():
+        raise ValueError(f"an OTA share of {ota_share} % is not a whole number of room-nights")
+    ota_nights = int(ota)
+    return ota_nights, _OTA_CLASSIFIED_ROOM_NIGHTS - ota_nights
+
 
 def ota_evaluation(
     *,
@@ -183,6 +197,8 @@ def ota_evaluation(
     triggered = status == TRIGGERED
     window_start = window_start or as_of_local_date
     window_end = window_end or (as_of_local_date + timedelta(days=29))
+    share = ota_share if triggered else Decimal("40.00")
+    ota_nights, direct_nights = _split_room_nights(share)
     return OtaDependencyEvaluation(
         decision_type=OtaDecisionType.REV_OTA_DEPENDENCY,
         status=status,
@@ -193,18 +209,18 @@ def ota_evaluation(
         window_start=window_start,
         window_end=window_end,
         window_days=30,
-        ota_room_nights=24,
-        direct_room_nights=10,
+        ota_room_nights=ota_nights,
+        direct_room_nights=direct_nights,
         other_room_nights=0,
         unknown_room_nights=0,
-        classified_room_nights=34,
-        certain_room_nights=34,
+        classified_room_nights=ota_nights + direct_nights,
+        certain_room_nights=ota_nights + direct_nights,
         observed_day_count=30,
         reconstructed_day_count=0,
         classification_coverage_pct_exact=Decimal("100.00"),
         snapshot_provenance_score_exact=Decimal("100.00"),
-        ota_share_exact=ota_share if triggered else Decimal("40.00"),
-        direct_share_exact=Decimal(100) - (ota_share if triggered else Decimal("40.00")),
+        ota_share_exact=share,
+        direct_share_exact=Decimal(100) - share,
         expected_ota_share_exact=Decimal("50.00"),
         p25_exact=Decimal("45.00"),
         p75_exact=Decimal("55.00"),

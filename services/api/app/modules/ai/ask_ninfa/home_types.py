@@ -29,7 +29,7 @@ MAX_HOME_DECISIONS = 10
 # `home_instructions.py`.
 MAX_HOME_ANSWER_CHARS = 1800
 
-ASK_MIA_HOME_INSTRUCTIONS_VERSION = "ask-mia-home-v3"
+ASK_MIA_HOME_INSTRUCTIONS_VERSION = "ask-mia-home-v4"
 
 
 class HomeGroundingRef(StrEnum):

@@ -1,4 +1,4 @@
-# Mia V2 - operational data access and short conversation (`ask-mia-home-v3`)
+# Mia V2 - operational data access and short conversation (`ask-mia-home-v4`)
 
 Mia is the natural-language interface to NINFA: a hotel owner asks "Gli OTA sono a posto?", "Quanto
 pesa Booking?", "Qual è l'occupazione dei prossimi 7 giorni?" and Mia answers **from facts NINFA
@@ -176,7 +176,8 @@ fetched for this question - is dropped by validation.
   untrusted and never mined; JSON-escaped in its own block; instructions: the NINFA context is
   authoritative, a conflicting earlier answer loses, history text is data.
 - Read-only: no `DecisionService.sync()`, no write (row counts asserted before/after).
-- The Decision Ask is untouched (700 chars, 1024 tokens, its own vocabulary, no history).
+- The Decision Ask keeps its limits (700 chars, 1024 tokens, its own vocabulary, no history); its
+  instructions gained one language rule in v1.4 (the internal word "context" is not said to the user).
 
 ## Frontend
 
@@ -189,15 +190,34 @@ fetched for this question - is dropped by validation.
   Enter sends, Shift+Enter inserts a new line, Enter during IME composition never sends; empty or
   whitespace-only never sends; the chips fill but never send; focus stays; `maxLength` 1000.
 
+## Final polish (v4) - what the first real-model run showed
+
+The first real Anthropic smoke test of v3 (48 requests) found one failure and a handful of minor
+defects. v4 corrects exactly those, with no new capability and no change to what Mia may know:
+
+| Observed | Correction |
+| --- | --- |
+| "quante camere ho piene domani?" routed to no topic (so the model had no snapshot fact and said it had no data) | the occupancy vocabulary gains `pieno / piena / pieni / piene`, `riempito / riempita / riempiti` and the phrase "camere piene". The four short words are matched **exactly**, never as the target of a typo (`EXACT_ONLY_ALIASES`: "piano" is one letter from "pieno") |
+| "30 notti dall'analisi" was read as "ultimi 30 giorni" (4 of 14 answers using the channel mix) | OTA and channel sections now carry `i prossimi 30 giorni, dal {inizio} al {fine}` (`forward_window_label`); the insufficiency reasons say "prossimi 30 giorni"; the instructions state the window is future, already-booked nights |
+| "Perché?" after the top priority explained why the engine ranked it first | the instructions limit the follow-up to what the Decision means and which facts triggered it; the ranking rationale is not in the data and is never inferred |
+| the word "context" appeared in user-facing Italian (Mia Home 9 of 41 answers, Decision Ask 2 of 2) | an explicit rule in both instruction sets (Mia Home v4 rule 47, Decision Ask v1.4 rule 26) with the preferred phrasing ("i dati disponibili", "le informazioni che NINFA ha analizzato"...). Internal names (`INSUFFICIENT_CONTEXT`, the `context` block) are unchanged |
+| a `NOT_PROCESSED` day offered "decisioni e priorità dell'ultima analisi" and "stato degli OTA" | for `NOT_PROCESSED` the generic `cosa NINFA sa spiegare` list is no longer handed over, and the instructions forbid offers of anything the request has no data for |
+| "tenderà a crescere", "cresce progressivamente" | explicit rule: no direction, trend or growth unless a NINFA fact states it; a descriptive sort is not a trend |
+| `INSUFFICIENT_CONTEXT` on "Quanto ho fatturato questo mese?" although room revenue was given | the instructions define the partial answer: a supported alternative + a clear statement of what NINFA cannot determine = `ANSWERED` (room revenue is never presented as fatturato); `INSUFFICIENT_CONTEXT` only when there is no useful grounded answer |
+| the channel mix was fetched (and explained) when Distribution was skipped or could not judge | the mix is read only to back a judgement NINFA made (a decision, or a CLEAR evaluation) or when the question names a channel ("Quanto pesa Booking?"); otherwise the coverage limitation is all Mia gets |
+| the shared OTA evaluation fixture had 24 OTA + 10 direct room-nights next to a 40 % / 75 % share | test fixture only: the counts are derived from the share (10,000 classified room-nights make every two-decimal share exact) and a test pins it. No production logic changed |
+
 ## What the tests do not prove
 
 A deterministic suite cannot show that a **real model** follows the instructions: that it reads
 `dati operativi richiesti` rather than inventing, answers "Per quanto analizzato oggi ..." in case B,
 keeps to 60-160 words, or resolves "Perché?" well. The tests prove the rules are in the instructions,
 the facts and the routing are right, the history is bounded and safe, the pipeline is read-only and
-scoped, and the refs are exact. The **real Anthropic smoke test** (a configured key, a feed with
-decisions / partial coverage / a `NOT_PROCESSED` day, the questions above plus typos and follow-ups)
-is still required, and so is measuring latency against the unchanged 15 s timeout.
+scoped, and the refs are exact. Whether the model then CHOOSES `ANSWERED` for a partial answer, avoids
+the word "context", or declines to predict a trend is shown only by running it. v3 was run for real
+(48 requests); the v4 corrections are covered here by deterministic tests, and their effect on the
+real model is a separate targeted run, reported with the gate and not asserted in this document.
+Latency is still measured against the unchanged 15 s timeout.
 
 ## Deferred capabilities
 

@@ -15,7 +15,7 @@ LOWER = TEXT.lower()
 
 
 def test_version_is_the_documented_home_string() -> None:
-    assert ASK_MIA_HOME_INSTRUCTIONS_VERSION == "ask-mia-home-v3"
+    assert ASK_MIA_HOME_INSTRUCTIONS_VERSION == "ask-mia-home-v4"
 
 
 def test_the_assistant_is_mia_and_the_principle_is_stated() -> None:
@@ -421,3 +421,65 @@ def test_every_new_context_key_the_rules_name_exists_in_the_serialization() -> N
         "Notti con dati",
     ):
         assert f'"{quoted}"' in TEXT, quoted
+
+
+# --- v4: final grounded response polish (each rule answers one defect the real model showed) ----
+
+
+def test_why_after_the_top_priority_explains_the_decision_never_the_ranking() -> None:
+    assert 'un seguito come "perché?" dopo la priorità più urgente' in LOWER
+    assert "non spiegare perché il motore l'ha messa per prima" in LOWER
+    assert "a meno che il motivo dell'ordine sia scritto esplicitamente nei dati" in LOWER
+    assert "le regole dell'ordinamento non fanno parte dei dati che hai" in LOWER
+    # the rule that already forbade inventing the ranking rationale is still there
+    assert "non inventare il motivo per cui ninfa ha messo una decisione prima" in LOWER
+
+
+def test_the_internal_word_context_is_never_said_to_the_user() -> None:
+    assert 'non scrivere mai la parola "context"' in LOWER
+    for banned in ('"contesto tecnico"', '"context disponibile"', '"nel context"'):
+        assert banned in LOWER, banned
+    for preferred in (
+        '"i dati disponibili"',
+        '"le informazioni che ninfa ha analizzato"',
+        '"i dati disponibili per questa analisi"',
+        '"le informazioni disponibili oggi"',
+    ):
+        assert preferred in LOWER, preferred
+    assert 'i campi "answer" e "limitations"' in LOWER
+
+
+def test_not_processed_offers_nothing_that_does_not_exist() -> None:
+    assert "dell'ultima analisi completata, e basta" in LOWER
+    assert "non offrire di spiegarli" in LOWER
+    assert 'niente "posso anche spiegarti..."' in LOWER
+    assert "è nota solo la data dell'ultima analisi, di' solo quella" in LOWER
+    assert "mai un elenco generico di cose che potresti spiegare" in LOWER
+
+
+def test_no_direction_trend_or_growth_is_ever_predicted() -> None:
+    assert "non prevedere né suggerire una direzione, un andamento o una crescita futura" in LOWER
+    for example in ('"tenderà a crescere"', '"cresce progressivamente"'):
+        assert example in LOWER, example
+    assert "a meno che un fatto di ninfa presente nei dati lo affermi esplicitamente" in LOWER
+    assert "un ordinamento descrittivo" in LOWER and "non è un andamento" in LOWER
+
+
+def test_ota_and_channel_values_are_the_next_thirty_nights_never_a_look_back() -> None:
+    assert "prossime 30 notti" in LOWER
+    assert 'non scrivere mai "ultimi 30 giorni"' in LOWER
+
+
+def test_a_distribution_area_that_cannot_be_judged_gets_the_coverage_limit_only() -> None:
+    assert "dai solo il limite di copertura e il motivo" in LOWER
+    assert "pesi dei canali" in LOWER
+
+
+def test_a_partial_answer_with_a_supported_alternative_is_answered() -> None:
+    assert "risposta parziale" in LOWER
+    assert "dai l'alternativa" in LOWER
+    assert 'e imposta "answered"' in LOWER
+    assert "non presentare mai l'alternativa come la cifra chiesta" in LOWER
+    assert "i ricavi camera non sono fatturato né incassi" in LOWER
+    # ...and INSUFFICIENT_CONTEXT stays for the case with no useful grounded answer at all
+    assert "e non c'è nessuna risposta utile fondata sui dati da dare" in LOWER

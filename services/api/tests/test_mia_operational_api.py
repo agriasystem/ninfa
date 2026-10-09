@@ -31,6 +31,7 @@ from tests.ask_home_support import (
     D1,
     ask_home_url,
     booking_only_coverage,
+    distribution_skipped_coverage,
     full_coverage,
     provenance_for,
     seed_night_snapshots,
@@ -637,6 +638,198 @@ def test_a_question_about_revenue_gets_room_revenue_and_the_fatturato_caveat(
         for note in operational["cosa NINFA non può determinare"]
     )
     assert "metric:revenue:2026-08-01:2026-08-31" in _sections(provider)
+
+
+# --- partial answers: ANSWERED with a supported alternative, INSUFFICIENT_CONTEXT with none -------
+
+
+def test_an_unsupported_concept_with_a_useful_supported_alternative_is_an_answered_partial_answer(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    """'Quanto ho fatturato questo mese?': NINFA has no fatturato but does have the room revenue on
+    the books. The context hands over BOTH (the supported figure, labelled as not fatturato, and the
+    sentence naming what cannot be determined), so a partial answer is possible - and its ANSWERED
+    status reaches the user untouched. Which status the real model picks is shown by the real-model
+    re-smoke, not here."""
+    at = _world(factory, authenticated_as, db_session, nights=31)
+    provider = _provider(
+        answer=(
+            "Un dato di fatturato NINFA non ce l'ha. Ha invece i ricavi camera sulle prenotazioni "
+            "attuali del mese, che non sono fatturato né incassi."
+        ),
+        refs=("metric:revenue:2026-08-01:2026-08-31",),
+    )
+    with_fake_provider(app)(provider)
+
+    response = _post(api_client, at, "Quanto ho fatturato questo mese?")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "ANSWERED"
+    operational = _context(provider)["dati operativi richiesti"]
+    assert any(
+        "non ha un dato di fatturato" in note
+        for note in operational["cosa NINFA non può determinare"]
+    )
+    section = _sections(provider)["metric:revenue:2026-08-01:2026-08-31"]
+    assert "Ricavi camera sulle prenotazioni attuali" in _points(section)
+    assert "non sono fatturato né incassi" in section["nota"]
+
+
+def test_a_truly_unsupported_question_hands_over_no_alternative_and_stays_insufficient_context(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = _world(factory, authenticated_as, db_session)
+    provider = _provider(
+        answer="NINFA non calcola il RevPAR e non ha un valore alternativo da darti.",
+        status=ModelAnswerStatus.INSUFFICIENT_CONTEXT,
+        refs=(),
+    )
+    with_fake_provider(app)(provider)
+
+    response = _post(api_client, at, "Qual è il revpar?")
+
+    assert response.json()["status"] == "INSUFFICIENT_CONTEXT"
+    operational = _context(provider)["dati operativi richiesti"]
+    assert operational["sezioni"] == []  # no supported figure to build a partial answer on
+    assert operational["cosa NINFA non può determinare"] == ["NINFA non calcola il RevPAR"]
+
+
+# --- NOT_PROCESSED: nothing is offered that does not exist for the request ------------------------
+
+
+def test_without_an_analysis_for_today_mia_is_not_handed_a_list_of_things_to_offer(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+) -> None:
+    at = authed_tenant(factory, authenticated_as)  # no analysis run at all
+    provider = _provider(
+        answer="L'analisi di oggi non è ancora disponibile.",
+        status=ModelAnswerStatus.INSUFFICIENT_CONTEXT,
+        refs=(),
+    )
+    with_fake_provider(app)(provider)
+
+    response = _post(api_client, at, "Come sta andando l'hotel oggi?")
+
+    assert response.status_code == 200, response.text
+    context = _context(provider)
+    assert context["stato dell'analisi"] == "L'analisi di oggi non è ancora disponibile"
+    operational = context["dati operativi richiesti"]
+    assert "cosa NINFA sa spiegare" not in operational
+    assert operational["sezioni"] == []
+    assert context["decisioni in ordine di priorità"] == []
+
+
+def test_with_an_analysis_an_unplaced_question_still_gets_the_list_of_what_mia_can_explain(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = _world(factory, authenticated_as, db_session)
+    provider = _provider()
+    with_fake_provider(app)(provider)
+
+    _post(api_client, at, "Come sta andando l'hotel oggi?")
+
+    assert _context(provider)["dati operativi richiesti"]["cosa NINFA sa spiegare"]
+
+
+# --- Distribution that cannot be judged: the coverage limit only ----------------------------------
+
+
+def test_a_skipped_distribution_area_hands_over_the_coverage_limit_and_no_channel_mix(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    at = _world(factory, authenticated_as, db_session, coverage=distribution_skipped_coverage())
+    world = DistributionWorld(db_session, at.tenant, factory)
+    booking = world.channel("Booking.com", channel_type=ChannelType.OTA, is_verified=True)
+    world.booking(booking, D1, D1 + timedelta(days=10), rooms=3)  # a mix COULD be built
+    calls = _fake_live_ota(monkeypatch, _ota(at))
+    provider = _provider()
+    with_fake_provider(app)(provider)
+
+    _post(api_client, at, OTA_Q)
+
+    operational = _context(provider)["dati operativi richiesti"]
+    assert list(_sections(provider)) == ["coverage:distribution"]
+    assert (
+        _points(_sections(provider)["coverage:distribution"])["Area analizzata oggi"]
+        == "non analizzata"
+    )
+    assert operational["cosa NINFA non può determinare"] == []
+    assert calls == []
+
+
+def test_a_channel_named_in_the_question_is_still_given_when_distribution_was_skipped(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    at = _world(factory, authenticated_as, db_session, coverage=distribution_skipped_coverage())
+    world = DistributionWorld(db_session, at.tenant, factory)
+    booking = world.channel("Booking.com", channel_type=ChannelType.OTA, is_verified=True)
+    direct = world.channel("Direct", channel_type=ChannelType.DIRECT, is_verified=True)
+    world.booking(booking, D1, D1 + timedelta(days=10), rooms=3)
+    world.booking(direct, D1, D1 + timedelta(days=10), rooms=1)
+    provider = _provider(refs=("metric:channel-mix:2026-08-01",))
+    with_fake_provider(app)(provider)
+
+    _post(api_client, at, "Quanto pesa Booking?")
+
+    sections = _sections(provider)
+    assert "metric:channel-mix:2026-08-01" in sections
+    values = _points(sections["metric:channel-mix:2026-08-01"])
+    assert values["Peso di Booking.com sul totale delle camere-notte prenotate"] == "75.00"
+    assert sections["metric:channel-mix:2026-08-01"]["periodo"] == (
+        "i prossimi 30 giorni, dal 1 agosto al 30 agosto"
+    )
+
+
+# --- the real-model occupancy miss: natural wording reaches the stored snapshots ------------------
+
+
+def test_the_question_that_missed_the_router_now_gets_tomorrows_occupancy(
+    api_client: TestClient,
+    app: FastAPI,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    db_session: Session,
+) -> None:
+    """'quante camere ho piene domani?' was UNKNOWN in the real-model smoke test: no snapshot fact
+    reached the model, so it said it had no data although tomorrow's occupancy exists."""
+    at = _world(factory, authenticated_as, db_session)
+    provider = _provider(refs=("metric:occupancy:2026-08-02:2026-08-02",))
+    with_fake_provider(app)(provider)
+
+    _post(api_client, at, "quante camere ho piene domani?")
+
+    operational = _context(provider)["dati operativi richiesti"]
+    assert operational["argomenti riconosciuti nella domanda"] == ["occupazione"]
+    assert "cosa NINFA sa spiegare" not in operational
+    section = _sections(provider)["metric:occupancy:2026-08-02:2026-08-02"]
+    assert section["periodo"] == "domani (domenica 2 agosto)"
+    values = _points(section)
+    assert values["Occupazione sulle prenotazioni attuali"] == "27.50"  # 11 of 40 rooms
+    assert values["Camere prenotate (notti con capienza nota)"] == "11"
 
 
 def test_channel_weights_for_booking(

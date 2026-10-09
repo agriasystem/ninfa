@@ -7,7 +7,7 @@ where [Ask NINFA](ask-ninfa-v1.md) answers about **one Decision**. See
 > **Update (Mia V2, ADR 0029):** the context now also carries `dati operativi richiesti` (occupancy,
 > bookings, room revenue on the books, the OTA share, channel weights, area status) selected by a
 > deterministic question router and computed by `HomeDataService`; the request accepts an optional
-> short `history`; the instructions are `ask-mia-home-v3`. The endpoint is no longer "one stateless
+> short `history`; the instructions are `ask-mia-home-v4`. The endpoint is no longer "one stateless
 > question without a history" - it is still stateless server-side. Everything about V2 is in
 > [mia-operational-data-v2.md](mia-operational-data-v2.md); the sections below describe the base
 > Mia Home it builds on.

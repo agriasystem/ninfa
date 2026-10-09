@@ -54,9 +54,11 @@ rows would break it, and so would "just tell the prompt to answer more questions
 ## Consequences
 
 - No migration, no new dependency. One new request field (`history`, optional) and one new context key
-  (`dati operativi richiesti`); instructions `ask-mia-home-v3`; `LanguageModelRequest` gains an
+  (`dati operativi richiesti`); instructions `ask-mia-home-v4`; `LanguageModelRequest` gains an
   optional `history`; the Anthropic adapter adds a history block only when there is history.
-- The Decision Ask is untouched (700 characters, 1024 tokens, its own vocabulary, no history).
+- The Decision Ask keeps its limits (700 characters, 1024 tokens, its own vocabulary, no history).
+  Its instructions gained one language rule in `ask-ninfa-v1.4` after the real-model smoke test: the
+  internal word "context" is not said to the user.
 - The OTA question costs one extra read-only evaluation (a handful of statements) when no OTA decision
   fired; a failure degrades to "la quota OTA non è al momento calcolabile", never a guess.
 - Not proven by the automated suite: how well a real model follows the instructions. The real-provider

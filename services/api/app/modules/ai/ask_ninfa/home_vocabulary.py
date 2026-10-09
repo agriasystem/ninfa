@@ -100,6 +100,13 @@ INTENT_WORDS: dict[HomeIntent, frozenset[str]] = {
             "occupato",
             "riempimento",
             "riempite",
+            "riempita",
+            "riempito",
+            "riempiti",
+            "pieno",
+            "piena",
+            "pieni",
+            "piene",
             "occupancy",
         }
     ),
@@ -177,6 +184,7 @@ INTENT_PHRASES: dict[HomeIntent, tuple[str, ...]] = {
     HomeIntent.OCCUPANCY: (
         "tasso di occupazione",
         "camere occupate",
+        "camere piene",
         "siamo pieni",
         "quanto siamo pieni",
         "giorni piu deboli",
@@ -269,6 +277,10 @@ TYPOS: dict[str, str] = {
 # Everyday words one edit away from an alias that must NOT be read as that alias ("costa" is "it
 # costs", not "costi"/"costo"). Exact aliases never go through the fuzzy path at all.
 FUZZY_STOPLIST: frozenset[str] = frozenset({"costa", "coste", "costar", "posto", "apposto"})
+
+# Short everyday aliases that are matched EXACTLY and never as the target of a typo: "pieno" is one
+# letter from "piano" (a plan) and "pieni" from "piani", which are not about occupancy at all.
+EXACT_ONLY_ALIASES: frozenset[str] = frozenset({"pieno", "piena", "pieni", "piene"})
 
 # "Quali giorni sono piu deboli?": a day word and a weak word anywhere in the question (descriptive:
 # the nights with the lowest occupancy on the books - NOT an Engine verdict about risk).
@@ -398,6 +410,8 @@ def fuzzy_alias(token: str, aliases: dict[str, HomeIntent]) -> HomeIntent | None
         # real words one letter apart usually do ("posto" / "costo"): same initial or no match.
         if len(alias) < 5 or alias[0] != token[0] or abs(len(alias) - len(token)) > budget:
             continue
+        if alias in EXACT_ONLY_ALIASES:
+            continue
         distance = damerau_levenshtein(token, alias)
         if distance > budget:
             continue
@@ -413,6 +427,7 @@ def fuzzy_alias(token: str, aliases: dict[str, HomeIntent]) -> HomeIntent | None
 
 __all__ = [
     "CHANNEL_WORDS",
+    "EXACT_ONLY_ALIASES",
     "FOLLOW_UP_WORDS",
     "FUZZY_STOPLIST",
     "INCIDENCE_WORDS",

@@ -8,9 +8,17 @@ from app.modules.ai.ask_ninfa.instructions import ASK_NINFA_SYSTEM_INSTRUCTIONS
 from app.modules.ai.ask_ninfa.types import ASK_NINFA_INSTRUCTIONS_VERSION
 
 
-def test_version_is_the_documented_v1_3_string() -> None:
+def test_version_is_the_documented_v1_4_string() -> None:
     # v1.3 (Home UI V1, D5): the visible assistant is called Mia - persona line only.
-    assert ASK_NINFA_INSTRUCTIONS_VERSION == "ask-ninfa-v1.3"
+    # v1.4 (final polish): one language rule - the internal word "context" is never said to users.
+    assert ASK_NINFA_INSTRUCTIONS_VERSION == "ask-ninfa-v1.4"
+
+
+def test_the_internal_word_context_is_never_to_be_said_to_the_user() -> None:
+    lowered = ASK_NINFA_SYSTEM_INSTRUCTIONS.lower()
+    assert 'non scrivere mai la parola "context"' in lowered
+    assert '"contesto tecnico"' in lowered
+    assert '"i dati disponibili"' in lowered
 
 
 def test_the_visible_assistant_is_named_mia_not_ask_ninfa() -> None:

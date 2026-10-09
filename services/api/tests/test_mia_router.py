@@ -90,6 +90,45 @@ def test_the_example_questions_are_placed_on_the_right_topic(
     assert not resolution.inherited and not resolution.referential
 
 
+# --- natural Italian occupancy wording (found by the real-model smoke test) ----------------------
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "quante camere ho piene domani?",
+        "quante camere sono occupate domani?",
+        "quanto sono pieno domani?",
+        "Siamo pieni domani?",
+        "Quante camere ho riempito per sabato?",
+        "Le camere piene di domani",
+        "Quanto è piena la settimana prossima?",
+    ],
+)
+def test_natural_occupancy_wording_is_routed_to_occupancy(question: str) -> None:
+    resolution = _resolve(question)
+    assert resolution.intents == (HomeIntent.OCCUPANCY,), question
+    assert not resolution.is_unknown and not resolution.referential
+
+
+def test_the_occupancy_question_keeps_its_day() -> None:
+    resolution = _resolve("quante camere ho piene domani?")
+    assert resolution.period is not None
+    assert resolution.period.start == date(2026, 10, 9) == resolution.period.end
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Qual è il piano di oggi?",  # "piano" (a plan) is one letter from "pieno" - never occupancy
+        "Quali piani ha l'hotel?",
+        "Che tempo fa domani?",
+    ],
+)
+def test_the_new_occupancy_words_are_matched_exactly_not_by_typo(question: str) -> None:
+    assert HomeIntent.OCCUPANCY not in _resolve(question).intents
+
+
 # --- the OTA family, standalone ----------------------------------------------------------------
 
 

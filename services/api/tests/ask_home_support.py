@@ -119,6 +119,26 @@ def booking_only_coverage() -> AnalysisCoverage:
     )
 
 
+def distribution_skipped_coverage() -> AnalysisCoverage:
+    """Revenue was evaluated; Distribution (and the rest) was not: NINFA cannot judge the OTAs."""
+    return AnalysisCoverage(
+        domains=(
+            DomainCoverage(AnalysisDomain.REVENUE, DomainCoverageStatus.EVALUATED),
+            DomainCoverage(
+                AnalysisDomain.DISTRIBUTION,
+                DomainCoverageStatus.SKIPPED,
+                DomainSkipReason.NOT_REQUESTED,
+            ),
+            DomainCoverage(
+                AnalysisDomain.COSTS, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
+            ),
+            DomainCoverage(
+                AnalysisDomain.LABOR, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
+            ),
+        )
+    )
+
+
 def full_coverage() -> AnalysisCoverage:
     return AnalysisCoverage(
         domains=tuple(
