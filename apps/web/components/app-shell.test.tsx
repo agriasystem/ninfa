@@ -87,13 +87,14 @@ describe("AppShell - structure and landmarks", () => {
 });
 
 describe("AppShell - navigation", () => {
-  it("makes Oggi and Decisioni real links that keep the property context", () => {
+  it("makes Oggi, Decisioni and Dati real links that keep the property context", () => {
     renderShell();
 
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("href")).toBe("/oggi?property=p1");
     expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("href")).toBe(
       "/decisioni?property=p1",
     );
+    expect(screen.getByRole("link", { name: "Dati" }).getAttribute("href")).toBe("/dati?property=p1");
   });
 
   it("links carry no property query when the account has no property", () => {
@@ -101,6 +102,7 @@ describe("AppShell - navigation", () => {
 
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("href")).toBe("/oggi");
     expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("href")).toBe("/decisioni");
+    expect(screen.getByRole("link", { name: "Dati" }).getAttribute("href")).toBe("/dati");
   });
 
   it("marks Oggi as the current page when the Home is active", () => {
@@ -117,18 +119,36 @@ describe("AppShell - navigation", () => {
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("aria-current")).toBeNull();
   });
 
-  it("draws Dati and Struttura as disabled, link-less items with a discreet 'In arrivo'", () => {
+  it("marks Dati as the current page when the Dati workspace is active, like Oggi and Decisioni", () => {
+    renderShell({ activeSection: "dati" });
+
+    expect(screen.getByRole("link", { name: "Dati" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("Dati is no longer 'In arrivo': an enabled, focusable link with no 'In arrivo' caption", () => {
     renderShell();
 
-    for (const name of ["Dati", "Struttura"]) {
-      const item = screen.getByText(name).closest("[aria-disabled='true']");
-      expect(item, name).not.toBeNull();
-      expect(item?.getAttribute("href")).toBeNull();
-      expect(item?.tagName).not.toBe("A");
-      expect(item?.getAttribute("tabindex")).toBeNull(); // never a dead tab stop
-      expect(within(item as HTMLElement).getByText("In arrivo")).not.toBeNull();
-    }
-    expect(screen.queryByRole("link", { name: "Dati" })).toBeNull();
+    const dati = screen.getByRole("link", { name: "Dati" });
+    expect(dati.tagName).toBe("A");
+    expect(dati.getAttribute("aria-disabled")).toBeNull();
+    expect(dati.textContent).not.toMatch(/In arrivo/u);
+    expect(dati.closest("[aria-disabled='true']")).toBeNull();
+  });
+
+  it("draws Struttura as a disabled, link-less item with a discreet 'In arrivo' - the only one left", () => {
+    renderShell();
+
+    const item = screen.getByText("Struttura").closest("[aria-disabled='true']");
+    expect(item).not.toBeNull();
+    expect(item?.getAttribute("href")).toBeNull();
+    expect(item?.tagName).not.toBe("A");
+    expect(item?.getAttribute("tabindex")).toBeNull(); // never a dead tab stop
+    expect(within(item as HTMLElement).getByText("In arrivo")).not.toBeNull();
+    // exactly one "In arrivo" caption in the navigation: Dati is not one of them
+    const nav = screen.getByRole("navigation", { name: "Navigazione principale" });
+    expect(within(nav).getAllByText("In arrivo")).toHaveLength(1);
   });
 
   it("draws Impostazioni as disabled and link-less, with its own accessible name", () => {
@@ -145,9 +165,12 @@ describe("AppShell - navigation", () => {
 
     const hrefs = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
     for (const href of hrefs) {
-      expect(href === "#main-content" || href?.startsWith("/oggi") || href?.startsWith("/decisioni")).toBe(
-        true,
-      );
+      expect(
+        href === "#main-content" ||
+          href?.startsWith("/oggi") ||
+          href?.startsWith("/decisioni") ||
+          href?.startsWith("/dati"),
+      ).toBe(true);
     }
   });
 });

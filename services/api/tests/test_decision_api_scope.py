@@ -36,6 +36,13 @@ _GET_ONLY_DECISION_PATHS = {
 _DECISION_PATHS = _GET_ONLY_DECISION_PATHS | {_ASK_PATH, _HOME_ASK_PATH}
 
 
+def _decision_namespace(paths: Iterable[str]) -> set[str]:
+    """The property-scoped paths of the DECISION API. Dati UI V1's `/data/overview` (ADR 0031) lives
+    under the same prefix but is not a decision route: it has its own exact-surface and read-only
+    guards in `test_auth_scope.py` and `test_data_overview_scope.py`."""
+    return {p for p in paths if p.startswith("/api/v1/properties/") and "/data/" not in p}
+
+
 def test_openapi_exposes_the_decision_routes_and_the_two_ask_posts(client: TestClient) -> None:
     """The EXACT full-surface guard (health + auth + decisions, nothing else) now lives in
     `test_auth_scope.py`, which supersedes this one now that Gate 13 legitimately adds three
@@ -45,7 +52,7 @@ def test_openapi_exposes_the_decision_routes_and_the_two_ask_posts(client: TestC
     schema = client.get("/openapi.json").json()
     paths = set(schema["paths"])
     assert paths >= _DECISION_PATHS
-    assert {p for p in paths if p.startswith("/api/v1/properties/")} == _DECISION_PATHS
+    assert _decision_namespace(paths) == _DECISION_PATHS
 
 
 def test_health_route_methods_are_unchanged_from_its_own_real_contract(client: TestClient) -> None:
@@ -115,7 +122,7 @@ def test_decision_paths_are_exactly_the_historical_four_plus_the_two_ask_routes(
     (`_GET_ONLY_DECISION_PATHS`), plus exactly one more, `_ASK_PATH` - never a sixth, never a
     GET-history-of-conversations, never a conversation-management route of any kind."""
     schema = client.get("/openapi.json").json()
-    paths = {p for p in schema["paths"] if p.startswith("/api/v1/properties/")}
+    paths = _decision_namespace(schema["paths"])
     assert paths == _GET_ONLY_DECISION_PATHS | {_ASK_PATH, _HOME_ASK_PATH}
     assert _ASK_PATH in paths
     assert _HOME_ASK_PATH in paths

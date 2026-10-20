@@ -2433,3 +2433,1373 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
     width: 100%;
   }
 }
+
+/* --- Dati UI V1: the operational data workspace ---------------------------------------------------
+   Composition and proportions of the approved visual reference (a large summary card, a 2x2 KPI block
+   and a principal chart side by side; a compact card and a large table below), drawn in the NINFA
+   language: Poppins, NINFA blue, the existing ink / muted / hairline tokens, white cards with large
+   radii. Orange appears ONLY where NINFA has an actual decision. LIGHT ONLY. Desktop (1672x941 and
+   1440x900) is the source of truth; everything below is responsive CSS, never screenshot coordinates. */
+
+.app-shell__main--wide {
+  width: 100%;
+  max-width: 1672px;
+  margin: 0 auto;
+  padding: 4px 36px 56px;
+}
+
+.dati-screen {
+  --dati-gap: 20px;
+  --dati-radius: 24px;
+  --dati-pad: 24px;
+  --dati-border: var(--home-hairline);
+  --dati-soft: #f3f6fd;
+  --dati-track: #d6e9fb;
+  --dati-shadow: 0 1px 2px rgba(16, 25, 54, 0.04), 0 10px 28px rgba(16, 25, 54, 0.045);
+  --dati-chart-h: 212px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dati-screen__header {
+  margin: 6px 0 20px;
+}
+
+.dati-screen__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.dati-screen__title-row h1 {
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--home-ink);
+  line-height: 1.15;
+}
+
+.dati-screen__subtitle {
+  margin-top: 4px;
+  font-size: 0.9375rem;
+  color: var(--home-muted);
+}
+
+.dati-screen__panel:focus {
+  outline: none;
+}
+
+.dati-screen__panel[data-period-busy="true"] .dati-grid,
+.dati-screen__panel[data-period-busy="true"] .dati-stack {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+/* internal tabs: the reference's compact pill navigation, in NINFA blue */
+
+.dati-tabs-scroller {
+  overflow-x: auto;
+  margin: 0 0 20px;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
+.dati-tabs-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.dati-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--home-hairline);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(16, 25, 54, 0.04), 0 6px 18px rgba(16, 25, 54, 0.04);
+}
+
+.dati-tab {
+  flex: none;
+  padding: 9px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--home-ink);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dati-tab:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--home-active-pill);
+}
+
+.dati-tab[aria-selected="true"] {
+  background: var(--home-link);
+  color: #fff;
+}
+
+.dati-tab:focus-visible,
+.dati-period__option:focus-visible,
+.dati-table__filter:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+/* the grid: three columns from 1440px, two, then one */
+
+.dati-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--dati-gap);
+  align-items: stretch;
+}
+
+.dati-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dati-gap);
+  min-width: 0;
+}
+
+.dati-cell > .dati-card,
+.dati-cell > .dati-kpis {
+  flex: 1;
+}
+
+.dati-grid--overview .dati-cell--occupancy,
+.dati-grid--overview .dati-cell--kpis {
+  grid-column: span 6;
+}
+
+.dati-grid--overview .dati-cell--chart,
+.dati-grid--overview .dati-cell--ota,
+.dati-grid--overview .dati-cell--table {
+  grid-column: span 12;
+}
+
+@media (min-width: 1440px) {
+  .dati-grid--overview .dati-cell--occupancy,
+  .dati-grid--overview .dati-cell--kpis,
+  .dati-grid--overview .dati-cell--chart,
+  .dati-grid--overview .dati-cell--ota {
+    grid-column: span 4;
+  }
+
+  .dati-grid--overview .dati-cell--table {
+    grid-column: span 8;
+  }
+}
+
+.dati-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dati-gap);
+}
+
+.dati-grid--bookings .dati-cell--chart,
+.dati-grid--bookings .dati-cell--table,
+.dati-grid--distribution .dati-cell--wide,
+.dati-grid--distribution .dati-cell--aside,
+.dati-grid--costs .dati-cell--summary,
+.dati-grid--costs .dati-cell--list,
+.dati-grid--labor .dati-cell--summary,
+.dati-grid--labor .dati-cell--list {
+  grid-column: span 12;
+}
+
+@media (min-width: 1600px) {
+  .dati-grid--bookings .dati-cell--chart {
+    grid-column: span 5;
+  }
+
+  .dati-grid--bookings .dati-cell--table {
+    grid-column: span 7;
+  }
+}
+
+@media (min-width: 1440px) {
+  .dati-grid--distribution .dati-cell--wide {
+    grid-column: span 8;
+  }
+
+  .dati-grid--distribution .dati-cell--aside {
+    grid-column: span 4;
+  }
+
+  .dati-grid--costs .dati-cell--summary,
+  .dati-grid--labor .dati-cell--summary {
+    grid-column: span 4;
+  }
+
+  .dati-grid--costs .dati-cell--list,
+  .dati-grid--labor .dati-cell--list {
+    grid-column: span 8;
+  }
+}
+
+/* the card */
+
+.dati-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: var(--dati-pad);
+  background: #fff;
+  border: 1px solid var(--dati-border);
+  border-radius: var(--dati-radius);
+  box-shadow: var(--dati-shadow);
+}
+
+.dati-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.dati-card__title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--home-ink);
+}
+
+.dati-card__basis {
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+.dati-card__fresh,
+.dati-note {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--home-muted);
+}
+
+.dati-card__fresh {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--home-hairline);
+}
+
+.dati-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  padding: 8px 0;
+}
+
+.dati-distribution .dati-empty,
+.dati-table-card .dati-empty {
+  justify-content: flex-start;
+}
+
+.dati-empty__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.dati-empty__body {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--home-muted);
+}
+
+/* the large occupancy card */
+
+.dati-occupancy__hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dati-occupancy__value {
+  font-size: 2.75rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--home-ink);
+}
+
+.dati-occupancy__value--na {
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+  color: var(--home-muted);
+}
+
+.dati-occupancy__scope {
+  font-size: 0.9375rem;
+  color: var(--home-greeting);
+}
+
+.dati-occupancy__note {
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+.dati-period {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dati-period__option,
+.dati-table__filter {
+  min-height: 40px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--dati-soft);
+  color: var(--home-ink);
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.dati-period__option:hover:not(:disabled),
+.dati-table__filter:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--home-active-pill);
+}
+
+.dati-period__option[aria-pressed="true"],
+.dati-table__filter[aria-pressed="true"] {
+  background: var(--home-link);
+  color: #fff;
+}
+
+.dati-occupancy__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dati-tile {
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--dati-soft);
+}
+
+.dati-tile__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--home-greeting);
+}
+
+.dati-tile__value {
+  margin-top: 2px;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.dati-tile__value--na {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--home-greeting);
+}
+
+.dati-tile__detail {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--home-greeting);
+}
+
+.dati-occupancy__fresh {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--home-hairline);
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+/* the 2x2 KPI block: the first card carries the NINFA-blue highlight */
+
+.dati-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: var(--dati-gap);
+}
+
+.dati-kpi {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--dati-border);
+  border-radius: var(--dati-radius);
+  box-shadow: var(--dati-shadow);
+}
+
+.dati-kpi--highlight {
+  background: var(--home-link);
+  border-color: transparent;
+  box-shadow: 0 14px 30px rgba(21, 80, 232, 0.24);
+  color: #fff;
+}
+
+.dati-kpi__label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--home-muted);
+}
+
+.dati-kpi--highlight .dati-kpi__label,
+.dati-kpi--highlight .dati-kpi__note {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.dati-kpi__value {
+  margin-top: auto;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  color: var(--home-ink);
+}
+
+.dati-kpi--highlight .dati-kpi__value {
+  color: #fff;
+}
+
+.dati-kpi__value--na {
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: var(--home-muted);
+}
+
+.dati-kpi__note {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--home-muted);
+}
+
+/* a change chip: NEUTRAL by design (no good / bad change exists in NINFA data) */
+
+.dati-delta {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--dati-soft);
+  color: var(--home-ink);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+/* the principal chart */
+
+.dati-chart__subtitle {
+  margin-top: -8px;
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+.dati-chart__figure {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.dati-chart__plot-wrap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  margin-top: auto;
+}
+
+.dati-chart__axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: var(--dati-chart-h);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.6875rem;
+  line-height: 1;
+  color: var(--home-muted);
+  text-align: right;
+  transform: translateY(-1px);
+}
+
+.dati-chart__plot {
+  position: relative;
+  height: calc(var(--dati-chart-h) + 24px);
+}
+
+.dati-chart__grid {
+  position: absolute;
+  inset: 0 0 24px 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dati-chart__grid span {
+  display: block;
+  height: 0;
+  border-top: 1px solid #edf1f9;
+}
+
+.dati-chart__bars {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dati-chart__bars[data-count="7"] {
+  gap: 12px;
+}
+
+.dati-chart__col {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 24px;
+  min-width: 0;
+}
+
+.dati-chart__area {
+  position: relative;
+  display: block;
+}
+
+.dati-chart__bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 78%;
+  max-width: 28px;
+  min-height: 2px;
+  border-radius: 8px 8px 3px 3px;
+  background: var(--home-link);
+  transform: translateX(-50%);
+  transition: background 0.15s ease;
+}
+
+.dati-chart__col:hover .dati-chart__bar {
+  background: #0c3ec2;
+}
+
+.dati-chart__slot {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 78%;
+  max-width: 28px;
+  transform: translateX(-50%);
+}
+
+.dati-chart__col--unknown-capacity .dati-chart__slot {
+  height: 34%;
+  border: 1.5px dashed #8e9bbd;
+  border-radius: 6px;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, #d5ddf0 4px 6px);
+}
+
+.dati-chart__col--no-data .dati-chart__slot {
+  height: 4px;
+  border-radius: 2px;
+  background: #dfe6f4;
+}
+
+.dati-chart__marker {
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--home-attention);
+  box-shadow: 0 0 0 2px #fff;
+  transform: translateX(-50%);
+}
+
+.dati-chart__col--unknown-capacity .dati-chart__marker {
+  bottom: calc(34% + 6px);
+}
+
+.dati-chart__col--no-data .dati-chart__marker {
+  bottom: 12px;
+}
+
+.dati-chart__marker--static {
+  position: static;
+  flex: none;
+  transform: none;
+}
+
+.dati-chart__tick {
+  display: block;
+  margin: 0 -14px;
+  padding-top: 8px;
+  font-size: 0.6875rem;
+  line-height: 1;
+  color: var(--home-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dati-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 0.75rem;
+  color: var(--home-muted);
+}
+
+.dati-chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dati-chart__legend-hatch {
+  width: 14px;
+  height: 10px;
+  border: 1.5px dashed #aab6d3;
+  border-radius: 3px;
+  background: repeating-linear-gradient(135deg, transparent 0 3px, #e3e9f6 3px 5px);
+}
+
+.dati-chart__empty {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 220px;
+}
+
+.dati-chart__ghost {
+  position: absolute;
+  inset: 8px 0 8px 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.dati-chart__ghost span {
+  flex: 1;
+  border-radius: 8px 8px 3px 3px;
+  background: linear-gradient(180deg, #eef3fc, #f6f9fe);
+}
+
+.dati-chart__empty .dati-empty {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  width: 100%;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+/* the OTA card */
+
+.dati-ota__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+}
+
+.dati-ota__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dati-ota__value {
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--home-link);
+}
+
+.dati-ota__figure--direct .dati-ota__value {
+  color: var(--home-ink);
+}
+
+.dati-ota__label {
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+.dati-ota__bar {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--dati-track);
+}
+
+.dati-ota__bar-ota {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px 0 0 999px;
+  background: var(--home-link);
+}
+
+.dati-ota__reference {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--home-ink);
+}
+
+.dati-ota__reference-text,
+.dati-ota__coverage,
+.dati-ota__note {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--home-muted);
+}
+
+.dati-ota__outcome {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--home-greeting);
+}
+
+.dati-ota__attention,
+.dati-decision-card__link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.dati-ota__attention a,
+.dati-decision-card__link a,
+.dati-inline-attention {
+  color: var(--home-attention-text);
+}
+
+.dati-ota__attention-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--home-attention);
+}
+
+.dati-ota__channels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--home-hairline);
+}
+
+.dati-ota__channels-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.dati-channels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dati-channel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "name group share" "track track track";
+  align-items: baseline;
+  gap: 4px 10px;
+  font-size: 0.875rem;
+}
+
+.dati-channel__name {
+  grid-area: name;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  color: var(--home-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dati-channel__group {
+  grid-area: group;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--dati-soft);
+  font-size: 0.6875rem;
+  color: var(--home-greeting);
+}
+
+.dati-channel__share {
+  grid-area: share;
+  min-width: 3.5em;
+  font-weight: 600;
+  color: var(--home-ink);
+  text-align: right;
+}
+
+.dati-channel__nights {
+  display: none;
+  grid-area: nights;
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+  text-align: right;
+}
+
+.dati-channel__track {
+  grid-area: track;
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--dati-soft);
+}
+
+.dati-channel__track span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--home-link);
+}
+
+.dati-channel[data-group="direct"] .dati-channel__track span {
+  background: var(--home-sky);
+}
+
+.dati-channel[data-group="other"] .dati-channel__track span,
+.dati-channel[data-group="unknown"] .dati-channel__track span {
+  background: var(--home-neutral);
+}
+
+.dati-channels__more {
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+.dati-distribution--full .dati-channel {
+  grid-template-columns: minmax(120px, 1.2fr) auto minmax(80px, 2fr) auto auto;
+  grid-template-areas: "name group track share nights";
+  align-items: center;
+}
+
+.dati-distribution--full .dati-channel__nights {
+  display: block;
+  min-width: 7.5em;
+}
+
+.dati-distribution--full .dati-ota__figures {
+  gap: 8px 48px;
+}
+
+.dati-distribution--full .dati-ota__value {
+  font-size: 2.25rem;
+}
+
+/* the detail table */
+
+.dati-table__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.dati-table__search input {
+  width: 168px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--home-hairline);
+  border-radius: 999px;
+  background: var(--dati-soft);
+  color: var(--home-ink);
+  font-size: 0.875rem;
+}
+
+.dati-table__search input:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+.dati-table__scroll {
+  flex: 1;
+  min-width: 0;
+  max-height: 392px;
+  overflow: auto;
+  border: 1px solid var(--home-hairline);
+  border-radius: 18px;
+}
+
+.dati-table__scroll:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+.dati-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+  color: var(--home-ink);
+}
+
+.dati-table--summary {
+  min-width: 720px;
+}
+
+.dati-table--categories {
+  min-width: 420px;
+}
+
+.dati-table th,
+.dati-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #eef2fa;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.dati-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f6f8fd;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--home-greeting);
+  vertical-align: bottom;
+  white-space: normal;
+}
+
+.dati-table tbody th {
+  font-weight: 500;
+}
+
+.dati-table th:first-child,
+.dati-table td:first-child,
+.dati-table .dati-table__status {
+  text-align: left;
+}
+
+.dati-table th:first-child,
+.dati-table td:first-child {
+  padding-left: 16px;
+}
+
+.dati-table th:last-child,
+.dati-table td:last-child {
+  padding-right: 16px;
+}
+
+.dati-table tbody tr:last-child th,
+.dati-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.dati-table tbody tr:hover {
+  background: #f8faff;
+}
+
+.dati-table__none {
+  padding: 28px 16px;
+  color: var(--home-muted);
+  text-align: center;
+}
+
+.dati-table__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  font-size: 0.75rem;
+  color: var(--home-muted);
+}
+
+.dati-table__decision {
+  display: inline-flex;
+  border-radius: 999px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.dati-table__decision:hover .dati-status {
+  text-decoration: underline;
+}
+
+.dati-na,
+.dati-na-text {
+  color: var(--home-muted);
+}
+
+.dati-na-text {
+  font-size: 0.8125rem;
+}
+
+.dati-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.dati-status__mark {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--home-neutral);
+}
+
+.dati-status--attention {
+  color: var(--home-attention-text);
+}
+
+.dati-status--attention .dati-status__mark {
+  background: var(--home-attention);
+}
+
+.dati-status--partial .dati-status__mark {
+  border: 2px solid var(--home-neutral);
+  background: transparent;
+}
+
+.dati-status--regular {
+  color: var(--home-ink);
+}
+
+.dati-status--not-evaluated {
+  color: var(--home-muted);
+}
+
+.dati-status--not-evaluated .dati-status__mark {
+  border: 1.5px dashed var(--home-neutral);
+  background: transparent;
+}
+
+.dati-inline-attention {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* the secondary tabs */
+
+.dati-cost-summary__label,
+.dati-labor-summary__days {
+  font-size: 0.875rem;
+  color: var(--home-muted);
+}
+
+.dati-cost-summary__value {
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  color: var(--home-ink);
+}
+
+.dati-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: auto 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--home-hairline);
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+.dati-facts__label {
+  margin-right: 8px;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.dati-defs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.dati-defs dt {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.dati-defs dd {
+  margin: 2px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--home-muted);
+}
+
+.dati-decision-card p:first-of-type {
+  font-size: 0.9375rem;
+  color: var(--home-ink);
+}
+
+/* coverage: visible, discreet */
+
+.dati-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: var(--dati-gap);
+  padding: 0 4px;
+}
+
+.dati-coverage__title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--home-muted);
+}
+
+.dati-coverage__chips,
+.dati-coverage__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dati-coverage__facts {
+  gap: 4px 18px;
+  font-size: 0.8125rem;
+  color: var(--home-muted);
+}
+
+.dati-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border: 1px solid var(--home-hairline);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8125rem;
+}
+
+.dati-chip__domain {
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.dati-chip__state {
+  color: var(--home-muted);
+}
+
+.dati-chip__mark {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--home-link);
+}
+
+.dati-chip[data-state="partial"] .dati-chip__mark {
+  border: 2px solid var(--home-neutral);
+  background: transparent;
+}
+
+.dati-chip[data-state="not_analyzed"] .dati-chip__mark,
+.dati-chip[data-state="unknown"] .dati-chip__mark {
+  border: 1.5px dashed var(--home-neutral);
+  background: transparent;
+}
+
+/* loading and error: contained, the shell and the tabs stay */
+
+.dati-skeleton__card {
+  min-height: 150px;
+  border: 1px solid var(--dati-border);
+  background: linear-gradient(90deg, #fff 25%, #f3f6fd 37%, #fff 63%);
+  background-size: 400% 100%;
+  animation: dati-skeleton-shimmer 1.6s ease-in-out infinite;
+}
+
+.dati-skeleton__card--tall {
+  min-height: 380px;
+}
+
+.dati-skeleton__card--medium {
+  min-height: 320px;
+}
+
+@keyframes dati-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+.dati-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 560px;
+  padding: 24px;
+  border: 1px solid var(--home-hairline);
+  border-radius: 24px;
+  background: #fff;
+  color: var(--home-greeting);
+}
+
+.dati-error button {
+  background: var(--home-link);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dati-skeleton__card {
+    animation: none;
+  }
+
+  .dati-chart__bar,
+  .dati-tab,
+  .dati-period__option,
+  .dati-screen__panel[data-period-busy="true"] .dati-grid {
+    transition: none;
+  }
+}
+
+/* responsive: 1024-1439 keeps the two-column top, below 1024 everything stacks */
+
+@media (max-width: 1439px) {
+  .dati-screen {
+    --dati-chart-h: 196px;
+  }
+
+  .dati-distribution--compact .dati-channels {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 28px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-shell__main--wide {
+    padding: 4px 24px 40px;
+  }
+
+  .dati-grid--overview .dati-cell--occupancy,
+  .dati-grid--overview .dati-cell--kpis {
+    grid-column: span 12;
+  }
+
+  .dati-kpis {
+    grid-auto-rows: auto;
+  }
+}
+
+@media (max-width: 639px) {
+  .app-shell__main--wide {
+    padding: 4px 16px 32px;
+  }
+
+  .dati-screen {
+    --dati-gap: 16px;
+    --dati-pad: 18px;
+    --dati-radius: 20px;
+    --dati-chart-h: 168px;
+  }
+
+  .dati-screen__title-row h1 {
+    font-size: 1.625rem;
+  }
+
+  .dati-occupancy__value {
+    font-size: 2.25rem;
+  }
+
+  .dati-occupancy__tiles {
+    gap: 8px;
+  }
+
+  .dati-tile {
+    padding: 10px;
+  }
+
+  .dati-period__option {
+    flex: 1;
+  }
+
+  .dati-table__controls,
+  .dati-table__search,
+  .dati-table__search input,
+  .dati-table__filter {
+    width: 100%;
+  }
+
+  .dati-distribution--compact .dati-channels {
+    display: flex;
+  }
+
+  .dati-chart__bars[data-count="7"] {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 479px) {
+  .dati-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dati-distribution--full .dati-channel {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas: "name group share" "track track track" "nights nights nights";
+  }
+
+  .dati-distribution--full .dati-channel__nights {
+    text-align: left;
+  }
+}

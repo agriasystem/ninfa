@@ -3,12 +3,14 @@
 Gate 18 adds exactly one further path, `.../decisions/{decision_id}/ask`, and Home UI V1 (Mia
 Home, ADR 0028) exactly one more, `.../properties/{property_id}/ask` - the only two POSTs among the
 `/api/v1/properties/` routes (see `test_decision_api_scope.py` for the route/method assertions).
+Dati UI V1 (ADR 0031) adds exactly one more, a GET: `.../properties/{property_id}/data/overview`.
 """
 
 from fastapi.testclient import TestClient
 
 _ASK_PATH = "/api/v1/properties/{property_id}/decisions/{decision_id}/ask"
 _HOME_ASK_PATH = "/api/v1/properties/{property_id}/ask"
+_DATA_OVERVIEW_PATH = "/api/v1/properties/{property_id}/data/overview"
 
 _EXPECTED_PATHS = {
     "/api/v1/health",
@@ -21,6 +23,7 @@ _EXPECTED_PATHS = {
     "/api/v1/properties/{property_id}/decisions/{decision_id}/history",
     _ASK_PATH,
     _HOME_ASK_PATH,
+    _DATA_OVERVIEW_PATH,
 }
 
 
