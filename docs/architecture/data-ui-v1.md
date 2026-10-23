@@ -77,8 +77,8 @@ Built from the repository as it is - no metric was assumed. "Now" = shown by Dat
 - A tab or period the user chooses **pushes** a history entry (back / forward walk through them); the
   resolution or the switch of the property **replaces** it. The property is always in the query, like
   every other screen. 0 / 1 / N properties behave as everywhere: empty state / plain name / selector.
-- The sidebar "Dati" is a real link with the same active state as Oggi and Decisioni; "In arrivo"
-  remains only on Struttura.
+- The sidebar "Dati" is a real link with the same active state as Oggi and Decisioni. (When this page
+  shipped, "In arrivo" remained on Struttura; Struttura UI V1 has since made it a link too.)
 
 ## Panoramica
 

@@ -4580,3 +4580,713 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
     width: 100%;
   }
 }
+
+/* --- Struttura UI V1: the structure's profile, rooms, parameters and data sources ----------------------
+   Composition and proportions of the approved visual reference (four numbered white cards under a title
+   row), drawn in the NINFA language: Poppins, NINFA blue, the existing ink / muted / hairline tokens.
+   Green appears ONLY for "connected" and "active"; nothing here is orange (no decision lives on this page).
+   LIGHT ONLY. Desktop is the source of truth; everything below is responsive CSS, never coordinates. */
+
+.struttura-screen {
+  --struttura-gap: 14px;
+  --struttura-radius: 18px;
+  --struttura-pad-x: 20px;
+  --struttura-pad-y: 16px;
+  --struttura-border: var(--home-hairline);
+  --struttura-line: #edf1f8;
+  --struttura-soft: #f4f7fc;
+  --struttura-tint: #e9f1fe;
+  --struttura-shadow: 0 1px 2px rgba(16, 25, 54, 0.035), 0 8px 24px rgba(16, 25, 54, 0.035);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.struttura-screen__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px 24px;
+  margin: 6px 0 22px;
+}
+
+.struttura-screen__header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--home-ink);
+  line-height: 1.2;
+}
+
+.struttura-screen__subtitle {
+  margin-top: 3px;
+  font-size: 0.875rem;
+  color: var(--home-greeting);
+}
+
+.struttura-screen__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--struttura-gap);
+  min-width: 0;
+}
+
+/* the card */
+
+.struttura-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: var(--struttura-pad-y) var(--struttura-pad-x);
+  background: #fff;
+  border: 1px solid var(--struttura-border);
+  border-radius: var(--struttura-radius);
+  box-shadow: var(--struttura-shadow);
+}
+
+.struttura-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.struttura-card__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--struttura-tint);
+  color: var(--home-link);
+}
+
+.struttura-card__icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.struttura-card__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.struttura-card__title {
+  font-size: 0.96875rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  color: var(--home-ink);
+}
+
+.struttura-card__description {
+  margin-top: 1px;
+  font-size: 0.78125rem;
+  line-height: 1.45;
+  color: var(--home-greeting);
+}
+
+/* buttons: the light-blue "Modifica ...", the filled call to action, the quiet "Collega fonte" */
+
+.struttura-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.struttura-button__icon {
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+
+.struttura-button--soft {
+  background: #eef4ff;
+  border-color: #dce8fc;
+  color: var(--home-active-ink);
+}
+
+.struttura-button--soft:hover:not(:disabled) {
+  background: #e3ecfd;
+  opacity: 1;
+}
+
+.struttura-button--primary {
+  background: var(--home-link);
+  color: #fff;
+}
+
+.struttura-button--primary:hover:not(:disabled) {
+  background: #0f45cf;
+  opacity: 1;
+}
+
+.struttura-button--outline {
+  min-height: 32px;
+  padding: 0 16px;
+  background: #fff;
+  border-color: #cfe0fb;
+  color: var(--home-active-ink);
+}
+
+.struttura-button--outline:hover:not(:disabled) {
+  background: #f1f6ff;
+  opacity: 1;
+}
+
+.struttura-button:focus-visible,
+.struttura-more:focus-visible,
+.struttura-table-scroll:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+/* the "..." trigger */
+
+.struttura-more {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--home-muted);
+}
+
+.struttura-more:hover:not(:disabled) {
+  background: rgba(21, 80, 232, 0.07);
+  color: var(--home-ink);
+  opacity: 1;
+}
+
+.struttura-more__icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* 1. profile: the photo, then two columns of facts */
+
+.struttura-profile {
+  display: grid;
+  grid-template-columns: 213px minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 20px 28px;
+  align-items: start;
+  padding-top: 5px;
+}
+
+@media (min-width: 1440px) {
+  .struttura-profile {
+    column-gap: 40px;
+  }
+}
+
+.struttura-profile__photo {
+  display: grid;
+  place-items: center;
+  width: 213px;
+  height: 151px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--struttura-tint);
+  color: var(--home-link);
+}
+
+.struttura-profile__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.struttura-profile__photo-empty {
+  width: 44px;
+  height: 44px;
+}
+
+.struttura-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin: 0;
+  min-width: 0;
+}
+
+.struttura-facts--secondary {
+  gap: 16.5px;
+}
+
+.struttura-fact {
+  display: grid;
+  /* the label column is a share of the facts' width, so the values keep their room on a laptop too */
+  grid-template-columns: minmax(88px, 41%) minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: baseline;
+}
+
+.struttura-facts--secondary .struttura-fact {
+  grid-template-columns: minmax(100px, 49%) minmax(0, 1fr);
+}
+
+.struttura-fact dt {
+  font-size: 0.75rem;
+  color: var(--home-muted);
+}
+
+.struttura-fact dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 0.78125rem;
+  font-weight: 500;
+  color: var(--home-ink);
+  overflow-wrap: anywhere;
+}
+
+/* a fact nothing has set: the same neutral grey as the "Non configurata" pill of the sources */
+.struttura-fact dd[data-state="not-configured"] {
+  font-weight: 400;
+  color: var(--home-muted);
+}
+
+/* the name: label above, the value larger, as the reference leads with it */
+.struttura-fact--name {
+  display: block;
+  margin-bottom: 1px;
+}
+
+.struttura-fact--name dd {
+  margin-top: 1px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.struttura-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.struttura-stars__row {
+  display: inline-flex;
+  gap: 1px;
+}
+
+.struttura-stars__star {
+  width: 13px;
+  height: 13px;
+  color: #fbbc1f;
+}
+
+.struttura-stars__star[data-earned="false"] {
+  color: #e3e7f0;
+}
+
+/* 2. the room inventory: a light table that scrolls inside its card instead of widening the page */
+
+.struttura-table-scroll {
+  /* the visually-hidden "Azioni" header is absolutely positioned: this keeps it inside the scroller, where
+     it is clipped, instead of widening the page past the viewport */
+  position: relative;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.struttura-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.78125rem;
+  color: var(--home-ink);
+}
+
+.struttura-table__col-type {
+  width: 25%;
+}
+
+.struttura-table__col-code {
+  width: 12%;
+}
+
+.struttura-table__col-rooms {
+  width: 13%;
+}
+
+.struttura-table__col-occupancy {
+  width: 25%;
+}
+
+.struttura-table__col-status {
+  width: 18%;
+}
+
+.struttura-table__col-actions {
+  width: 7%;
+}
+
+.struttura-table th,
+.struttura-table td {
+  height: 36px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--struttura-line);
+  text-align: left;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.struttura-table thead th {
+  height: 34px;
+  font-size: 0.71875rem;
+  font-weight: 500;
+  color: var(--home-greeting);
+}
+
+.struttura-table tbody th {
+  font-weight: 600;
+}
+
+.struttura-table td.struttura-table__actions {
+  text-align: right;
+  padding-right: 2px;
+}
+
+/* no room type configured: one soft panel with the message and "Configura inventario" */
+
+.struttura-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: var(--struttura-soft);
+}
+
+.struttura-empty__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.71875rem;
+  font-weight: 500;
+  color: var(--color-success);
+}
+
+.struttura-status__dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22a05a;
+}
+
+.struttura-status[data-status="inactive"] {
+  color: var(--home-muted);
+}
+
+.struttura-status[data-status="inactive"] .struttura-status__dot {
+  background: #a9b0c0;
+}
+
+/* 3. the operating parameters: three soft tiles side by side, wrapping when the width runs out */
+
+.struttura-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(228px, 1fr));
+  gap: var(--struttura-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.struttura-tile {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: var(--struttura-soft);
+}
+
+.struttura-tile__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #edf2fc;
+  color: var(--home-link);
+}
+
+.struttura-tile__icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.struttura-tile__text {
+  min-width: 0;
+}
+
+.struttura-tile__label {
+  font-size: 0.71875rem;
+  color: var(--home-greeting);
+}
+
+.struttura-tile__value {
+  margin-top: 3px;
+  font-size: 0.78125rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-tile__value[data-state="not-configured"] {
+  font-weight: 500;
+  color: var(--home-muted);
+}
+
+.struttura-tile__detail {
+  margin-top: 1px;
+  font-size: 0.71875rem;
+  color: var(--home-greeting);
+}
+
+/* 4. the data sources: compact cards, connected and not connected told apart by pill, icon and action */
+
+.struttura-sources {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--struttura-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.struttura-source {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+  min-height: 116px;
+  padding: 11px 12px;
+  border: 1px solid var(--struttura-line);
+  border-radius: 12px;
+  background: var(--struttura-soft);
+}
+
+.struttura-source__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--struttura-tint);
+  color: var(--home-link);
+}
+
+.struttura-source__icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.struttura-source[data-connection="not-connected"] .struttura-source__icon {
+  border: 1px solid var(--struttura-line);
+  background: #fff;
+  color: #4b536b;
+}
+
+.struttura-source__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.struttura-source__name {
+  /* leaves room for the "..." that sits in the card's corner */
+  padding-right: 24px;
+  font-size: 0.71875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--home-ink);
+}
+
+.struttura-source__detail {
+  margin-top: -3px;
+  font-size: 0.6875rem;
+  color: var(--home-muted);
+}
+
+.struttura-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.struttura-pill[data-tone="connected"] {
+  background: #e4f4ea;
+  color: #17713d;
+}
+
+.struttura-pill[data-tone="idle"] {
+  background: #e9ecf2;
+  color: var(--home-greeting);
+}
+
+.struttura-pill__icon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  color: #22a05a;
+}
+
+.struttura-source__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: auto 0 0;
+  padding-top: 2px;
+  font-size: 0.6875rem;
+  color: var(--home-muted);
+}
+
+.struttura-source__meta strong {
+  font-size: 0.78125rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-source > .struttura-source__body > .struttura-button {
+  margin-top: auto;
+}
+
+.struttura-source__more {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* responsive: the five source cards wrap 3 + 2, then 2 + 2 + 1 and one by one; the profile's two fact
+   columns stack under the photo, then everything goes single column */
+
+@media (max-width: 1439px) {
+  .struttura-sources {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .struttura-sources {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1199px) {
+  .struttura-profile {
+    grid-template-columns: 213px minmax(0, 1fr);
+  }
+
+  .struttura-facts--secondary {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 40px;
+    padding-top: 0;
+  }
+
+  .struttura-facts--secondary .struttura-fact {
+    grid-template-columns: minmax(96px, 150px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .struttura-screen__header {
+    margin-bottom: 18px;
+  }
+
+  .struttura-card {
+    --struttura-pad-x: 16px;
+    --struttura-pad-y: 14px;
+  }
+
+  .struttura-card__header {
+    flex-wrap: wrap;
+  }
+
+  .struttura-card__heading {
+    flex-basis: calc(100% - 64px);
+  }
+
+  .struttura-card__header > .struttura-button {
+    margin-left: 52px;
+  }
+
+  .struttura-profile {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .struttura-profile__photo {
+    width: 100%;
+    max-width: 360px;
+    height: auto;
+    aspect-ratio: 213 / 151;
+  }
+
+  .struttura-facts--secondary {
+    display: flex;
+    gap: 14px;
+  }
+
+  .struttura-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 479px) {
+  .struttura-fact,
+  .struttura-facts--secondary .struttura-fact {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 2px;
+  }
+
+  .struttura-sources {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

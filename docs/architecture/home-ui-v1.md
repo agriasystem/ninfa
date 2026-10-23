@@ -22,10 +22,11 @@ of them is runtime data, and the tests assert none of them is hardcoded.
 | `/decisioni` | **today's** actionable decisions: the same feed the Home counts from (below); its board presentation is in [decisioni-ui-v1.md](decisioni-ui-v1.md) |
 | `/oggi/decisioni/{id}` | the existing Decision Detail (unchanged URL; sidebar highlights "Decisioni") |
 
-`Struttura` and `Impostazioni` do not exist yet: they are drawn in the approved layout with a
-discreet "In arrivo", **never as links** (no `href`, `aria-disabled="true"`, not focusable) - no page
-was invented for them. (`Dati` was drawn the same way until Dati UI V1, which made it a real
-destination at `/dati`: see [data-ui-v1.md](data-ui-v1.md).)
+`Impostazioni` does not exist yet: it is drawn in the approved layout with a discreet "In arrivo",
+**never as a link** (no `href`, `aria-disabled="true"`, not focusable) - no page was invented for it.
+(`Dati` and `Struttura` were drawn the same way until Dati UI V1 and Struttura UI V1 made them real
+destinations at `/dati` and `/struttura`: see [data-ui-v1.md](data-ui-v1.md) and
+[struttura-ui-v1.md](struttura-ui-v1.md).)
 
 ## App shell
 
@@ -258,6 +259,6 @@ shell-logo-context}.tsx`, `lib/home/*`, `lib/motion/*`, `lib/feed/use-decision-f
 
 ## Explicitly deferred
 
-Dark mode; Struttura / Impostazioni pages (Dati: see data-ui-v1.md); per-area clickable tiles and any per-area
+Dark mode; the Impostazioni page (Dati: see data-ui-v1.md; Struttura: see struttura-ui-v1.md); per-area clickable tiles and any per-area
 severity; the Decision memory list (`GET /decisions`) as a page; a per-area breakdown of
 insufficient checks; a given-name field; a brand-exact SVG logo; voice input; charts.

@@ -31,6 +31,12 @@ export function decisioniRoute(propertyId?: string): string {
   return propertyId ? `/decisioni?${PROPERTY_QUERY_PARAM}=${propertyId}` : "/decisioni";
 }
 
+/** "/struttura", optionally scoped to a property - the structure's profile, room inventory, operating
+ * parameters and connected data sources (Struttura UI V1). Same `?property=` convention as the rest. */
+export function strutturaRoute(propertyId?: string): string {
+  return propertyId ? `/struttura?${PROPERTY_QUERY_PARAM}=${propertyId}` : "/struttura";
+}
+
 export const DATI_TAB_PARAM = "tab";
 export const DATI_PERIOD_PARAM = "period";
 
