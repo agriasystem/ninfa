@@ -71,6 +71,17 @@ class DataSourceRepository:
         self._session.flush()
         return data_source
 
+    def reactivate(self, data_source_id: UUID) -> DataSource:
+        """Switch a data source back on. Its history stays attached to it: re-linking a source must
+        never start a second, empty one that the analysis would read instead of the imported
+        data."""
+        data_source = self.get(data_source_id)
+        if data_source is None:
+            raise NotFoundError("Data source")
+        data_source.is_active = True
+        self._session.flush()
+        return data_source
+
 
 class ImportJobRepository:
     """Import jobs of ONE workspace (metadata/lifecycle only)."""

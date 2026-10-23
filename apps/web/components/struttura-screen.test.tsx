@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PropertyAccess, SessionContextResponse } from "@ninfa/contracts";
 
 import { demoStructureOverview } from "@/lib/structure/demo-structure";
+import { nothingConfigured, ok } from "@/test/sources-support";
 
 import type { StrutturaActions } from "./struttura-parts";
 import { StrutturaScreen, type StructureOverviewSource } from "./struttura-screen";
@@ -13,8 +14,14 @@ import { StrutturaScreen, type StructureOverviewSource } from "./struttura-scree
 const useSessionMock = vi.fn();
 const miaMock = vi.fn();
 const fetchMock = vi.fn();
+const getDataSourcesMock = vi.fn();
 
 vi.mock("@/lib/session/session-context", () => ({ useSession: () => useSessionMock() }));
+// "Fonti dati" is the ONE block that asks the backend something (its own API, deep-tested in
+// `struttura-sources.test.tsx`); here it just answers "nothing configured", like a real property today.
+vi.mock("@/lib/api/data-sources", () => ({
+  getDataSources: (...args: unknown[]) => getDataSourcesMock(...args),
+}));
 // Struttura is deterministic: it must never reach Mia or any model. Every entry point is a spy.
 vi.mock("@/lib/api/ask-ninfa", () => ({
   askNinfa: (...args: unknown[]) => miaMock(...args),
@@ -67,11 +74,13 @@ function renderPage({ actions, requested = "p1", getOverview }: RenderOptions = 
 }
 
 /** The complete example page of the approved reference: an EXPLICIT fixture, the way development looks at it. */
-const demoOverview: StructureOverviewSource = (_property, now) => demoStructureOverview(now);
+const demoOverview: StructureOverviewSource = () => demoStructureOverview();
 const renderDemoPage = (options: Omit<RenderOptions, "getOverview"> = {}) =>
   renderPage({ ...options, getOverview: demoOverview });
 
 const region = (name: string) => screen.getByRole("region", { name });
+/** The cards of "Fonti dati" arrive from the backend: wait for them. */
+const sourcesLoaded = () => screen.findByRole("list", { name: "Fonti dati collegate e collegabili" });
 
 /** Every value of the demo dataset: none may ever reach the page the real route renders. */
 const DEMO_VALUES =
@@ -80,6 +89,8 @@ const DEMO_VALUES =
 beforeEach(() => {
   miaMock.mockReset();
   fetchMock.mockReset();
+  getDataSourcesMock.mockReset();
+  getDataSourcesMock.mockResolvedValue(ok(nothingConfigured()));
   vi.stubGlobal("fetch", fetchMock);
   signIn([property("p1", "Residenza Alba")]);
 });
@@ -140,11 +151,14 @@ describe("/struttura - route, shell and header", () => {
     ).not.toBeNull();
   });
 
-  it("never reaches Mia, a model or the network", () => {
+  it("never reaches Mia or a model; its only request is the data-source API of Fonti dati", async () => {
     renderPage();
+    await sourcesLoaded();
 
     expect(miaMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(getDataSourcesMock).toHaveBeenCalledTimes(1);
+    expect(getDataSourcesMock.mock.calls[0]?.[0]).toBe("p1");
   });
 
   it("shows the empty state, not the page, when the account has no property", () => {
@@ -224,33 +238,29 @@ describe("/struttura - the real route, with no real data: nothing is invented", 
     expect(screen.getByRole("button", { name: "Modifica parametri" })).not.toBeNull();
   });
 
-  it("4. Fonti: every source is neutral - not configured, no system named, a way to connect it", () => {
+  it("4. Fonti: every source reads what the backend says - here, nothing is configured", async () => {
     const { container } = renderPage();
+    await sourcesLoaded();
 
-    const categories = ["PMS", "Channel Manager", "OTA", "Contabilità", "Personale"];
     const cards = within(region("4. Fonti dati")).getAllByRole("listitem");
-    expect(cards.map((card) => flat(card))).toEqual(
-      categories.map((category) => `${category} Nessuna fonte collegata Non configurata Collega fonte`),
-    );
+    expect(cards.map((card) => flat(card))).toEqual([
+      "PMS Nessuna fonte collegata Non configurato Collega fonte",
+      "Channel Manager Nessuna fonte collegata Non configurato Collega fonte",
+      "OTA Nessun dato canale disponibile Non configurato Configura fonte",
+      "Contabilità Nessuna fonte collegata Non configurato Collega fonte",
+      "Personale Nessuna fonte collegata Non configurato Collega fonte",
+    ]);
     for (const card of Array.from(container.querySelectorAll(".struttura-source"))) {
-      expect(card.getAttribute("data-connection")).toBe("not-connected");
+      expect(card.getAttribute("data-state")).toBe("NOT_CONFIGURED");
     }
-    const sources = region("4. Fonti dati");
     expect(
-      within(sources)
-        .getAllByRole("button", { name: /^Collega fonte / })
-        .map((button) => button.getAttribute("aria-label")),
-    ).toEqual(categories.map((category) => `Collega fonte ${category}`));
-    expect(
-      within(sources)
-        .getAllByRole("button", { name: /^Azioni per / })
-        .map((button) => button.getAttribute("aria-label")),
-    ).toEqual(categories.map((category) => `Azioni per ${category}`));
-    expect(within(sources).getByRole("button", { name: "Collega una nuova fonte" })).not.toBeNull();
+      within(region("4. Fonti dati")).getByRole("button", { name: "Collega una nuova fonte" }),
+    ).not.toBeNull();
   });
 
-  it("says nothing about data quality: only whether a system is connected (that is Dati)", () => {
+  it("says nothing about data quality: only whether a system is connected (that is Dati)", async () => {
     renderPage();
+    await sourcesLoaded();
 
     expect(flat(region("4. Fonti dati"))).not.toMatch(/copertura|qualit|complet|mesi di storico/iu);
   });
@@ -354,48 +364,29 @@ describe("/struttura - the explicit demo fixture (development and tests only)", 
     ]);
   });
 
-  it("4. Fonti: a source is 'Collegato' ONLY because the data says so, with its system and last update", () => {
+  it("4. Fonti: the fixture does not touch the data sources - they still read what the API says", async () => {
     renderDemoPage();
+    await sourcesLoaded();
 
-    const cards = within(region("4. Fonti dati")).getAllByRole("listitem");
-    expect(cards.map((card) => flat(card))).toEqual([
-      "PMS Mews Collegato Ultimo aggiornamento 4 min fa",
-      "Channel Manager SiteMinder Collegato Ultimo aggiornamento 6 min fa",
-      "OTA Booking.com Collegato Ultimo aggiornamento 7 min fa",
-      "Contabilità Nessuna fonte collegata Non configurata Collega fonte",
-      "Personale Nessuna fonte collegata Non configurata Collega fonte",
-    ]);
-  });
-
-  it("4. Fonti: connected and not connected differ by state attribute, wording and action, not by colour alone", () => {
-    const { container } = renderDemoPage();
-
-    const cards = Array.from(container.querySelectorAll(".struttura-source"));
-    expect(cards.map((card) => card.getAttribute("data-connection"))).toEqual([
-      "connected",
-      "connected",
-      "connected",
-      "not-connected",
-      "not-connected",
-    ]);
-    expect(within(cards[0] as HTMLElement).queryByRole("button", { name: /Collega fonte/u })).toBeNull();
-    expect(within(cards[3] as HTMLElement).queryByText("Ultimo aggiornamento")).toBeNull();
-    for (const card of cards.slice(3)) {
-      expect(card.querySelector(".struttura-source__detail")?.textContent).toBe("Nessuna fonte collegata");
-    }
+    const text = flat(region("4. Fonti dati"));
+    expect(text).not.toMatch(/Mews|SiteMinder|Booking|TeamSystem|Collegato/u);
+    expect(text).toContain("Non configurato");
   });
 });
 
-describe("/struttura - the buttons are ready but not wired", () => {
-  it("clicking any button without handlers does nothing and does not throw", async () => {
+describe("/struttura - the profile, inventory and parameter buttons are ready but not wired", () => {
+  it("clicking them without handlers does nothing and does not throw", async () => {
     const user = userEvent.setup();
     renderPage();
+    await sourcesLoaded();
+    const sources = region("4. Fonti dati");
 
     for (const button of screen.getAllByRole("button")) {
-      // the profile menu of the shell is a real control: only the page's own buttons are under test
-      if (button.closest(".app-sidebar")) continue;
+      // the shell's profile menu and the (fully wired) Fonti dati block are not under test here
+      if (button.closest(".app-sidebar") || sources.contains(button)) continue;
       await user.click(button);
     }
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -406,9 +397,7 @@ describe("/struttura - the buttons are ready but not wired", () => {
       onEditInventory: vi.fn(),
       onConfigureInventory: vi.fn(),
       onEditParameters: vi.fn(),
-      onConnectSource: vi.fn(),
       onRoomMenu: vi.fn(),
-      onSourceMenu: vi.fn(),
     };
 
     // the real route: no inventory yet, so "Configura inventario" is the action
@@ -416,9 +405,6 @@ describe("/struttura - the buttons are ready but not wired", () => {
     await user.click(screen.getByRole("button", { name: "Modifica struttura" }));
     await user.click(screen.getByRole("button", { name: "Configura inventario" }));
     await user.click(screen.getByRole("button", { name: "Modifica parametri" }));
-    await user.click(screen.getByRole("button", { name: "Collega una nuova fonte" }));
-    await user.click(screen.getByRole("button", { name: "Collega fonte Personale" }));
-    await user.click(screen.getByRole("button", { name: "Azioni per OTA" }));
     real.unmount();
 
     // the demo fixture: an inventory exists, so "Modifica inventario" and the row menus are there
@@ -430,9 +416,7 @@ describe("/struttura - the buttons are ready but not wired", () => {
     expect(actions.onConfigureInventory).toHaveBeenCalledTimes(1);
     expect(actions.onEditInventory).toHaveBeenCalledTimes(1);
     expect(actions.onEditParameters).toHaveBeenCalledTimes(1);
-    expect(actions.onConnectSource).toHaveBeenNthCalledWith(1);
-    expect(actions.onConnectSource).toHaveBeenNthCalledWith(2, "STAFF");
     expect(actions.onRoomMenu).toHaveBeenCalledWith("suite");
-    expect(actions.onSourceMenu).toHaveBeenCalledWith("OTA");
+    await waitFor(() => expect(getDataSourcesMock).toHaveBeenCalled());
   });
 });

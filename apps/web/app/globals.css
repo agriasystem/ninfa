@@ -4587,7 +4587,8 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
    Green appears ONLY for "connected" and "active"; nothing here is orange (no decision lives on this page).
    LIGHT ONLY. Desktop is the source of truth; everything below is responsive CSS, never coordinates. */
 
-.struttura-screen {
+.struttura-screen,
+.struttura-modal {
   --struttura-gap: 14px;
   --struttura-radius: 18px;
   --struttura-pad-x: 20px;
@@ -4597,6 +4598,9 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   --struttura-soft: #f4f7fc;
   --struttura-tint: #e9f1fe;
   --struttura-shadow: 0 1px 2px rgba(16, 25, 54, 0.035), 0 8px 24px rgba(16, 25, 54, 0.035);
+}
+
+.struttura-screen {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -4704,6 +4708,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.2;
+  text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -5202,18 +5207,496 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   right: 8px;
 }
 
+/* 4. data sources: the states beyond connected / not connected, the card actions and the "..." menu */
+
+.struttura-pill[data-tone="configured"] {
+  background: #e6efff;
+  color: var(--home-active-ink);
+}
+
+.struttura-pill[data-tone="derived"] {
+  background: #e9eef6;
+  color: #3b4a68;
+}
+
+.struttura-source__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.struttura-source .struttura-button--outline {
+  padding: 0 12px;
+}
+
+.struttura-source__link {
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--home-active-ink);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.struttura-source__link:hover:not(:disabled) {
+  background: transparent;
+  text-decoration: underline;
+  opacity: 1;
+}
+
+.struttura-source__more {
+  z-index: 2;
+}
+
+.struttura-menu {
+  position: relative;
+}
+
+.struttura-menu__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 176px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--struttura-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(16, 25, 54, 0.14);
+}
+
+.struttura-menu__item {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--home-ink);
+  font-family: inherit;
+  font-size: 0.78125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.struttura-menu__item:hover:not(:disabled),
+.struttura-menu__item:focus-visible {
+  background: var(--struttura-tint);
+  opacity: 1;
+}
+
+.struttura-sources__intro {
+  margin: 0;
+  font-size: 0.78125rem;
+  line-height: 1.5;
+  color: var(--home-greeting);
+}
+
+.struttura-sources-skeleton {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--struttura-gap);
+}
+
+.struttura-sources-skeleton__card {
+  min-height: 116px;
+  border-radius: 12px;
+  background: var(--struttura-soft);
+  animation: struttura-pulse 1.4s ease-in-out infinite;
+}
+
+.struttura-sources-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--struttura-soft);
+  font-size: 0.8125rem;
+  color: var(--home-ink);
+}
+
+@keyframes struttura-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* dialogs: one calm panel over a soft veil */
+
+.struttura-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  overflow-y: auto;
+  background: rgba(16, 25, 54, 0.38);
+}
+
+.struttura-modal__panel {
+  width: min(100%, 560px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 22px 24px;
+  background: #fff;
+  border: 1px solid var(--struttura-border);
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(16, 25, 54, 0.22);
+}
+
+.struttura-modal__panel:focus {
+  outline: none;
+}
+
+.struttura-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.struttura-modal__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--home-ink);
+}
+
+.struttura-modal__description {
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--home-greeting);
+}
+
+.struttura-modal__close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--home-muted);
+}
+
+.struttura-modal__close:hover:not(:disabled) {
+  background: var(--struttura-tint);
+  color: var(--home-ink);
+  opacity: 1;
+}
+
+.struttura-modal__close:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.struttura-modal__close-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.struttura-modal__body {
+  margin-top: 16px;
+}
+
+/* the options of a dialog: what NINFA can really do, and what is "Prossimamente" */
+
+.struttura-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.struttura-option {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--struttura-line);
+  border-radius: 12px;
+  background: var(--struttura-soft);
+}
+
+.struttura-option > div {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.struttura-option__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-option__body {
+  margin-top: 2px;
+  font-size: 0.78125rem;
+  line-height: 1.5;
+  color: var(--home-greeting);
+}
+
+.struttura-option--soon {
+  border-style: dashed;
+  background: transparent;
+}
+
+.struttura-option--soon .struttura-option__title,
+.struttura-option--soon .struttura-option__body {
+  color: var(--home-muted);
+}
+
+.struttura-badge {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #e9ecf2;
+  color: var(--home-greeting);
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.struttura-kind {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--struttura-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--home-ink);
+  font-family: inherit;
+  text-align: left;
+}
+
+.struttura-kind:hover:not(:disabled) {
+  background: var(--struttura-soft);
+  border-color: #cfe0fb;
+  opacity: 1;
+}
+
+.struttura-kind__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.struttura-kind__body {
+  font-size: 0.78125rem;
+  font-weight: 400;
+  color: var(--home-greeting);
+}
+
+/* putting a file in: choose, look, confirm, result */
+
+.struttura-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--home-ink);
+}
+
+.struttura-flow p {
+  margin: 0;
+}
+
+.struttura-flow__hint,
+.struttura-flow__note {
+  font-size: 0.78125rem;
+  color: var(--home-greeting);
+}
+
+.struttura-flow__file,
+.struttura-flow__found {
+  font-weight: 600;
+}
+
+.struttura-flow__subtitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-flow__error {
+  font-size: 0.78125rem;
+  color: var(--color-danger);
+}
+
+.struttura-flow__problem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--color-warning-soft);
+}
+
+.struttura-flow__problem ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.struttura-flow__problem code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(16, 25, 54, 0.06);
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+.struttura-flow__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.struttura-flow__sample {
+  overflow-x: auto;
+  border: 1px solid var(--struttura-line);
+  border-radius: 10px;
+}
+
+.struttura-flow__sample table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.71875rem;
+}
+
+.struttura-flow__sample th,
+.struttura-flow__sample td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--struttura-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.struttura-flow__sample th {
+  background: var(--struttura-soft);
+  font-weight: 500;
+  color: var(--home-greeting);
+}
+
+.struttura-flow__sample tr:last-child td {
+  border-bottom: 0;
+}
+
+.struttura-flow__sample:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+.struttura-flow__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.struttura-flow__pick {
+  cursor: pointer;
+}
+
+.struttura-flow__pick:focus-within {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+.struttura-flow__busy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--home-greeting);
+}
+
+.struttura-flow__spinner {
+  width: 18px;
+  height: 18px;
+  animation: struttura-spin 0.9s linear infinite;
+}
+
+@keyframes struttura-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.struttura-manage__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.struttura-manage__facts dt {
+  font-size: 0.75rem;
+  color: var(--home-muted);
+}
+
+.struttura-manage__facts dd {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.struttura-source__link:focus-visible,
+.struttura-menu__item:focus-visible,
+.struttura-kind:focus-visible,
+.struttura-modal__close:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .struttura-sources-skeleton__card,
+  .struttura-flow__spinner {
+    animation: none;
+  }
+}
+
 /* responsive: the five source cards wrap 3 + 2, then 2 + 2 + 1 and one by one; the profile's two fact
    columns stack under the photo, then everything goes single column */
 
 @media (max-width: 1439px) {
-  .struttura-sources {
+  .struttura-sources,
+  .struttura-sources-skeleton {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 767px) {
-  .struttura-sources {
+  .struttura-sources,
+  .struttura-sources-skeleton {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .struttura-modal__panel {
+    padding: 18px 16px;
   }
 }
 
@@ -5286,7 +5769,12 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
     row-gap: 2px;
   }
 
-  .struttura-sources {
+  .struttura-sources,
+  .struttura-sources-skeleton {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .struttura-option > div {
+    flex-basis: 100%;
   }
 }

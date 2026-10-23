@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import type { PropertyAccess } from "@ninfa/contracts";
 
@@ -22,14 +22,14 @@ function StrutturaContent({
   property,
   actions,
   getOverview,
+  onPropertyInvalid,
 }: {
   property: PropertyAccess;
   actions: StrutturaActions;
   getOverview: StructureOverviewSource;
+  onPropertyInvalid: () => void;
 }) {
-  // One instant for the whole page: every "N min fa" is measured against the same `now`.
-  const [now] = useState(() => new Date());
-  const overview = useMemo(() => getOverview(property, now), [getOverview, property, now]);
+  const overview = useMemo(() => getOverview(property), [getOverview, property]);
 
   return (
     <div className="struttura-screen">
@@ -47,7 +47,11 @@ function StrutturaContent({
         <StrutturaProfile profile={overview.profile} />
         <StrutturaRooms rooms={overview.rooms} actions={actions} />
         <StrutturaParameters parameters={overview.parameters} actions={actions} />
-        <StrutturaSources sources={overview.sources} now={now} actions={actions} />
+        <StrutturaSources
+          propertyId={property.id}
+          timeZone={property.timezone}
+          onPropertyInvalid={onPropertyInvalid}
+        />
       </div>
     </div>
   );
@@ -58,7 +62,7 @@ export interface StrutturaScreenProps {
   requestedPropertyId: string | null;
   onSelectProperty: (propertyId: string) => void;
   onNavigateToLogin: () => void;
-  /** What the page's buttons do. None is wired yet (see `StrutturaActions`). */
+  /** What the profile, inventory and parameter buttons do. None is wired yet (see `StrutturaActions`). */
   actions?: StrutturaActions;
   /** Where the structure's data comes from: the one seam to point at a real endpoint. The route never passes
    * it, so a real property shows what is really known (its name and timezone) and "Non configurata" for the
@@ -66,14 +70,15 @@ export interface StrutturaScreenProps {
   getOverview?: StructureOverviewSource;
 }
 
-/** Builds the overview of a property; `now` is the instant the page measures "N min fa" against. */
-export type StructureOverviewSource = (property: PropertyAccess, now: Date) => StructureOverview;
+/** Builds the structure overview of a property (its profile, room inventory and parameters). */
+export type StructureOverviewSource = (property: PropertyAccess) => StructureOverview;
 
 const NO_ACTIONS: StrutturaActions = {};
 
 /** The full "/struttura" screen: auth bootstrap gate, property resolution (0 / 1 / N properties), the
  * sidebar shell with "Struttura" active, and the page. Framework-free - `app/struttura/page.tsx` wires it
- * to the real router; this is what gets tested. Deterministic: no call to Mia, to a model or to the API. */
+ * to the real router; this is what gets tested. No call to Mia or to a model; the only request is the
+ * data-source API of "Fonti dati" (`lib/api/data-sources.ts`). */
 export function StrutturaScreen({
   requestedPropertyId,
   onSelectProperty,
@@ -89,7 +94,14 @@ export function StrutturaScreen({
       activeSection="struttura"
       variant="wide"
     >
-      {(selected) => <StrutturaContent property={selected} actions={actions} getOverview={getOverview} />}
+      {(selected, onPropertyInvalid) => (
+        <StrutturaContent
+          property={selected}
+          actions={actions}
+          getOverview={getOverview}
+          onPropertyInvalid={onPropertyInvalid}
+        />
+      )}
     </PropertyScreen>
   );
 }

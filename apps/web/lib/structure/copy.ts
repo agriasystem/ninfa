@@ -1,5 +1,3 @@
-import type { DataSourceCategory } from "./types";
-
 /**
  * Centralised Italian copy for Struttura UI V1 - one source per string, exactly like `lib/copy.ts` and
  * `lib/data/copy.ts`. The page only DESCRIBES the structure and its connected systems, so the wording
@@ -69,23 +67,8 @@ export const strutturaCopy = {
   sources: {
     title: "4. Fonti dati",
     description: "Sistemi collegati alla struttura da cui NINFA riceve i dati.",
-    connectNew: "Collega una nuova fonte",
-    connect: "Collega fonte",
-    connected: "Collegato",
-    // Neutral on purpose: it says the source is not set up here, never that something is wrong or missing.
-    notConnected: "Non configurata",
-    noSource: "Nessuna fonte collegata",
-    lastUpdate: "Ultimo aggiornamento",
     listLabel: "Fonti dati collegate e collegabili",
-    actions: (name: string) => `Azioni per ${name}`,
   },
-  categoryLabels: {
-    PMS: "PMS",
-    CHANNEL_MANAGER: "Channel Manager",
-    OTA: "OTA",
-    ACCOUNTING: "Contabilità",
-    STAFF: "Personale",
-  } satisfies Record<DataSourceCategory, string>,
   /** Capitalised on purpose: the page writes "Marzo – Novembre". Index 0 is January. */
   months: [
     "Gennaio",
@@ -101,11 +84,4 @@ export const strutturaCopy = {
     "Novembre",
     "Dicembre",
   ],
-  age: {
-    now: "adesso",
-    minutes: (count: number) => `${count} min fa`,
-    hours: (count: number) => (count === 1 ? "1 ora fa" : `${count} ore fa`),
-    yesterday: "ieri",
-    days: (count: number) => `${count} giorni fa`,
-  },
 } as const;

@@ -7,6 +7,9 @@ export type ApiResult<T> =
 export interface ApiRequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  /** A file sent as the RAW request body (`application/octet-stream`, no multipart): Fonti dati. Mutually
+   * exclusive with `body`. */
+  file?: Blob;
   signal?: AbortSignal;
 }
 
@@ -47,15 +50,18 @@ export async function apiRequest<T>(
 
   const url = baseUrl.replace(/\/+$/, "") + path;
   const hasBody = options.body !== undefined;
+  const hasFile = options.file !== undefined;
 
   let response: Response;
   try {
     response = await fetchImpl(url, {
       method: options.method ?? "GET",
-      headers: hasBody
-        ? { Accept: "application/json", "Content-Type": "application/json" }
-        : { Accept: "application/json" },
-      body: hasBody ? JSON.stringify(options.body) : undefined,
+      headers: hasFile
+        ? { Accept: "application/json", "Content-Type": "application/octet-stream" }
+        : hasBody
+          ? { Accept: "application/json", "Content-Type": "application/json" }
+          : { Accept: "application/json" },
+      body: hasFile ? options.file : hasBody ? JSON.stringify(options.body) : undefined,
       credentials: "include",
       cache: "no-store",
       signal: options.signal,

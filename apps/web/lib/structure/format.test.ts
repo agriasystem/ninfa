@@ -5,11 +5,7 @@ import {
   formatMaxOccupancy,
   formatMonthRange,
   formatTimeZoneLabel,
-  formatUpdateAge,
 } from "./format";
-
-const NOW = new Date("2026-10-23T10:00:00Z");
-const minutesBefore = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000).toISOString();
 
 describe("formatMonthRange", () => {
   it("writes the capitalised months with an en dash", () => {
@@ -53,22 +49,5 @@ describe("formatMaxOccupancy", () => {
     expect(formatMaxOccupancy({ maxAdults: 2, maxChildren: 0 })).toBe("2 adulti");
     expect(formatMaxOccupancy({ maxAdults: 2, maxChildren: 1 })).toBe("2 adulti + 1 bambino");
     expect(formatMaxOccupancy({ maxAdults: 1, maxChildren: 2 })).toBe("1 adulto + 2 bambini");
-  });
-});
-
-describe("formatUpdateAge", () => {
-  it("counts minutes, then hours, then days", () => {
-    expect(formatUpdateAge(minutesBefore(0), NOW)).toBe("adesso");
-    expect(formatUpdateAge(minutesBefore(4), NOW)).toBe("4 min fa");
-    expect(formatUpdateAge(minutesBefore(59), NOW)).toBe("59 min fa");
-    expect(formatUpdateAge(minutesBefore(60), NOW)).toBe("1 ora fa");
-    expect(formatUpdateAge(minutesBefore(3 * 60 + 40), NOW)).toBe("3 ore fa");
-    expect(formatUpdateAge(minutesBefore(24 * 60), NOW)).toBe("ieri");
-    expect(formatUpdateAge(minutesBefore(3 * 24 * 60), NOW)).toBe("3 giorni fa");
-  });
-
-  it("reads a time in the future as 'adesso' and an unparsable one as nothing", () => {
-    expect(formatUpdateAge(minutesBefore(-5), NOW)).toBe("adesso");
-    expect(formatUpdateAge("ieri sera", NOW)).toBe("");
   });
 });

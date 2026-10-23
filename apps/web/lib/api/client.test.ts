@@ -153,4 +153,16 @@ describe("apiRequest", () => {
       message: "Failed to fetch",
     });
   });
+
+  it("sends a file as the RAW body with an octet-stream type, and never JSON-encodes it", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ ok: true }));
+    const file = new File(["a,b"], "x.csv");
+
+    await apiRequest("/api/v1/upload", { method: "POST", file }, fetchMock);
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(init.body).toBe(file);
+    expect(init.headers).toEqual({ Accept: "application/json", "Content-Type": "application/octet-stream" });
+  });
 });

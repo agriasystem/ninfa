@@ -9,7 +9,8 @@
  *
  * Today the only producer is `getStructureOverview` (`lib/structure/overview.ts`). It fills what the session
  * really knows (the name and the timezone) and leaves everything else not configured: no profile fact, no room
- * type, no parameter, no connected source. When a Struttura endpoint exists, replacing that one function is the
+ * type, no parameter. (The data sources of "Fonti dati" are NOT part of this object: they come from their own
+ * backend API, `lib/api/data-sources.ts`.) When a Struttura endpoint exists, replacing that one function is the
  * whole job - no component reads anything but this shape. The complete example dataset
  * (`demoStructureOverview`, `lib/structure/demo-structure.ts`) is an explicit fixture for development and tests;
  * the real route never uses it.
@@ -66,38 +67,9 @@ export interface OperatingParameters {
   maxGuests: number | null;
 }
 
-export type DataSourceCategory = "PMS" | "CHANNEL_MANAGER" | "OTA" | "ACCOUNTING" | "STAFF";
-
-/** The order the page lists the categories in. */
-export const DATA_SOURCE_CATEGORIES: readonly DataSourceCategory[] = [
-  "PMS",
-  "CHANNEL_MANAGER",
-  "OTA",
-  "ACCOUNTING",
-  "STAFF",
-];
-
-/** The system's own name exists ONLY on a connection that is real: a source that is not connected names no
- * system (the type forbids a provider there), so a card can never show a vendor as if it were wired. */
-export type DataSourceConnection =
-  | {
-      status: "CONNECTED";
-      /** The system's own name, as the vendor writes it. */
-      provider: string;
-      /** ISO 8601 instant of the last update NINFA received. */
-      lastUpdateAt: string;
-    }
-  | { status: "NOT_CONNECTED" };
-
-export interface DataSource {
-  category: DataSourceCategory;
-  connection: DataSourceConnection;
-}
-
 export interface StructureOverview {
   profile: StructureProfile;
   /** Empty = the inventory is not configured. */
   rooms: RoomType[];
   parameters: OperatingParameters;
-  sources: DataSource[];
 }

@@ -1,15 +1,16 @@
 import type { ComponentType, ReactNode, SVGProps } from "react";
 
-import type { DataSourceCategory } from "@/lib/structure/types";
+import Link from "next/link";
 
 import { MoreIcon } from "./icons";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 /**
- * What the buttons of the Struttura page do. NONE of them is wired yet: the structure has no write path
- * (no form, no modal, no endpoint), so every callback is optional and the buttons are drawn, real and
- * focusable, ready for the day they get one. No callback here ever fabricates a workflow.
+ * What the buttons of the Struttura page do. The profile, the room inventory and the parameters are NOT
+ * wired yet (the structure has no write path for them), so those callbacks are optional and the buttons are
+ * drawn, real and focusable, ready for the day they get one. "Fonti dati" is fully wired and needs none: it
+ * opens its own dialogs (see `struttura-sources.tsx`). No callback here ever fabricates a workflow.
  */
 export interface StrutturaActions {
   onEditStructure?: () => void;
@@ -17,10 +18,7 @@ export interface StrutturaActions {
   /** "Configura inventario": the empty state's way to set the room types up for the first time. */
   onConfigureInventory?: () => void;
   onEditParameters?: () => void;
-  /** "Collega una nuova fonte" (no category) or "Collega fonte" on a source that is not connected. */
-  onConnectSource?: (category?: DataSourceCategory) => void;
   onRoomMenu?: (roomId: string) => void;
-  onSourceMenu?: (category: DataSourceCategory) => void;
 }
 
 export interface StrutturaButtonProps {
@@ -31,20 +29,52 @@ export interface StrutturaButtonProps {
   onClick?: () => void;
   /** Overrides the accessible name when the visible text alone is ambiguous (two "Collega fonte"). */
   ariaLabel?: string;
+  disabled?: boolean;
   children: ReactNode;
 }
 
-export function StrutturaButton({ variant, Icon, onClick, ariaLabel, children }: StrutturaButtonProps) {
+export function StrutturaButton({
+  variant,
+  Icon,
+  onClick,
+  ariaLabel,
+  disabled,
+  children,
+}: StrutturaButtonProps) {
   return (
     <button
       type="button"
       className={`struttura-button struttura-button--${variant}`}
       aria-label={ariaLabel}
+      disabled={disabled}
       onClick={onClick}
     >
       {Icon ? <Icon className="struttura-button__icon" /> : null}
       {children}
     </button>
+  );
+}
+
+/** A link that looks exactly like a `StrutturaButton`: "Visualizza canali" goes to a page, it opens nothing. */
+export function StrutturaLinkButton({
+  variant,
+  href,
+  ariaLabel,
+  children,
+}: {
+  variant: StrutturaButtonProps["variant"];
+  href: string;
+  ariaLabel?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      className={`struttura-button struttura-button--${variant}`}
+      href={href}
+      aria-label={ariaLabel}
+    >
+      {children}
+    </Link>
   );
 }
 

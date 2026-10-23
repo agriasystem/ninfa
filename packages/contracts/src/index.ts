@@ -593,3 +593,97 @@ export interface DataOverviewResponse {
   decisions: DataDecisionRef[];
   overview_version: string;
 }
+
+// --- Data-source API V1 (Struttura > Fonti dati, `app/api/v1/sources`) ---------------------------------
+
+/** The five cards of "Fonti dati". A card is a PRESENTATION of a kind of data, not a connection of its own:
+ * Channel Manager and OTA are never linked separately (they are read from the bookings). */
+export type SourceCardKey = "PMS" | "CHANNEL_MANAGER" | "OTA" | "ACCOUNTING" | "STAFF";
+
+/** The kind of data a file source carries. */
+export type DataSourceDomain = "BOOKINGS" | "COSTS" | "LABOR";
+
+export type SourceCardState =
+  | "NOT_CONFIGURED"
+  /** A file source exists: data arrive when someone uploads a file. */
+  | "CONFIGURED_FILE"
+  /** A real automatic integration. The backend never produces it today: no integration exists. */
+  | "CONNECTED"
+  /** Received through another configured source (the OTA channels come with the bookings). */
+  | "DERIVED";
+
+export type SourceMethod = "CSV" | "XML";
+
+export interface DataSourceCard {
+  card: SourceCardKey;
+  state: SourceCardState;
+  domain: DataSourceDomain | null;
+  /** Only when exactly one active source of the domain exists. */
+  data_source_id: string | null;
+  method: SourceMethod | null;
+  /** When the latest SUCCEEDED import of this exact source finished (UTC). `null` = never imported. */
+  last_update_at: string | null;
+  /** More than one active source of the domain: NINFA does not pick one. */
+  several_sources: boolean;
+  /** `PMS` and `CHANNEL_MANAGER` appear only once an automatic integration exists. */
+  derived_from: "BOOKINGS_FILE" | "PMS" | "CHANNEL_MANAGER" | null;
+  /** The automatic integration's own name; always `null` while none exists. */
+  provider: string | null;
+  /** Real channel names read from the imported bookings (OTA card only). */
+  channels: string[];
+}
+
+export interface DataSourceCapability {
+  domain: DataSourceDomain;
+  methods: SourceMethod[];
+}
+
+export interface DataSourcesResponse {
+  property_id: string;
+  cards: DataSourceCard[];
+  /** How each kind of data can REALLY be provided today; nothing else is ever offered. */
+  capabilities: DataSourceCapability[];
+  /** Real automatic integrations. Empty today, by design. */
+  automatic_integrations: string[];
+}
+
+/** WHY a file cannot be (or was not) imported - one stable word the page turns into a sentence. */
+export type ImportProblem =
+  | "UNSUPPORTED_FILE"
+  | "UNREADABLE_FILE"
+  | "EMPTY_FILE"
+  | "NO_ROWS"
+  | "FILE_TOO_LARGE"
+  | "MISSING_COLUMNS"
+  | "DUPLICATE_COLUMNS"
+  | "INVALID_ROWS"
+  | "UNSUPPORTED_FORMAT"
+  | "SAME_DAY_CONFLICT"
+  | "GENERIC";
+
+export interface ImportPreviewResponse {
+  method: SourceMethod;
+  can_import: boolean;
+  problem: ImportProblem | null;
+  /** Data rows of a CSV, invoices of an XML. */
+  rows_total: number;
+  recognized_columns: string[];
+  /** Each entry is a group of alternatives, one of which the file must carry. */
+  missing_columns: string[][];
+  unrecognized_columns: string[];
+  sample_columns: string[];
+  sample_rows: string[][];
+  documents_with_issues: number;
+  already_imported: boolean;
+}
+
+export interface ImportResultResponse {
+  succeeded: boolean;
+  problem: ImportProblem | null;
+  rows_total: number;
+  rows_invalid: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  already_imported: boolean;
+}

@@ -22,7 +22,7 @@ Every command exits 1 (after printing the machine-readable outcome) when the imp
 succeed: a failed import is never silently "processed".
 
 UNRECOGNIZED-COLUMN WARNING (Gate 24B, bookings/labor only - invoices are FatturaPA XML and have
-no header/mapping concept at all): `_identity_column_mapping` already silently drops any header
+no header/mapping concept at all): `identity_column_mapping` already silently drops any header
 that fails to normalize-match a canonical field name, whether that header is a genuinely
 irrelevant extra column or a typo of an optional one - the two are indistinguishable (no fuzzy/
 edit-distance matching exists anywhere in this codebase, and none is added here). Before every
@@ -33,8 +33,6 @@ never changes the exit code (0 on success, exactly as before) and never weakens
 """
 
 import argparse
-import csv
-import io
 from datetime import date
 from enum import StrEnum
 from pathlib import Path
@@ -44,67 +42,24 @@ from sqlalchemy.orm import Session
 
 from app.cli._support import resolve_tenant_and_property, run_cli
 from app.db.session import get_sessionmaker
-from app.modules.bookings.mapping import CanonicalField, normalize_header
+from app.modules.bookings.mapping import CanonicalField
 from app.modules.bookings.service import BookingImportService
+from app.modules.ingestion.canonical_csv import (
+    booking_format_options,
+    identity_column_mapping,
+    labor_format_options,
+    read_headers,
+    unrecognized_columns,
+)
 from app.modules.invoices.service import InvoiceImportService
 from app.modules.labor.mapping import LaborField
 from app.modules.labor.service import LaborImportService
-
-_BOOKING_DATE_FIELDS = (
-    CanonicalField.BOOKED_AT,
-    CanonicalField.CHECK_IN,
-    CanonicalField.CHECK_OUT,
-    CanonicalField.CANCELLED_AT,
-)
-
-
-def _identity_column_mapping(
-    headers: list[str], fields: type[StrEnum]
-) -> dict[str, dict[str, str]]:
-    """Map every canonical field whose exact name is present as a header, verbatim, to itself -
-    the one pilot convention this CLI supports (see the module docstring). Never a fuzzy or
-    suggested mapping."""
-    present = {normalize_header(h) for h in headers}
-    return {
-        field.value: {"column": field.value}
-        for field in fields
-        if normalize_header(field.value) in present
-    }
-
-
-def _read_headers(content: bytes) -> list[str]:
-    """The header row only, exactly as the reader will see it (UTF-8, comma-delimited: the one
-    pilot CSV convention - see the module docstring)."""
-    text = content.decode("utf-8-sig")
-    reader = csv.reader(io.StringIO(text))
-    return next(reader, [])
-
-
-def _unrecognized_columns(headers: list[str], fields: type[StrEnum]) -> list[str]:
-    """Gate 24B: every header that does NOT normalize-match any of `fields`' canonical names -
-    the exact complement of what `_identity_column_mapping` above maps. Deliberately uses the
-    SAME `normalize_header` as every other header comparison in this CLI (no fuzzy/edit-distance
-    logic - see the module docstring): a typo of an optional field and a genuinely irrelevant
-    extra column are indistinguishable here, on purpose. Original header spelling is kept (never
-    the normalized form) since that is what the operator actually wrote and will recognise;
-    order is first-occurrence-in-the-file and duplicates are dropped, so the output is
-    deterministic and stable for logging/automation."""
-    known = {normalize_header(field.value) for field in fields}
-    seen: set[str] = set()
-    unrecognized: list[str] = []
-    for header in headers:
-        key = normalize_header(header)
-        if not key or key in known or key in seen:
-            continue
-        seen.add(key)
-        unrecognized.append(header)
-    return unrecognized
 
 
 def _print_unrecognized_columns_warning(headers: list[str], fields: type[StrEnum]) -> None:
     """Prints nothing when every header is recognized. Never calls any column "invalid" or a
     "typo" - it states a fact (these headers were not recognized), never a diagnosis of why."""
-    unrecognized = _unrecognized_columns(headers, fields)
+    unrecognized = unrecognized_columns(headers, fields)
     if unrecognized:
         print(f"WARNING unrecognized_columns={','.join(unrecognized)}")
 
@@ -122,18 +77,13 @@ def run_import_bookings(
     tenant, prop = resolve_tenant_and_property(session, workspace_slug, property_slug)
     content = file.read_bytes()
     service = BookingImportService(session, tenant)
-    headers = _read_headers(content)
+    headers = read_headers(content)
     _print_unrecognized_columns_warning(headers, CanonicalField)
     service.save_mapping(
         data_source_id,
         headers=headers,
-        column_mapping=_identity_column_mapping(headers, CanonicalField),
-        format_options={
-            "delimiter": ",",
-            "encoding": "utf-8",
-            "date_formats": {field.value: "%Y-%m-%d" for field in _BOOKING_DATE_FIELDS},
-            "decimal_separator": ".",
-        },
+        column_mapping=identity_column_mapping(headers, CanonicalField),
+        format_options=booking_format_options(),
         property_id=prop.id,
     )
     result = service.import_file(
@@ -161,18 +111,13 @@ def run_import_labor(
     tenant, prop = resolve_tenant_and_property(session, workspace_slug, property_slug)
     content = file.read_bytes()
     service = LaborImportService(session, tenant)
-    headers = _read_headers(content)
+    headers = read_headers(content)
     _print_unrecognized_columns_warning(headers, LaborField)
     service.save_mapping(
         data_source_id,
         headers=headers,
-        column_mapping=_identity_column_mapping(headers, LaborField),
-        format_options={
-            "delimiter": ",",
-            "encoding": "utf-8",
-            "date_formats": {LaborField.WORK_DATE.value: "%Y-%m-%d"},
-            "decimal_separator": ".",
-        },
+        column_mapping=identity_column_mapping(headers, LaborField),
+        format_options=labor_format_options(),
         property_id=prop.id,
     )
     result = service.import_file(

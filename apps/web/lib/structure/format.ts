@@ -49,19 +49,3 @@ export function formatMaxOccupancy(room: Pick<RoomType, "maxAdults" | "maxChildr
   const adults = strutturaCopy.rooms.adults(room.maxAdults);
   return room.maxChildren > 0 ? `${adults} + ${strutturaCopy.rooms.children(room.maxChildren)}` : adults;
 }
-
-/** How long ago the last update was, in the words the page uses ("4 min fa"). A time in the future (clock
- * skew between NINFA and the browser) reads "adesso" rather than a negative age; an unparsable value reads
- * as nothing. */
-export function formatUpdateAge(lastUpdateAt: string, now: Date): string {
-  const instant = Date.parse(lastUpdateAt);
-  if (Number.isNaN(instant)) return "";
-  const minutes = Math.max(0, Math.floor((now.getTime() - instant) / 60_000));
-  const { age } = strutturaCopy;
-  if (minutes < 1) return age.now;
-  if (minutes < 60) return age.minutes(minutes);
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return age.hours(hours);
-  const days = Math.floor(hours / 24);
-  return days === 1 ? age.yesterday : age.days(days);
-}

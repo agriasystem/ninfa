@@ -41,13 +41,14 @@ describe("Struttura sources", () => {
     expect(sources.map((source) => source.file)).toContain(DEMO_FILE);
   });
 
-  it("imports no Mia, Ask, model or API code: the page is deterministic and calls nothing", () => {
+  it("imports no Mia, Ask or model code, and reaches the backend ONLY through the data-source API", () => {
     for (const { file, text } of sources) {
       const imports = text.split("\n").filter((line) => /^\s*(import|export)\b.*\bfrom\b/u.test(line));
       for (const line of imports) {
-        expect(line, `${file}: ${line}`).not.toMatch(
-          /ask-ninfa|\/mia|anthropic|openai|gateway|language-model|lib\/api\//iu,
-        );
+        expect(line, `${file}: ${line}`).not.toMatch(/ask-ninfa|\/mia|anthropic|openai|gateway|language-model/iu);
+        // the one API of this page is Fonti dati's own: no other client (decisions, data overview, auth...)
+        const api = /from "@\/lib\/api\/([^"]+)"/u.exec(line)?.[1];
+        if (api !== undefined) expect(api, `${file}: ${line}`).toBe("data-sources");
       }
       expect(text, file).not.toMatch(/\bfetch\(|askMiaHome|askNinfa|postMiaMessage|Chiedi a Mia/u);
     }
@@ -76,7 +77,6 @@ describe("Struttura sources", () => {
   it("never lets the real route show demo data: no source file imports the demo dataset", () => {
     // the real data source reports everything it has no real data for as not configured...
     const overview = read("lib/structure/overview.ts");
-    expect(overview).toMatch(/sources: notConfiguredSources\(\)/u);
     expect(overview).toMatch(/rooms: \[\]/u);
     expect(overview).toMatch(/parameters: \{ opening: null, peakSeason: null, maxGuests: null \}/u);
     // ...the route passes no other source of data...
@@ -90,10 +90,10 @@ describe("Struttura sources", () => {
     }
   });
 
-  it("keeps the provider inside the connection, so a source that is not connected cannot name a vendor", () => {
+  it("keeps the data sources out of the structure model: they come from their own backend API", () => {
     const types = read("lib/structure/types.ts");
-    expect(types).toMatch(/status: "CONNECTED";[\s\S]*?provider: string;[\s\S]*?\| \{ status: "NOT_CONNECTED" \}/u);
-    expect(types).not.toMatch(/provider: string \| null/u);
+    expect(types).not.toMatch(/DataSource|provider|CONNECTED/u);
+    expect(read("lib/structure/overview.ts")).not.toMatch(/\bsources\s*:/u);
   });
 
   it("lets every profile fact and every parameter be 'not configured' (null), but never the name or the timezone", () => {
@@ -168,12 +168,14 @@ describe("responsive-critical CSS (jsdom cannot lay out, so the rules are pinned
   });
 
   it("lays the five source cards 5 across, then 3 + 2 below 1440px, 2 columns on a tablet, 1 on a phone", () => {
+    // the loading skeleton shares the cards' grid at every width, so nothing jumps when the cards arrive
+    const grid = String.raw`\.struttura-sources,\s*\.struttura-sources-skeleton \{\s*grid-template-columns:`;
     expect(struttura).toMatch(/\.struttura-sources \{[^}]*repeat\(5, minmax\(0, 1fr\)\)/u);
     expect(struttura).toMatch(
-      /@media \(max-width: 1439px\) \{\s*\.struttura-sources \{\s*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/u,
+      new RegExp(String.raw`@media \(max-width: 1439px\) \{\s*${grid} repeat\(3, minmax\(0, 1fr\)\)`, "u"),
     );
     expect(struttura).toMatch(
-      /@media \(max-width: 767px\) \{\s*\.struttura-sources \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/u,
+      new RegExp(String.raw`@media \(max-width: 767px\) \{\s*${grid} repeat\(2, minmax\(0, 1fr\)\)`, "u"),
     );
   });
 
@@ -196,7 +198,7 @@ describe("responsive-critical CSS (jsdom cannot lay out, so the rules are pinned
       /@media \(max-width: 767px\) \{[\s\S]*?\.struttura-profile \{\s*grid-template-columns: minmax\(0, 1fr\);/u,
     );
     expect(struttura).toMatch(
-      /@media \(max-width: 479px\) \{[\s\S]*?\.struttura-sources \{\s*grid-template-columns: minmax\(0, 1fr\);/u,
+      /@media \(max-width: 479px\) \{[\s\S]*?\.struttura-sources,\s*\.struttura-sources-skeleton \{\s*grid-template-columns: minmax\(0, 1fr\);/u,
     );
   });
 

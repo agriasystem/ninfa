@@ -3,26 +3,20 @@ import type { StructureOverview } from "./types";
 /**
  * DEMO DATA for the Struttura page - an explicit, COMPLETE fixture for development and tests. NINFA has no
  * endpoint for the structure yet; the values are the ones of the approved visual reference, so the screen can
- * be reviewed against it: Villa Serenità, Hotel, 4 stelle, Bellagio (CO), 32 camere in four room types, the
- * three operating parameters and three connected systems.
+ * be reviewed against it: Villa Serenità, Hotel, 4 stelle, Bellagio (CO), 32 camere in four room types and the
+ * three operating parameters. (The data sources are not part of it: they come from their own API.)
  *
  * They are NOT facts about any real property, and the real route NEVER uses them: `getStructureOverview`
  * (lib/structure/overview.ts) reports everything it has no real data for as not configured. This file is
  * imported only by tests and by whoever wants to look at the full page - by passing
- * `getOverview={(_property, now) => demoStructureOverview(now)}` to `StrutturaScreen`, which the route itself
- * never does. A demo vendor shown as "Collegato", or a demo room type shown as the inventory, on a real
- * property could be taken for operating data.
+ * `getOverview={() => demoStructureOverview()}` to `StrutturaScreen`, which the route itself never does. A
+ * demo room type shown as the inventory on a real property could be taken for operating data.
  */
 
 /** The placeholder photo, served from `public/placeholders` (a crop of the approved reference). */
 export const DEMO_STRUCTURE_PHOTO = "/placeholders/struttura-placeholder.jpg";
 
-const MINUTE = 60_000;
-
-/** `now` anchors the connected systems' "last update" instants, so the demo always reads a few minutes old. */
-export function demoStructureOverview(now: Date): StructureOverview {
-  const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * MINUTE).toISOString();
-
+export function demoStructureOverview(): StructureOverview {
   return {
     profile: {
       name: "Villa Serenità",
@@ -47,12 +41,5 @@ export function demoStructureOverview(now: Date): StructureOverview {
       // the theoretical capacity of the room types above (8x2 + 12x3 + 8x3 + 4x4); a test keeps them equal
       maxGuests: 92,
     },
-    sources: [
-      { category: "PMS", connection: { status: "CONNECTED", provider: "Mews", lastUpdateAt: minutesAgo(4) } },
-      { category: "CHANNEL_MANAGER", connection: { status: "CONNECTED", provider: "SiteMinder", lastUpdateAt: minutesAgo(6) } },
-      { category: "OTA", connection: { status: "CONNECTED", provider: "Booking.com", lastUpdateAt: minutesAgo(7) } },
-      { category: "ACCOUNTING", connection: { status: "NOT_CONNECTED" } },
-      { category: "STAFF", connection: { status: "NOT_CONNECTED" } },
-    ],
   };
 }

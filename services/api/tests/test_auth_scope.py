@@ -4,6 +4,8 @@ Gate 18 adds exactly one further path, `.../decisions/{decision_id}/ask`, and Ho
 Home, ADR 0028) exactly one more, `.../properties/{property_id}/ask` - the only two POSTs among the
 `/api/v1/properties/` routes (see `test_decision_api_scope.py` for the route/method assertions).
 Dati UI V1 (ADR 0031) adds exactly one more, a GET: `.../properties/{property_id}/data/overview`.
+Fonti dati V1 (docs/architecture/data-sources-v1.md) adds the `.../data-sources` family under
+`/properties/{property_id}`, whose exact methods are pinned below and in `test_data_sources_api.py`.
 """
 
 from fastapi.testclient import TestClient
@@ -11,6 +13,15 @@ from fastapi.testclient import TestClient
 _ASK_PATH = "/api/v1/properties/{property_id}/decisions/{decision_id}/ask"
 _HOME_ASK_PATH = "/api/v1/properties/{property_id}/ask"
 _DATA_OVERVIEW_PATH = "/api/v1/properties/{property_id}/data/overview"
+_SOURCES = "/api/v1/properties/{property_id}/data-sources"
+# The data-source family, with the EXACT methods each path may answer.
+_SOURCES_METHODS = {
+    _SOURCES: {"get"},  # NO POST: a source is never created on its own, only by a successful import
+    f"{_SOURCES}/{{data_source_id}}": {"delete"},
+    f"{_SOURCES}/import-preview": {"post"},
+    f"{_SOURCES}/imports": {"post"},
+    f"{_SOURCES}/templates/{{domain}}": {"get"},
+}
 
 _EXPECTED_PATHS = {
     "/api/v1/health",
@@ -24,6 +35,7 @@ _EXPECTED_PATHS = {
     _ASK_PATH,
     _HOME_ASK_PATH,
     _DATA_OVERVIEW_PATH,
+    *_SOURCES_METHODS,
 }
 
 
@@ -52,7 +64,9 @@ def test_decision_routes_remain_get_only_except_the_two_ask_posts(client: TestCl
     for path, methods in schema["paths"].items():
         if not path.startswith("/api/v1/properties/"):
             continue
-        if path in (_ASK_PATH, _HOME_ASK_PATH):
+        if path in _SOURCES_METHODS:
+            assert set(methods) == _SOURCES_METHODS[path], path
+        elif path in (_ASK_PATH, _HOME_ASK_PATH):
             assert set(methods) == {"post"}, path
         else:
             assert set(methods) == {"get"}, path
