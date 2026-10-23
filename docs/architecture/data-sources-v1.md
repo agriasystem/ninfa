@@ -39,9 +39,40 @@ sources of a kind refuses the import (409 `SEVERAL_SOURCES`) instead of picking 
 frontend independently refuses to show a file source as configured without a real last update. The "Configurato · Mai
 importato" state therefore **cannot appear**.
 
-Known limit (no migration, so no unique constraint): two *simultaneous first* imports of the same kind could each create a
-source; the next import would then be refused with `SEVERAL_SOURCES` and an operator would have to switch one off. It is
-the same limit the CLI always had and is acceptable for the pilot.
+### Imports of the same data run one at a time (concurrency)
+
+"Is there a source of this kind?" followed by "no, create one" is a check-then-act. Two *first* imports arriving together
+(a double click, two tabs, two API workers) would both read "no source", both create one, and the property would answer
+`SEVERAL_SOURCES` from then on. A second hazard sat behind the first: one import that fails switches off the source it
+switched on, while another import that had found that source active was still filling it.
+
+Both are removed by **serialising the whole import** per `(workspace, property, kind of data)`, with no schema change:
+
+- `app.db.locks.hold_source_import_lock` takes a PostgreSQL **advisory transaction lock**
+  (`pg_advisory_xact_lock(hashtextextended('source-import:<workspace>:<property>:<domain>', 0))`) on a **connection and
+  transaction of its own** and keeps it until the import has finished — source created or reactivated, file imported,
+  source switched off again if it failed. A lock on the request's own session would not do: the import services commit
+  several times and a transaction-scoped lock is released by the first commit.
+- It is PostgreSQL's lock, so it holds across every API worker and process (nothing is in-process, nothing is read from
+  the page). It is still transaction-scoped: it dies with its transaction, or with its connection if the process dies —
+  no lock can be leaked.
+- The second import **waits** (`IMPORT_LOCK_WAIT_MS` = 30 s, enforced by `lock_timeout`, an import being seconds of
+  work), then sees exactly what the first left behind: the active source (it imports into it), or the removed one (it
+  reactivates it, history attached). After the wait it answers **409 `IMPORT_IN_PROGRESS`**, changes nothing and the page
+  tells the user to wait and retry.
+- Another **property**, another **kind of data** and another **workspace** use another key and never wait. The preview and
+  the overview take no lock. Lock order is fixed (`source-import` → per-data-source → supplier registry), so the three
+  can never deadlock.
+- The unique constraint that would make this a database guarantee (`UNIQUE (workspace_id, property_id, domain) WHERE
+  is_active`) needs a migration, and existing data could already violate it: it is **not** needed for correctness while
+  every writer of an API source goes through this service, and is left as a possible hardening. The only other code that
+  creates a source is the operator's `app.cli.pilot` provisioning command, run by hand once per pilot property; it does
+  not take the lock and is not the path of this page.
+
+Pinned with real commits and threads in `test_data_sources_real_commits.py` (two first imports → one source, both jobs on
+it; the same setup *without* the lock → two sources, as a control; failing + succeeding in either order; a later import
+reuses the source; other property / other kind not blocked; lock released after success, refusal and crash; bounded
+wait → `IMPORT_IN_PROGRESS`).
 
 ## Audit: what already existed
 

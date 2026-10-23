@@ -219,6 +219,7 @@ export const sourcesCopy = {
   } satisfies Partial<Record<ImportProblem, Record<SourceMethod, string>>>,
   errors: {
     sourceGone: "Questa fonte non è più disponibile. Aggiorna la pagina.",
+    importInProgress: "È già in corso un altro import di questi dati. Attendi qualche istante e riprova.",
     alreadyConfigured: "Hai già una fonte per questi dati.",
     tryAgain: "Riprova",
   },

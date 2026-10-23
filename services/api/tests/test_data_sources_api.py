@@ -16,10 +16,12 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
+import app.modules.data_sources.service as service_module
 from app.cli import imports as cli
+from app.db.locks import source_import_lock_key
 from app.modules.bookings.mapping import CanonicalField
 from app.modules.bookings.repository import BookingRepository
 from app.modules.data_sources.service import DataSourcesService, ImportOutcome
@@ -260,6 +262,34 @@ def test_an_import_is_refused_rather_than_guessing_between_several_active_source
     assert _source_count(db_session) == sources_before
     assert _job_count(db_session) == jobs_before
     assert BookingRepository(db_session, env.tenant).list_for_property(env.property.id) == []
+
+
+def test_an_import_that_waits_too_long_for_another_one_answers_409_and_changes_nothing(
+    api_client: TestClient,
+    db_session: Session,
+    db_engine: Engine,
+    env: SourcesEnv,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Another import of the same kind and property is still running: this one is told to retry
+    (a clear, specific code), not hung and not half-done. Concurrency itself is proven with real
+    commits in `test_data_sources_real_commits.py`."""
+    monkeypatch.setattr(service_module, "IMPORT_LOCK_WAIT_MS", 200)
+    key = source_import_lock_key(env.workspace.id, env.property.id, "BOOKINGS")
+
+    with db_engine.connect() as other, other.begin():  # "the other import", holding the lock
+        other.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(CAST(:k AS text), 0))"), {"k": key}
+        )
+        refused = raw(api_client, env.imports_url("BOOKINGS"), booking_bytes())
+        # the lock is per kind of data: staff files for the same property are not held up
+        staff = raw(api_client, env.imports_url("LABOR", snapshot=LABOR_DAY), labor_bytes())
+
+    assert_error(refused, status_code=409, code="IMPORT_IN_PROGRESS")
+    assert staff.status_code == 200
+    assert sources_of(db_session, env, DataSourceDomain.BOOKINGS) == []  # nothing was created
+    assert card(api_client, env, "PMS")["state"] == "NOT_CONFIGURED"
+    assert import_ok(api_client, env, "BOOKINGS")["rows_total"] == 2  # the retry goes through
 
 
 # --- a source exists only after a SUCCESSFUL import ----------------------------------------------

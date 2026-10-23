@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
+from app.db.locks import LockWaitTimeoutError, hold_source_import_lock
 from app.modules.bookings.mapping import CanonicalField
 from app.modules.bookings.models import ChannelType
 from app.modules.bookings.repository import BookingChannelRepository
@@ -29,6 +30,7 @@ from app.modules.data_sources.errors import (
     AmbiguousSourceError,
     DataSourceNotFoundError,
     FileTooLargeError,
+    ImportInProgressError,
     InvalidSnapshotDateError,
 )
 from app.modules.data_sources.files import (
@@ -69,6 +71,10 @@ from app.modules.labor.service import LaborImportService
 logger = logging.getLogger(__name__)
 
 _MAX_CHANNELS_SHOWN = 8
+
+# How long an import waits for another import of the same kind and property to finish. An import is
+# seconds of work (10 MB at most); past this wait the caller is told to retry instead of hanging.
+IMPORT_LOCK_WAIT_MS = 30_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,12 +239,48 @@ class DataSourcesService:
         confirms the import, and switched off again if the import does not succeed. A flow that is
         abandoned, or a file that fails, therefore never leaves a "configured" source behind (the
         failed attempt stays as a FAILED job, like every other operational record).
+
+        Imports of the same kind of data for the same property run ONE AT A TIME, from "is there a
+        source?" to "switch it off again": two first imports arriving together would otherwise both
+        find no source and create two, and one import failing could switch off a source another
+        one was still filling. The second waits (a bounded time, then `ImportInProgressError`) and
+        then sees what the first left behind. Other properties and other kinds of data never wait.
         """
         self._check_size(content)
         if domain == DataSourceDomain.LABOR and snapshot_local_date is None:
             # The day the file is dated as of is never guessed (the labor service insists) - and a
             # request that cannot be imported must not even switch a source on.
             raise InvalidSnapshotDateError()
+        try:
+            with hold_source_import_lock(
+                self._session,
+                self._tenant.workspace_id,
+                property_id,
+                domain.value,
+                wait_ms=IMPORT_LOCK_WAIT_MS,
+            ):
+                return self._import_into_source(
+                    property_id, domain, filename, content, snapshot_local_date
+                )
+        except LockWaitTimeoutError as error:
+            logger.warning(
+                "data source import not started: another import is running workspace_id=%s "
+                "property_id=%s domain=%s",
+                self._tenant.workspace_id,
+                property_id,
+                domain.value,
+            )
+            raise ImportInProgressError() from error
+
+    def _import_into_source(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        filename: str,
+        content: bytes,
+        snapshot_local_date: date | None,
+    ) -> ImportOutcome:
+        """The create / import / switch-off sequence. Always runs under the import lock."""
         source, switched_on = self._source_for_import(property_id, domain)
         source_id = source.id
         try:
@@ -273,6 +315,9 @@ class DataSourcesService:
         The active source when there is one (several active ones are refused: NINFA does not pick);
         otherwise the one that was removed before (so its history stays attached - a second, empty
         source would be read by the analysis instead of the imported data); otherwise a new one.
+
+        Only called under the import lock: the read of the existing sources and the write that
+        follows it are one step, no other import of this kind can slip in between.
         """
         existing = self._sources_of(property_id, domain, include_inactive=True)
         active = [source for source in existing if source.is_active]

@@ -23,7 +23,7 @@ export const METHOD_OF_DOMAIN: Record<DataSourceDomain, SourceMethod> = {
 const EXTENSION_OF_METHOD: Record<SourceMethod, string> = { CSV: ".csv", XML: ".xml" };
 
 /** A problem that is not about the file itself. */
-export type FlowProblem = ImportProblem | "SOURCE_GONE";
+export type FlowProblem = ImportProblem | "SOURCE_GONE" | "IMPORT_IN_PROGRESS";
 
 export type ImportFlowState =
   | { step: "choose"; wrongType: boolean }
@@ -56,6 +56,8 @@ export interface ImportFlow {
 /** The reason an API call failed, in the page's own terms. Technical text never leaves this function. */
 function problemOfFailure(result: Extract<ApiResult<unknown>, { ok: false }>): FlowProblem {
   if (result.code === "FILE_TOO_LARGE") return "FILE_TOO_LARGE";
+  // Another import of the same data is still running: nothing was changed, the user can try again.
+  if (result.code === "IMPORT_IN_PROGRESS") return "IMPORT_IN_PROGRESS";
   if (result.code === "DATA_SOURCE_NOT_FOUND" || result.code === "PROPERTY_NOT_FOUND") {
     return "SOURCE_GONE";
   }

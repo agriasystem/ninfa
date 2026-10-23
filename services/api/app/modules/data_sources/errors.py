@@ -29,6 +29,18 @@ class AmbiguousSourceError(AppError):
         )
 
 
+class ImportInProgressError(AppError):
+    """Another import of this kind of data, for this property, is still running and did not finish
+    within the wait. Nothing was changed: the caller can simply try again."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "IMPORT_IN_PROGRESS",
+            "Another import of this kind of data is already running for this property",
+            status_code=HTTPStatus.CONFLICT,
+        )
+
+
 class UnsupportedDomainError(AppError):
     def __init__(self) -> None:
         super().__init__(
@@ -61,6 +73,7 @@ __all__ = [
     "AmbiguousSourceError",
     "DataSourceNotFoundError",
     "FileTooLargeError",
+    "ImportInProgressError",
     "InvalidSnapshotDateError",
     "UnsupportedDomainError",
 ]

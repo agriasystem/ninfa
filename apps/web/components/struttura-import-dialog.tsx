@@ -19,6 +19,7 @@ const COPY = sourcesCopy.importFlow;
 /** The sentence for a problem, with what to do next where it helps. Never a technical word. */
 function problemText(problem: FlowProblem, method: SourceMethod): string {
   if (problem === "SOURCE_GONE") return sourcesCopy.errors.sourceGone;
+  if (problem === "IMPORT_IN_PROGRESS") return sourcesCopy.errors.importInProgress;
   const base = sourcesCopy.problems[problem];
   const hints: Partial<Record<FlowProblem, Record<SourceMethod, string>>> = sourcesCopy.problemHints;
   const hint = hints[problem]?.[method];

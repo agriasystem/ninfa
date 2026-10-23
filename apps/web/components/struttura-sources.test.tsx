@@ -510,6 +510,27 @@ describe("Fonti dati - from 'Importa file' to the result", () => {
     expect(within(dialog()).getByLabelText("Seleziona file")).not.toBeNull();
   });
 
+  it("an import that finds another import of the same data still running says to wait and try again", async () => {
+    const user = await openLaborImport();
+    previewImportMock.mockResolvedValue(ok(previewOf()));
+    importFileMock.mockResolvedValueOnce(failure("IMPORT_IN_PROGRESS", 409));
+    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
+    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
+
+    const alert = await within(dialog()).findByRole("alert");
+    expect(flat(alert)).toContain("È già in corso un altro import di questi dati. Attendi qualche istante e riprova.");
+    expect(flat(alert)).toContain("Non è stato importato nulla.");
+    expect(document.body.textContent).not.toMatch(/409|IMPORT_IN_PROGRESS|NINFA non è riuscita a leggere/u);
+    expect(getDataSourcesMock).toHaveBeenCalledTimes(1); // nothing changed: the cards are not re-read
+
+    // the user simply tries again, and this time it goes through
+    await user.click(within(dialog()).getByRole("button", { name: "Scegli un altro file" }));
+    importFileMock.mockResolvedValueOnce(ok(resultOf()));
+    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
+    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
+    expect(await within(dialog()).findByText("Importazione completata")).not.toBeNull();
+  });
+
   it("a same-day labor conflict says to upload the updated version tomorrow", async () => {
     const user = await openLaborImport();
     previewImportMock.mockResolvedValue(ok(previewOf()));
