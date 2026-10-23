@@ -136,6 +136,16 @@ export function TrendIcon(props: IconProps) {
   );
 }
 
+export function TargetIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="0.9" />
+    </Icon>
+  );
+}
+
 export function ArrowRightIcon(props: IconProps) {
   return (
     <Icon {...props}>
