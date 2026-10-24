@@ -1,0 +1,275 @@
+"""What a column MEANS: its name, read by words, checked against its values.
+
+V2 compared the whole header with a list of names, or by how alike the letters were. "Reparto o
+mansione" shares too few letters with "reparto" to match, although it plainly says it. Here a header
+is read as WORDS: a field has rules like "a word for hours AND a word for planned", so any
+header that carries them matches - "Tot. ore previste", "Ore programmate", "Programmed hours".
+
+A match by name is then CHECKED against the values of the column: a header that says "Data" over a
+column of names is not a date. How sure NINFA is follows from both:
+
+    HIGH    a known name or the words of a rule, and values that fit, enough of them to prove it
+    MEDIUM  a name that is only close, values that only partly fit, or too few values to be sure
+    LOW     a guess: the person is asked
+
+Nothing here writes anything or decides a mapping: it proposes, deterministically, and says why.
+"""
+
+import difflib
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
+from enum import StrEnum
+
+from app.modules.bookings.mapping import normalize_header
+from app.modules.document_understanding.pii import PiiKind
+from app.modules.document_understanding.stats import MIN_EVIDENCE, ColumnStats
+from app.modules.document_understanding.text import stems, tokens
+from app.modules.ingestion.models import DataSourceDomain
+from app.modules.ingestion.suggestions import LOW_THRESHOLD, MEDIUM_THRESHOLD
+
+FitFunction = Callable[[ColumnStats], float]
+
+
+class Level(StrEnum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class NameMatch(StrEnum):
+    EXACT = "EXACT"  # the header is a name NINFA knows for the field
+    TOKEN = "TOKEN"  # the header carries the words of a rule
+    FUZZY = "FUZZY"  # the header looks like a known name
+    VALUES = "VALUES"  # no name at all: only what the values look like
+
+
+@dataclass(frozen=True, slots=True)
+class TokenRule:
+    """A header matches when it has a word from EACH group in `all_of` and none from `none_of`."""
+
+    all_of: tuple[frozenset[str], ...]
+    none_of: frozenset[str] = frozenset()
+    weight: float = 0.9
+
+
+def rule(*all_of: str, none: str = "", weight: float = 0.9) -> TokenRule:
+    """`rule("ore hours", "previste planned")` - each argument is a list of alternative words."""
+    return TokenRule(tuple(stems(group) for group in all_of), stems(none), weight)
+
+
+def rule_score(header_words: frozenset[str], rules: Sequence[TokenRule]) -> float:
+    """The best weight among the rules the header satisfies, a little less for each word of the
+    header the rule does not explain (a long header with an incidental match is not as good)."""
+    best = 0.0
+    for candidate in rules:
+        if candidate.none_of & header_words:
+            continue
+        if all(group & header_words for group in candidate.all_of):
+            explained = frozenset().union(*candidate.all_of)
+            extra = len(header_words - explained)
+            best = max(best, candidate.weight - min(0.06, 0.02 * extra))
+    return best
+
+
+@dataclass(frozen=True, slots=True)
+class FieldSem:
+    key: str
+    # Names that mean this field exactly (compared folded, like V2's aliases).
+    exact: tuple[str, ...]
+    rules: tuple[TokenRule, ...] = ()
+    # How well the VALUES of a column fit this field, 0..1 (None: the values say nothing).
+    fit: FitFunction | None = None
+    # A column may be proposed from its values alone, when it is the only one that fits.
+    value_only: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class AmbiguousColumn:
+    """A column clearly "hours" or "cost" that does not say WHICH one: a question, not a guess."""
+
+    key: str  # "HOURS", "COST", "AMOUNT"
+    words: frozenset[str]  # a header with one of these...
+    veto: frozenset[str]  # ...and none of these is such a column
+    candidates: tuple[str, ...]  # the fields it may be (the person picks one)
+    fit: FitFunction | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DomainSem:
+    domain: DataSourceDomain
+    fields: Mapping[str, FieldSem]
+    order: tuple[str, ...]
+    # Stems that mark a title, a sheet name or a header as belonging to this kind of document.
+    title_words: frozenset[str]
+    # What the personal data of this kind of file is called when it is left out.
+    locked: Mapping[PiiKind, str] = field(default_factory=dict)
+    ambiguous: tuple[AmbiguousColumn, ...] = ()
+    # Rules for columns that must NEVER be offered as a field (an hourly rate): reason by rule.
+    never: tuple[tuple[str, TokenRule], ...] = ()
+    # Two columns that confirm each other: ((field, folded header), (field, folded header)).
+    # "Dal" alone is only a maybe; "Dal" next to "Al", both dates, is an arrival and a departure.
+    pairs: tuple[tuple[tuple[str, str], tuple[str, str]], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class Candidate:
+    field: str
+    name: NameMatch
+    score: float
+
+
+def name_candidates(sem: DomainSem, header: str) -> list[Candidate]:
+    """Every field the NAME of this header could mean, best first."""
+    key = normalize_header(header)
+    words = tokens(header)
+    found: list[Candidate] = []
+    for spec in sem.fields.values():
+        if key in {normalize_header(name) for name in spec.exact}:
+            found.append(Candidate(spec.key, NameMatch.EXACT, 1.0))
+            continue
+        score = rule_score(words, spec.rules)
+        if score:
+            found.append(Candidate(spec.key, NameMatch.TOKEN, score))
+            continue
+        names = [normalize_header(name) for name in spec.exact]
+        best = max(
+            (difflib.SequenceMatcher(None, key, name).ratio() for name in names), default=0.0
+        )
+        if best >= LOW_THRESHOLD and key:
+            found.append(Candidate(spec.key, NameMatch.FUZZY, best))
+    return sorted(
+        found, key=lambda c: (-c.score, sem.order.index(c.field) if c.field in sem.order else 99)
+    )
+
+
+def level_of(name: NameMatch, score: float, fit: float | None, stats: ColumnStats) -> Level:
+    """How sure NINFA is that this name AND these values mean the field."""
+    values_fit = 0.75 if fit is None else fit  # a field the values say nothing about
+    if name in {NameMatch.EXACT, NameMatch.TOKEN}:
+        if name == NameMatch.TOKEN and score < 0.8:
+            return Level.MEDIUM if values_fit >= 0.5 else Level.LOW  # a loose rule: to be checked
+        if fit is not None and fit >= 0.85 and stats.enough():
+            return Level.HIGH
+        if fit is None and stats.enough():
+            return Level.HIGH if name == NameMatch.EXACT or score >= 0.88 else Level.MEDIUM
+        if values_fit >= 0.5:
+            return Level.MEDIUM
+        return Level.LOW
+    if name == NameMatch.FUZZY:
+        if score >= MEDIUM_THRESHOLD and values_fit >= 0.85 and stats.enough():
+            return Level.MEDIUM
+        return Level.LOW
+    # values alone
+    return Level.MEDIUM if values_fit >= 0.9 and stats.enough() else Level.LOW
+
+
+# --- how values fit -------------------------------------------------------------------------------
+
+
+def fit_date(stats: ColumnStats) -> float:
+    return stats.date_fraction
+
+
+def fit_hours(stats: ColumnStats) -> float:
+    if not stats.n or stats.maximum is None or stats.minimum is None:
+        return 0.0
+    if stats.minimum < 0 or stats.maximum > 168:
+        return 0.2 * stats.numeric_fraction
+    return stats.numeric_fraction
+
+
+def fit_money(stats: ColumnStats, *, allow_negative: bool = False) -> float:
+    if not stats.n:
+        return 0.0
+    if stats.negatives and not allow_negative:
+        return 0.3 * stats.numeric_fraction
+    return stats.numeric_fraction
+
+
+def fit_small_integer(maximum: int) -> FitFunction:
+    def fit(stats: ColumnStats) -> float:
+        if not stats.n or stats.maximum is None or stats.minimum is None:
+            return 0.0
+        if stats.minimum < 0 or stats.maximum > maximum or stats.integral < stats.numeric:
+            return 0.0
+        return stats.numeric_fraction
+
+    return fit
+
+
+def fit_percentage(stats: ColumnStats) -> float:
+    if not stats.n or stats.maximum is None or stats.minimum is None:
+        return 0.0
+    return stats.numeric_fraction if stats.minimum >= 0 and stats.maximum <= 100 else 0.0
+
+
+def fit_label(stats: ColumnStats) -> float:
+    """Text that repeats: a department, a channel, a status, a rate plan."""
+    if not stats.n:
+        return 0.0
+    if stats.text_fraction < 0.8:
+        return 0.0
+    return 1.0 if (stats.distinct_ratio <= 0.7 or stats.distinct <= 25) else 0.6
+
+
+def fit_text(stats: ColumnStats) -> float:
+    return stats.text_fraction if stats.n else 0.0
+
+
+def fit_identifier(stats: ColumnStats) -> float:
+    """Mostly different from row to row: a booking code, a document number."""
+    if not stats.n:
+        return 0.0
+    if stats.date_fraction > 0.5:
+        return 0.0
+    return min(1.0, stats.distinct_ratio + 0.05)
+
+
+def fit_vocabulary(check: Callable[[str], bool]) -> FitFunction:
+    """Text whose distinct values are, for the most part, words the domain knows."""
+
+    def fit(stats: ColumnStats) -> float:
+        base = fit_label(stats)
+        if not base or not stats.texts:
+            return base
+        known = sum(1 for text in stats.texts if check(text)) / len(stats.texts)
+        return 1.0 if known >= 0.6 else 0.8 * base
+
+    return fit
+
+
+_CURRENCIES = frozenset({"eur", "usd", "gbp", "chf", "euro", "€", "$", "£"})
+
+
+def fit_currency(stats: ColumnStats) -> float:
+    if not stats.n or not stats.texts:
+        return 0.0
+    known = sum(1 for text in stats.texts if text.strip().lower() in _CURRENCIES)
+    return known / len(stats.texts)
+
+
+__all__ = [
+    "AmbiguousColumn",
+    "Candidate",
+    "DomainSem",
+    "FieldSem",
+    "FitFunction",
+    "Level",
+    "NameMatch",
+    "TokenRule",
+    "fit_currency",
+    "fit_date",
+    "fit_hours",
+    "fit_identifier",
+    "fit_label",
+    "fit_money",
+    "fit_percentage",
+    "fit_small_integer",
+    "fit_text",
+    "fit_vocabulary",
+    "level_of",
+    "name_candidates",
+    "rule",
+    "rule_score",
+    "MIN_EVIDENCE",
+]

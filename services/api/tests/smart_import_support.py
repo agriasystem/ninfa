@@ -34,6 +34,7 @@ __all__ = [
     "inspect",
     "inspection",
     "labor_it_file",
+    "understand",
     "post_json",
     "profiles_of",
     "validation",
@@ -176,6 +177,33 @@ def inspect(
     if sheet is not None:
         url += f"&sheet_name={sheet}"
     return client.post(url, content=content, headers={"Content-Type": "application/octet-stream"})
+
+
+def understand(
+    client: TestClient,
+    env: SourcesEnv,
+    domain: str,
+    filename: str,
+    content: bytes,
+    answers: Mapping[str, Any] | None = None,
+    *,
+    confirmed: bool = False,
+) -> dict[str, Any]:
+    """What NINFA understands of a whole document (Smart Import V3)."""
+    response = post_json(
+        client,
+        f"{env.base}/import-understanding",
+        {
+            "domain": domain,
+            "filename": filename,
+            "file_base64": b64(content),
+            "confirmed_domain": confirmed,
+            "answers": dict(answers or {}),
+        },
+    )
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body
 
 
 def dry_run(

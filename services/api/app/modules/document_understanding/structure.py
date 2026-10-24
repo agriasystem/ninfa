@@ -16,6 +16,7 @@ dropped silently.
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from enum import StrEnum
 from math import ceil
@@ -156,12 +157,29 @@ def _features(number: int, cells: list[Cell]) -> _Row:
     )
 
 
+def _day_dates(row: _Row) -> bool:
+    """Dates that are the DAYS of a grid: at least three, most of the row, each one a day or a few
+    days after the one before. A bookings row (booked on, arrival, departure) is not."""
+    days: list[date] = []
+    for position in row.positions:
+        cell = row.cells[position]
+        if isinstance(cell, datetime):
+            days.append(cell.date())
+        elif isinstance(cell, date):
+            days.append(cell)
+    if len(days) < 3 or len(days) * 2 < row.n:
+        return False
+    return all(
+        1 <= (later - earlier).days <= 3 for earlier, later in zip(days, days[1:], strict=False)
+    )
+
+
 def _label_row(row: _Row) -> bool:
     """Made of labels: at least two cells, nearly all text (dates count when they are day
     columns)."""
     if row.n < 2 or row.n_text < 1:
         return False
-    labelish = row.n_text + (row.n_date if row.n_date >= 3 else 0)
+    labelish = row.n_text + (row.n_date if _day_dates(row) else 0)
     return labelish / row.n >= 0.75
 
 
@@ -362,9 +380,9 @@ def _total_check(
         total_cell = row.cells[column.index] if column.index < len(row.cells) else None
         if kind_of(total_cell) != CellKind.NUMBER:
             continue
-        total = _as_decimal(total_cell)
+        total = as_decimal(total_cell)
         parts = [
-            _as_decimal(m.cells[column.index] if column.index < len(m.cells) else None)
+            as_decimal(m.cells[column.index] if column.index < len(m.cells) else None)
             for m in members
         ]
         numbers = [p for p in parts if p is not None]
@@ -381,7 +399,7 @@ def _total_check(
     return TotalCheck(row.number, label, checked, matched, state)
 
 
-def _as_decimal(cell: Cell) -> Decimal | None:
+def as_decimal(cell: Cell) -> Decimal | None:
     if isinstance(cell, bool) or cell is None:
         return None
     if isinstance(cell, int | float | Decimal):
@@ -606,6 +624,7 @@ __all__ = [
     "TableCandidate",
     "TotalCheck",
     "analyze_sheet",
+    "as_decimal",
     "classify_row",
     "is_note_text",
     "is_total_label",

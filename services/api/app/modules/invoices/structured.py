@@ -549,6 +549,7 @@ def _assemble_group(
             source_line_number=r.line_number,
             raw=_raw_line(r),
             issues=list(r.issues),
+            file_row=r.number,
         )
         for r in rows
     ]

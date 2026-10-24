@@ -90,7 +90,7 @@ def _save(book: Workbook) -> bytes:
     return buffer.getvalue()
 
 
-def _csv(rows: Sequence[Sequence[object]], delimiter: str = ";") -> bytes:
+def csv_of(rows: Sequence[Sequence[object]], delimiter: str = ";") -> bytes:
     lines: list[str] = []
     for row in rows:
         cells = []
@@ -264,7 +264,97 @@ def staff_csv_with_title(delimiter: str = ";") -> tuple[bytes, Expected]:
         *rows,
         ["TOTALE", None, None, None, float(expected.planned_hours)],
     ]
-    return _csv(lines, delimiter), expected
+    return csv_of(lines, delimiter), expected
+
+
+def staff_two_tables_xlsx() -> bytes:
+    """Two staff tables on one sheet, of the same size: morning shifts and evening shifts."""
+    book = Workbook()
+    sheet = book.active
+    day = datetime.combine(WEEK_START, datetime.min.time())
+    sheet.append(["Turni mattina"])
+    sheet.append(["Data", "Reparto", "Ore previste"])
+    for person in PEOPLE[:5]:
+        sheet.append([day, person[1], person[3]])
+    sheet.append([])
+    sheet.append(["Turni sera"])
+    sheet.append(["Data", "Reparto", "Ore previste"])
+    for person in PEOPLE[5:10]:
+        sheet.append([day, person[1], person[3]])
+    return _save(book)
+
+
+def staff_title_department_xlsx() -> bytes:
+    """The department is written only in the title: "TURNI HOUSEKEEPING - SETTIMANA 43"."""
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "Foglio1"
+    sheet["A1"] = "TURNI HOUSEKEEPING - SETTIMANA 43"
+    sheet.append([])
+    sheet.append(["Data", "Nome", "Ore previste"])
+    for offset in range(3):
+        day = datetime.combine(WEEK_START + timedelta(days=offset), datetime.min.time())
+        for person in [p for p in PEOPLE if p[1] == "Housekeeping"]:
+            sheet.append([day, person[0], person[3]])
+    return _save(book)
+
+
+def staff_no_department_xlsx() -> bytes:
+    """Nothing says the department: no column, no line, no sheet name, no title."""
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "Foglio1"
+    sheet.append(["Data", "Nome", "Ore previste", "Ore effettive"])
+    for offset in range(3):
+        day = datetime.combine(WEEK_START + timedelta(days=offset), datetime.min.time())
+        for person in PEOPLE[:4]:
+            sheet.append([day, person[0], person[3], person[3]])
+    return _save(book)
+
+
+def staff_unknown_labels_xlsx() -> bytes:
+    """Department words only this hotel uses ("HK", "Turno A") next to words NINFA knows."""
+    book = Workbook()
+    sheet = book.active
+    sheet.append(["Data", "Reparto", "Ore previste"])
+    labels = ["Reception", "HK", "HK", "Turno A", "Turno A", "Turno A", "Cucina", "HK"]
+    for index, label in enumerate(labels):
+        day = datetime.combine(WEEK_START + timedelta(days=index % 3), datetime.min.time())
+        sheet.append([day, label, 6 + (index % 3)])
+    return _save(book)
+
+
+def staff_bare_hours_xlsx() -> bytes:
+    """One column of hours that does not say whether they are planned or actual."""
+    book = Workbook()
+    sheet = book.active
+    sheet.append(["Data", "Reparto", "Ore"])
+    for offset in range(3):
+        day = datetime.combine(WEEK_START + timedelta(days=offset), datetime.min.time())
+        for person in PEOPLE[:5]:
+            sheet.append([day, person[1], person[3]])
+    return _save(book)
+
+
+def bookings_missing_checkout_xlsx() -> bytes:
+    """A bookings file with no departure date at all."""
+    book = Workbook()
+    sheet = book.active
+    sheet.append(
+        ["Codice prenotazione", "Data prenotazione", "Arrivo", "Stato", "Camere", "Canale"]
+    )
+    for index in range(6):
+        sheet.append(
+            [
+                f"RES-{index}",
+                datetime(2026, 10, 1 + index),
+                datetime(2026, 11, 2 + index),
+                "Confermata",
+                1,
+                "Booking.com",
+            ]
+        )
+    return _save(book)
 
 
 def staff_duplicate_headers_xlsx() -> bytes:
@@ -401,51 +491,85 @@ def bookings_dal_al_xlsx() -> bytes:
 # --- costs ---------------------------------------------------------------------------------------
 
 
-def costs_register_xlsx(
-    *, with_summary_sheet: bool = True, unknown_category: bool = False
-) -> bytes:
-    """Numero documento | Data | Fornitore | Descrizione | Categoria | Imponibile | IVA | Totale."""
-    book = Workbook()
-    sheet = book.active
-    sheet.title = "Registro acquisti"
-    sheet.append(
-        [
-            "Numero documento",
-            "Data",
-            "Fornitore",
-            "Descrizione",
-            "Categoria",
-            "Imponibile",
-            "IVA",
-            "Totale",
-        ]
-    )
-    suppliers = [
-        ("Enel Energia", "Utenze", "Bolletta ottobre"),
-        ("Sysco Italia", "Food", "Fornitura cucina"),
-        ("Lavanderia Bianca", "Lavanderia", "Lavaggio biancheria"),
-        ("Studio Rossi", "Consulenze", "Consulenza contabile"),
+COSTS_SUPPLIERS = [
+    ("Enel Energia", "Utenze", "Bolletta ottobre"),
+    ("Sysco Italia", "Food", "Fornitura cucina"),
+    ("Lavanderia Bianca", "Lavanderia", "Lavaggio biancheria"),
+    ("Studio Rossi", "Consulenze", "Consulenza contabile"),
+]
+
+
+def costs_register_rows(
+    *,
+    unknown_category: bool = False,
+    wrong_total: bool = False,
+    with_description: bool = True,
+    first_number: int = 200,
+) -> list[list[object]]:
+    """Numero documento | Data | Fornitore | Descrizione | Categoria | Imponibile | IVA | Totale
+    (one row per invoice, eight invoices from four suppliers)."""
+    header: list[object] = [
+        "Numero documento",
+        "Data",
+        "Fornitore",
+        "Descrizione",
+        "Categoria",
+        "Imponibile",
+        "IVA",
+        "Totale",
     ]
-    for index, (name, category, description) in enumerate(suppliers * 2):
+    rows: list[list[object]] = [header]
+    for index, (name, category, description) in enumerate(COSTS_SUPPLIERS * 2):
         net = 1000.0 + 100 * index
         category_text = "Boh???" if unknown_category and index == 1 else category
-        sheet.append(
+        gross = round(net * 1.22, 2) + (50 if wrong_total else 0)
+        rows.append(
             [
-                f"FT-{200 + index}",
+                f"FT-{first_number + index}",
                 datetime(2026, 10, 3 + index),
                 name,
                 description,
                 category_text,
                 net,
                 round(net * 0.22, 2),
-                round(net * 1.22, 2),
+                gross,
             ]
         )
+    if not with_description:
+        for row in rows:
+            del row[3]
+    return rows
+
+
+def costs_register_xlsx(
+    *,
+    with_summary_sheet: bool = True,
+    unknown_category: bool = False,
+    wrong_total: bool = False,
+    with_description: bool = True,
+    first_number: int = 200,
+) -> bytes:
+    """A purchases register as an accountant exports it, with a summary sheet next to it."""
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "Registro acquisti"
+    for row in costs_register_rows(
+        unknown_category=unknown_category,
+        wrong_total=wrong_total,
+        with_description=with_description,
+        first_number=first_number,
+    ):
+        sheet.append(row)
     if with_summary_sheet:
         summary = book.create_sheet("Riepilogo")
         summary.append(["Categoria", "Totale"])
         summary.append(["Utenze", 2500])
     return _save(book)
+
+
+def costs_register_csv(*, first_number: int = 200) -> bytes:
+    """The same register as an Italian Excel CSV: dd/mm/yyyy dates, decimal commas."""
+    return csv_of(costs_register_rows(first_number=first_number))
 
 
 def costs_amount_only_xlsx() -> bytes:
@@ -460,27 +584,36 @@ def costs_amount_only_xlsx() -> bytes:
 
 
 __all__ = [
+    "COSTS_SUPPLIERS",
     "PEOPLE",
     "STAFF_HEADER",
     "WEEK_END",
     "WEEK_START",
     "Expected",
     "bookings_dal_al_xlsx",
+    "bookings_missing_checkout_xlsx",
     "bookings_xlsx",
     "costs_amount_only_xlsx",
+    "costs_register_csv",
+    "costs_register_rows",
     "costs_register_xlsx",
     "empty_xlsx",
     "hostile_xlsx",
+    "staff_bare_hours_xlsx",
     "staff_csv_with_title",
     "staff_duplicate_headers_xlsx",
     "staff_grid_xlsx",
+    "staff_no_department_xlsx",
     "staff_rows",
     "staff_sections_xlsx",
     "staff_sheet_per_department_xlsx",
     "staff_simple_xlsx",
+    "staff_title_department_xlsx",
     "staff_title_summary_xlsx",
     "staff_totals_wrong_xlsx",
     "staff_two_level_header_xlsx",
+    "staff_two_tables_xlsx",
+    "staff_unknown_labels_xlsx",
     "staff_weekly_summary_xlsx",
     "two_tables_xlsx",
 ]

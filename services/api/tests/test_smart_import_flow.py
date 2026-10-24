@@ -428,19 +428,24 @@ def test_a_failed_import_never_spoils_the_configuration_that_was_working(
     assert card(api_client, env, "STAFF")["state"] == "CONFIGURED_FILE"  # and the source stays on
 
 
-def test_costs_have_no_columns_to_match(api_client: TestClient, env: SourcesEnv) -> None:
+def test_a_fatturapa_xml_cannot_be_matched_and_leaves_no_source_behind(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    from tests.invoice_support import fattura_xml
+
     response = post_json(
         api_client,
         f"{env.base}/imports/mapped",
         {
             "domain": "COSTS",
-            "filename": "f.csv",
-            "file_base64": b64(b"a;b\n1;2\n"),
-            "mapping": None,
+            "filename": "f.xml",
+            "file_base64": b64(fattura_xml()),
+            "mapping": decision({"Fornitore": "supplier_name"}),
         },
     )
 
-    assert response.status_code == 404 and response.json()["error"]["code"] == "UNSUPPORTED_DOMAIN"
+    assert response.status_code == 200 and response.json()["succeeded"] is False
+    assert response.json()["problem"] == "UNSUPPORTED_FILE"
     assert card(api_client, env, "ACCOUNTING")["state"] == "NOT_CONFIGURED"
 
 

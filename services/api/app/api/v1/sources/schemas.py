@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.modules.data_sources.errors import InvalidImportRequestError
 from app.modules.data_sources.files import MAX_FILE_BYTES
 from app.modules.data_sources.mapping_types import MappingInput
+from app.modules.data_sources.understanding import UnderstandAnswers
 from app.modules.ingestion.models import DataSourceDomain
 
 
@@ -102,6 +103,121 @@ class ProfileInfoResponse(BaseModel):
     missing_columns: list[str]
 
 
+class ChoiceResponse(BaseModel):
+    value: str
+    count: int | None
+    sheets: list[str]
+    columns: list[str]
+
+
+class LabelCountResponse(BaseModel):
+    label: str
+    count: int
+
+
+class QuestionResponse(BaseModel):
+    id: str
+    kind: str
+    column: str | None
+    field: str | None
+    document: str | None
+    candidate: str | None
+    origin: str | None
+    choices: list[ChoiceResponse]
+    labels: list[LabelCountResponse]
+    total_labels: int
+
+
+class BlockerResponse(BaseModel):
+    code: str
+    groups: list[list[str]]
+
+
+class OriginResponse(BaseModel):
+    kind: str
+    detail: str | None
+
+
+class RecognizedResponse(BaseModel):
+    field: str
+    origin: OriginResponse
+    level: str
+    example: str | None
+
+
+class DomainScoreResponse(BaseModel):
+    domain: str
+    score: float
+
+
+class DetectionResponse(BaseModel):
+    domain: str | None
+    level: str
+    scores: list[DomainScoreResponse]
+    expected: str | None
+
+
+class SheetSummaryResponse(BaseModel):
+    name: str
+    role: str
+    rows: int
+
+
+class TableSummaryResponse(BaseModel):
+    sheets: list[str]
+    header_rows: list[int]
+    first_row: int
+    last_row: int
+    data_rows: int
+    partition: bool
+    renamed_headers: int
+
+
+class SkippedSummaryResponse(BaseModel):
+    totals: int
+    notes: int
+    sections: int
+
+
+class DocumentSummaryResponse(BaseModel):
+    file_type: str
+    sheets: list[SheetSummaryResponse]
+    table: TableSummaryResponse | None
+    title: str | None
+    period_start: str | None
+    period_end: str | None
+    skipped: SkippedSummaryResponse
+    totals: str | None
+    day_grid: bool
+    amounts: str | None = None
+
+
+class UnderstandingResponse(BaseModel):
+    level: str
+    detection: DetectionResponse
+    document: DocumentSummaryResponse
+    recognized: list[RecognizedResponse]
+    people: int | None
+    questions: list[QuestionResponse]
+    blockers: list[BlockerResponse]
+
+
+class DryRunSummaryResponse(BaseModel):
+    date_from: str | None
+    date_to: str | None
+    departments: list[str]
+    planned_hours: str | None
+    actual_hours: str | None
+    planned_cost: str | None
+    actual_cost: str | None
+    currency: str | None
+    channels: int | None
+    revenue: str | None
+    documents: int | None
+    suppliers: int | None
+    net_total: str | None
+
+
 class FileInspectionResponse(BaseModel):
     domain: str
     file_type: str | None
@@ -117,6 +233,10 @@ class FileInspectionResponse(BaseModel):
     already_canonical: bool
     profile: ProfileInfoResponse
     already_imported: bool
+    # Smart Import V3 (only on `import-understanding`): what NINFA understood of the DOCUMENT and
+    # the decision it proposes from that.
+    understanding: UnderstandingResponse | None = None
+    proposal: MappingInput | None = None
 
 
 class MappingProblemResponse(BaseModel):
@@ -174,6 +294,8 @@ class DryRunResponse(BaseModel):
     invalid_rows: list[InvalidRowResponse]
     already_imported: bool
     rows_unclassified: int
+    summary: DryRunSummaryResponse | None = None
+    questions: list[QuestionResponse] = Field(default_factory=list)
 
 
 class SavedColumnResponse(BaseModel):
@@ -215,6 +337,27 @@ class MappedFileRequest(BaseModel):
     file_base64: str = Field(max_length=MAX_JSON_BODY_BYTES)
     # None: use the configuration saved for this kind of data.
     mapping: MappingInput | None = None
+    # The first day of the period THIS file is about (a grid of days written Lun/Mar/...).
+    period_start: date | None = None
+
+    def content(self) -> bytes:
+        try:
+            return base64.b64decode(self.file_base64, validate=True)
+        except (binascii.Error, ValueError) as error:
+            raise InvalidImportRequestError() from error
+
+
+class UnderstandRequest(BaseModel):
+    """A file, the kind of data it should be read as, and what the person has already said."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    domain: DataSourceDomain
+    filename: str = Field(min_length=1, max_length=255)
+    file_base64: str = Field(max_length=MAX_JSON_BODY_BYTES)
+    # The person already said this is the kind of data (do not ask again).
+    confirmed_domain: bool = False
+    answers: UnderstandAnswers = Field(default_factory=UnderstandAnswers)
 
     def content(self) -> bytes:
         try:
@@ -243,6 +386,10 @@ __all__ = [
     "ImportResultResponse",
     "InvalidRowResponse",
     "MappedFileRequest",
+    "UnderstandRequest",
+    "UnderstandingResponse",
+    "DryRunSummaryResponse",
+    "QuestionResponse",
     "MappedImportRequest",
     "MappedImportResultResponse",
     "MappingCheckRequest",

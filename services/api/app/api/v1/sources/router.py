@@ -27,6 +27,7 @@ same 404), and everything else is `DataSourcesService`. A file travels as the ra
 multipart: no new dependency) with its name in `?filename=`; it is never stored by this API.
 """
 
+from dataclasses import asdict
 from datetime import date
 from uuid import UUID
 
@@ -42,6 +43,7 @@ from app.api.v1.sources.schemas import (
     ColumnInfoResponse,
     ConstantSpecResponse,
     DryRunResponse,
+    DryRunSummaryResponse,
     FieldSpecResponse,
     FileInspectionResponse,
     FormatHintResponse,
@@ -55,6 +57,7 @@ from app.api.v1.sources.schemas import (
     MappingCheckResponse,
     MappingProblemResponse,
     ProfileInfoResponse,
+    QuestionResponse,
     RowIssueResponse,
     RowProblemResponse,
     SavedColumnResponse,
@@ -62,6 +65,8 @@ from app.api.v1.sources.schemas import (
     SavedConstantResponse,
     SourceCardResponse,
     SourcesOverviewResponse,
+    UnderstandingResponse,
+    UnderstandRequest,
 )
 from app.db.session import get_session
 from app.modules.data_sources.errors import (
@@ -190,6 +195,12 @@ def _inspection_response(inspection: FileInspection) -> FileInspectionResponse:
             missing_columns=list(profile.missing_columns),
         ),
         already_imported=inspection.already_imported,
+        understanding=(
+            None
+            if inspection.understanding is None
+            else UnderstandingResponse.model_validate(asdict(inspection.understanding))
+        ),
+        proposal=inspection.proposal,
     )
 
 
@@ -234,6 +245,12 @@ def _dry_run_response(result: DryRun) -> DryRunResponse:
         ],
         already_imported=result.already_imported,
         rows_unclassified=result.rows_unclassified,
+        summary=(
+            None
+            if result.summary is None
+            else DryRunSummaryResponse.model_validate(asdict(result.summary))
+        ),
+        questions=[QuestionResponse.model_validate(asdict(q)) for q in result.questions],
     )
 
 
@@ -369,6 +386,32 @@ async def inspect_import(
 
 
 @router.post(
+    "/import-understanding",
+    response_model=FileInspectionResponse,
+    summary="Understand a whole document and say what is still unclear (writes nothing)",
+)
+async def understand_import(
+    request: Request,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    session: Session = Depends(get_session),
+) -> FileInspectionResponse:
+    body = await _read_json(request, UnderstandRequest)
+    content = body.content()
+    service = DataSourcesService(session, scope.tenant)
+    inspection = await run_in_threadpool(
+        lambda: service.understand_file(
+            scope.property_id,
+            body.domain,
+            filename=body.filename,
+            content=content,
+            answers=body.answers,
+            confirmed_domain=body.confirmed_domain,
+        )
+    )
+    return _inspection_response(inspection)
+
+
+@router.post(
     "/import-mapping-check",
     response_model=MappingCheckResponse,
     summary="Is this matching of columns enough to import? (the backend's own rules)",
@@ -403,6 +446,7 @@ async def dry_run_import(
             filename=body.filename,
             content=content,
             mapping=body.mapping,
+            period_start=body.period_start,
         )
     )
     return _dry_run_response(result)
@@ -428,7 +472,7 @@ async def import_mapped_file(
             filename=body.filename,
             content=content,
             snapshot_local_date=body.snapshot_local_date,
-            mapped=MappedImport(body.mapping, body.save_configuration),
+            mapped=MappedImport(body.mapping, body.save_configuration, body.period_start),
         )
     )
     return MappedImportResultResponse(

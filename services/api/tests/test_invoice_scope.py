@@ -46,6 +46,7 @@ INVOICE_MODULES = {
     "repository",
     "service",
     "structured",
+    "suggestions",
 }
 SUPPLIER_MODULES = {
     "__init__",

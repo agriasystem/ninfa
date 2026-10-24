@@ -53,11 +53,12 @@ class LayoutSpec(BaseModel):
     # Per file: never saved in a profile.
     period_start: date | None = None
 
-    def for_profile(self) -> "LayoutSpec | None":
-        """What is worth remembering for the next file: everything except this file's own dates."""
-        kept = self.model_copy(update={"period_start": None})
-        empty = not (kept.sheets or kept.table_key or kept.department or kept.grid)
-        return None if empty else kept
+    def for_profile(self) -> "LayoutSpec":
+        """What is worth remembering for the next file: everything except this file's own dates and
+        the row numbers of its table (the next file's will be different). Even a layout with
+        nothing else is kept: its presence is what makes the next file be read the same way
+        (title, summary and totals skipped, the header found by what the rows are)."""
+        return self.model_copy(update={"period_start": None, "table_key": None})
 
 
 __all__ = ["DepartmentContext", "DepartmentKind", "GridLayout", "HoursField", "LayoutSpec"]

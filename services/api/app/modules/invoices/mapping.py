@@ -31,6 +31,11 @@ from app.modules.invoices.models import DocumentKind
 __all__ = ["compute_header_signature", "header_index", "normalize_header"]
 
 
+# Bumped when the meaning of a stored mapping changes (the same rule as the bookings' and the
+# labor mapping): a configuration saved against another version is never applied silently.
+MAPPING_SCHEMA_VERSION = 1
+
+
 class InvoiceField(StrEnum):
     SUPPLIER_NAME = "supplier_name"
     SUPPLIER_VAT_NUMBER = "supplier_vat_number"
@@ -114,6 +119,8 @@ class InvoiceFormatOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sheet_name: str | None = None
+    # The MAPPING_SCHEMA_VERSION the profile was confirmed against (None: saved before versions).
+    schema_version: int | None = None
     delimiter: Literal[",", ";", "\t"] | None = None
     encoding: Literal["utf-8", "cp1252"] | None = None
     date_formats: dict[InvoiceField, str] = {}

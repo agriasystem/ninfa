@@ -33,7 +33,7 @@ from app.modules.document_understanding.structure import (
     Column,
     Row,
     RowKind,
-    _as_decimal,
+    as_decimal,
     classify_row,
     row_features,
 )
@@ -230,7 +230,7 @@ def generate(
                 value = cells[column] if column < len(cells) else None
                 if value is None:
                     continue
-                amount = _as_decimal(value)
+                amount = as_decimal(value)
                 if amount is not None and amount == Decimal(0):
                     continue  # a day off is "not scheduled", not "scheduled for zero hours"
                 counter += 1

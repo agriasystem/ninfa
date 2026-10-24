@@ -4,11 +4,9 @@ columns.
 The corpus is synthetic but shaped like real hotel files (`understanding_support`): titles, summary
 blocks, two-level headers, department lines, one sheet per department, day grids, totals, notes.
 What is pinned: the table is FOUND, what is not a record (totals, notes, department lines) is left
-out
-AND reported, a department that is a line / a sheet / the title becomes information about its rows,
-a
-grid of days becomes one row per person per day only when its days are real dates, and a cell is
-data whatever it says.
+out AND reported, a department that is a line / a sheet / the title becomes information about its
+rows, a grid of days becomes one row per person per day only when its days are real dates, and a
+cell is data whatever it says.
 """
 
 from datetime import datetime
@@ -261,7 +259,8 @@ def test_the_period_of_a_grid_is_never_saved_in_a_profile() -> None:
 
     kept = layout.for_profile()
     assert kept is not None and kept.period_start is None and kept.grid is not None
-    assert LayoutSpec(period_start=date(2026, 10, 26)).for_profile() is None
+    bare = LayoutSpec(period_start=date(2026, 10, 26), table_key="Foglio1:6").for_profile()
+    assert bare == LayoutSpec()  # nothing else to remember, but the way of reading is
 
 
 def test_a_weekly_summary_has_no_days_to_build_rows_from() -> None:
@@ -270,6 +269,23 @@ def test_a_weekly_summary_has_no_days_to_build_rows_from() -> None:
     selection = document.chosen
     assert selection is not None and selection.day_grid is None
     assert "Data" not in [c.label for c in selection.first.columns]
+
+
+def test_a_data_row_with_three_dates_is_not_the_header_of_a_grid_of_days() -> None:
+    # booked on / arrival / departure are three dates in one row, and the row above is the header
+    document = _doc(corpus.bookings_xlsx(extra=["Nome ospite"]))
+
+    selection = _chosen(document)
+    assert len(document.selections) == 1
+    assert selection.first.header_rows == (1,) and selection.day_grid is None
+    assert selection.first.data_rows == 8
+
+
+def test_the_dates_of_a_grid_header_follow_one_another() -> None:
+    document = _doc(corpus.staff_grid_xlsx(period_in_title=False, weekday_names=False))
+
+    selection = _chosen(document)
+    assert selection.day_grid is not None and len(selection.day_grid.columns) == 7
 
 
 # --- more than one table, nothing at all, hostile cells -------------------------------------------
