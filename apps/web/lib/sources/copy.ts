@@ -594,8 +594,8 @@ export const sourcesCopy = {
         `Per importare questo tipo di dati usa la scheda «${name}» di Fonti dati. Qui non è stato importato nulla.`,
       TABLE: {
         title: "Ho trovato più di una tabella nel file. Quale devo leggere?",
-        choice: (sheet: string, rows: number, columns: string) =>
-          `${sheet}: ${rows === 1 ? "1 riga" : `${rows} righe`} (colonne: ${columns})`,
+        choice: (title: string, sheet: string, firstRow: number, rows: number, columns: string) =>
+          `${title.length > 0 ? `«${title}» - ` : ""}foglio ${sheet}, dalla riga ${firstRow} (${rows === 1 ? "1 riga" : `${rows} righe`}; colonne: ${columns})`,
       },
       DEPARTMENT_ROWS: "A quale reparto appartengono le righe di questo file?",
       DEPARTMENT_CONFIRM: {

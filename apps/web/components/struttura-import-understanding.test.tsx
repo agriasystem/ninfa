@@ -184,6 +184,25 @@ describe("a file NINFA understands by itself", () => {
     expect(text).toContain("impostazioni della struttura");
     expect(within(table).getAllByText("Da controllare")).toHaveLength(1); // only the suggested one
     expect(flat(dialog())).toContain("Alcuni abbinamenti sono suggerimenti di NINFA");
+    // a column that is only "da controllare" (not a suggestion of the assistant) does not say so
+  });
+
+  it("does not call a column to check a suggestion", async () => {
+    understandFileMock.mockResolvedValue(
+      ok(
+        understoodInspection({
+          recognized: [
+            { field: "role", origin: { kind: "COLUMN", detail: "Reparto" }, level: "MEDIUM", example: "Cucina" },
+          ],
+        }),
+      ),
+    );
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = await openStaffImport();
+    await pick(user, xlsxFile());
+
+    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(flat(dialog())).not.toContain("suggerimenti di NINFA");
   });
 
   it("says when a file is read as last time and then saves nothing new", async () => {
@@ -405,6 +424,36 @@ describe("ONE question at a time", () => {
 
     await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ confirmedDomain: true });
+  });
+
+  it("tells two tables with the same columns apart by the line above each", async () => {
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection({
+          level: "ASK",
+          questions: [
+            questionOf("TABLE", {
+              choices: [
+                { value: "Foglio1#3", count: 5, sheets: ["Foglio1"], columns: ["Data", "Reparto"], title: "Turni mattina", first_row: 3 },
+                { value: "Foglio1#11", count: 5, sheets: ["Foglio1"], columns: ["Data", "Reparto"], title: "Turni sera", first_row: 11 },
+              ],
+            }),
+          ],
+        }),
+      ),
+    );
+    understandFileMock.mockResolvedValueOnce(ok(understoodInspection()));
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = await openStaffImport();
+    await pick(user, xlsxFile());
+
+    await within(dialog()).findByText("Ho trovato più di una tabella nel file. Quale devo leggere?");
+    const evening = within(dialog()).getByRole("button", { name: /«Turni sera»/u });
+    expect(evening.textContent).toContain("dalla riga 11");
+    await user.click(evening);
+
+    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { table_key: "Foglio1#11" } });
   });
 
   it("confirms a column it is only fairly sure about, or opens the matching on request", async () => {

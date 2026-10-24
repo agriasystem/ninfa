@@ -615,3 +615,24 @@ def test_any_day_of_the_week_names_the_week_of_a_grid(
     assert _level(answered) == "READY"
     tried = _tried(api_client, env, content, answered)
     assert tried["summary"]["date_from"] == "2026-10-26"  # the Monday of that week
+
+
+def test_two_tables_with_the_same_columns_are_told_apart_by_the_line_above_them(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    asked = understand(api_client, env, LABOR, "turni.xlsx", corpus.staff_two_tables_xlsx())
+
+    choices = asked["understanding"]["questions"][0]["choices"]
+    assert [c["title"] for c in choices] == ["Turni mattina", "Turni sera"]
+    assert [c["first_row"] for c in choices] == [3, 11]
+
+
+def test_what_was_recognised_shows_a_value_seen_in_the_file_but_never_a_person(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    body = understand(api_client, env, LABOR, "t.xlsx", corpus.staff_title_summary_xlsx()[0])
+
+    examples = {r["field"]: r["example"] for r in body["understanding"]["recognized"]}
+    assert examples["role"] == "Reception" and examples["planned_hours"] == "8"
+    assert examples["work_date"] == "2026-10-26"
+    assert not any(name in repr(body) for name, *_ in corpus.PEOPLE)

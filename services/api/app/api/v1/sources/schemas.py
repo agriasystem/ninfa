@@ -108,6 +108,8 @@ class ChoiceResponse(BaseModel):
     count: int | None
     sheets: list[str]
     columns: list[str]
+    title: str | None = None
+    first_row: int | None = None
 
 
 class LabelCountResponse(BaseModel):

@@ -56,7 +56,7 @@ export function StrutturaImportUnderstood({
   const period = periodText(validation);
   const document = understanding.document;
   const known = inspection.profile.status === "RECOGNIZED";
-  const toCheck = understanding.recognized.some((item) => item.level !== "HIGH");
+  const suggested = understanding.recognized.some((item) => item.origin.kind === "ASSISTANT");
 
   return (
     <>
@@ -108,7 +108,7 @@ export function StrutturaImportUnderstood({
           <p>{COPY.unclassified(validation.rows_unclassified)}</p>
         </div>
       ) : null}
-      {toCheck ? <p className="struttura-flow__note">{COPY.assistantNote}</p> : null}
+      {suggested ? <p className="struttura-flow__note">{COPY.assistantNote}</p> : null}
       {validation.already_imported ? (
         <p className="struttura-flow__note">{sourcesCopy.preview.alreadyImported}</p>
       ) : null}

@@ -6103,6 +6103,18 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   align-items: stretch;
 }
 
+/* a choice may be a sentence (two tables with the same columns): it wraps instead of overflowing */
+.struttura-question .struttura-button {
+  max-width: 100%;
+  padding-block: 8px;
+  white-space: normal;
+  text-align: left;
+}
+
+.struttura-question__choices--stacked .struttura-button {
+  justify-content: flex-start;
+}
+
 .struttura-question__date {
   display: flex;
   flex-direction: column;

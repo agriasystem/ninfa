@@ -855,6 +855,9 @@ export interface UnderstandingChoice {
   count: number | null;
   sheets: string[];
   columns: string[];
+  /** A table on offer: the line written just above it, and the row it starts on. */
+  title?: string | null;
+  first_row?: number | null;
 }
 
 export interface UnderstandingQuestion {

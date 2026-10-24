@@ -129,7 +129,9 @@ export function StrutturaImportQuestion({ step, domain, flow }: StrutturaImportQ
                 onClick={() => void flow.answer({ table_key: choice.value })}
               >
                 {COPY.TABLE.choice(
+                  choice.title ?? "",
                   choice.sheets[0] ?? choice.value,
+                  choice.first_row ?? 0,
                   choice.count ?? 0,
                   choice.columns.join(", "),
                 )}

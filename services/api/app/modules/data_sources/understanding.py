@@ -413,6 +413,7 @@ class UnderstandingService:
             answers,
             table,
             ai_headers,
+            samples,
         )
         level = self._level(
             adapter,
@@ -595,6 +596,10 @@ class UnderstandingService:
                     count=c.selection.first.data_rows,
                     sheets=tuple(t.sheet for t in c.selection.tables if t.sheet),
                     columns=tuple(col.label for col in c.selection.first.columns[:6]),
+                    title=_short(
+                        c.selection.first.preamble[-1] if c.selection.first.preamble else None
+                    ),
+                    first_row=c.selection.first.first_row,
                 )
                 for c in ranked[:_MAX_TABLES_OFFERED]
             ),
@@ -773,6 +778,7 @@ class UnderstandingService:
         answers: UnderstandAnswers,
         table: LayoutTable,
         ai_headers: frozenset[str] = frozenset(),
+        samples: Sequence[ColumnSample] = (),
     ) -> list[Recognized]:
         out: list[Recognized] = []
         decided = {c.header: c.field for c in decision.columns if c.field is not None}
@@ -785,7 +791,7 @@ class UnderstandingService:
                 kind = OriginKind.USER
             elif column.header in ai_headers and not by_profile:
                 kind = OriginKind.ASSISTANT
-            example = None if column.locked or column.pii else _example(column)
+            example = None if column.locked or column.pii else _example(samples, column)
             if layout.department is not None and column.header == _synthetic_header(
                 table, layout.department.kind
             ):
@@ -1140,8 +1146,18 @@ def _with_answers(proposal: Proposal, overrides: Mapping[str, str]) -> Proposal:
     return Proposal(tuple(columns))
 
 
-def _example(column: ColumnProposal) -> str | None:
+def _example(samples: Sequence[ColumnSample], column: ColumnProposal) -> str | None:
+    """A value seen in the file for this column (never for personal data: the caller checks)."""
+    if column.position < len(samples) and samples[column.position].examples:
+        return _short(samples[column.position].examples[0])
     return column.stats.texts[0] if column.stats.texts else None
+
+
+def _short(text: str | None) -> str | None:
+    if text is None:
+        return None
+    flat = " ".join(text.split())
+    return flat if len(flat) <= 60 else flat[:59].rstrip() + "…"
 
 
 def _detection_info(verdict_: DomainVerdict, expected: DataSourceDomain) -> Detection:

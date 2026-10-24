@@ -262,6 +262,8 @@ describe("responsive-critical CSS of the dialogs and the cards", () => {
     expect(block).toMatch(/\.struttura-option \{[^}]*flex-wrap: wrap;/u);
     expect(block).toMatch(/\.struttura-flow__actions \{[^}]*flex-wrap: wrap;/u);
     expect(block).toMatch(/\.struttura-flow__sample \{[^}]*overflow-x: auto;/u);
+    // a question's choice may be a whole sentence: it wraps instead of pushing the dialog sideways
+    expect(block).toMatch(/\.struttura-question \.struttura-button \{[^}]*white-space: normal;/u);
   });
 
   it("keeps a visible focus ring on every new control", () => {

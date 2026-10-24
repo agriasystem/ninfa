@@ -83,6 +83,10 @@ class Choice:
     # A table on offer: where it is and how big (for the TABLE question).
     sheets: tuple[str, ...] = ()
     columns: tuple[str, ...] = ()
+    # The line written just above it ("Turni sera") and the row it starts on, so two tables with the
+    # same columns can be told apart.
+    title: str | None = None
+    first_row: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
