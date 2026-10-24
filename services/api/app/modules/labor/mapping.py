@@ -23,6 +23,7 @@ from app.modules.bookings.mapping import (
     validate_date_pattern,
 )
 from app.modules.bookings.text import normalize_key
+from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.labor.errors import LaborErrorCode, LaborImportError
 from app.modules.labor.roles import LaborCategory
 
@@ -80,6 +81,8 @@ class LaborFormatOptions(BaseModel):
     date_formats: dict[LaborField, str] = {}
     decimal_separator: Literal[".", ","] | None = None
     thousands_separator: Literal[",", ".", " ", "'"] | None = None
+    # Smart Import V3: how the document's structure is read (title, totals, sections, day grid).
+    layout: LayoutSpec | None = None
 
     @field_validator("date_formats")
     @classmethod

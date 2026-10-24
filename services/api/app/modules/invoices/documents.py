@@ -39,6 +39,8 @@ class ParsedLine:
     source_line_number: int | None
     raw: RawLine | None = None
     issues: list[RowIssue] = field(default_factory=list)
+    # The row of the file this line was read from (structured files; None for XML).
+    file_row: int | None = None
 
 
 @dataclass(slots=True)

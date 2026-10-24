@@ -23,6 +23,7 @@ ONE data source of ONE property of ONE workspace and is reachable only through i
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -71,6 +72,10 @@ from app.modules.data_sources.mapping_types import (
     SavedConfiguration,
     SuggestionLevel,
 )
+from app.modules.data_sources.understanding_costs import category_question
+from app.modules.data_sources.understanding_labor import label_question
+from app.modules.data_sources.understanding_types import Question
+from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.ingestion.models import DataSource, DataSourceDomain
 from app.modules.ingestion.repository import ImportJobRepository
 from app.modules.ingestion.suggestions import SuggestionConfidence
@@ -122,7 +127,7 @@ def problem_of_error(error: AppError) -> ImportProblem:
 
 
 @dataclass(frozen=True, slots=True)
-class _Formats:
+class Formats:
     date_formats: dict[str, str]
     decimal_separator: str | None
     thousands_separator: str | None
@@ -157,16 +162,47 @@ class SmartImportService:
     def domain(self, domain: DataSourceDomain) -> FileDomain:
         adapter = domain_adapter(domain, self._session, self._tenant)
         if adapter is None:
-            raise UnsupportedDomainError()  # costs: FatturaPA XML, no column matching
+            raise UnsupportedDomainError()
         return adapter
 
     # --- reading a file -------------------------------------------------------------------------
 
     @staticmethod
-    def read_table(content: bytes, filename: str, sheet_name: str | None = None) -> SourceTable:
-        """The file as a table (CSV or Excel). Raises the reader's own `BookingImportError`."""
+    def read_table(
+        content: bytes,
+        filename: str,
+        sheet_name: str | None = None,
+        layout: LayoutSpec | None = None,
+    ) -> SourceTable:
+        """The file as a table (CSV or Excel). Raises the reader's own `BookingImportError`.
+
+        With a `layout` the document's structure is understood first (title, totals, sections, a
+        grid of days): the table is the one the importers will read."""
         detect_file_type(filename, content)
-        return open_table(content, filename, FormatOptions(sheet_name=sheet_name))
+        return open_table(content, filename, FormatOptions(sheet_name=sheet_name, layout=layout))
+
+    # --- the period of THIS file (never saved in a configuration) ---------------------------------
+
+    @staticmethod
+    def mapping_with_period(
+        mapping: MappingInput | None, period_start: date | None
+    ) -> MappingInput | None:
+        """The decision, with the first day of the period this file is about (a grid of days)."""
+        if mapping is None or mapping.layout is None or period_start is None:
+            return mapping
+        layout = mapping.layout.model_copy(update={"period_start": period_start})
+        return mapping.model_copy(update={"layout": layout})
+
+    @staticmethod
+    def config_with_period(adapter: FileDomain, config: Any, period_start: date | None) -> Any:
+        """The saved configuration, read for the week THIS file is about."""
+        layout = adapter.format_of(config).layout
+        if layout is None or period_start is None or layout.grid is None:
+            return config
+        options = config.format_options.model_copy(
+            update={"layout": layout.model_copy(update={"period_start": period_start})}
+        )
+        return config.model_copy(update={"format_options": options})
 
     # --- 1. what NINFA finds in the file ----------------------------------------------------------
 
@@ -364,14 +400,29 @@ class SmartImportService:
             return Resolved(problem=ImportProblem.MAPPING_INCOMPLETE, check=check)
         return Resolved(
             config=config,
-            documents=adapter.documents_of(config),
+            documents=self._documents_to_keep(adapter, mapping, formats, preserved or {}),
             headers=tuple(table.headers),
             format_hints=formats.hints,
         )
 
+    def _documents_to_keep(
+        self,
+        adapter: FileDomain,
+        mapping: MappingInput,
+        formats: "Formats",
+        preserved: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        """What a profile remembers of this decision: everything, except the dates of THIS file."""
+        kept = mapping.model_copy(
+            update={"layout": mapping.layout.for_profile() if mapping.layout else None}
+        )
+        return adapter.documents_of(
+            adapter.parse_config(self._documents(adapter, kept, formats, preserved))
+        )
+
     def _formats(
         self, adapter: FileDomain, mapping: MappingInput, samples: list[ColumnSample]
-    ) -> _Formats:
+    ) -> Formats:
         """How the mapped date and amount columns are written: from what the values prove, from
         the person's choice where they do not."""
         by_key = {normalize_header(sample.header): sample for sample in samples}
@@ -456,7 +507,7 @@ class SmartImportService:
             )
         if style_choice is not None and number_columns:
             decimal = (",", ".") if style_choice == "COMMA" else (".", ",")
-        return _Formats(
+        return Formats(
             date_formats,
             decimal[0] if decimal else None,
             decimal[1] if decimal else None,
@@ -470,7 +521,7 @@ class SmartImportService:
         self,
         adapter: FileDomain,
         mapping: MappingInput,
-        formats: "_Formats",
+        formats: "Formats",
         preserved: dict[str, dict[str, Any]],
     ) -> dict[str, dict[str, Any]]:
         column_mapping: dict[str, Any] = {}
@@ -482,6 +533,10 @@ class SmartImportService:
         options: dict[str, Any] = {"schema_version": adapter.schema_version}
         if mapping.sheet_name:
             options["sheet_name"] = mapping.sheet_name
+        if mapping.layout is not None:
+            options["layout"] = mapping.layout.model_dump(
+                mode="json", exclude_none=True, exclude_defaults=True
+            )
         if formats.date_formats:
             options["date_formats"] = formats.date_formats
         if formats.decimal_separator:
@@ -492,8 +547,15 @@ class SmartImportService:
             "format_options": options,
         }
         for name in adapter.value_documents:
-            documents[name] = dict(preserved.get(name, {}))
+            # What was taught before stays; what the person says now wins (same word, new meaning).
+            documents[name] = {**preserved.get(name, {}), **mapping.labels.get(name, {})}
         return documents
+
+    def formats_of(
+        self, adapter: FileDomain, mapping: MappingInput, samples: list[ColumnSample]
+    ) -> "Formats":
+        """How the mapped date and amount columns are written, and what is still unproven."""
+        return self._formats(adapter, mapping, samples)
 
     # --- 4. trying a decision on the whole file ---------------------------------------------------
 
@@ -506,12 +568,16 @@ class SmartImportService:
         mapping: MappingInput | None,
         source: DataSource | None,
         already_imported: bool,
+        period_start: date | None = None,
     ) -> DryRun:
         """Judge every row as the import would, and write nothing. `mapping=None` means the
         configuration saved for this kind of data."""
         adapter = self.domain(domain)
+        mapping = self.mapping_with_period(mapping, period_start)
         try:
-            config, blocked, hints = self._config_for(adapter, mapping, filename, content, source)
+            config, blocked, hints = self._config_for(
+                adapter, mapping, filename, content, source, period_start
+            )
         except BookingImportError as error:
             return DryRun(DryRunStatus.BLOCKED, problem=problem_of_error(error))
         if blocked is not None:
@@ -529,13 +595,14 @@ class SmartImportService:
         filename: str,
         content: bytes,
         source: DataSource | None,
+        period_start: date | None = None,
     ) -> tuple[Any, DryRun | None, tuple[FormatHint, ...]]:
         if mapping is None:
             config, problem = self.saved_config_for(adapter, source)
             if config is None:
                 return None, DryRun(DryRunStatus.BLOCKED, problem=problem), ()
-            return config, None, ()
-        table = self.read_table(content, filename, mapping.sheet_name)
+            return self.config_with_period(adapter, config, period_start), None, ()
+        table = self.read_table(content, filename, mapping.sheet_name, mapping.layout)
         preserved = self.preserved_documents(adapter, source)
         resolved = self.resolve(adapter, mapping, table, preserved)
         if resolved.needs_choice:
@@ -598,6 +665,8 @@ class SmartImportService:
             invalid_rows=tuple(invalid),
             already_imported=already_imported,
             rows_unclassified=data.rows_unclassified,
+            summary=data.summary,
+            questions=_value_questions_of(data),
         )
 
     # --- the saved configuration -----------------------------------------------------------------
@@ -631,6 +700,12 @@ class SmartImportService:
         if profile is None:
             return {}
         return {name: profile.documents.get(name, {}) for name in adapter.value_documents}
+
+    def profile_info(
+        self, adapter: FileDomain, source: DataSource | None, table: SourceTable
+    ) -> ProfileInfo:
+        """How the saved configuration of this source relates to THIS file."""
+        return self._profile_info(adapter, source, table)
 
     def _profile_info(
         self, adapter: FileDomain, source: DataSource | None, table: SourceTable
@@ -687,6 +762,7 @@ class SmartImportService:
                 date_order = "MDY"
         return MappingInput(
             sheet_name=fmt.sheet_name,
+            layout=fmt.layout,
             columns=[
                 ColumnChoice(header=header, field=field_of.get(normalize_header(header)))
                 for header in headers
@@ -755,8 +831,21 @@ class SmartImportService:
 # --- helpers --------------------------------------------------------------------------------------
 
 
-def _no_formats() -> _Formats:
-    return _Formats({}, None, None, (), ())
+def _value_questions_of(data: DryRunData) -> tuple[Question, ...]:
+    """The department / category words the file uses that NINFA does not know (one question,
+    never a guess)."""
+    if not data.unclassified_labels:
+        return ()
+    labels = list(data.unclassified_labels)
+    if data.labels_document == "category_mapping":
+        found = category_question(labels, {})
+    else:
+        found = label_question(labels, {})
+    return () if found is None else (found,)
+
+
+def _no_formats() -> Formats:
+    return Formats({}, None, None, (), ())
 
 
 def _suffix(code: str) -> str:

@@ -146,6 +146,7 @@ describe("Fonti dati sources", () => {
       "POST",
       "POST",
       "POST",
+      "POST",
     ]);
     // opening a dialog and choosing "Importa file" only changes what is shown
     const dialogs = withoutComments(read("components/struttura-source-dialogs.tsx"));
@@ -200,6 +201,9 @@ describe("Smart Import: the page decides nothing about the data", () => {
     "lib/sources/problem-text.ts",
     "components/struttura-import-mapping.tsx",
     "components/struttura-import-preview.tsx",
+    "components/struttura-import-question.tsx",
+    "components/struttura-import-understood.tsx",
+    "lib/sources/understanding-format.ts",
     "components/struttura-import-dialog.tsx",
     "components/struttura-manage-dialog.tsx",
   ];
@@ -258,6 +262,8 @@ describe("responsive-critical CSS of the dialogs and the cards", () => {
     expect(block).toMatch(/\.struttura-option \{[^}]*flex-wrap: wrap;/u);
     expect(block).toMatch(/\.struttura-flow__actions \{[^}]*flex-wrap: wrap;/u);
     expect(block).toMatch(/\.struttura-flow__sample \{[^}]*overflow-x: auto;/u);
+    // a question's choice may be a whole sentence: it wraps instead of pushing the dialog sideways
+    expect(block).toMatch(/\.struttura-question \.struttura-button \{[^}]*white-space: normal;/u);
   });
 
   it("keeps a visible focus ring on every new control", () => {

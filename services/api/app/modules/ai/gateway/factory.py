@@ -9,9 +9,16 @@ raised if the configuration were invalid.
 from typing import assert_never
 
 from app.core.config import Settings
-from app.modules.ai.gateway.anthropic_provider import AnthropicLanguageModelProvider
+from app.modules.ai.gateway.anthropic_provider import (
+    AnthropicImportUnderstandingProvider,
+    AnthropicLanguageModelProvider,
+)
 from app.modules.ai.gateway.protocol import LanguageModelProvider
 from app.modules.ai.gateway.unconfigured import UnconfiguredLanguageModelProvider
+from app.modules.ai.import_understanding.resolver import (
+    ImportUnderstandingProvider,
+    ImportUnderstandingResolver,
+)
 
 
 def build_language_model_provider(settings: Settings) -> LanguageModelProvider:
@@ -27,4 +34,20 @@ def build_language_model_provider(settings: Settings) -> LanguageModelProvider:
     assert_never(provider)
 
 
-__all__ = ["build_language_model_provider"]
+def build_import_understanding_resolver(settings: Settings) -> ImportUnderstandingResolver:
+    """The optional assistant of Smart Import V3, built ONCE when the app is built. With the
+    provider `unconfigured` - the default - the resolver has no provider at all: it asks nothing,
+    sends nothing anywhere, and Smart Import reads files exactly as it does without it."""
+    provider: ImportUnderstandingProvider | None = None
+    selected = settings.import_understanding_provider
+    if selected == "anthropic":
+        assert settings.anthropic_api_key is not None  # guaranteed by Settings' own validator
+        provider = AnthropicImportUnderstandingProvider(
+            api_key=settings.anthropic_api_key.get_secret_value()
+        )
+    elif selected != "unconfigured":
+        assert_never(selected)
+    return ImportUnderstandingResolver(provider)
+
+
+__all__ = ["build_import_understanding_resolver", "build_language_model_provider"]

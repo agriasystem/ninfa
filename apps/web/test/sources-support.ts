@@ -13,6 +13,8 @@ import type {
   MappingCheckResponse,
   SavedImportConfiguration,
   SourceCardKey,
+  Understanding,
+  UnderstandingQuestion,
 } from "@ninfa/contracts";
 
 /**
@@ -407,5 +409,142 @@ export function savedConfigurationOf(overrides: Partial<SavedImportConfiguration
 export function xlsxFile(name = "turni.xlsx"): File {
   return new File(["PK"], name, {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+}
+
+// --- Smart Import V3: NINFA understood the document ---------------------------------------------------------
+
+/** The decision NINFA proposes for the realistic staff file (title, summary, totals, department column). */
+export function proposalOf(overrides: Partial<ImportMapping> = {}): ImportMapping {
+  return {
+    sheet_name: null,
+    columns: [
+      { header: "Data", field: "work_date" },
+      { header: "Nome e cognome", field: null },
+      { header: "Reparto o mansione", field: "role" },
+      { header: "Ore previste", field: "planned_hours" },
+      { header: "Ore effettive", field: "actual_hours" },
+      { header: "Costo previsto", field: "planned_cost" },
+    ],
+    constants: { currency: "EUR" },
+    date_order: null,
+    decimal_style: null,
+    layout: { version: 1 },
+    labels: {},
+    ...overrides,
+  };
+}
+
+export function understandingOf(overrides: Partial<Understanding> = {}): Understanding {
+  return {
+    level: "READY",
+    detection: {
+      domain: "LABOR",
+      level: "HIGH",
+      scores: [{ domain: "LABOR", score: 0.93 }],
+      expected: "LABOR",
+    },
+    document: {
+      file_type: "XLSX",
+      sheets: [{ name: "Turni", role: "DATA", rows: 70 }],
+      table: {
+        sheets: ["Turni"],
+        header_rows: [6],
+        first_row: 7,
+        last_row: 70,
+        data_rows: 64,
+        partition: false,
+        renamed_headers: 0,
+      },
+      title: "PIANIFICAZIONE PERSONALE E TURNI",
+      period_start: "2026-10-26",
+      period_end: "2026-11-01",
+      skipped: { totals: 1, notes: 1, sections: 0 },
+      totals: "MATCH",
+      day_grid: false,
+      amounts: null,
+    },
+    recognized: [
+      { field: "work_date", origin: { kind: "COLUMN", detail: "Data" }, level: "HIGH", example: "2026-10-26" },
+      { field: "role", origin: { kind: "COLUMN", detail: "Reparto o mansione" }, level: "HIGH", example: "Reception" },
+      { field: "planned_hours", origin: { kind: "COLUMN", detail: "Ore previste" }, level: "HIGH", example: "8" },
+      { field: "actual_hours", origin: { kind: "COLUMN", detail: "Ore effettive" }, level: "HIGH", example: "8,5" },
+      { field: "planned_cost", origin: { kind: "COLUMN", detail: "Costo previsto" }, level: "HIGH", example: "120" },
+      { field: "currency", origin: { kind: "PROPERTY", detail: null }, level: "HIGH", example: "EUR" },
+    ],
+    people: 13,
+    questions: [],
+    blockers: [],
+    ...overrides,
+  };
+}
+
+/** What `import-understanding` answers: the inspection plus what NINFA understood and proposes. */
+export function understoodInspection(
+  understanding: Partial<Understanding> = {},
+  overrides: Partial<FileInspectionResponse> = {},
+): FileInspectionResponse {
+  return laborInspection({
+    file_type: "XLSX",
+    columns: [
+      column(0, "Data", ["26/10/2026"], { field: "work_date", level: "RECOGNIZED" }),
+      column(1, "Nome e cognome", [], { not_used_reason: "PERSON" }),
+      column(2, "Reparto o mansione", ["Reception", "Cucina"], { field: "role", level: "RECOGNIZED" }),
+      column(3, "Ore previste", ["8", "6"], { field: "planned_hours", level: "RECOGNIZED" }),
+      column(4, "Ore effettive", ["8,5", "6"], { field: "actual_hours", level: "RECOGNIZED" }),
+      column(5, "Costo previsto", ["120", "84"], { field: "planned_cost", level: "RECOGNIZED" }),
+    ],
+    understanding: understandingOf(understanding),
+    proposal: proposalOf(),
+    ...overrides,
+  });
+}
+
+export function questionOf(
+  kind: UnderstandingQuestion["kind"],
+  overrides: Partial<UnderstandingQuestion> = {},
+): UnderstandingQuestion {
+  return {
+    id: kind,
+    kind,
+    column: null,
+    field: null,
+    document: null,
+    candidate: null,
+    origin: null,
+    choices: [],
+    labels: [],
+    total_labels: 0,
+    ...overrides,
+  };
+}
+
+export const DEPARTMENT_CHOICES = ["HOUSEKEEPING", "FRONT_OFFICE", "FOOD_BEVERAGE", "KITCHEN", "MAINTENANCE", "OTHER"].map(
+  (value) => ({ value, count: null, sheets: [], columns: [] }),
+);
+
+/** What the dry run says about the realistic staff file: 13 people, 6 departments, hours and costs. */
+export function realisticValidation(overrides: Partial<ImportValidationResponse> = {}): ImportValidationResponse {
+  return validationOf({
+    rows_total: 52,
+    rows_valid: 52,
+    sample_rows: [],
+    sample_fields: [],
+    summary: {
+      date_from: "2026-10-26",
+      date_to: "2026-11-01",
+      departments: ["FRONT_OFFICE", "HOUSEKEEPING", "KITCHEN", "FOOD_BEVERAGE", "MAINTENANCE", "MANAGEMENT"],
+      planned_hours: "410",
+      actual_hours: "420.5",
+      planned_cost: "6304.60",
+      actual_cost: null,
+      currency: "EUR",
+      channels: null,
+      revenue: null,
+      documents: null,
+      suppliers: null,
+      net_total: null,
+    },
+    ...overrides,
   });
 }

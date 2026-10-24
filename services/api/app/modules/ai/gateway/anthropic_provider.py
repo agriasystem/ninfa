@@ -36,6 +36,8 @@ from app.modules.ai.gateway.protocol import (
     LanguageModelRequest,
     ModelAnswerStatus,
 )
+from app.modules.ai.import_understanding.resolver import ImportUnderstandingUnavailableError
+from app.modules.ai.import_understanding.types import ImportUnderstandingRequest
 
 logger = logging.getLogger(__name__)
 
@@ -238,4 +240,98 @@ class AnthropicLanguageModelProvider:
         return answer
 
 
-__all__ = ["ANTHROPIC_MODEL", "AnthropicLanguageModelProvider"]
+# --- Smart Import V3: the optional assistant that suggests what a column means -------------------
+#
+# A second, small class in the same file because this is the one file allowed to import
+# `anthropic`. At most two calls per file ever reach it (`ImportUnderstandingResolver`): the first
+# with the smaller model, the repeat - only after an answer that broke the rules - with the larger
+# one. Same discipline as above: bounded time, no retries, no prompt logging, no thinking shown,
+# and a failure of any kind is `ImportUnderstandingUnavailableError` - the deterministic reading
+# goes on without it.
+
+IMPORT_UNDERSTANDING_MODELS: tuple[str, str] = ("claude-haiku-5-5", "claude-sonnet-5-5")
+_IMPORT_TIMEOUT_SECONDS = 20.0
+_IMPORT_MAX_OUTPUT_TOKENS = 1500
+
+
+def _evidence_blocks(request: ImportUnderstandingRequest) -> list[TextBlockParam]:
+    """The evidence (DATA) and, on the repeat, the rules the previous answer broke - as stable
+    codes, never the previous answer. Separate blocks, never concatenated into the instructions."""
+    blocks: list[TextBlockParam] = [
+        {"type": "text", "text": f"<evidence>\n{request.evidence_json}\n</evidence>"}
+    ]
+    if request.retry_hints:
+        codes = ", ".join(request.retry_hints)
+        blocks.append(
+            {
+                "type": "text",
+                "text": f"<previous_answer_broke_rules>{codes}</previous_answer_broke_rules>",
+            }
+        )
+    return blocks
+
+
+def _payload_from_message(message: Message) -> object:
+    text_blocks = [block.text for block in message.content if block.type == "text"]
+    if len(text_blocks) != 1:
+        raise ImportUnderstandingUnavailableError("the response had no single structured block")
+    try:
+        return json.loads(text_blocks[0])
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ImportUnderstandingUnavailableError("the response was not valid JSON") from exc
+
+
+class AnthropicImportUnderstandingProvider:
+    """Implements `ImportUnderstandingProvider`; the resolver never knows this class exists."""
+
+    def __init__(self, api_key: str) -> None:
+        self._client = anthropic.Anthropic(
+            api_key=api_key, timeout=_IMPORT_TIMEOUT_SECONDS, max_retries=_MAX_RETRIES
+        )
+
+    def suggest(self, request: ImportUnderstandingRequest) -> object:
+        started = time.monotonic()
+        model = IMPORT_UNDERSTANDING_MODELS[min(max(request.attempt, 1), 2) - 1]
+        output_format: JSONOutputFormatParam = {
+            "type": "json_schema",
+            "schema": dict(request.schema),
+        }
+        output_config: OutputConfigParam = {"format": output_format}
+        messages: list[MessageParam] = [{"role": "user", "content": _evidence_blocks(request)}]
+        try:
+            message = self._client.messages.create(
+                model=model,
+                max_tokens=_IMPORT_MAX_OUTPUT_TOKENS,
+                system=request.system_instructions,
+                messages=messages,
+                output_config=output_config,
+            )
+        except Exception as exc:
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            logger.warning(
+                "import_understanding provider=anthropic model=%s status=UNAVAILABLE"
+                " elapsed_ms=%d error_type=%s",
+                model,
+                elapsed_ms,
+                type(exc).__name__,
+            )
+            raise ImportUnderstandingUnavailableError("the provider request failed") from exc
+        payload = _payload_from_message(message)
+        logger.info(
+            "import_understanding provider=anthropic model=%s attempt=%d elapsed_ms=%d"
+            " input_tokens=%d output_tokens=%d",
+            model,
+            request.attempt,
+            int((time.monotonic() - started) * 1000),
+            message.usage.input_tokens,
+            message.usage.output_tokens,
+        )
+        return payload
+
+
+__all__ = [
+    "ANTHROPIC_MODEL",
+    "IMPORT_UNDERSTANDING_MODELS",
+    "AnthropicImportUnderstandingProvider",
+    "AnthropicLanguageModelProvider",
+]

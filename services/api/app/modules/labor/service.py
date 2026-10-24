@@ -24,6 +24,7 @@ import logging
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date
+from decimal import Decimal
 from pathlib import PurePath
 from typing import Any
 from uuid import UUID, uuid4
@@ -152,6 +153,10 @@ class LaborDryRun:
     # Valid rows whose category NINFA could not work out from the role label (they would be kept as
     # OTHER, which no staffing decision uses). Counted over the WHOLE file, not just the samples.
     rows_unclassified: int = 0
+    # The role labels behind those rows, with how many rows each (department words, never names).
+    unclassified_labels: list[tuple[str, int]] = field(default_factory=list)
+    # What the valid rows add up to: from the validated, normalised rows - never from raw cells.
+    summary: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -320,6 +325,8 @@ class LaborImportService:
                 if (row.normalized_payload or {}).get("classification_method")
                 == LaborClassificationMethod.UNCLASSIFIED.value
             ),
+            unclassified_labels=_unclassified_labels(valid),
+            summary=_summary(valid),
         )
 
     # --- import -------------------------------------------------------------------------------
@@ -483,6 +490,7 @@ class LaborImportService:
             sheet_name=sheet_name,
             delimiter=None if options is None else options.delimiter,
             encoding=None if options is None else options.encoding,
+            layout=None if options is None else options.layout,
         )
         try:
             return open_table(content, filename, booking_options)
@@ -684,6 +692,62 @@ class LaborImportService:
 
 
 # --- module functions -----------------------------------------------------------------------------
+
+
+def _unclassified_labels(valid: list[StagedRow]) -> list[tuple[str, int]]:
+    counts: Counter[str] = Counter()
+    for row in valid:
+        payload = row.normalized_payload or {}
+        if payload.get("classification_method") == LaborClassificationMethod.UNCLASSIFIED.value:
+            label = payload.get("role_raw")
+            if isinstance(label, str) and label:
+                counts[label] += 1
+    return counts.most_common()
+
+
+def _hours_text(minutes: int) -> str:
+    return format((Decimal(minutes) / Decimal(60)).normalize(), "f")
+
+
+def _summary(valid: list[StagedRow]) -> dict[str, Any]:
+    """The totals of the rows that passed validation (what the import would actually keep)."""
+    planned_minutes = actual_minutes = 0
+    has_planned = has_actual = False
+    planned_cost = actual_cost = Decimal(0)
+    has_planned_cost = has_actual_cost = False
+    days: list[str] = []
+    departments: set[str] = set()
+    currencies: set[str] = set()
+    for row in valid:
+        payload = row.normalized_payload or {}
+        if payload.get("planned_minutes") is not None:
+            planned_minutes += int(payload["planned_minutes"])
+            has_planned = True
+        if payload.get("actual_minutes") is not None:
+            actual_minutes += int(payload["actual_minutes"])
+            has_actual = True
+        if payload.get("planned_cost") is not None:
+            planned_cost += Decimal(str(payload["planned_cost"]))
+            has_planned_cost = True
+        if payload.get("actual_cost") is not None:
+            actual_cost += Decimal(str(payload["actual_cost"]))
+            has_actual_cost = True
+        if payload.get("work_date"):
+            days.append(str(payload["work_date"]))
+        if payload.get("labor_category"):
+            departments.add(str(payload["labor_category"]))
+        if payload.get("currency"):
+            currencies.add(str(payload["currency"]))
+    return {
+        "date_from": min(days) if days else None,
+        "date_to": max(days) if days else None,
+        "departments": sorted(departments),
+        "planned_hours": _hours_text(planned_minutes) if has_planned else None,
+        "actual_hours": _hours_text(actual_minutes) if has_actual else None,
+        "planned_cost": format(planned_cost, "f") if has_planned_cost else None,
+        "actual_cost": format(actual_cost, "f") if has_actual_cost else None,
+        "currency": next(iter(currencies)) if len(currencies) == 1 else None,
+    }
 
 
 def _stage(rows: list[ParsedLaborRow]) -> tuple[list[StagedRow], dict[str, int]]:

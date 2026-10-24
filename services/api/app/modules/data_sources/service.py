@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
 from app.db.locks import LockWaitTimeoutError, hold_source_import_lock
+from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
 from app.modules.bookings.errors import BookingImportError
 from app.modules.bookings.mapping import CanonicalField, header_index, normalize_header
 from app.modules.bookings.models import ChannelType
@@ -65,6 +66,7 @@ from app.modules.data_sources.types import (
     SourcesOverview,
     SourceState,
 )
+from app.modules.data_sources.understanding import UnderstandAnswers, UnderstandingService
 from app.modules.ingestion.canonical_csv import (
     booking_format_options,
     identity_column_mapping,
@@ -81,6 +83,7 @@ from app.modules.ingestion.schemas import DataSourceCreate
 from app.modules.invoices.service import InvoiceImportService, detect_source
 from app.modules.labor.mapping import LaborField
 from app.modules.labor.service import LaborImportService
+from app.modules.properties.repository import PropertyRepository
 
 logger = logging.getLogger(__name__)
 
@@ -116,10 +119,17 @@ class MappedImport:
 
     mapping: MappingInput | None
     save_configuration: bool = False
+    # The first day of the period THIS file is about (a grid of days written Lun/Mar/...).
+    period_start: date | None = None
 
 
 class DataSourcesService:
-    def __init__(self, session: Session, tenant: TenantContext) -> None:
+    def __init__(
+        self,
+        session: Session,
+        tenant: TenantContext,
+        resolver: ImportUnderstandingResolver | None = None,
+    ) -> None:
         self._session = session
         self._tenant = tenant
         self._sources = DataSourceRepository(session, tenant)
@@ -127,6 +137,7 @@ class DataSourcesService:
         self._files = ImportFileRepository(session, tenant)
         self._channels = BookingChannelRepository(session, tenant)
         self._smart = SmartImportService(session, tenant)
+        self._understanding = UnderstandingService(session, tenant, self._smart, resolver)
 
     # --- reading ------------------------------------------------------------------------------
 
@@ -267,6 +278,32 @@ class DataSourcesService:
             self._already_imported(property_id, domain, content),
         )
 
+    def understand_file(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        *,
+        filename: str,
+        content: bytes,
+        answers: UnderstandAnswers,
+        confirmed_domain: bool = False,
+    ) -> FileInspection:
+        """What NINFA understands of a whole DOCUMENT (title, totals, department lines, a grid of
+        days, one sheet per department...) and what it still needs to ask. Read-only: it writes
+        NOTHING, exactly like `inspect_file`."""
+        self._check_size(content)
+        hotel = PropertyRepository(self._session, self._tenant).get(property_id)
+        return self._understanding.understand(
+            domain,
+            filename,
+            content,
+            answers,
+            confirmed_domain,
+            self._source_for_domain(property_id, domain),
+            self._already_imported(property_id, domain, content),
+            currency=None if hotel is None else hotel.currency,
+        )
+
     def check_mapping(self, domain: DataSourceDomain, mapping: MappingInput) -> MappingCheck:
         """Is the person's decision enough to import? Answered by the import service's own rules;
         needs no file and writes nothing."""
@@ -280,6 +317,7 @@ class DataSourcesService:
         filename: str,
         content: bytes,
         mapping: MappingInput | None,
+        period_start: date | None = None,
     ) -> DryRun:
         """Judge every row of the file with this decision exactly as the import will, and write
         NOTHING. `mapping=None` uses the configuration saved for this kind of data."""
@@ -292,6 +330,7 @@ class DataSourcesService:
             mapping,
             self._source_for_domain(property_id, domain),
             self._already_imported(property_id, domain, content),
+            period_start,
         )
 
     def saved_configuration(
@@ -409,28 +448,30 @@ class DataSourcesService:
         content: bytes,
         mapped: MappedImport,
     ) -> ImportOutcome | None:
-        adapter = self._smart.domain(domain)  # costs are XML: there are no columns to match
+        adapter = self._smart.domain(domain)
         if mapped.mapping is None:
             config, problem = self._smart.saved_config_for(
                 adapter, self._source_for_domain(property_id, domain)
             )
             if config is None:
                 return ImportOutcome(False, problem or ImportProblem.PROFILE_NOT_USABLE)
+            config = self._smart.config_with_period(adapter, config, mapped.period_start)
             try:
-                table = self._smart.read_table(
-                    content, filename, adapter.format_of(config).sheet_name
-                )
+                fmt = adapter.format_of(config)
+                table = self._smart.read_table(content, filename, fmt.sheet_name, fmt.layout)
             except BookingImportError as error:
                 return ImportOutcome(False, problem_of_error(error))
             index = header_index(table.headers)
             if any(normalize_header(c) not in index for c in adapter.columns_of(config).values()):
                 return ImportOutcome(False, ImportProblem.PROFILE_NOT_USABLE)  # another layout
             return None
+        mapping = self._smart.mapping_with_period(mapped.mapping, mapped.period_start)
+        assert mapping is not None
         try:
-            table = self._smart.read_table(content, filename, mapped.mapping.sheet_name)
+            table = self._smart.read_table(content, filename, mapping.sheet_name, mapping.layout)
         except BookingImportError as error:
             return ImportOutcome(False, problem_of_error(error))
-        resolved = self._smart.resolve(adapter, mapped.mapping, table)
+        resolved = self._smart.resolve(adapter, mapping, table)
         if resolved.config is not None:
             return None
         return ImportOutcome(
@@ -593,13 +634,17 @@ class DataSourcesService:
         resolved: Resolved | None = None
         override = None
         if mapped.mapping is not None:
+            mapping = self._smart.mapping_with_period(mapped.mapping, mapped.period_start)
+            assert mapping is not None
             try:
-                table = self._smart.read_table(content, filename, mapped.mapping.sheet_name)
+                table = self._smart.read_table(
+                    content, filename, mapping.sheet_name, mapping.layout
+                )
             except BookingImportError as error:
                 return ImportOutcome(False, problem_of_error(error)), None
             resolved = self._smart.resolve(
                 adapter,
-                mapped.mapping,
+                mapping,
                 table,
                 self._smart.preserved_documents(adapter, source),
             )
@@ -615,6 +660,9 @@ class DataSourcesService:
             saved, not_usable = self._smart.saved_config_for(adapter, source)
             if saved is None:
                 return ImportOutcome(False, not_usable or ImportProblem.PROFILE_NOT_USABLE), None
+            # The week THIS file is about goes with the saved structure (a grid of days).
+            with_week = self._smart.config_with_period(adapter, saved, mapped.period_start)
+            override = None if with_week is saved else with_week
         if source.domain == DataSourceDomain.BOOKINGS:
             booking = BookingImportService(self._session, self._tenant).import_file(
                 source.id,
@@ -635,6 +683,28 @@ class DataSourcesService:
                     updated=booking.bookings_updated,
                     unchanged=booking.bookings_unchanged,
                     already_imported=booking.duplicate_of_import_file_id is not None,
+                ),
+                resolved,
+            )
+        if source.domain == DataSourceDomain.COSTS:
+            invoices = InvoiceImportService(self._session, self._tenant).import_file(
+                source.id,
+                filename=filename,
+                content=content,
+                property_id=property_id,
+                mapping_override=override,
+            )
+            return (
+                ImportOutcome(
+                    succeeded=invoices.succeeded,
+                    problem=None
+                    if invoices.succeeded
+                    else problem_of_error_code(invoices.error_code, invoices.details),
+                    rows_total=invoices.rows_total,
+                    rows_invalid=invoices.rows_invalid,
+                    created=invoices.invoices_created,
+                    unchanged=invoices.invoices_unchanged,
+                    already_imported=invoices.duplicate_of_import_file_id is not None,
                 ),
                 resolved,
             )

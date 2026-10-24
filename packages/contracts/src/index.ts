@@ -721,12 +721,46 @@ export type ImportFieldKey =
   | "actual_hours"
   | "planned_cost"
   | "actual_cost"
-  | "currency";
+  | "currency"
+  // costs (a register in CSV / Excel, read through the same invoice model as the FatturaPA XML)
+  | "supplier_name"
+  | "supplier_vat_number"
+  | "supplier_tax_code"
+  | "supplier_iban"
+  | "invoice_number"
+  | "invoice_date"
+  | "due_date"
+  | "document_type"
+  | "invoice_net_amount"
+  | "invoice_tax_amount"
+  | "invoice_gross_amount"
+  | "line_number"
+  | "line_description"
+  | "quantity"
+  | "unit"
+  | "unit_price"
+  | "line_total"
+  | "vat_rate"
+  | "cost_category";
 
 /** What the person decided about ONE column. `field: null` is "ignore this column". */
 export interface ImportColumnChoice {
   header: string;
   field: ImportFieldKey | null;
+}
+
+/**
+ * How the STRUCTURE of the document is read (Smart Import V3): where the department of a row comes from
+ * when no column says it, which hours a grid of days holds, which table. The backend builds it and the page
+ * only carries it back; the week of a grid (`period_start`) is per file and never remembered.
+ */
+export interface ImportLayout {
+  version?: 1;
+  sheets?: string[];
+  table_key?: string | null;
+  department?: { kind: "SECTION" | "SHEET" | "TITLE" } | null;
+  grid?: { hours_field: "planned_hours" | "actual_hours" } | null;
+  period_start?: string | null;
 }
 
 /** The whole decision: what each column means, fixed values for what the file lacks, how it is written. */
@@ -739,6 +773,10 @@ export interface ImportMapping {
   date_order?: "DMY" | "MDY" | null;
   /** Only needed when the file writes amounts with a comma or a point as the decimal mark. */
   decimal_style?: "COMMA" | "POINT" | null;
+  /** Smart Import V3: how the document's structure is read. Carried back as the backend built it. */
+  layout?: ImportLayout | null;
+  /** The words the person taught NINFA: `{ role_mapping: { HK: "HOUSEKEEPING" } }`. */
+  labels?: Record<string, Record<string, string>>;
 }
 
 export type ImportSuggestionLevel = "RECOGNIZED" | "TO_CHECK";
@@ -751,7 +789,7 @@ export interface ImportColumnInfo {
   field: ImportFieldKey | null;
   level: ImportSuggestionLevel | null;
   /** Why a column is deliberately not offered as a field: a person's name, an hourly rate. */
-  not_used_reason: "PERSON" | "HOURLY_RATE" | null;
+  not_used_reason: "PERSON" | "HOURLY_RATE" | "CONTACT" | "IDENTITY" | null;
   /** What the values prove about how dates / numbers are written. */
   date_order: "ISO" | "DMY" | "MDY" | "AMBIGUOUS" | "CONFLICT" | null;
   number_style: "COMMA" | "POINT" | "AMBIGUOUS" | "MIXED" | null;
@@ -781,6 +819,140 @@ export interface ImportProfileInfo {
   missing_columns: string[];
 }
 
+// --- Smart Import V3: NINFA understands the DOCUMENT ----------------------------------------------------
+
+/** How much NINFA understood: READY = no question; ASK = a few single questions; MANUAL = match the columns;
+ * BLOCKED = the file cannot be imported as it is, and says why. */
+export type UnderstandingLevel = "READY" | "ASK" | "MANUAL" | "BLOCKED";
+
+export type UnderstandingQuestionKind =
+  | "DOMAIN"
+  | "TABLE"
+  | "DEPARTMENT_ROWS"
+  | "DEPARTMENT_CONFIRM"
+  | "VALUE_LABELS"
+  | "COLUMN_MEANING"
+  | "GRID_HOURS"
+  | "PERIOD"
+  | "AMOUNT_BASIS"
+  | "DATE_ORDER"
+  | "DECIMAL_STYLE";
+
+export type UnderstandingOriginKind =
+  | "COLUMN"
+  | "SECTION"
+  | "SHEET"
+  | "TITLE"
+  | "PROFILE"
+  | "USER"
+  | "LEARNED"
+  | "GRID"
+  | "PROPERTY"
+  | "ASSISTANT";
+
+export interface UnderstandingChoice {
+  value: string;
+  count: number | null;
+  sheets: string[];
+  columns: string[];
+  /** A table on offer: the line written just above it, and the row it starts on. */
+  title?: string | null;
+  first_row?: number | null;
+}
+
+export interface UnderstandingQuestion {
+  id: string;
+  kind: UnderstandingQuestionKind;
+  column: string | null;
+  field: string | null;
+  /** The stored document an answer is kept in ("role_mapping", "category_mapping", "status_mapping"). */
+  document: string | null;
+  /** A likely answer and who suggests it; the person still answers. */
+  candidate: string | null;
+  origin: UnderstandingOriginKind | null;
+  choices: UnderstandingChoice[];
+  /** VALUE_LABELS: the unknown words, most frequent first, with how many rows each. */
+  labels: { label: string; count: number }[];
+  total_labels: number;
+}
+
+export type UnderstandingBlockerCode =
+  | "NO_TABLE"
+  | "MISSING_REQUIRED"
+  | "PERIOD_SUMMARY_ONLY"
+  | "GRID_NOT_SUPPORTED"
+  | "GRID_NOT_HOURS"
+  | "AMOUNT_NOT_NET"
+  | "MIXED_FORMATS";
+
+export interface UnderstandingBlocker {
+  code: UnderstandingBlockerCode;
+  /** MISSING_REQUIRED: what the file does not have; each group is "at least one of". */
+  groups: string[][];
+}
+
+export interface UnderstandingRecognized {
+  field: ImportFieldKey;
+  origin: { kind: UnderstandingOriginKind; detail: string | null };
+  level: "HIGH" | "MEDIUM" | "LOW";
+  /** A value seen in the file (never for personal data). */
+  example: string | null;
+}
+
+export interface UnderstandingDocument {
+  file_type: string;
+  sheets: { name: string; role: string; rows: number }[];
+  table: {
+    sheets: string[];
+    header_rows: number[];
+    first_row: number;
+    last_row: number;
+    data_rows: number;
+    partition: boolean;
+    renamed_headers: number;
+  } | null;
+  title: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  skipped: { totals: number; notes: number; sections: number };
+  /** Do the totals of the file add up the rows? */
+  totals: "MATCH" | "PARTIAL" | "MISMATCH" | "UNVERIFIED" | null;
+  day_grid: boolean;
+  /** Costs: do net + VAT = total on the rows? */
+  amounts: "MATCH" | "MISMATCH" | null;
+}
+
+export interface Understanding {
+  level: UnderstandingLevel;
+  detection: {
+    domain: DataSourceDomain | null;
+    level: "HIGH" | "MEDIUM" | "LOW";
+    scores: { domain: DataSourceDomain; score: number }[];
+    expected: DataSourceDomain | null;
+  };
+  document: UnderstandingDocument;
+  recognized: UnderstandingRecognized[];
+  /** Staff files: distinct people, counted in memory and kept nowhere. */
+  people: number | null;
+  questions: UnderstandingQuestion[];
+  blockers: UnderstandingBlocker[];
+}
+
+/** What the person has already said, so a question is never asked twice. */
+export interface UnderstandAnswers {
+  sheet_name?: string | null;
+  table_key?: string | null;
+  period_start?: string | null;
+  grid_hours?: "planned_hours" | "actual_hours" | null;
+  department_from?: "SECTION" | "SHEET" | "TITLE" | null;
+  department_value?: string | null;
+  amount_basis?: "NET" | "GROSS" | null;
+  date_order?: "DMY" | "MDY" | null;
+  decimal_style?: "COMMA" | "POINT" | null;
+  column_fields?: Record<string, string>;
+  labels?: Record<string, Record<string, string>>;
+}
+
 export interface FileInspectionResponse {
   domain: DataSourceDomain;
   file_type: "CSV" | "XLSX" | null;
@@ -798,6 +970,9 @@ export interface FileInspectionResponse {
   already_canonical: boolean;
   profile: ImportProfileInfo;
   already_imported: boolean;
+  /** Only on `import-understanding`: what NINFA understood of the document, and the decision it proposes. */
+  understanding?: Understanding | null;
+  proposal?: ImportMapping | null;
 }
 
 export interface MappingCheckResponse {
@@ -826,6 +1001,26 @@ export interface ImportInvalidRow {
   issues: { field: string; code: string }[];
 }
 
+/** What a whole file adds up to, from the rows that PASSED validation (never from raw cells). */
+export interface ImportSummary {
+  date_from: string | null;
+  date_to: string | null;
+  /** Staff */
+  departments: string[];
+  planned_hours: string | null;
+  actual_hours: string | null;
+  planned_cost: string | null;
+  actual_cost: string | null;
+  currency: string | null;
+  /** Bookings */
+  channels: number | null;
+  revenue: string | null;
+  /** Costs */
+  documents: number | null;
+  suppliers: number | null;
+  net_total: string | null;
+}
+
 export interface ImportValidationResponse {
   status: "READY" | "NEEDS_CHOICE" | "BLOCKED";
   problem: ImportProblem | null;
@@ -845,6 +1040,10 @@ export interface ImportValidationResponse {
    * staffing decision uses. Counted over the whole file. Always 0 for the other kinds of data.
    */
   rows_unclassified: number;
+  /** What the valid rows add up to; `null` when nothing was valid. */
+  summary?: ImportSummary | null;
+  /** Words the whole file uses that NINFA does not know (a department, a category): asked once. */
+  questions?: UnderstandingQuestion[];
 }
 
 export interface MappedImportResultResponse extends ImportResultResponse {

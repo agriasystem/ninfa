@@ -25,6 +25,7 @@ import hashlib
 import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import PurePath
 from typing import Any, Literal
 from uuid import UUID, uuid4
@@ -154,6 +155,23 @@ class InvoiceImportResult:
 
 
 @dataclass(frozen=True)
+class InvoiceDryRun:
+    """What importing a structured file WOULD do with a given mapping. Nothing was written."""
+
+    file_type: str
+    rows_total: int
+    rows_valid: int
+    rows_invalid: int
+    row_error_summary: dict[str, int]
+    sample_payloads: list[dict[str, Any]]
+    invalid_rows: list[tuple[int, list[dict[str, str]]]]
+    # The category words of the file that mean nothing yet, with how many rows each.
+    unknown_categories: list[tuple[str, int]] = field(default_factory=list)
+    # What the valid documents add up to (from the validated documents, never raw cells).
+    summary: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class _Ids:
     """Plain ids, captured up front: safe to use after a rollback expired the ORM objects."""
 
@@ -256,6 +274,98 @@ class InvoiceImportService:
         )
         return profile
 
+    # --- dry run ------------------------------------------------------------------------------
+
+    def dry_run(
+        self,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: InvoiceMappingConfig,
+        sample_size: int = 5,
+        invalid_sample_size: int = 5,
+    ) -> InvoiceDryRun:
+        """Read, map, normalise and validate a structured file exactly as the import would, and
+        write NOTHING: no job, no staged row, no supplier, no profile. It needs no data source.
+
+        Raises InvoiceImportError for what stops the import before any row is judged (an
+        unreadable file, a mapped column that is not there, a date or number format that has to be
+        chosen). Every other problem is a row problem and is counted in the result.
+        """
+        prop = self._properties.get(property_id)
+        if prop is None or prop.archived_at is not None:
+            raise InvoiceImportError(
+                InvoiceErrorCode.INVALID_DATA_SOURCE,
+                "The property cannot be used for invoice imports",
+                details={"reason": "property_unavailable"},
+            )
+        options = mapping.format_options
+        table = self._open_table(
+            content,
+            filename,
+            FormatOptions(
+                sheet_name=options.sheet_name,
+                delimiter=options.delimiter,
+                encoding=options.encoding,
+                layout=options.layout,
+            ),
+        )
+        schema = check_schema(mapping, compute_header_signature(table.headers), table.headers)
+        if not schema.compatible:
+            raise InvoiceImportError(
+                InvoiceErrorCode.SOURCE_SCHEMA_CHANGED,
+                "The file does not have the columns the mapping refers to",
+                details={
+                    "reason": "mapped_columns_missing",
+                    "missing_columns": list(schema.missing_columns),
+                },
+            )
+        rows = extract(table, mapping)
+        if not rows:
+            raise InvoiceImportError(InvoiceErrorCode.EMPTY_FILE, "The file has no invoice rows")
+        require_explicit_formats(rows, mapping)
+        documents = parse_structured(
+            rows,
+            mapping,
+            property_currency=prop.currency,
+            data_source_id=None,
+            source_format=SourceFormat.XLSX if table.file_type == "xlsx" else SourceFormat.CSV,
+        )
+        staged, summary, _warnings = _stage(documents)
+        # One entry per staged row, in the same order: the row of the file it was read from.
+        file_rows: list[int | None] = []
+        for document in documents:
+            file_rows.extend(line.file_row for line in document.lines)
+            if not document.lines:  # a document with no line still has a row to carry its issues
+                file_rows.append(None)
+        valid = [row for row in staged if row.validation_status == ImportRowStatus.VALID]
+        invalid = [
+            (position, row)
+            for position, row in enumerate(staged)
+            if row.validation_status == ImportRowStatus.INVALID
+        ]
+        unknown: Counter[str] = Counter(
+            str(issue["value"])
+            for _position, row in invalid
+            for issue in row.validation_errors
+            if issue.get("code") == InvoiceErrorCode.UNKNOWN_CATEGORY.value and issue.get("value")
+        )
+        return InvoiceDryRun(
+            file_type=table.file_type,
+            rows_total=len(staged),
+            rows_valid=len(valid),
+            rows_invalid=len(invalid),
+            row_error_summary=summary,
+            sample_payloads=[dict(row.normalized_payload or {}) for row in valid[:sample_size]],
+            invalid_rows=[
+                (_file_row(file_rows, position) or row.row_number, list(row.validation_errors))
+                for position, row in invalid[:invalid_sample_size]
+            ],
+            unknown_categories=unknown.most_common(),
+            summary=_dry_run_summary(documents),
+        )
+
     # --- import -------------------------------------------------------------------------------
 
     def import_file(
@@ -266,8 +376,12 @@ class InvoiceImportService:
         content: bytes,
         mime_type: str | None = None,
         property_id: UUID | None = None,
+        mapping_override: InvoiceMappingConfig | None = None,
     ) -> InvoiceImportResult:
         """Import one invoice file into the canonical model, atomically and idempotently.
+
+        `mapping_override` is a validated mapping used instead of the one saved for the data source
+        (Smart Import: the person's own matching, saved only once this import has succeeded).
 
         Raises InvoiceImportError(INVOICE_INVALID_DATA_SOURCE) when the data source cannot be used
         (nothing is created). Every later problem ends as a FAILED ImportJob and a returned result
@@ -296,7 +410,7 @@ class InvoiceImportService:
         self._log("invoice import started", ids)
 
         try:
-            result = self._run(ids, filename, content, currency, duplicate_of)
+            result = self._run(ids, filename, content, currency, duplicate_of, mapping_override)
         except (InvoiceImportError, SupplierError) as error:
             result = self._fail(ids, error.code, error.message, _details(error), duplicate_of)
         except Exception as error:  # a bug or infrastructure problem: never leave the job RUNNING
@@ -332,6 +446,7 @@ class InvoiceImportService:
         content: bytes,
         currency: str,
         duplicate_of: UUID | None,
+        mapping_override: InvoiceMappingConfig | None = None,
     ) -> InvoiceImportResult:
         kind = detect_source(filename, content)
         source_format = {
@@ -342,7 +457,9 @@ class InvoiceImportService:
         if kind == "xml":
             documents = parse_fatturapa(content, data_source_id=ids.data_source)
         else:
-            documents = self._parse_structured(ids, filename, content, currency, source_format)
+            documents = self._parse_structured(
+                ids, filename, content, currency, source_format, mapping_override
+            )
         if not documents:
             raise InvoiceImportError(
                 InvoiceErrorCode.EMPTY_FILE, "The file has a header but no invoice rows"
@@ -375,19 +492,24 @@ class InvoiceImportService:
         content: bytes,
         currency: str,
         source_format: SourceFormat,
+        mapping_override: InvoiceMappingConfig | None = None,
     ) -> list[ParsedDocument]:
-        profile = self._profiles.get_for_data_source(ids.data_source)
-        if profile is None:
+        profile = (
+            None
+            if mapping_override is not None
+            else self._profiles.get_for_data_source(ids.data_source)
+        )
+        if profile is None and mapping_override is None:
             raise InvoiceImportError(
                 InvoiceErrorCode.MAPPING_REQUIRED,
                 "This data source has no confirmed mapping yet: describe the file and confirm one",
                 details={"reason": "no_confirmed_mapping"},
             )
-        config = InvoiceMappingConfig.parse(
+        config = mapping_override or InvoiceMappingConfig.parse(
             {
-                "column_mapping": profile.column_mapping,
-                "category_mapping": profile.category_mapping,
-                "format_options": profile.format_options,
+                "column_mapping": profile.column_mapping if profile else {},
+                "category_mapping": profile.category_mapping if profile else {},
+                "format_options": profile.format_options if profile else {},
             }
         )
         options = config.format_options
@@ -398,9 +520,12 @@ class InvoiceImportService:
                 sheet_name=options.sheet_name,
                 delimiter=options.delimiter,
                 encoding=options.encoding,
+                layout=options.layout,
             ),
         )
-        schema = check_schema(config, profile.header_signature, table.headers)
+        # An override was built from THIS file's headers a moment ago: only a saved one can be
+        # stale.
+        schema = check_schema(config, profile.header_signature if profile else "", table.headers)
         if not schema.compatible:
             raise InvoiceImportError(
                 InvoiceErrorCode.SOURCE_SCHEMA_CHANGED,
@@ -810,6 +935,28 @@ def _stage(
                 )
             )
     return rows, dict(sorted(summary.items())), dict(sorted(warnings.items()))
+
+
+def _file_row(file_rows: list[int | None], position: int) -> int | None:
+    return file_rows[position] if position < len(file_rows) else None
+
+
+def _dry_run_summary(documents: list[ParsedDocument]) -> dict[str, Any]:
+    """The totals of the documents that passed validation (what the import would keep)."""
+    valid = [document.canonical for document in documents if document.valid and document.canonical]
+    if not valid:
+        return {}
+    net = sum((line.line_total for doc in valid for line in doc.lines), Decimal(0))
+    dates = [doc.invoice_date.isoformat() for doc in valid]
+    currencies = {doc.currency for doc in valid}
+    return {
+        "documents": len(valid),
+        "suppliers": len({doc.supplier.normalized_name for doc in valid}),
+        "net_total": format(net, "f"),
+        "date_from": min(dates),
+        "date_to": max(dates),
+        "currency": next(iter(currencies)) if len(currencies) == 1 else None,
+    }
 
 
 def _resolution_story(

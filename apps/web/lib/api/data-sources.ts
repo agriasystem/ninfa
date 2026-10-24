@@ -9,6 +9,7 @@ import type {
   MappedImportResultResponse,
   MappingCheckResponse,
   SavedImportConfiguration,
+  UnderstandAnswers,
 } from "@ninfa/contracts";
 
 import { apiBaseUrl, apiRequest, type ApiResult } from "@/lib/api/client";
@@ -137,6 +138,40 @@ export function inspectFile(
   return apiRequest<FileInspectionResponse>(
     `${dataSourcesPath(propertyId)}/import-inspection?${query.toString()}`,
     { method: "POST", file },
+    fetchImpl,
+  );
+}
+
+export interface UnderstandFileArgs {
+  propertyId: string;
+  domain: DataSourceDomain;
+  file: File;
+  /** What the person has already said (a question is never asked twice). */
+  answers: UnderstandAnswers;
+  /** The person has already confirmed this is the kind of data they are importing. */
+  confirmedDomain: boolean;
+}
+
+/**
+ * POST - NINFA reads the whole DOCUMENT (every sheet, titles, totals, department lines, a grid of days)
+ * and says what it understood, what it still needs to ask and the decision it proposes. Writes NOTHING.
+ */
+export async function understandFile(
+  { propertyId, domain, file, answers, confirmedDomain }: UnderstandFileArgs,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ApiResult<FileInspectionResponse>> {
+  return apiRequest<FileInspectionResponse>(
+    `${dataSourcesPath(propertyId)}/import-understanding`,
+    {
+      method: "POST",
+      body: {
+        domain,
+        filename: file.name,
+        file_base64: await fileToBase64(file),
+        confirmed_domain: confirmedDomain,
+        answers,
+      },
+    },
     fetchImpl,
   );
 }

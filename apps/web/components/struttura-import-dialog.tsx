@@ -2,7 +2,11 @@
 
 import { useState, type ChangeEvent } from "react";
 
-import type { DataSourceDomain, ImportPreviewResponse } from "@ninfa/contracts";
+import type {
+  DataSourceDomain,
+  ImportPreviewResponse,
+  UnderstandingBlocker,
+} from "@ninfa/contracts";
 
 import { downloadTemplate } from "@/lib/api/data-sources";
 import { formatPropertyLocalDateLongItalian } from "@/lib/date/property-date";
@@ -14,10 +18,13 @@ import { ACCEPT_OF_DOMAIN, useImportFlow } from "@/lib/sources/use-import-flow";
 import { DownloadIcon, SpinnerIcon, UploadIcon } from "./icons";
 import { StrutturaImportMapping } from "./struttura-import-mapping";
 import { StrutturaImportPreview } from "./struttura-import-preview";
+import { StrutturaImportQuestion } from "./struttura-import-question";
+import { StrutturaImportUnderstood } from "./struttura-import-understood";
 import { StrutturaModal } from "./struttura-modal";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.importFlow;
+const UNDERSTANDING = sourcesCopy.understanding;
 
 function Busy({ text }: { text: string }) {
   return (
@@ -25,6 +32,23 @@ function Busy({ text }: { text: string }) {
       <SpinnerIcon className="struttura-flow__spinner" />
       {text}
     </p>
+  );
+}
+
+/** Why a file cannot be imported as it is, in the hotelier's words (the backend names the reason). */
+function BlockerLine({ blocker }: { blocker: UnderstandingBlocker }) {
+  const copy = UNDERSTANDING.blocked;
+  if (blocker.code !== "MISSING_REQUIRED") return <p>{copy[blocker.code]}</p>;
+  const label = (field: string) => (sourcesCopy.fields as Record<string, string>)[field] ?? field;
+  return (
+    <>
+      <p>{copy.MISSING_REQUIRED}</p>
+      <ul>
+        {blocker.groups.map((group) => (
+          <li key={group.join("|")}>{copy.missingGroup(group.map(label))}</li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -204,7 +228,17 @@ export function StrutturaImportDialog({
           />
         ) : null}
 
-        {state.step === "ready" ? (
+        {state.step === "ready" && state.understanding !== null ? (
+          <StrutturaImportUnderstood
+            step={state}
+            onSave={flow.setSave}
+            onImport={() => void flow.confirm()}
+            onReview={flow.reviewColumns}
+            onChooseOther={flow.reset}
+          />
+        ) : null}
+
+        {state.step === "ready" && state.understanding === null ? (
           <StrutturaImportPreview
             step={state}
             timeZone={timeZone}
@@ -213,6 +247,42 @@ export function StrutturaImportDialog({
             onReview={flow.reviewColumns}
             onChooseOther={flow.reset}
           />
+        ) : null}
+
+        {state.step === "ask" ? (
+          <StrutturaImportQuestion step={state} domain={domain} flow={flow} />
+        ) : null}
+
+        {state.step === "blocked" ? (
+          <>
+            <p className="struttura-flow__file">{COPY.chosen(state.file.name)}</p>
+            <div className="struttura-flow__problem" role="alert">
+              <h3 className="struttura-flow__subtitle">{UNDERSTANDING.blocked.title}</h3>
+              {state.understanding.blockers.map((blocker) => (
+                <BlockerLine key={blocker.code} blocker={blocker} />
+              ))}
+              <p>{UNDERSTANDING.blocked.nothingImported}</p>
+            </div>
+            <div className="struttura-flow__actions">
+              <StrutturaButton variant="outline" onClick={flow.reset}>
+                {COPY.chooseOther}
+              </StrutturaButton>
+            </div>
+          </>
+        ) : null}
+
+        {state.step === "other-kind" ? (
+          <>
+            <p className="struttura-flow__file">{COPY.chosen(state.file.name)}</p>
+            <div className="struttura-flow__problem" role="alert">
+              <p>{UNDERSTANDING.question.otherKind(UNDERSTANDING.kindName[state.kind])}</p>
+            </div>
+            <div className="struttura-flow__actions">
+              <StrutturaButton variant="outline" onClick={flow.reset}>
+                {COPY.chooseOther}
+              </StrutturaButton>
+            </div>
+          </>
         ) : null}
 
         {state.step === "preview" ? (

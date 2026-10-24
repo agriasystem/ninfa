@@ -26,6 +26,7 @@ from app.modules.bookings.errors import BookingErrorCode, BookingImportError
 from app.modules.bookings.models import BookingStatus, ChannelType
 from app.modules.bookings.statuses import resolve_status
 from app.modules.bookings.text import normalize_key
+from app.modules.document_understanding.layout import LayoutSpec
 
 
 class CanonicalField(StrEnum):
@@ -128,6 +129,8 @@ class FormatOptions(BaseModel):
     date_formats: dict[CanonicalField, str] = {}
     decimal_separator: Literal[".", ","] | None = None
     thousands_separator: Literal[",", ".", " ", "'"] | None = None
+    # Smart Import V3: how the document's structure is read (title, totals, sections, day grid).
+    layout: LayoutSpec | None = None
 
     @field_validator("date_formats")
     @classmethod

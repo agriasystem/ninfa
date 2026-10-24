@@ -11,15 +11,20 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.data_sources.files import ImportProblem
+from app.modules.data_sources.understanding_types import Question, UnderstandingInfo
+from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.ingestion.models import DataSourceDomain
 
 MAX_COLUMNS = 200
 MAX_HEADER_LENGTH = 200
 MAX_CONSTANTS = 20
 MAX_CONSTANT_LENGTH = 200
+MAX_LABEL_DOCUMENTS = 4
+MAX_LABELS = 200
+MAX_LABEL_LENGTH = 120
 
 
 # --- what the person decides (the request) --------------------------------------------------------
@@ -49,6 +54,25 @@ class MappingInput(BaseModel):
     date_order: Literal["DMY", "MDY"] | None = None
     # Only needed when the file writes amounts with a comma or a point as the decimal mark.
     decimal_style: Literal["COMMA", "POINT"] | None = None
+    # Smart Import V3: how the STRUCTURE of the document is read (a department that is a line, a
+    # sheet or the title; a grid of days) - saved with the configuration, minus this file's dates.
+    layout: LayoutSpec | None = None
+    # The words the person taught NINFA: {"role_mapping": {"HK": "HOUSEKEEPING"}} (a department
+    # label, a status, a cost category). Kept in the configuration of THIS source only.
+    labels: dict[str, dict[str, str]] = Field(default_factory=dict)
+
+    @field_validator("labels")
+    @classmethod
+    def _labels_are_bounded(cls, value: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+        if len(value) > MAX_LABEL_DOCUMENTS:
+            raise ValueError("too many documents of labels")
+        for document, words in value.items():
+            if len(document) > 40 or len(words) > MAX_LABELS:
+                raise ValueError("too many labels")
+            for label, meaning in words.items():
+                if not label.strip() or len(label) > MAX_LABEL_LENGTH or len(meaning) > 40:
+                    raise ValueError("a label is empty or too long")
+        return value
 
 
 # --- what the page may ask for --------------------------------------------------------------------
@@ -154,6 +178,10 @@ class FileInspection:
     already_canonical: bool = False
     profile: ProfileInfo = field(default_factory=lambda: ProfileInfo(ProfileStatus.NONE))
     already_imported: bool = False
+    # Smart Import V3: what NINFA understood of the DOCUMENT (None: the plain V2 reading).
+    understanding: UnderstandingInfo | None = None
+    # ...and the decision it proposes from that (columns, layout, what the person already said).
+    proposal: "MappingInput | None" = None
 
 
 # --- checking and trying a decision ---------------------------------------------------------------
@@ -204,6 +232,28 @@ class InvalidRow:
 
 
 @dataclass(frozen=True, slots=True)
+class DryRunSummary:
+    """What a whole file adds up to, from the rows that PASSED validation (never from raw cells)."""
+
+    date_from: str | None = None
+    date_to: str | None = None
+    # Staff
+    departments: tuple[str, ...] = ()
+    planned_hours: str | None = None
+    actual_hours: str | None = None
+    planned_cost: str | None = None
+    actual_cost: str | None = None
+    currency: str | None = None
+    # Bookings
+    channels: int | None = None
+    revenue: str | None = None
+    # Costs
+    documents: int | None = None
+    suppliers: int | None = None
+    net_total: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class DryRun:
     status: DryRunStatus
     problem: ImportProblem | None = None
@@ -221,6 +271,9 @@ class DryRun:
     # Valid rows NINFA could not assign to a department (kept as "Altro", which no staffing decision
     # uses). Staff files only; always 0 elsewhere.
     rows_unclassified: int = 0
+    summary: DryRunSummary | None = None
+    # What is still unclear about the VALUES of the file (department words NINFA does not know...).
+    questions: tuple[Question, ...] = ()
 
     @property
     def can_import(self) -> bool:
@@ -246,6 +299,8 @@ class SavedConfiguration:
 
 __all__ = [
     "MAX_COLUMNS",
+    "MAX_LABELS",
+    "DryRunSummary",
     "MAX_CONSTANTS",
     "MAX_CONSTANT_LENGTH",
     "MAX_HEADER_LENGTH",

@@ -24,6 +24,7 @@ _SOURCES_METHODS = {
     f"{_SOURCES}/imports": {"post"},
     f"{_SOURCES}/imports/mapped": {"post"},
     f"{_SOURCES}/import-inspection": {"post"},
+    f"{_SOURCES}/import-understanding": {"post"},
     f"{_SOURCES}/import-mapping-check": {"post"},
     f"{_SOURCES}/import-validation": {"post"},
     f"{_SOURCES}/{{data_source_id}}/import-configuration": {"get", "delete"},

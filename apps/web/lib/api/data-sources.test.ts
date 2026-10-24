@@ -70,6 +70,7 @@ describe("the data-source API client", () => {
       "inspectFile",
       "previewImport",
       "removeDataSource",
+      "understandFile",
       "validateImport",
     ]);
   });

@@ -244,13 +244,22 @@ def test_reading_a_file_writes_nothing_at_all(
     assert card(api_client, env, "STAFF")["state"] == "NOT_CONFIGURED"
 
 
-def test_costs_arrive_as_fatturapa_xml_and_have_no_columns_to_match(
+def test_a_fatturapa_xml_has_no_columns_to_match_and_a_cost_register_has(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
-    response = inspect(api_client, env, "COSTS", "fatture.csv", b"a;b\n1;2\n")
+    from tests.invoice_support import fattura_xml
 
-    assert response.status_code == 404
-    assert response.json()["error"]["code"] == "UNSUPPORTED_DOMAIN"
+    xml = inspect(api_client, env, "COSTS", "fattura.xml", fattura_xml())
+    csv = b"Fornitore;Numero fattura;Data\r\nA;1;2026-10-03\r\n"
+    register = inspect(api_client, env, "COSTS", "registro.csv", csv)
+
+    assert xml.status_code == 200 and xml.json()["problem"] == "UNSUPPORTED_FILE"
+    assert register.status_code == 200 and register.json()["problem"] is None
+    assert {c["header"]: c["field"] for c in register.json()["columns"]} == {
+        "Fornitore": "supplier_name",
+        "Numero fattura": "invoice_number",
+        "Data": "invoice_date",
+    }
 
 
 # --- is this matching enough? -------------------------------------------------------------------
