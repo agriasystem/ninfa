@@ -724,7 +724,20 @@ describe("a format NINFA already knows", () => {
     await pick(user, csvFile());
 
     expect(await within(dialog()).findByRole("heading", { level: 3, name: "Abbina le colonne del tuo file" })).not.toBeNull();
+    expect(within(dialog()).getByText(/colonne diverse dall'ultima volta.*non è stata applicata/u)).not.toBeNull();
     expect(validateImportMock).not.toHaveBeenCalled(); // never applied silently
+  });
+
+  it("a configuration written for an older way of reading says so", async () => {
+    const user = await openStaffImport(laborViaCsv());
+    const old = recognizedInspection();
+    inspectFileMock.mockResolvedValue(
+      ok({ ...old, profile: { ...old.profile, status: "NEEDS_REVIEW", reason: "VERSION_CHANGED", missing_columns: [] } }),
+    );
+
+    await pick(user, csvFile());
+
+    expect(await within(dialog()).findByText(/ha aggiornato il modo di leggere questi file/u)).not.toBeNull();
   });
 });
 

@@ -1,6 +1,7 @@
 import type {
   ImportFieldKey,
   ImportProblem,
+  ImportProfileInfo,
   SourceCardKey,
   SourceMethod,
 } from "@ninfa/contracts";
@@ -242,6 +243,14 @@ export const sourcesCopy = {
     intro: "NINFA ha riconosciuto alcune colonne. Controlla che siano corrette prima di importare i dati.",
     introNothing:
       "NINFA non ha riconosciuto le colonne di questo file: scegli tu cosa significa ciascuna.",
+    // shown when a saved configuration exists but was not applied to this file
+    savedNotApplied: {
+      COLUMNS_CHANGED:
+        "Questo file ha colonne diverse dall'ultima volta, quindi la configurazione salvata non è stata applicata. Controlla l'abbinamento.",
+      VERSION_CHANGED:
+        "NINFA ha aggiornato il modo di leggere questi file: controlla l'abbinamento prima di importare.",
+      INVALID: "La configurazione salvata non è più valida: abbina di nuovo le colonne.",
+    } satisfies Record<NonNullable<ImportProfileInfo["reason"]>, string>,
     tableLabel: "Colonne del file",
     columns: { file: "Colonna nel tuo file", example: "Esempio", meaning: "Significato per NINFA" },
     ignore: "Ignora questa colonna",

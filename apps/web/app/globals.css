@@ -5784,46 +5784,91 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
    "Abbina le colonne", the preview and the saved configuration. Light, no orange.
    ========================================================================== */
 
-.struttura-match table {
+/* The matching screen lives in a narrow dialog: each column of the file is a small card (name, example values,
+   what it means), never a table row that would push the part that matters out of sight. */
+.struttura-match table,
+.struttura-match tbody {
+  display: block;
   width: 100%;
-  border-collapse: collapse;
   font-size: 0.8125rem;
+}
+
+.struttura-match thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.struttura-match tbody tr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px 14px;
+  padding: 12px;
+  border-bottom: 1px solid var(--struttura-line);
+}
+
+.struttura-match tbody tr:last-child {
+  border-bottom: 0;
 }
 
 .struttura-match th,
 .struttura-match td {
-  padding: 9px 12px;
+  display: block;
+  padding: 0;
+  border: 0;
   text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid var(--struttura-line);
-}
-
-.struttura-match tbody tr:last-child th,
-.struttura-match tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.struttura-match thead th {
-  font-weight: 600;
-  color: var(--home-greeting);
-  white-space: nowrap;
-  background: var(--struttura-soft);
+  white-space: normal;
+  background: transparent;
 }
 
 .struttura-match tbody th {
-  min-width: 120px;
   font-weight: 600;
   color: var(--home-ink);
+  overflow-wrap: anywhere;
 }
 
 .struttura-match td:nth-child(2) {
-  min-width: 120px;
+  font-size: 0.75rem;
   color: var(--home-greeting);
   overflow-wrap: anywhere;
 }
 
 .struttura-match td:nth-child(3) {
-  min-width: 220px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 4px;
+}
+
+.struttura-match td:nth-child(3) select {
+  flex: 1 1 180px;
+}
+
+@media (min-width: 720px) {
+  .struttura-match tbody tr {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    align-items: start;
+  }
+
+  .struttura-match tbody th {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .struttura-match td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .struttura-match td:nth-child(3) {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    margin-top: 0;
+  }
 }
 
 .struttura-match select,
@@ -5858,7 +5903,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 }
 
 .struttura-match td .struttura-badge {
-  margin-left: 8px;
+  margin-left: 0;
 }
 
 .struttura-badge[data-level="RECOGNIZED"] {
@@ -5868,7 +5913,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 
 .struttura-match__note {
   display: block;
-  margin-top: 4px;
+  flex-basis: 100%;
   font-size: 0.75rem;
   font-weight: 400;
   color: var(--home-greeting);
@@ -5991,10 +6036,6 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 }
 
 @media (max-width: 719px) {
-  .struttura-match td:nth-child(3) {
-    min-width: 190px;
-  }
-
   .struttura-match__fixed-row label {
     flex-direction: column;
     align-items: stretch;

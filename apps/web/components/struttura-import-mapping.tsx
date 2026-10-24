@@ -158,6 +158,11 @@ export function StrutturaImportMapping({
     hint.question === "DATE_ORDER" ? !decision.date_order : !decision.decimal_style,
   );
   const anySuggested = inspection.columns.some((column) => column.field !== null);
+  // A saved configuration that was NOT applied says why, so the person is not left wondering.
+  const savedNote =
+    inspection.profile.status === "NEEDS_REVIEW" && inspection.profile.reason !== null
+      ? COPY.savedNotApplied[inspection.profile.reason]
+      : null;
   const canContinue = check?.valid === true && !busy && !checking && !unanswered;
 
   return (
@@ -165,6 +170,7 @@ export function StrutturaImportMapping({
       <p className="struttura-flow__file">{FLOW.chosen(step.file.name)}</p>
       <h3 className="struttura-flow__subtitle">{COPY.title}</h3>
       <p>{anySuggested ? COPY.intro : COPY.introNothing}</p>
+      {savedNote !== null ? <p className="struttura-flow__note">{savedNote}</p> : null}
 
       <div className="struttura-flow__sample struttura-match" role="region" aria-label={COPY.tableLabel} tabIndex={0}>
         <table>
