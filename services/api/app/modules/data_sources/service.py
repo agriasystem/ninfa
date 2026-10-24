@@ -13,7 +13,7 @@ property's source answers the same `DataSourceNotFoundError` as an id that does 
 
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from uuid import UUID
 
@@ -22,7 +22,8 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
 from app.db.locks import LockWaitTimeoutError, hold_source_import_lock
-from app.modules.bookings.mapping import CanonicalField
+from app.modules.bookings.errors import BookingImportError
+from app.modules.bookings.mapping import CanonicalField, header_index, normalize_header
 from app.modules.bookings.models import ChannelType
 from app.modules.bookings.repository import BookingChannelRepository
 from app.modules.bookings.service import BookingImportService
@@ -40,6 +41,19 @@ from app.modules.data_sources.files import (
     preview_csv,
     preview_invoices,
     problem_of_code,
+)
+from app.modules.data_sources.mapping_types import (
+    DryRun,
+    FileInspection,
+    MappingCheck,
+    MappingInput,
+    SavedConfiguration,
+)
+from app.modules.data_sources.smart_import import (
+    Resolved,
+    SmartImportService,
+    problem_of_error,
+    problem_of_error_code,
 )
 from app.modules.data_sources.types import (
     DOMAIN_METHOD,
@@ -89,6 +103,19 @@ class ImportOutcome:
     # This exact file had already been imported by this source: the import is idempotent, nothing
     # doubles.
     already_imported: bool = False
+    # Smart Import: the way the columns were matched has been remembered for the next file.
+    configuration_saved: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class MappedImport:
+    """An import of a spreadsheet-like file read through the person's own matching of columns:
+    `mapping` is what they confirmed for THIS file, or None to use the configuration saved for
+    this kind of data. `save_configuration` asks to remember `mapping` once the import succeeded.
+    """
+
+    mapping: MappingInput | None
+    save_configuration: bool = False
 
 
 class DataSourcesService:
@@ -99,6 +126,7 @@ class DataSourcesService:
         self._jobs = ImportJobRepository(session, tenant)
         self._files = ImportFileRepository(session, tenant)
         self._channels = BookingChannelRepository(session, tenant)
+        self._smart = SmartImportService(session, tenant)
 
     # --- reading ------------------------------------------------------------------------------
 
@@ -211,16 +239,106 @@ class DataSourcesService:
         """Look at a file. Read-only: it writes NOTHING - no source, no job, no row - so opening a
         dialog and choosing a file can never configure anything."""
         self._check_size(content)
-        digest = hashlib.sha256(content).hexdigest()
-        # "Already imported" is a fact about the property's own sources of this kind, removed ones
-        # included (a source that was switched off keeps its history).
-        already = any(
-            self._files.find_successful_for_data_source(source.id, digest) is not None
-            for source in self._sources_of(property_id, domain, include_inactive=True)
-        )
+        already = self._already_imported(property_id, domain, content)
         if domain == DataSourceDomain.COSTS:
             return preview_invoices(content, already_imported=already)
         return preview_csv(domain, content, already_imported=already)
+
+    # --- Smart Import: reading, checking and trying a file the hotel already has -----------------
+
+    def inspect_file(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        *,
+        filename: str,
+        content: bytes,
+        sheet_name: str | None = None,
+    ) -> FileInspection:
+        """What NINFA finds in a CSV / Excel file and proposes for each column. Read-only: like
+        the preview, it writes NOTHING - no source, no job, no profile."""
+        self._check_size(content)
+        return self._smart.inspect(
+            domain,
+            filename,
+            content,
+            sheet_name,
+            self._source_for_domain(property_id, domain),
+            self._already_imported(property_id, domain, content),
+        )
+
+    def check_mapping(self, domain: DataSourceDomain, mapping: MappingInput) -> MappingCheck:
+        """Is the person's decision enough to import? Answered by the import service's own rules;
+        needs no file and writes nothing."""
+        return self._smart.check(domain, mapping)
+
+    def dry_run(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: MappingInput | None,
+    ) -> DryRun:
+        """Judge every row of the file with this decision exactly as the import will, and write
+        NOTHING. `mapping=None` uses the configuration saved for this kind of data."""
+        self._check_size(content)
+        return self._smart.dry_run(
+            property_id,
+            domain,
+            filename,
+            content,
+            mapping,
+            self._source_for_domain(property_id, domain),
+            self._already_imported(property_id, domain, content),
+        )
+
+    def saved_configuration(
+        self, property_id: UUID, data_source_id: UUID
+    ) -> SavedConfiguration | None:
+        """How this source's files are read, if that has been saved (None: nothing saved)."""
+        return self._smart.configuration_of(self._load(property_id, data_source_id))
+
+    def forget_configuration(self, property_id: UUID, data_source_id: UUID) -> bool:
+        """Forget how this source's files are read. The source and every imported row stay."""
+        source = self._load(property_id, data_source_id)
+        forgotten = self._smart.forget(source)
+        self._session.commit()
+        if forgotten:
+            logger.info(
+                "import configuration forgotten workspace_id=%s property_id=%s data_source_id=%s",
+                self._tenant.workspace_id,
+                property_id,
+                source.id,
+            )
+        return forgotten
+
+    def _already_imported(
+        self, property_id: UUID, domain: DataSourceDomain, content: bytes
+    ) -> bool:
+        """ "Already imported" is a fact about the property's own sources of this kind, removed ones
+        included (a source that was switched off keeps its history)."""
+        digest = hashlib.sha256(content).hexdigest()
+        return any(
+            self._files.find_successful_for_data_source(source.id, digest) is not None
+            for source in self._sources_of(property_id, domain, include_inactive=True)
+        )
+
+    def _source_for_domain(self, property_id: UUID, domain: DataSourceDomain) -> DataSource | None:
+        """The source an import of this kind WOULD go into, without touching anything: the active
+        one, else the one that was removed (its saved configuration is still its own), else none."""
+        existing = self._sources_of(property_id, domain, include_inactive=True)
+        active = [source for source in existing if source.is_active]
+        if len(active) > 1:
+            return None
+        if active:
+            return active[0]
+        if existing:
+            return max(existing, key=lambda item: (item.updated_at, str(item.id)))
+        return None
+
+    # --- importing ---------------------------------------------------------------------------
 
     def import_file(
         self,
@@ -230,6 +348,7 @@ class DataSourcesService:
         filename: str,
         content: bytes,
         snapshot_local_date: date | None = None,
+        mapped: MappedImport | None = None,
     ) -> ImportOutcome:
         """Import one file through the SAME service the pilot CLI uses. Nothing is re-implemented:
         parsing, validation, idempotency and all-or-nothing are the import service's.
@@ -245,12 +364,22 @@ class DataSourcesService:
         find no source and create two, and one import failing could switch off a source another
         one was still filling. The second waits (a bounded time, then `ImportInProgressError`) and
         then sees what the first left behind. Other properties and other kinds of data never wait.
+
+        `mapped` reads a CSV / Excel file through the person's own matching of columns (Smart
+        Import) instead of NINFA's canonical column names; without it nothing changes.
         """
         self._check_size(content)
         if domain == DataSourceDomain.LABOR and snapshot_local_date is None:
             # The day the file is dated as of is never guessed (the labor service insists) - and a
             # request that cannot be imported must not even switch a source on.
             raise InvalidSnapshotDateError()
+        if mapped is not None:
+            # A file that cannot be read, a matching that is not enough, a format that must still be
+            # chosen, a saved configuration that is not there: all refused HERE, before a source is
+            # created or switched on and before any job exists.
+            refusal = self._refusal_before_import(property_id, domain, filename, content, mapped)
+            if refusal is not None:
+                return refusal
         try:
             with hold_source_import_lock(
                 self._session,
@@ -260,7 +389,7 @@ class DataSourcesService:
                 wait_ms=IMPORT_LOCK_WAIT_MS,
             ):
                 return self._import_into_source(
-                    property_id, domain, filename, content, snapshot_local_date
+                    property_id, domain, filename, content, snapshot_local_date, mapped
                 )
         except LockWaitTimeoutError as error:
             logger.warning(
@@ -272,6 +401,48 @@ class DataSourcesService:
             )
             raise ImportInProgressError() from error
 
+    def _refusal_before_import(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        filename: str,
+        content: bytes,
+        mapped: MappedImport,
+    ) -> ImportOutcome | None:
+        adapter = self._smart.domain(domain)  # costs are XML: there are no columns to match
+        if mapped.mapping is None:
+            config, problem = self._smart.saved_config_for(
+                adapter, self._source_for_domain(property_id, domain)
+            )
+            if config is None:
+                return ImportOutcome(False, problem or ImportProblem.PROFILE_NOT_USABLE)
+            try:
+                table = self._smart.read_table(
+                    content, filename, adapter.format_of(config).sheet_name
+                )
+            except BookingImportError as error:
+                return ImportOutcome(False, problem_of_error(error))
+            index = header_index(table.headers)
+            if any(normalize_header(c) not in index for c in adapter.columns_of(config).values()):
+                return ImportOutcome(False, ImportProblem.PROFILE_NOT_USABLE)  # another layout
+            return None
+        try:
+            table = self._smart.read_table(content, filename, mapped.mapping.sheet_name)
+        except BookingImportError as error:
+            return ImportOutcome(False, problem_of_error(error))
+        resolved = self._smart.resolve(adapter, mapped.mapping, table)
+        if resolved.config is not None:
+            return None
+        return ImportOutcome(
+            False,
+            resolved.problem
+            or (
+                ImportProblem.FORMAT_UNCLEAR
+                if resolved.needs_choice
+                else ImportProblem.MAPPING_INCOMPLETE
+            ),
+        )
+
     def _import_into_source(
         self,
         property_id: UUID,
@@ -279,12 +450,15 @@ class DataSourcesService:
         filename: str,
         content: bytes,
         snapshot_local_date: date | None,
+        mapped: MappedImport | None,
     ) -> ImportOutcome:
         """The create / import / switch-off sequence. Always runs under the import lock."""
         source, switched_on = self._source_for_import(property_id, domain)
         source_id = source.id
         try:
-            outcome = self._run_import(source, property_id, filename, content, snapshot_local_date)
+            outcome, resolved = self._run_import(
+                source, property_id, filename, content, snapshot_local_date, mapped
+            )
         except Exception:
             if switched_on:
                 # An unexpected failure may leave the transaction unusable: start clean, then undo
@@ -294,6 +468,11 @@ class DataSourcesService:
             raise
         if switched_on and not outcome.succeeded:
             self._switch_off(source_id)
+        elif outcome.succeeded and mapped is not None and mapped.save_configuration and resolved:
+            # Remembered only now, once the file has really been imported: a mapping that did not
+            # work is never kept, and one that works is used for the next file of the same layout.
+            saved = self._smart.remember(source, self._smart.domain(domain), resolved)
+            outcome = replace(outcome, configuration_saved=saved)
         return outcome
 
     def _sources_of(
@@ -359,17 +538,23 @@ class DataSourcesService:
         filename: str,
         content: bytes,
         snapshot_local_date: date | None,
-    ) -> ImportOutcome:
+        mapped: MappedImport | None = None,
+    ) -> tuple[ImportOutcome, Resolved | None]:
         try:
+            if mapped is not None:
+                return self._run_mapped(
+                    source, property_id, filename, content, snapshot_local_date, mapped
+                )
             if source.domain == DataSourceDomain.BOOKINGS:
-                return self._import_bookings(source, property_id, filename, content)
+                return self._import_bookings(source, property_id, filename, content), None
             if source.domain == DataSourceDomain.LABOR and snapshot_local_date is not None:
-                return self._import_labor(
+                outcome = self._import_labor(
                     source, property_id, filename, content, snapshot_local_date
                 )
-            return self._import_invoices(source, property_id, filename, content)
+                return outcome, None
+            return self._import_invoices(source, property_id, filename, content), None
         except UnicodeDecodeError:
-            return ImportOutcome(False, ImportProblem.UNREADABLE_FILE)
+            return ImportOutcome(False, ImportProblem.UNREADABLE_FILE), None
         except (AppError, ValueError) as error:
             # A refusal BEFORE a job exists (an unusable mapping, a source that cannot be used).
             code = getattr(error, "error_code", None) or getattr(error, "code", None)
@@ -381,9 +566,101 @@ class DataSourcesService:
                 source.id,
                 code,
             )
-            return ImportOutcome(
-                False, problem_of_code(code) if code else ImportProblem.MISSING_COLUMNS
+            if mapped is not None and isinstance(error, AppError):
+                return ImportOutcome(False, problem_of_error(error)), None
+            return (
+                ImportOutcome(
+                    False, problem_of_code(code) if code else ImportProblem.MISSING_COLUMNS
+                ),
+                None,
             )
+
+    def _run_mapped(
+        self,
+        source: DataSource,
+        property_id: UUID,
+        filename: str,
+        content: bytes,
+        snapshot_local_date: date | None,
+        mapped: MappedImport,
+    ) -> tuple[ImportOutcome, Resolved | None]:
+        """Import with the person's own matching of columns, or with the saved configuration.
+
+        The mapping is validated and built BEFORE the import and is not stored by it: it is saved
+        (by the caller) only if the import succeeds. A decision that cannot be turned into a valid
+        mapping is refused here, before any job exists."""
+        adapter = self._smart.domain(source.domain)
+        resolved: Resolved | None = None
+        override = None
+        if mapped.mapping is not None:
+            try:
+                table = self._smart.read_table(content, filename, mapped.mapping.sheet_name)
+            except BookingImportError as error:
+                return ImportOutcome(False, problem_of_error(error)), None
+            resolved = self._smart.resolve(
+                adapter,
+                mapped.mapping,
+                table,
+                self._smart.preserved_documents(adapter, source),
+            )
+            if resolved.config is None:
+                problem = resolved.problem or (
+                    ImportProblem.FORMAT_UNCLEAR
+                    if resolved.needs_choice
+                    else ImportProblem.MAPPING_INCOMPLETE
+                )
+                return ImportOutcome(False, problem), None
+            override = resolved.config
+        else:
+            saved, not_usable = self._smart.saved_config_for(adapter, source)
+            if saved is None:
+                return ImportOutcome(False, not_usable or ImportProblem.PROFILE_NOT_USABLE), None
+        if source.domain == DataSourceDomain.BOOKINGS:
+            booking = BookingImportService(self._session, self._tenant).import_file(
+                source.id,
+                filename=filename,
+                content=content,
+                property_id=property_id,
+                mapping_override=override,
+            )
+            return (
+                ImportOutcome(
+                    succeeded=booking.succeeded,
+                    problem=None
+                    if booking.succeeded
+                    else problem_of_error_code(booking.error_code, booking.details),
+                    rows_total=booking.rows_total,
+                    rows_invalid=booking.rows_invalid,
+                    created=booking.bookings_created,
+                    updated=booking.bookings_updated,
+                    unchanged=booking.bookings_unchanged,
+                    already_imported=booking.duplicate_of_import_file_id is not None,
+                ),
+                resolved,
+            )
+        if snapshot_local_date is None:  # the caller refuses this first; never guess a day
+            raise InvalidSnapshotDateError()
+        labor = LaborImportService(self._session, self._tenant).import_file(
+            source.id,
+            filename=filename,
+            content=content,
+            snapshot_local_date=snapshot_local_date,
+            property_id=property_id,
+            mapping_override=override,
+        )
+        return (
+            ImportOutcome(
+                succeeded=labor.succeeded,
+                problem=None
+                if labor.succeeded
+                else problem_of_error_code(labor.error_code, labor.details),
+                rows_total=labor.rows_total,
+                rows_invalid=labor.rows_invalid,
+                created=labor.entries_created,
+                already_imported=labor.duplicate_of_import_file_id is not None,
+            ),
+            resolved,
+        )
 
     def _import_bookings(
         self, source: DataSource, property_id: UUID, filename: str, content: bytes
@@ -478,4 +755,4 @@ class DataSourcesService:
             raise FileTooLargeError(MAX_FILE_BYTES)
 
 
-__all__ = ["DataSourcesService", "ImportOutcome"]
+__all__ = ["DataSourcesService", "ImportOutcome", "MappedImport"]

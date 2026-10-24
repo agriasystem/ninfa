@@ -35,7 +35,8 @@ from app.modules.bookings.models import (
     BookingMappingProfile,
 )
 from app.modules.data_sources.errors import ImportInProgressError
-from app.modules.data_sources.service import DataSourcesService, ImportOutcome
+from app.modules.data_sources.mapping_types import MappingInput
+from app.modules.data_sources.service import DataSourcesService, ImportOutcome, MappedImport
 from app.modules.data_sources.types import SourceState
 from app.modules.ingestion.models import (
     DataSource,
@@ -90,6 +91,7 @@ class Committed:
         property_id: UUID | None = None,
         domain: DataSourceDomain = DataSourceDomain.BOOKINGS,
         snapshot: date | None = None,
+        mapped: MappedImport | None = None,
     ) -> ImportOutcome:
         """One import, the way a request makes it: its own session (like the app's), already used
         for a read before the import starts (authentication does that), a fresh connection."""
@@ -102,6 +104,7 @@ class Committed:
                 filename="file.csv",
                 content=content,
                 snapshot_local_date=snapshot,
+                mapped=mapped,
             )
 
     def sources(
@@ -471,3 +474,40 @@ def test_an_import_that_waits_longer_than_allowed_is_told_so_and_changes_nothing
     assert len(committed.jobs()) == 1  # the import that gave up left no trace at all
     assert committed.count(Booking) == 2
     assert committed.import_file(bookings_file("THREE")).succeeded  # and a retry goes through
+
+
+# --- Smart Import: the same lock holds for a file read through the person's own matching ---------
+
+
+def test_two_matched_first_imports_arriving_together_leave_one_source_and_one_configuration(
+    committed: Committed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.smart_import_support import LABOR_IT_DECISION, labor_it_file
+
+    BothInsideTheWindow(monkeypatch)
+    mapped = MappedImport(MappingInput.model_validate(LABOR_IT_DECISION), save_configuration=True)
+    files = [
+        (labor_it_file(days=("26/10/2026", "27/10/2026")), date(2026, 10, 23)),
+        (labor_it_file(days=("28/10/2026", "29/10/2026")), date(2026, 10, 24)),
+    ]
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(
+                committed.import_file,
+                content,
+                domain=DataSourceDomain.LABOR,
+                snapshot=snapshot,
+                mapped=mapped,
+            )
+            for content, snapshot in files
+        ]
+        outcomes = [future.result(timeout=WAIT) for future in futures]
+
+    assert [o.succeeded for o in outcomes] == [True, True]
+    sources = committed.sources(property_id=committed.property_id, domain=DataSourceDomain.LABOR)
+    assert len(sources) == 1 and sources[0].is_active
+    assert committed.count(LaborMappingProfile) == 1  # one source, one configuration, not two
+    assert committed.count(LaborEntry) == 4
+    assert {job.data_source_id for job in committed.jobs()} == {sources[0].id}
+    assert committed.overview_state("STAFF") == (SourceState.CONFIGURED_FILE, False)

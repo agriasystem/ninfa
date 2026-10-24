@@ -41,6 +41,18 @@ class ImportInProgressError(AppError):
         )
 
 
+class InvalidImportRequestError(AppError):
+    """The body of an import request is not what the page sends (not JSON of the expected shape, or
+    a file that is not valid base64). Nothing was read into NINFA."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "INVALID_IMPORT_REQUEST",
+            "The import request is not valid",
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+        )
+
+
 class UnsupportedDomainError(AppError):
     def __init__(self) -> None:
         super().__init__(
@@ -74,6 +86,7 @@ __all__ = [
     "DataSourceNotFoundError",
     "FileTooLargeError",
     "ImportInProgressError",
+    "InvalidImportRequestError",
     "InvalidSnapshotDateError",
     "UnsupportedDomainError",
 ]

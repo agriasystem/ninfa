@@ -85,7 +85,7 @@ describe("a card configured through a file", () => {
   it("shows how the data arrive, the real last update and the upload / manage actions", () => {
     const staff = view(laborViaCsv("2026-10-23T07:31:00Z"), "STAFF");
 
-    expect(staff.line).toBe("Import CSV");
+    expect(staff.line).toBe("Import file");
     expect(staff.pill).toEqual({ tone: "configured", text: "Configurato" });
     expect(staff.meta).toEqual({ label: "Ultimo aggiornamento", value: "Oggi alle 09:31" });
     expect(staff.primary?.label).toBe("Carica nuovo file");
@@ -107,7 +107,7 @@ describe("a card configured through a file", () => {
     expect(staff.primary?.label).toBe("Collega fonte");
     expect(staff.secondary).toBeNull();
     expect(staff.menu.map((item) => item.label)).toEqual(["Collega fonte"]);
-    expect(JSON.stringify(staff)).not.toMatch(/Configurato|Mai importato|Import CSV/u);
+    expect(JSON.stringify(staff)).not.toMatch(/Configurato|Mai importato|Import file/u);
   });
 
   it("'nothing configured' counts such a card as not configured", () => {

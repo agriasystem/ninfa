@@ -22,7 +22,7 @@ export type SourceDialog =
   | { kind: "connect"; card: SourceCardKey }
   | { kind: "wizard" }
   | { kind: "manage"; card: SourceCardKey; confirmRemove?: boolean }
-  | { kind: "import"; domain: DataSourceDomain };
+  | { kind: "import"; domain: DataSourceDomain; mode?: "import" | "edit" };
 
 /** The card that owns each kind of file source (a card is a presentation of a kind of data). */
 const OWNER_OF_DOMAIN: Record<DataSourceDomain, SourceCardKey> = {
@@ -146,6 +146,7 @@ export function StrutturaSourceDialogs({
         propertyId={propertyId}
         timeZone={timeZone}
         domain={dialog.domain}
+        mode={dialog.mode}
         snapshotLocalDate={propertyLocalDate(new Date(), timeZone)}
         onImported={() => void refresh()}
         onClose={close}
@@ -161,10 +162,14 @@ export function StrutturaSourceDialogs({
     return (
       <StrutturaManageDialog
         propertyId={propertyId}
+        timeZone={timeZone}
         view={view}
         initialConfirm={dialog.confirmRemove === true}
         onUpload={() => {
           if (domain !== null) start(domain);
+        }}
+        onEditColumns={() => {
+          if (domain !== null) setDialog({ kind: "import", domain, mode: "edit" });
         }}
         onRemoved={() => {
           close();

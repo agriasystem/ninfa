@@ -659,6 +659,11 @@ export type ImportProblem =
   | "INVALID_ROWS"
   | "UNSUPPORTED_FORMAT"
   | "SAME_DAY_CONFLICT"
+  /** Smart Import: matching the columns of a file the person already has. */
+  | "MAPPING_INCOMPLETE"
+  | "FORMAT_UNCLEAR"
+  | "PROFILE_NOT_USABLE"
+  | "SHEET_REQUIRED"
   | "GENERIC";
 
 export interface ImportPreviewResponse {
@@ -686,4 +691,174 @@ export interface ImportResultResponse {
   updated: number;
   unchanged: number;
   already_imported: boolean;
+}
+
+// --- Smart Import: the hotel's own CSV / Excel file, its columns matched by the person -------------------
+
+/** What a column of a spreadsheet-like file can mean. The backend owns the list (`fields` of an inspection). */
+export type ImportFieldKey =
+  // bookings
+  | "source_record_id"
+  | "booked_at"
+  | "check_in"
+  | "check_out"
+  | "status"
+  | "rooms"
+  | "room_revenue"
+  | "channel"
+  | "guests"
+  | "total_revenue"
+  | "commission_amount"
+  | "commission_rate"
+  | "cancelled_at"
+  | "room_type"
+  | "rate_plan"
+  // labor
+  | "work_date"
+  | "role"
+  | "labor_category"
+  | "planned_hours"
+  | "actual_hours"
+  | "planned_cost"
+  | "actual_cost"
+  | "currency";
+
+/** What the person decided about ONE column. `field: null` is "ignore this column". */
+export interface ImportColumnChoice {
+  header: string;
+  field: ImportFieldKey | null;
+}
+
+/** The whole decision: what each column means, fixed values for what the file lacks, how it is written. */
+export interface ImportMapping {
+  sheet_name?: string | null;
+  columns: ImportColumnChoice[];
+  /** "The same value on every row", only for the fields the backend allows it for. */
+  constants: Partial<Record<ImportFieldKey, string | number>>;
+  /** Only needed when the file writes dates as 12/10/2026 and its values do not say which is the day. */
+  date_order?: "DMY" | "MDY" | null;
+  /** Only needed when the file writes amounts with a comma or a point as the decimal mark. */
+  decimal_style?: "COMMA" | "POINT" | null;
+}
+
+export type ImportSuggestionLevel = "RECOGNIZED" | "TO_CHECK";
+
+export interface ImportColumnInfo {
+  position: number;
+  header: string;
+  examples: string[];
+  /** The meaning NINFA proposes; `null` = nothing proposed. */
+  field: ImportFieldKey | null;
+  level: ImportSuggestionLevel | null;
+  /** Why a column is deliberately not offered as a field: a person's name, an hourly rate. */
+  not_used_reason: "PERSON" | "HOURLY_RATE" | null;
+  /** What the values prove about how dates / numbers are written. */
+  date_order: "ISO" | "DMY" | "MDY" | "AMBIGUOUS" | "CONFLICT" | null;
+  number_style: "COMMA" | "POINT" | "AMBIGUOUS" | "MIXED" | null;
+}
+
+export interface ImportConstantSpec {
+  kind: "INTEGER" | "TEXT" | "CHOICE" | "CURRENCY";
+  choices: string[];
+  default: string | number | null;
+}
+
+export interface ImportFieldSpec {
+  key: ImportFieldKey;
+  kind: "DATE" | "DATETIME" | "DECIMAL" | "INTEGER" | "TEXT" | "CHOICE" | "CURRENCY";
+  /** `null`: this field can only come from a column of the file. */
+  constant: ImportConstantSpec | null;
+}
+
+export type ImportProfileStatus = "NONE" | "RECOGNIZED" | "NEEDS_REVIEW";
+
+export interface ImportProfileInfo {
+  status: ImportProfileStatus;
+  reason: "COLUMNS_CHANGED" | "VERSION_CHANGED" | "INVALID" | null;
+  /** The saved configuration written as a decision, to start "Controlla colonne" from it. */
+  mapping: ImportMapping | null;
+  last_used_at: string | null;
+  missing_columns: string[];
+}
+
+export interface FileInspectionResponse {
+  domain: DataSourceDomain;
+  file_type: "CSV" | "XLSX" | null;
+  problem: ImportProblem | null;
+  sheet_name: string | null;
+  sheet_names: string[];
+  requires_sheet_selection: boolean;
+  columns: ImportColumnInfo[];
+  fields: ImportFieldSpec[];
+  /** Each group is "at least one of"; a one-field group is a field that is required. */
+  requirement_groups: ImportFieldKey[][];
+  /** The proposal as it stands already meets every requirement. */
+  suggestion_complete: boolean;
+  /** The file already is in NINFA's own format. */
+  already_canonical: boolean;
+  profile: ImportProfileInfo;
+  already_imported: boolean;
+}
+
+export interface MappingCheckResponse {
+  valid: boolean;
+  /** What is still needed: each entry is a group "at least one of these". */
+  missing: ImportFieldKey[][];
+  problems: { code: string; fields: string[] }[];
+}
+
+export interface ImportFormatHint {
+  question: "DATE_ORDER" | "DECIMAL_STYLE";
+  /** What the values already prove, or `null` when only the person knows. */
+  proven: "DMY" | "MDY" | "COMMA" | "POINT" | null;
+  columns: string[];
+}
+
+export interface ImportRowProblem {
+  /** `""` when more than one field has this problem. */
+  field: string;
+  code: string;
+  count: number;
+}
+
+export interface ImportInvalidRow {
+  row: number;
+  issues: { field: string; code: string }[];
+}
+
+export interface ImportValidationResponse {
+  status: "READY" | "NEEDS_CHOICE" | "BLOCKED";
+  problem: ImportProblem | null;
+  can_import: boolean;
+  check: MappingCheckResponse | null;
+  format_hints: ImportFormatHint[];
+  rows_total: number;
+  rows_valid: number;
+  rows_invalid: number;
+  sample_fields: ImportFieldKey[];
+  sample_rows: (string | null)[][];
+  row_problems: ImportRowProblem[];
+  invalid_rows: ImportInvalidRow[];
+  already_imported: boolean;
+  /**
+   * Staff files: valid rows whose department NINFA could not work out. They are kept as "Altro", which no
+   * staffing decision uses. Counted over the whole file. Always 0 for the other kinds of data.
+   */
+  rows_unclassified: number;
+}
+
+export interface MappedImportResultResponse extends ImportResultResponse {
+  /** The way the columns were matched has been remembered for the next file of the same layout. */
+  configuration_saved: boolean;
+}
+
+/** How a source's files are read, as it was saved. */
+export interface SavedImportConfiguration {
+  data_source_id: string;
+  domain: DataSourceDomain;
+  columns: { field: ImportFieldKey; column: string }[];
+  constants: { field: ImportFieldKey; value: string }[];
+  last_used_at: string | null;
+  /** `false`: made for another version of NINFA's rules, so it must be looked at again. */
+  schema_current: boolean;
 }

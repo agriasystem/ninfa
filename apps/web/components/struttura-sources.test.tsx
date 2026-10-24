@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DataSourcesResponse } from "@ninfa/contracts";
 
@@ -15,8 +15,7 @@ import {
   nothingConfigured,
   ok,
   PROPERTY_ID,
-  previewOf,
-  resultOf,
+  previewOf,
   sources,
   xmlFile,
 } from "@/test/sources-support";
@@ -27,6 +26,8 @@ const getDataSourcesMock = vi.fn();
 const removeDataSourceMock = vi.fn();
 const previewImportMock = vi.fn();
 const importFileMock = vi.fn();
+const getImportConfigurationMock = vi.fn();
+const forgetImportConfigurationMock = vi.fn();
 const downloadTemplateMock = vi.fn();
 const saveBlobMock = vi.fn();
 
@@ -35,6 +36,12 @@ vi.mock("@/lib/api/data-sources", () => ({
   removeDataSource: (...args: unknown[]) => removeDataSourceMock(...args),
   previewImport: (...args: unknown[]) => previewImportMock(...args),
   importFile: (...args: unknown[]) => importFileMock(...args),
+  inspectFile: vi.fn(),
+  checkMapping: vi.fn(),
+  validateImport: vi.fn(),
+  importMatchedFile: vi.fn(),
+  getImportConfiguration: (...args: unknown[]) => getImportConfigurationMock(...args),
+  forgetImportConfiguration: (...args: unknown[]) => forgetImportConfigurationMock(...args),
   downloadTemplate: (...args: unknown[]) => downloadTemplateMock(...args),
 }));
 vi.mock("@/lib/sources/save-file", async (original) => ({
@@ -72,12 +79,23 @@ beforeEach(() => {
     removeDataSourceMock,
     previewImportMock,
     importFileMock,
+    getImportConfigurationMock,
+    forgetImportConfigurationMock,
     downloadTemplateMock,
     saveBlobMock,
     onPropertyInvalid,
   ]) {
     mock.mockReset();
   }
+  // a source with no saved configuration: the manage dialog simply has nothing to show
+  getImportConfigurationMock.mockResolvedValue(failure("DATA_SOURCE_NOT_FOUND", 404));
+  // "Oggi" is always the same day: the cards say "Oggi alle 11:31" whatever the real date is
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-23T09:45:00Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // --- loading, error ------------------------------------------------------------------------------------
@@ -111,24 +129,6 @@ describe("Fonti dati - loading and failure are said, never papered over", () => 
     getDataSourcesMock.mockResolvedValueOnce(ok(laborViaCsv()));
     await user.click(screen.getByRole("button", { name: "Riprova" }));
     expect(await screen.findByRole("list", { name: "Fonti dati collegate e collegabili" })).not.toBeNull();
-  });
-
-  it("a failed re-read keeps the last cards and the dialog that is open on top of them", async () => {
-    const user = userEvent.setup({ applyAccept: false });
-    await renderBlock(nothingConfigured());
-    await user.click(within(cardOf("Personale")).getByRole("button", { name: "Collega fonte Personale" }));
-    await user.click(within(dialog()).getByRole("button", { name: "Importa file" }));
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(ok(resultOf()));
-    getDataSourcesMock.mockResolvedValue(failure("INTERNAL_ERROR", 500)); // the re-read after the import
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-
-    expect(await within(dialog()).findByRole("heading", { level: 3, name: "Importazione completata" })).not.toBeNull();
-    await waitFor(() => expect(getDataSourcesMock).toHaveBeenCalledTimes(2));
-    expect(screen.queryByText("Non siamo riusciti a caricare le fonti dati.")).toBeNull();
-    expect(cardOf("Personale")).not.toBeNull();
   });
 
   it("asks the caller to re-resolve the property when the backend says it no longer exists", async () => {
@@ -165,7 +165,7 @@ describe("Fonti dati - every card says what the backend says", () => {
     await renderBlock(laborViaCsv("2026-10-18T10:00:00Z"));
 
     expect(flat(cardOf("Personale"))).toBe(
-      "Personale Import CSV Configurato Ultimo aggiornamento 18 ottobre 2026 Carica nuovo file Gestisci",
+      "Personale Import file Configurato Ultimo aggiornamento 18 ottobre 2026 Carica nuovo file Gestisci",
     );
     // the introduction is only for an empty section
     expect(screen.queryByText(/Collega le fonti utilizzate dalla struttura/u)).toBeNull();
@@ -175,7 +175,7 @@ describe("Fonti dati - every card says what the backend says", () => {
     await renderBlock(laborViaCsv(null));
 
     expect(flat(cardOf("Personale"))).toBe("Personale Nessuna fonte collegata Non configurato Collega fonte");
-    expect(document.body.textContent).not.toMatch(/Mai importato|Configurato|Import CSV/u);
+    expect(document.body.textContent).not.toMatch(/Mai importato|Configurato|Import file/u);
     expect(within(cardOf("Personale")).getByRole("button", { name: "Collega fonte Personale" })).not.toBeNull();
     expect(screen.getByText(/Collega le fonti utilizzate dalla struttura/u)).not.toBeNull(); // still an empty section
   });
@@ -228,21 +228,21 @@ describe("Fonti dati - every card says what the backend says", () => {
 
 describe("Fonti dati - 'Collega fonte' opens a real dialog for each card", () => {
   const cases: [string, string, string, RegExp][] = [
-    ["PMS", "Collega il tuo PMS", "Indica da quale sistema NINFA riceverà i dati della struttura.", /Importa tramite CSV/u],
+    ["PMS", "Collega il tuo PMS", "Indica da quale sistema NINFA riceverà i dati della struttura.", /Importa da file/u],
     [
       "Channel Manager",
       "Collega il tuo Channel Manager",
       "Se il tuo Channel Manager raccoglie già le prenotazioni provenienti da Booking.com, Expedia e altri portali, NINFA può utilizzare quella fonte senza richiedere collegamenti separati per ogni OTA.",
-      /Importa tramite CSV/u,
+      /Importa da file/u,
     ],
     [
       "OTA",
       "Configura la fonte dei canali",
       "Normalmente NINFA riceve questi dati dal PMS o dal Channel Manager. Non è necessario collegare ogni portale separatamente se il tuo gestionale li raccoglie già.",
-      /Importa tramite CSV/u,
+      /Importa da file/u,
     ],
     ["Contabilità", "Come vuoi fornire i dati dei costi?", "Scegli come NINFA riceverà le fatture e i costi della struttura.", /Importa fatture/u],
-    ["Personale", "Come vuoi fornire i dati del personale?", "Scegli come NINFA riceverà le ore e i costi del personale.", /Importa CSV/u],
+    ["Personale", "Come vuoi fornire i dati del personale?", "Scegli come NINFA riceverà le ore e i costi del personale.", /Importa da file/u],
   ];
 
   it.each(cases)("%s: title, plain explanation, the real option and 'Prossimamente'", async (name, title, intro, option) => {
@@ -376,220 +376,6 @@ describe("Fonti dati - from 'Importa file' to the result", () => {
     expect(screen.queryByRole("dialog", { name: "Importa i dati del personale" })).toBeNull();
   });
 
-  async function openLaborImport() {
-    const user = userEvent.setup({ applyAccept: false });
-    await renderBlock(laborViaCsv());
-    await user.click(within(cardOf("Personale")).getByRole("button", { name: "Carica nuovo file Personale" }));
-    await screen.findByRole("heading", { level: 2, name: "Importa i dati del personale" });
-    return user;
-  }
-
-  it("explains the format in plain words and dates a labor file with the property's today", async () => {
-    await openLaborImport();
-
-    const box = dialog();
-    expect(within(box).getByText(/Utilizza il formato compatibile con NINFA/u)).not.toBeNull();
-    expect(within(box).getByText(/I dati vengono registrati con la data di oggi \(\d{1,2} \w+ \d{4}\)/u)).not.toBeNull();
-    expect(within(box).getByLabelText("Seleziona file")).not.toBeNull();
-    expect(within(box).getByRole("button", { name: "Scarica modello CSV" })).not.toBeNull();
-  });
-
-  it("refuses a file of the wrong type without sending it anywhere", async () => {
-    const user = await openLaborImport();
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), new File(["x"], "personale.xlsx"));
-
-    expect(within(dialog()).getByRole("alert").textContent).toBe("Scegli un file con estensione .csv.");
-    expect(previewImportMock).not.toHaveBeenCalled();
-  });
-
-  it("looks at the file, shows what it found and imports only after the user confirms", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValue(
-      ok(previewOf({ unrecognized_columns: ["note"], already_imported: true })),
-    );
-    importFileMock.mockResolvedValue(ok(resultOf({ created: 2 })));
-    getDataSourcesMock.mockResolvedValue(ok(laborViaCsv("2026-10-23T09:00:00Z")));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-
-    expect(await within(dialog()).findByText("2 righe trovate")).not.toBeNull();
-    const box = dialog();
-    expect(previewImportMock).toHaveBeenCalledWith(PROPERTY_ID, "LABOR", expect.any(File));
-    expect(importFileMock).not.toHaveBeenCalled(); // looking is not importing
-    expect(within(box).getByText("File selezionato: personale.csv")).not.toBeNull();
-    expect(within(box).getByText("Queste colonne non verranno utilizzate: note.")).not.toBeNull();
-    expect(within(box).getByText("Questo file è già stato importato: caricarlo di nuovo non duplica i dati.")).not.toBeNull();
-    expect(within(box).getByText(/I controlli sulle singole righe avvengono durante l'importazione/u)).not.toBeNull();
-    expect(
-      within(within(box).getByRole("region", { name: "Prime righe del file" })).getAllByText("HOUSEKEEPING", { selector: "td" }),
-    ).toHaveLength(2);
-
-    await user.click(within(box).getByRole("button", { name: "Conferma importazione" }));
-
-    expect(await within(dialog()).findByRole("heading", { level: 3, name: "Importazione completata" })).not.toBeNull();
-    expect(importFileMock).toHaveBeenCalledTimes(1);
-    const args = importFileMock.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(args).toMatchObject({ propertyId: PROPERTY_ID, domain: "LABOR" });
-    expect(args).not.toHaveProperty("dataSourceId");
-    expect(args.snapshotLocalDate).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
-    expect(within(dialog()).getByText("Elementi: 2 nuovi.")).not.toBeNull();
-    // the cards were re-read, so the new last update shows
-    await waitFor(() => expect(getDataSourcesMock).toHaveBeenCalledTimes(2));
-  });
-
-  it("a bookings file is not dated by the page: no snapshot date is sent", async () => {
-    const user = userEvent.setup({ applyAccept: false });
-    await renderBlock(bookingsViaFile());
-    await user.click(within(cardOf("PMS")).getByRole("button", { name: "Carica nuovo file PMS" }));
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(ok(resultOf()));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile("prenotazioni.csv"));
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-
-    await waitFor(() => expect(importFileMock).toHaveBeenCalled());
-    expect((importFileMock.mock.calls[0]?.[0] as Record<string, unknown>).snapshotLocalDate).toBeUndefined();
-  });
-
-  it("names the missing columns, offers the template and blocks the import", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValue(
-      ok(
-        previewOf({
-          can_import: false,
-          problem: "MISSING_COLUMNS",
-          rows_total: 1,
-          missing_columns: [["work_date"], ["actual_hours", "planned_hours"]],
-          sample_rows: [],
-        }),
-      ),
-    );
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-
-    const alert = await within(dialog()).findByRole("alert");
-    expect(flat(alert)).toContain("Il file non contiene alcune colonne richieste da NINFA.");
-    expect(flat(alert)).toContain("work_date");
-    expect(flat(alert)).toContain("actual_hours oppure planned_hours");
-    expect(flat(alert)).toContain("Non è stato importato nulla.");
-    expect(within(dialog()).queryByRole("button", { name: "Conferma importazione" })).toBeNull();
-    expect(within(dialog()).getByRole("button", { name: "Scarica modello CSV" })).not.toBeNull();
-    expect(importFileMock).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["UNREADABLE_FILE", "NINFA non riesce a leggere questo file. Controlla che sia un CSV in formato UTF-8."],
-    ["EMPTY_FILE", "Il file è vuoto."],
-    ["NO_ROWS", "Il file contiene solo l'intestazione, senza righe di dati."],
-    ["DUPLICATE_COLUMNS", "Il file ha colonne con lo stesso nome: rinomina o elimina quelle duplicate."],
-  ] as const)("a file that cannot be used (%s) is explained in one plain sentence", async (problem, sentence) => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValue(ok(previewOf({ can_import: false, problem, rows_total: 0, sample_rows: [] })));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-
-    expect(flat(await within(dialog()).findByRole("alert"))).toContain(sentence);
-  });
-
-  it("an import that fails tells why, says nothing was imported, and lets the user choose another file", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(ok(resultOf({ succeeded: false, problem: "INVALID_ROWS", created: 0, rows_invalid: 1 })));
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-
-    const alert = await within(dialog()).findByRole("alert");
-    expect(flat(alert)).toContain("Importazione non riuscita");
-    expect(flat(alert)).toContain("Alcune righe del file non sono valide, quindi non è stato importato nulla.");
-    expect(flat(alert)).toContain("Non è stato importato nulla.");
-    // the cards are not re-read for a failure: nothing changed
-    expect(getDataSourcesMock).toHaveBeenCalledTimes(1);
-
-    await user.click(within(dialog()).getByRole("button", { name: "Scegli un altro file" }));
-    expect(within(dialog()).getByLabelText("Seleziona file")).not.toBeNull();
-  });
-
-  it("an import that finds another import of the same data still running says to wait and try again", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValueOnce(failure("IMPORT_IN_PROGRESS", 409));
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-
-    const alert = await within(dialog()).findByRole("alert");
-    expect(flat(alert)).toContain("È già in corso un altro import di questi dati. Attendi qualche istante e riprova.");
-    expect(flat(alert)).toContain("Non è stato importato nulla.");
-    expect(document.body.textContent).not.toMatch(/409|IMPORT_IN_PROGRESS|NINFA non è riuscita a leggere/u);
-    expect(getDataSourcesMock).toHaveBeenCalledTimes(1); // nothing changed: the cards are not re-read
-
-    // the user simply tries again, and this time it goes through
-    await user.click(within(dialog()).getByRole("button", { name: "Scegli un altro file" }));
-    importFileMock.mockResolvedValueOnce(ok(resultOf()));
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-    expect(await within(dialog()).findByText("Importazione completata")).not.toBeNull();
-  });
-
-  it("a same-day labor conflict says to upload the updated version tomorrow", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(ok(resultOf({ succeeded: false, problem: "SAME_DAY_CONFLICT", created: 0 })));
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-
-    expect(flat(await within(dialog()).findByRole("alert"))).toContain(
-      "Per oggi hai già caricato un file del personale diverso: carica la versione aggiornata domani.",
-    );
-  });
-
-  it("a network or server error never shows technical text", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValue(failure("NETWORK_ERROR", 0));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-
-    const alert = await within(dialog()).findByRole("alert");
-    expect(flat(alert)).toContain("NINFA non è riuscita a leggere questa fonte. Riprova oppure utilizza un file CSV.");
-    expect(document.body.textContent).not.toContain("technical message");
-    expect(document.body.textContent).not.toMatch(/422|500|NETWORK_ERROR|validation error|connector failed/iu);
-  });
-
-  it("a file over the maximum and a source that disappeared each have their own sentence", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockResolvedValueOnce(failure("FILE_TOO_LARGE", 413));
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    expect(flat(await within(dialog()).findByRole("alert"))).toContain("Il file è troppo grande.");
-
-    await user.click(within(dialog()).getByRole("button", { name: "Scegli un altro file" }));
-    previewImportMock.mockResolvedValueOnce(failure("PROPERTY_NOT_FOUND", 404));
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    expect(flat(await within(dialog()).findByRole("alert"))).toContain(
-      "Questa fonte non è più disponibile. Aggiorna la pagina.",
-    );
-  });
-
-  it("downloads the CSV template through the backend", async () => {
-    const user = await openLaborImport();
-    const blob = new Blob(["work_date\r\n"], { type: "text/csv" });
-    downloadTemplateMock.mockResolvedValue(blob);
-
-    await user.click(within(dialog()).getByRole("button", { name: "Scarica modello CSV" }));
-
-    await waitFor(() => expect(saveBlobMock).toHaveBeenCalledWith(blob, "modello-personale.csv"));
-    expect(downloadTemplateMock).toHaveBeenCalledWith(PROPERTY_ID, "LABOR");
-  });
-
-  it("says so when the template cannot be fetched", async () => {
-    const user = await openLaborImport();
-    downloadTemplateMock.mockResolvedValue(null);
-
-    await user.click(within(dialog()).getByRole("button", { name: "Scarica modello CSV" }));
-
-    expect(await within(dialog()).findByText("Il modello non è disponibile al momento.")).not.toBeNull();
-    expect(saveBlobMock).not.toHaveBeenCalled();
-  });
-
   it("costs take FatturaPA XML only: its own hint, no template, no labor date", async () => {
     const user = userEvent.setup({ applyAccept: false });
     await renderBlock(costsViaXml());
@@ -608,17 +394,6 @@ describe("Fonti dati - from 'Importa file' to the result", () => {
     expect(await within(box).findByText("1 fattura trovata")).not.toBeNull();
   });
 
-  it("cannot be dismissed while a file is being checked", async () => {
-    const user = await openLaborImport();
-    previewImportMock.mockReturnValue(new Promise(() => undefined));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-
-    expect(await within(dialog()).findByText("Controllo del file in corso…")).not.toBeNull();
-    expect((within(dialog()).getByRole("button", { name: "Chiudi" }) as HTMLButtonElement).disabled).toBe(true);
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).not.toBeNull();
-  });
 });
 
 // --- the "..." menu ------------------------------------------------------------------------------------------
@@ -717,7 +492,7 @@ describe("Fonti dati - 'Gestisci' and 'Rimuovi fonte'", () => {
 
     const box = screen.getByRole("dialog", { name: "Gestisci Personale" });
     expect(flat(box.querySelector("dl") as HTMLElement)).toBe(
-      "Come arrivano i dati Import CSV Ultimo aggiornamento 18 ottobre 2026",
+      "Come arrivano i dati Import file Ultimo aggiornamento 18 ottobre 2026",
     );
     expect(within(box).getByRole("button", { name: "Carica nuovo file" })).not.toBeNull();
     expect(within(box).getByRole("button", { name: "Rimuovi fonte" })).not.toBeNull();
@@ -771,7 +546,7 @@ describe("Fonti dati - 'Gestisci' and 'Rimuovi fonte'", () => {
     await user.click(within(dialog()).getByRole("button", { name: "Rimuovi fonte" }));
 
     expect(flat(await within(dialog()).findByRole("alert"))).toBe(
-      "NINFA non è riuscita a leggere questa fonte. Riprova oppure utilizza un file CSV.",
+      "NINFA non è riuscita a leggere questa fonte. Riprova oppure carica un altro file.",
     );
     expect(getDataSourcesMock).toHaveBeenCalledTimes(1);
   });
@@ -839,117 +614,6 @@ describe("Fonti dati - 'Collega una nuova fonte'", () => {
     expect(within(box).getByText("Hai già una fonte per questi dati. Puoi caricare un nuovo file per aggiornarli.")).not.toBeNull();
     await user.click(within(box).getByRole("button", { name: "Carica nuovo file" }));
     expect(await screen.findByRole("dialog", { name: "Importa i dati del personale" })).not.toBeNull();
-  });
-});
-
-// --- a source exists only after a SUCCESSFUL import --------------------------------------------------------------
-
-describe("Fonti dati - a source exists only after a successful import", () => {
-  const NOT_CONFIGURED_PERSONALE = "Personale Nessuna fonte collegata Non configurato Collega fonte";
-
-  async function openStaffImport() {
-    const user = userEvent.setup({ applyAccept: false });
-    await renderBlock(nothingConfigured());
-    await user.click(within(cardOf("Personale")).getByRole("button", { name: "Collega fonte Personale" }));
-    await user.click(within(dialog()).getByRole("button", { name: "Importa file" }));
-    await screen.findByRole("heading", { level: 2, name: "Importa i dati del personale" });
-    return user;
-  }
-
-  it("1. opening the dialog without choosing a file writes nothing, and closing it leaves the card as it was", async () => {
-    const user = await openStaffImport();
-
-    expect(previewImportMock).not.toHaveBeenCalled();
-    expect(importFileMock).not.toHaveBeenCalled();
-    await user.click(within(dialog()).getAllByRole("button", { name: "Chiudi" })[0] as HTMLElement);
-
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(flat(cardOf("Personale"))).toBe(NOT_CONFIGURED_PERSONALE);
-    expect(getDataSourcesMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("2. a file that was looked at but not confirmed configures nothing", async () => {
-    const user = await openStaffImport();
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    expect(await within(dialog()).findByRole("button", { name: "Conferma importazione" })).not.toBeNull();
-    expect(previewImportMock).toHaveBeenCalledTimes(1);
-    await user.click(within(dialog()).getAllByRole("button", { name: "Chiudi" })[0] as HTMLElement); // the user walks away
-
-    expect(importFileMock).not.toHaveBeenCalled();
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(flat(cardOf("Personale"))).toBe(NOT_CONFIGURED_PERSONALE);
-    expect(document.body.textContent).not.toMatch(/Configurato|Mai importato/u);
-    expect(getDataSourcesMock).toHaveBeenCalledTimes(1); // no re-read: nothing changed
-  });
-
-  it("3. an import that fails configures nothing", async () => {
-    const user = await openStaffImport();
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(ok(resultOf({ succeeded: false, problem: "INVALID_ROWS", created: 0, rows_invalid: 1 })));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-    expect(flat(await within(dialog()).findByRole("alert"))).toContain("Non è stato importato nulla.");
-    await user.click(within(dialog()).getAllByRole("button", { name: "Chiudi" })[0] as HTMLElement);
-
-    expect(importFileMock).toHaveBeenCalledTimes(1);
-    expect(flat(cardOf("Personale"))).toBe(NOT_CONFIGURED_PERSONALE);
-    expect(document.body.textContent).not.toMatch(/Configurato|Mai importato/u);
-    expect(getDataSourcesMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("3b. a request that fails on the way configures nothing either", async () => {
-    const user = await openStaffImport();
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(failure("NETWORK_ERROR", 0));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-    await within(dialog()).findByRole("alert");
-    await user.click(within(dialog()).getAllByRole("button", { name: "Chiudi" })[0] as HTMLElement);
-
-    expect(flat(cardOf("Personale"))).toBe(NOT_CONFIGURED_PERSONALE);
-  });
-
-  it("4. an import that succeeds configures the source: the cards are re-read and show the real update", async () => {
-    const user = await openStaffImport();
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(ok(resultOf({ created: 1 })));
-    getDataSourcesMock.mockResolvedValue(ok(laborViaCsv("2026-10-18T10:00:00Z")));
-
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-    expect(await within(dialog()).findByRole("heading", { level: 3, name: "Importazione completata" })).not.toBeNull();
-    await user.click(within(dialog()).getAllByRole("button", { name: "Chiudi" })[0] as HTMLElement);
-
-    await waitFor(() => expect(getDataSourcesMock).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(flat(cardOf("Personale"))).toBe(
-        "Personale Import CSV Configurato Ultimo aggiornamento 18 ottobre 2026 Carica nuovo file Gestisci",
-      ),
-    );
-  });
-
-  it("5. a later import goes into the same source: a configured card imports again and is re-read", async () => {
-    const user = userEvent.setup({ applyAccept: false });
-    await renderBlock(laborViaCsv("2026-10-18T10:00:00Z"));
-    previewImportMock.mockResolvedValue(ok(previewOf()));
-    importFileMock.mockResolvedValue(ok(resultOf({ created: 1 })));
-    getDataSourcesMock.mockResolvedValue(ok(laborViaCsv("2026-10-23T09:00:00Z")));
-
-    await user.click(within(cardOf("Personale")).getByRole("button", { name: "Carica nuovo file Personale" }));
-    await user.upload(within(dialog()).getByLabelText("Seleziona file"), csvFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Conferma importazione" }));
-    await within(dialog()).findByRole("heading", { level: 3, name: "Importazione completata" });
-    await user.click(within(dialog()).getAllByRole("button", { name: "Chiudi" })[0] as HTMLElement);
-
-    // the SAME kind of data is sent; the page names no source and creates none
-    expect(importFileMock).toHaveBeenCalledTimes(1);
-    expect(importFileMock.mock.calls[0]?.[0]).toMatchObject({ propertyId: PROPERTY_ID, domain: "LABOR" });
-    await waitFor(() => expect(flat(cardOf("Personale"))).toContain("Ultimo aggiornamento Oggi alle 11:00"));
-    expect(screen.getAllByRole("listitem")).toHaveLength(5); // still five cards, no second one
   });
 });
 

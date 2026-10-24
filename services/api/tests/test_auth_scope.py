@@ -6,6 +6,8 @@ Home, ADR 0028) exactly one more, `.../properties/{property_id}/ask` - the only 
 Dati UI V1 (ADR 0031) adds exactly one more, a GET: `.../properties/{property_id}/data/overview`.
 Fonti dati V1 (docs/architecture/data-sources-v1.md) adds the `.../data-sources` family under
 `/properties/{property_id}`, whose exact methods are pinned below and in `test_data_sources_api.py`.
+Smart Import V2 (docs/architecture/smart-import-v2.md) adds to that family, all POST except the
+saved configuration (GET / DELETE): read a file, check a matching, dry-run it, import with it.
 """
 
 from fastapi.testclient import TestClient
@@ -20,6 +22,11 @@ _SOURCES_METHODS = {
     f"{_SOURCES}/{{data_source_id}}": {"delete"},
     f"{_SOURCES}/import-preview": {"post"},
     f"{_SOURCES}/imports": {"post"},
+    f"{_SOURCES}/imports/mapped": {"post"},
+    f"{_SOURCES}/import-inspection": {"post"},
+    f"{_SOURCES}/import-mapping-check": {"post"},
+    f"{_SOURCES}/import-validation": {"post"},
+    f"{_SOURCES}/{{data_source_id}}/import-configuration": {"get", "delete"},
     f"{_SOURCES}/templates/{{domain}}": {"get"},
 }
 

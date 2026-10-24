@@ -41,6 +41,10 @@ class LaborField(StrEnum):
 
 
 F = LaborField
+
+# See `app.modules.bookings.mapping.MAPPING_SCHEMA_VERSION`: the same rule for the labor mapping.
+MAPPING_SCHEMA_VERSION = 1
+
 # work_date is always required; at least one of {planned_hours, actual_hours} and at least one
 # of {role, labor_category} must ALSO be mapped (checked below: it is not a fixed set).
 REQUIRED_FIELDS = frozenset({F.WORK_DATE})
@@ -71,6 +75,8 @@ class LaborFormatOptions(BaseModel):
     sheet_name: str | None = None
     delimiter: Literal[",", ";", "\t"] | None = None
     encoding: Literal["utf-8", "cp1252"] | None = None
+    # The MAPPING_SCHEMA_VERSION the profile was confirmed against (None: saved before versions).
+    schema_version: int | None = None
     date_formats: dict[LaborField, str] = {}
     decimal_separator: Literal[".", ","] | None = None
     thousands_separator: Literal[",", ".", " ", "'"] | None = None
