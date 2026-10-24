@@ -18,7 +18,7 @@ export interface FeedStateViewProps {
  * `null` for FULL coverage (no extra noise when nothing was skipped). Coverage is a SEPARATE
  * dimension from feed_state on purpose (see docs/architecture/analysis-coverage-v1.md): this
  * never changes which of the four branches renders, only adds one subordinate line to it. */
-function coverageNote(coverage: AnalysisCoverage): string | null {
+export function coverageNote(coverage: AnalysisCoverage): string | null {
   if (coverage.summary === "UNKNOWN") return copy.today.coverageUnknown;
   if (coverage.summary === "FULL") return null;
   const skipped = coverage.domains

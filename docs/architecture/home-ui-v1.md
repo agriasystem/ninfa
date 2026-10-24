@@ -19,12 +19,14 @@ of them is runtime data, and the tests assert none of them is hardcoded.
 | Route | What it is |
 | --- | --- |
 | `/oggi` | the Home (this document) |
-| `/decisioni` | **today's** actionable decisions: the same feed the Home counts from (below) |
+| `/decisioni` | **today's** actionable decisions: the same feed the Home counts from (below); its board presentation is in [decisioni-ui-v1.md](decisioni-ui-v1.md) |
 | `/oggi/decisioni/{id}` | the existing Decision Detail (unchanged URL; sidebar highlights "Decisioni") |
 
-`Dati`, `Struttura` and `Impostazioni` do not exist yet: they are drawn in the approved layout with
-a discreet "In arrivo", **never as links** (no `href`, `aria-disabled="true"`, not focusable) - no
-page was invented for them.
+`Impostazioni` does not exist yet: it is drawn in the approved layout with a discreet "In arrivo",
+**never as a link** (no `href`, `aria-disabled="true"`, not focusable) - no page was invented for it.
+(`Dati` and `Struttura` were drawn the same way until Dati UI V1 and Struttura UI V1 made them real
+destinations at `/dati` and `/struttura`: see [data-ui-v1.md](data-ui-v1.md) and
+[struttura-ui-v1.md](struttura-ui-v1.md).)
 
 ## App shell
 
@@ -226,7 +228,9 @@ masked arc), `aria-hidden`, fixed to the bottom of the viewport.
 ## No graphs
 
 Gate 14's "no `<svg>`/`<canvas>`" rule was about **analytical graphs**, and that rule stands: the
-Home and `/decisioni` show **zero charts**; the area strip is textual. What is now allowed, as
+Home shows **zero charts**; the area strip is textual. (`/decisioni` draws, per row, a small decorative
+comparison of the two numbers the decision itself carries - never a trend or a time series; see
+[decisioni-ui-v1.md](decisioni-ui-v1.md).) What is now allowed, as
 *presentation only*: the icon set (`components/icons.tsx`, all `aria-hidden`), the logo, and the
 temporary canvas motion above. The existing "no svg/canvas" tests on decision cards, the feed
 states, the Decision Detail and Ask panel are unchanged (they render content, not the shell).
@@ -255,6 +259,6 @@ shell-logo-context}.tsx`, `lib/home/*`, `lib/motion/*`, `lib/feed/use-decision-f
 
 ## Explicitly deferred
 
-Dark mode; Dati / Struttura / Impostazioni pages; per-area clickable tiles and any per-area
+Dark mode; the Impostazioni page (Dati: see data-ui-v1.md; Struttura: see struttura-ui-v1.md); per-area clickable tiles and any per-area
 severity; the Decision memory list (`GET /decisions`) as a page; a per-area breakdown of
 insufficient checks; a given-name field; a brand-exact SVG logo; voice input; charts.

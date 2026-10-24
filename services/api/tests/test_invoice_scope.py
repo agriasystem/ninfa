@@ -300,10 +300,16 @@ def test_every_repository_query_is_tenant_scoped() -> None:
 
 
 def test_the_only_public_endpoint_is_still_the_health_check(client: TestClient) -> None:
+    """Gate 6 itself exposes nothing over HTTP: no module of the invoice import added a route
+    (see the next test). The ONLY routes with these words are the authenticated, property-scoped
+    data-source API of Fonti dati V1 (`.../data-sources/imports`), which hands a file to the
+    import services the pilot CLI already used - its own exact-surface guard is in
+    `test_auth_scope.py`."""
     paths = list(client.get("/openapi.json").json()["paths"])
     assert "/api/v1/health" in paths
+    own = [p for p in paths if "/data-sources" not in p]
     for word in ("supplier", "invoice", "cost", "import", "review", "fattura"):
-        assert not [p for p in paths if word in p]
+        assert not [p for p in own if word in p]
 
 
 def test_no_router_or_endpoint_was_added_by_the_gate_6_modules() -> None:

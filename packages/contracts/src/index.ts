@@ -387,3 +387,303 @@ export interface AskResponse {
   grounding_refs: string[];
   limitations: string[];
 }
+
+// --- Dati overview API V1 (Dati UI V1, `app/api/v1/data/schemas.py`) ---------------------------------
+//
+// ONE read-only GET: GET /api/v1/properties/{property_id}/data/overview?as_of=YYYY-MM-DD&period=7|30.
+// Every figure is calculated by the backend (a deterministic projection of what NINFA already stores
+// or calculates) - the frontend only formats. A Decimal is a two-decimal STRING and a figure that
+// cannot be calculated safely is `null` with a stated `reason`: never `0`. Open vocabularies (reason
+// codes, cost/labor categories, outcome) are plain strings on the wire and are mapped to Italian
+// defensively by `lib/data/*`, failing safe on anything unknown.
+
+export type DataPeriod = 7 | 30;
+
+/** A night's status, read from the run's own decisions and coverage - never a frontend threshold. */
+export type NightStatus = "ATTENTION" | "PARTIAL" | "REGULAR" | "NOT_EVALUATED";
+
+/** The analysis state of one area, in the Home's own vocabulary. */
+export type DomainState = "ANALYZED" | "PARTIAL" | "NOT_ANALYZED" | "UNKNOWN";
+
+export type DataAvailability = "AVAILABLE" | "NOT_AVAILABLE";
+
+export interface DataDecisionRef {
+  decision_id: string;
+  decision_type: string;
+  domain: string;
+  /** ISO date: the stay date (revenue), the work date (labor) or the month start (cost). */
+  target_date: string | null;
+  category: string | null;
+}
+
+export interface DataPeriodMetrics {
+  start_date: string;
+  end_date: string;
+  nights_requested: number;
+  nights_with_data: number;
+  nights_with_capacity: number;
+  /** Room-nights booked over every stored night - NOT a booking count. */
+  room_nights: number | null;
+  rooms_on_books_with_capacity: number | null;
+  rooms_available: number | null;
+  occupancy_pct: DecimalString | null;
+  room_revenue: DecimalString | null;
+  adr: DecimalString | null;
+  /** Present only when EVERY night has a row both today and in the snapshot of 7 days ago. */
+  room_nights_7d_ago: number | null;
+  room_nights_delta_7d: number | null;
+}
+
+export interface DataNightRow {
+  stay_date: string;
+  has_data: boolean;
+  bookings: number | null;
+  rooms_on_books: number | null;
+  rooms_available: number | null;
+  occupancy_pct: DecimalString | null;
+  room_revenue: DecimalString | null;
+  adr: DecimalString | null;
+  rooms_on_books_7d_ago: number | null;
+  /** Rooms now minus rooms 7 days ago for this night, calculated by the backend. */
+  rooms_delta_7d: number | null;
+  status: NightStatus;
+  decision_id: string | null;
+}
+
+export interface DataOccupancy {
+  state: DataAvailability;
+  reason: string | null;
+  today: DataPeriodMetrics | null;
+  days_7: DataPeriodMetrics | null;
+  days_30: DataPeriodMetrics | null;
+  selected: DataPeriodMetrics | null;
+  nights: DataNightRow[];
+}
+
+export interface DataChannelWeight {
+  name: string;
+  /** "OTA" | "DIRECT" | "OTHER" | "UNKNOWN". */
+  group: string;
+  room_nights: number;
+  share_pct: DecimalString;
+}
+
+export interface DataChannelMix {
+  total_room_nights: number;
+  channels: DataChannelWeight[];
+}
+
+export interface DataDistribution {
+  state: DataAvailability;
+  reason: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  /** "DECISION" | "CLEAR" | "INSUFFICIENT_DATA" | "SUPPRESSED" | "NOT_APPLICABLE" |
+   * "CHANGED_AFTER_ANALYSIS". */
+  outcome: string | null;
+  ota_share_pct: DecimalString | null;
+  direct_share_pct: DecimalString | null;
+  reference_ota_share_pct: DecimalString | null;
+  classification_coverage_pct: DecimalString | null;
+  insufficient_reasons: string[];
+  decision_id: string | null;
+  channel_mix: DataChannelMix | null;
+}
+
+export interface DataCostCategory {
+  category: string;
+  net_cost: DecimalString;
+  cpor: DecimalString | null;
+  /** "READY" | "NO_OCCUPANCY_SOURCE" | "INCOMPLETE" | "ZERO_OCCUPANCY" |
+   * "LOW_CLASSIFICATION_COVERAGE" | "NO_COST_DATA" | "NOT_APPLICABLE". */
+  cpor_status: string;
+  decision_id: string | null;
+}
+
+export interface DataCostDecision {
+  decision_id: string;
+  period_start: string;
+  category: string;
+  currency: string | null;
+  actual_cpor: DecimalString | null;
+  expected_cpor: DecimalString | null;
+}
+
+export interface DataCosts {
+  state: DataAvailability;
+  reason: string | null;
+  month_start: string;
+  month_end: string;
+  previous_month_start: string;
+  currency: string;
+  total_net_cost: DecimalString | null;
+  previous_total_net_cost: DecimalString | null;
+  delta_pct: DecimalString | null;
+  other_currencies_present: boolean;
+  classification_coverage_pct: DecimalString | null;
+  categories: DataCostCategory[];
+  decision: DataCostDecision | null;
+}
+
+export interface DataLaborCategory {
+  category: string;
+  planned_hours: DecimalString;
+  days_complete: number;
+  days_incomplete: number;
+  planned_cost: DecimalString | null;
+}
+
+export interface DataLaborDecision {
+  decision_id: string;
+  work_date: string;
+  category: string;
+  scheduled_hours: DecimalString | null;
+  expected_hours: DecimalString | null;
+  excess_hours: DecimalString | null;
+}
+
+export interface DataLabor {
+  state: DataAvailability;
+  reason: string | null;
+  window_start: string;
+  window_end: string;
+  currency: string;
+  days_with_data: number;
+  categories: DataLaborCategory[];
+  decision: DataLaborDecision | null;
+}
+
+/** A FACT about one domain's data: when the latest successful import of its source finished. */
+export interface DataDomainFreshness {
+  status: "KNOWN" | "UNKNOWN";
+  last_successful_import_finished_at: string | null;
+  /** "NO_SOURCE" | "SEVERAL_SOURCES" | "NO_IMPORT" when UNKNOWN. */
+  reason: string | null;
+}
+
+export interface DataFreshness {
+  bookings: DataDomainFreshness;
+  costs: DataDomainFreshness;
+  labor: DataDomainFreshness;
+}
+
+export interface DataDomainState {
+  domain: AnalysisDomain;
+  state: DomainState;
+}
+
+export interface DataAnalysis {
+  feed_state: FeedState;
+  coverage: AnalysisCoverage;
+  domain_states: DataDomainState[];
+  last_successful_analysis: LastSuccessfulAnalysis | null;
+}
+
+export interface DataOverviewResponse {
+  property_id: string;
+  as_of_local_date: string;
+  period_days: number;
+  currency: string;
+  analysis: DataAnalysis;
+  freshness: DataFreshness;
+  occupancy: DataOccupancy;
+  distribution: DataDistribution;
+  costs: DataCosts;
+  labor: DataLabor;
+  decisions: DataDecisionRef[];
+  overview_version: string;
+}
+
+// --- Data-source API V1 (Struttura > Fonti dati, `app/api/v1/sources`) ---------------------------------
+
+/** The five cards of "Fonti dati". A card is a PRESENTATION of a kind of data, not a connection of its own:
+ * Channel Manager and OTA are never linked separately (they are read from the bookings). */
+export type SourceCardKey = "PMS" | "CHANNEL_MANAGER" | "OTA" | "ACCOUNTING" | "STAFF";
+
+/** The kind of data a file source carries. */
+export type DataSourceDomain = "BOOKINGS" | "COSTS" | "LABOR";
+
+export type SourceCardState =
+  | "NOT_CONFIGURED"
+  /** A file source exists: data arrive when someone uploads a file. */
+  | "CONFIGURED_FILE"
+  /** A real automatic integration. The backend never produces it today: no integration exists. */
+  | "CONNECTED"
+  /** Received through another configured source (the OTA channels come with the bookings). */
+  | "DERIVED";
+
+export type SourceMethod = "CSV" | "XML";
+
+export interface DataSourceCard {
+  card: SourceCardKey;
+  state: SourceCardState;
+  domain: DataSourceDomain | null;
+  /** Only when exactly one active source of the domain exists. */
+  data_source_id: string | null;
+  method: SourceMethod | null;
+  /** When the latest SUCCEEDED import of this exact source finished (UTC). `null` = never imported. */
+  last_update_at: string | null;
+  /** More than one active source of the domain: NINFA does not pick one. */
+  several_sources: boolean;
+  /** `PMS` and `CHANNEL_MANAGER` appear only once an automatic integration exists. */
+  derived_from: "BOOKINGS_FILE" | "PMS" | "CHANNEL_MANAGER" | null;
+  /** The automatic integration's own name; always `null` while none exists. */
+  provider: string | null;
+  /** Real channel names read from the imported bookings (OTA card only). */
+  channels: string[];
+}
+
+export interface DataSourceCapability {
+  domain: DataSourceDomain;
+  methods: SourceMethod[];
+}
+
+export interface DataSourcesResponse {
+  property_id: string;
+  cards: DataSourceCard[];
+  /** How each kind of data can REALLY be provided today; nothing else is ever offered. */
+  capabilities: DataSourceCapability[];
+  /** Real automatic integrations. Empty today, by design. */
+  automatic_integrations: string[];
+}
+
+/** WHY a file cannot be (or was not) imported - one stable word the page turns into a sentence. */
+export type ImportProblem =
+  | "UNSUPPORTED_FILE"
+  | "UNREADABLE_FILE"
+  | "EMPTY_FILE"
+  | "NO_ROWS"
+  | "FILE_TOO_LARGE"
+  | "MISSING_COLUMNS"
+  | "DUPLICATE_COLUMNS"
+  | "INVALID_ROWS"
+  | "UNSUPPORTED_FORMAT"
+  | "SAME_DAY_CONFLICT"
+  | "GENERIC";
+
+export interface ImportPreviewResponse {
+  method: SourceMethod;
+  can_import: boolean;
+  problem: ImportProblem | null;
+  /** Data rows of a CSV, invoices of an XML. */
+  rows_total: number;
+  recognized_columns: string[];
+  /** Each entry is a group of alternatives, one of which the file must carry. */
+  missing_columns: string[][];
+  unrecognized_columns: string[];
+  sample_columns: string[];
+  sample_rows: string[][];
+  documents_with_issues: number;
+  already_imported: boolean;
+}
+
+export interface ImportResultResponse {
+  succeeded: boolean;
+  problem: ImportProblem | null;
+  rows_total: number;
+  rows_invalid: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  already_imported: boolean;
+}

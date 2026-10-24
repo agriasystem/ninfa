@@ -21,7 +21,7 @@ export interface PropertyScreenProps {
   onSelectProperty: (propertyId: string) => void;
   onNavigateToLogin: () => void;
   activeSection: ShellSection;
-  variant?: "page" | "home";
+  variant?: "page" | "home" | "wide";
   logoInitiallyHidden?: boolean;
   /** Rendered inside the shell for the RESOLVED property. `onPropertyInvalid` re-resolves the
    * session's properties - the page calls it when its own request answers 404 PROPERTY_NOT_FOUND. */

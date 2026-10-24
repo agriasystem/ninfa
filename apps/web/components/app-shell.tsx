@@ -19,8 +19,8 @@ export interface AppShellProps {
   /** Which sidebar section is current (the Decision Detail passes "decisioni"). */
   activeSection: ShellSection;
   /** `"home"`: the full-bleed canvas of the Home; `"page"` (default): the centred reading column
-   * every other screen uses. */
-  variant?: "page" | "home";
+   * every other screen uses; `"wide"`: the analytical workspace of Dati (many cards side by side). */
+  variant?: "page" | "home" | "wide";
   /** `true` on the Home: the sidebar logo starts empty because the hero logo is the one on screen
    * (the Home reveals it, through `useShellLogo()`, once the logo transition has landed). */
   logoInitiallyHidden?: boolean;
@@ -30,8 +30,8 @@ export interface AppShellProps {
 /**
  * The whole authenticated shell (Home UI V1, replacing Gate 14's topbar): a sidebar with the logo
  * slot, Oggi / Decisioni / Dati / Struttura and profile | settings; and, on the content side, the
- * property header (name + local date) above the page. Dati, Struttura and Impostazioni do not exist
- * yet and are never links (see `AppSidebar`). Logout is the profile menu's "Esci" - the same
+ * property header (name + local date) above the page. Impostazioni does not exist yet and is never a
+ * link (see `AppSidebar`). Logout is the profile menu's "Esci" - the same
  * `logout()` Gate 14 wired, unchanged.
  */
 export function AppShell({

@@ -30,7 +30,7 @@ export const copy = {
     logout: "Esci",
   },
   property: {
-    // "Struttura attiva", not "Struttura": the sidebar has its own (future) "Struttura" section.
+    // "Struttura attiva", not "Struttura": the sidebar has its own "Struttura" section.
     selectorLabel: "Struttura attiva",
     emptyStateTitle: "Nessuna struttura disponibile",
     emptyStateBody: "Il tuo account non è associato a nessuna struttura.",
@@ -77,8 +77,8 @@ export const copy = {
     reliabilityLabel: "Affidabilità",
     rankLabel: "Priorità",
   },
-  // Home UI V1: the sidebar. Dati / Struttura / Impostazioni do not exist yet - they are shown in the
-  // approved layout, but never as a link to a page that is not there (see `AppSidebar`).
+  // Home UI V1: the sidebar. Impostazioni does not exist yet - it is shown in the approved layout, but
+  // never as a link to a page that is not there (see `AppSidebar`).
   nav: {
     skipToContent: "Vai al contenuto",
     mainLabel: "Navigazione principale",

@@ -1,3 +1,7 @@
+import type { DataPeriod } from "@ninfa/contracts";
+
+import { DEFAULT_DATA_PERIOD, type DatiTab } from "@/lib/data/tabs";
+
 /**
  * Frontend route paths, centralised so the query-param name/shape is defined once. These build
  * URLs WITHIN this app (never a backend API path - see `lib/api/decisions.ts` for those).
@@ -25,4 +29,34 @@ export function decisionDetailRoute(propertyId: string, decisionId: string): str
  * the number a user clicks and the list they land on can never disagree. */
 export function decisioniRoute(propertyId?: string): string {
   return propertyId ? `/decisioni?${PROPERTY_QUERY_PARAM}=${propertyId}` : "/decisioni";
+}
+
+/** "/struttura", optionally scoped to a property - the structure's profile, room inventory, operating
+ * parameters and connected data sources (Struttura UI V1). Same `?property=` convention as the rest. */
+export function strutturaRoute(propertyId?: string): string {
+  return propertyId ? `/struttura?${PROPERTY_QUERY_PARAM}=${propertyId}` : "/struttura";
+}
+
+export const DATI_TAB_PARAM = "tab";
+export const DATI_PERIOD_PARAM = "period";
+
+export interface DatiRouteOptions {
+  /** The internal section; `?tab=` is written whenever it is given. */
+  tab?: DatiTab;
+  /** `?period=` is written only for the non-default 7 days (30 is the default). */
+  period?: DataPeriod;
+}
+
+/** "/dati?property={propertyId}&tab={tab}&period={period}" - the Dati workspace (Dati UI V1). The
+ * property stays in the query like every other screen; the section and the period are query state
+ * too, so back/forward and a reload keep them. */
+export function datiRoute(propertyId?: string, options: DatiRouteOptions = {}): string {
+  const params = new URLSearchParams();
+  if (propertyId) params.set(PROPERTY_QUERY_PARAM, propertyId);
+  if (options.tab !== undefined) params.set(DATI_TAB_PARAM, options.tab);
+  if (options.period !== undefined && options.period !== DEFAULT_DATA_PERIOD) {
+    params.set(DATI_PERIOD_PARAM, String(options.period));
+  }
+  const query = params.toString();
+  return query ? `/dati?${query}` : "/dati";
 }

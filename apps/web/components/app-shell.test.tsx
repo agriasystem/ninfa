@@ -69,12 +69,8 @@ describe("AppShell - structure and landmarks", () => {
 
     const nav = screen.getByRole("navigation", { name: "Navigazione principale" });
     const items = within(nav).getAllByRole("listitem");
-    expect(items.map((item) => item.textContent)).toEqual([
-      "Oggi",
-      "Decisioni",
-      expect.stringContaining("Dati"),
-      expect.stringContaining("Struttura"),
-    ]);
+    // exact labels: no "In arrivo" caption is left on any of the four, and "Home" is never the name
+    expect(items.map((item) => item.textContent)).toEqual(["Oggi", "Decisioni", "Dati", "Struttura"]);
   });
 
   it("no longer carries the old topbar (wordmark text, e-mail line, loose logout button)", () => {
@@ -87,12 +83,16 @@ describe("AppShell - structure and landmarks", () => {
 });
 
 describe("AppShell - navigation", () => {
-  it("makes Oggi and Decisioni real links that keep the property context", () => {
+  it("makes Oggi, Decisioni, Dati and Struttura real links that keep the property context", () => {
     renderShell();
 
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("href")).toBe("/oggi?property=p1");
     expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("href")).toBe(
       "/decisioni?property=p1",
+    );
+    expect(screen.getByRole("link", { name: "Dati" }).getAttribute("href")).toBe("/dati?property=p1");
+    expect(screen.getByRole("link", { name: "Struttura" }).getAttribute("href")).toBe(
+      "/struttura?property=p1",
     );
   });
 
@@ -101,6 +101,8 @@ describe("AppShell - navigation", () => {
 
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("href")).toBe("/oggi");
     expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("href")).toBe("/decisioni");
+    expect(screen.getByRole("link", { name: "Dati" }).getAttribute("href")).toBe("/dati");
+    expect(screen.getByRole("link", { name: "Struttura" }).getAttribute("href")).toBe("/struttura");
   });
 
   it("marks Oggi as the current page when the Home is active", () => {
@@ -117,18 +119,43 @@ describe("AppShell - navigation", () => {
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("aria-current")).toBeNull();
   });
 
-  it("draws Dati and Struttura as disabled, link-less items with a discreet 'In arrivo'", () => {
+  it("marks Dati as the current page when the Dati workspace is active, like Oggi and Decisioni", () => {
+    renderShell({ activeSection: "dati" });
+
+    expect(screen.getByRole("link", { name: "Dati" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("Dati is no longer 'In arrivo': an enabled, focusable link with no 'In arrivo' caption", () => {
     renderShell();
 
-    for (const name of ["Dati", "Struttura"]) {
-      const item = screen.getByText(name).closest("[aria-disabled='true']");
-      expect(item, name).not.toBeNull();
-      expect(item?.getAttribute("href")).toBeNull();
-      expect(item?.tagName).not.toBe("A");
-      expect(item?.getAttribute("tabindex")).toBeNull(); // never a dead tab stop
-      expect(within(item as HTMLElement).getByText("In arrivo")).not.toBeNull();
-    }
-    expect(screen.queryByRole("link", { name: "Dati" })).toBeNull();
+    const dati = screen.getByRole("link", { name: "Dati" });
+    expect(dati.tagName).toBe("A");
+    expect(dati.getAttribute("aria-disabled")).toBeNull();
+    expect(dati.textContent).not.toMatch(/In arrivo/u);
+    expect(dati.closest("[aria-disabled='true']")).toBeNull();
+  });
+
+  it("marks Struttura as the current page when the Struttura page is active, like the other sections", () => {
+    renderShell({ activeSection: "struttura" });
+
+    expect(screen.getByRole("link", { name: "Struttura" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("aria-current")).toBeNull();
+    expect(screen.getByRole("link", { name: "Dati" }).getAttribute("aria-current")).toBeNull();
+  });
+
+  it("Struttura is no longer 'In arrivo': an enabled, focusable link - no section of the main navigation is disabled", () => {
+    renderShell();
+
+    const structure = screen.getByRole("link", { name: "Struttura" });
+    expect(structure.tagName).toBe("A");
+    expect(structure.getAttribute("aria-disabled")).toBeNull();
+    expect(structure.closest("[aria-disabled='true']")).toBeNull();
+    const nav = screen.getByRole("navigation", { name: "Navigazione principale" });
+    expect(within(nav).queryByText("In arrivo")).toBeNull();
+    expect(nav.querySelector("[aria-disabled='true']")).toBeNull();
   });
 
   it("draws Impostazioni as disabled and link-less, with its own accessible name", () => {
@@ -145,9 +172,13 @@ describe("AppShell - navigation", () => {
 
     const hrefs = Array.from(container.querySelectorAll("a")).map((a) => a.getAttribute("href"));
     for (const href of hrefs) {
-      expect(href === "#main-content" || href?.startsWith("/oggi") || href?.startsWith("/decisioni")).toBe(
-        true,
-      );
+      expect(
+        href === "#main-content" ||
+          href?.startsWith("/oggi") ||
+          href?.startsWith("/decisioni") ||
+          href?.startsWith("/dati") ||
+          href?.startsWith("/struttura"),
+      ).toBe(true);
     }
   });
 });
