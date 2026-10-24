@@ -25,7 +25,7 @@ function sourceFiles(): { file: string; text: string }[] {
     ...readdirSync(path.join(WEB, "components"))
       .filter(
         (name) =>
-          /^struttura-(sources|source-.*|import-dialog|manage-dialog|modal)\.tsx$/u.test(name) &&
+          /^struttura-(sources|source-.*|import-.*|manage-dialog|modal)\.tsx$/u.test(name) &&
           !name.includes(".test."),
       )
       .map((name) => `components/${name}`),
@@ -63,7 +63,7 @@ describe("Fonti dati sources", () => {
   const files = sourceFiles();
 
   it("finds the sources", () => {
-    expect(files.length).toBeGreaterThanOrEqual(12);
+    expect(files.length).toBeGreaterThanOrEqual(16);
   });
 
   it("never names a vendor or a product: what does not exist is only 'Prossimamente'", () => {
@@ -83,6 +83,18 @@ describe("Fonti dati sources", () => {
     const strings = allStrings(sourcesCopy);
     expect(strings.length).toBeGreaterThan(100);
     for (const text of strings) expect(text).not.toMatch(technical);
+  });
+
+  it("speaks the hotelier's words when matching columns: none of the words the brief rules out", () => {
+    const ruledOut = /\bmapping\b|\bparser\b|canonical|normalized|data contract|\bdatacontract\b/iu;
+    for (const text of allStrings(sourcesCopy)) expect(text).not.toMatch(ruledOut);
+    // and the words the brief asks for are the ones on the screen
+    const match = allStrings(sourcesCopy.match).join(" | ");
+    for (const word of ["Abbina le colonne", "Ignora questa colonna", "Riconosciuto", "Da verificare", "Continua"]) {
+      expect(match).toContain(word);
+    }
+    expect(allStrings(sourcesCopy.preview).join(" | ")).toContain("Salva questa configurazione");
+    expect(allStrings(sourcesCopy.recognized).join(" | ")).toContain("Importa con questa configurazione");
   });
 
   it("uses the product's own words for the actions", () => {
@@ -122,10 +134,16 @@ describe("Fonti dati sources", () => {
       // only the removal (DELETE of a source the card already showed) is addressed by a source id
       if (file !== "lib/api/data-sources.ts") expect(code, file).not.toMatch(/\bdataSourceId\b/u);
     }
-    // the only mutations are the import itself and the removal
+    // the only mutations are the imports (looking at a file, checking and trying a matching are POSTs that
+    // write nothing - the backend says so and its tests pin it), the removal and forgetting a configuration
     const client = withoutComments(read("lib/api/data-sources.ts"));
     expect([...client.matchAll(/method: "(POST|DELETE|PUT|PATCH)"/gu)].map((match) => match[1]).sort()).toEqual([
       "DELETE",
+      "DELETE",
+      "POST",
+      "POST",
+      "POST",
+      "POST",
       "POST",
       "POST",
     ]);
@@ -169,6 +187,45 @@ describe("Fonti dati sources", () => {
     }
     // the states the backend can produce, no more: an automatic connection is documented as never produced yet
     expect(contracts).toMatch(/"NOT_CONFIGURED"[\s\S]*"CONFIGURED_FILE"[\s\S]*"CONNECTED"[\s\S]*"DERIVED"/u);
+  });
+});
+
+describe("Smart Import: the page decides nothing about the data", () => {
+  const FIELD_KEYS =
+    /"(source_record_id|booked_at|check_in|check_out|rooms|room_revenue|work_date|labor_category|planned_hours|actual_hours|planned_cost|actual_cost)"/u;
+  const logic = [
+    "lib/sources/use-import-flow.ts",
+    "lib/sources/mapping-decision.ts",
+    "lib/sources/sample-format.ts",
+    "lib/sources/problem-text.ts",
+    "components/struttura-import-mapping.tsx",
+    "components/struttura-import-preview.tsx",
+    "components/struttura-import-dialog.tsx",
+    "components/struttura-manage-dialog.tsx",
+  ];
+
+  it("names no field of any kind of data in its logic: what is required, and what a field is, come from the backend", () => {
+    for (const file of logic) expect(withoutComments(read(file)), file).not.toMatch(FIELD_KEYS);
+  });
+
+  it("never decides on its own that a matching is enough: the button waits for the backend's answer", () => {
+    const mapping = withoutComments(read("components/struttura-import-mapping.tsx"));
+    expect(mapping).toMatch(/check\?\.valid === true/u);
+    const flow = withoutComments(read("lib/sources/use-import-flow.ts"));
+    expect(flow).toMatch(/state\.check\?\.valid !== true/u);
+    expect(flow).not.toMatch(/requirement_groups|(?<!SHEET_)REQUIRED|\brequired\b/u);
+  });
+
+  it("offers the import only when the backend says every row can be imported", () => {
+    const preview = withoutComments(read("components/struttura-import-preview.tsx"));
+    expect(preview).toMatch(/validation\.can_import/u);
+    expect(withoutComments(read("lib/sources/use-import-flow.ts"))).toMatch(/!state\.validation\.can_import/u);
+  });
+
+  it("sends the file only to the data-source API and reads it back in no other way", () => {
+    const client = withoutComments(read("lib/api/data-sources.ts"));
+    expect(client).toMatch(/readAsDataURL/u); // a file travels as text inside the request, never to a third party
+    for (const file of logic) expect(read(file), file).not.toMatch(/\bfetch\(|XMLHttpRequest|sendBeacon/u);
   });
 });
 

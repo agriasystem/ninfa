@@ -2,29 +2,22 @@
 
 import { useState, type ChangeEvent } from "react";
 
-import type { DataSourceDomain, ImportPreviewResponse, SourceMethod } from "@ninfa/contracts";
+import type { DataSourceDomain, ImportPreviewResponse } from "@ninfa/contracts";
 
 import { downloadTemplate } from "@/lib/api/data-sources";
 import { formatPropertyLocalDateLongItalian } from "@/lib/date/property-date";
 import { sourcesCopy } from "@/lib/sources/copy";
+import { problemText } from "@/lib/sources/problem-text";
 import { saveBlob, TEMPLATE_FILENAME } from "@/lib/sources/save-file";
-import { useImportFlow, type FlowProblem } from "@/lib/sources/use-import-flow";
+import { ACCEPT_OF_DOMAIN, useImportFlow } from "@/lib/sources/use-import-flow";
 
 import { DownloadIcon, SpinnerIcon, UploadIcon } from "./icons";
+import { StrutturaImportMapping } from "./struttura-import-mapping";
+import { StrutturaImportPreview } from "./struttura-import-preview";
 import { StrutturaModal } from "./struttura-modal";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.importFlow;
-
-/** The sentence for a problem, with what to do next where it helps. Never a technical word. */
-function problemText(problem: FlowProblem, method: SourceMethod): string {
-  if (problem === "SOURCE_GONE") return sourcesCopy.errors.sourceGone;
-  if (problem === "IMPORT_IN_PROGRESS") return sourcesCopy.errors.importInProgress;
-  const base = sourcesCopy.problems[problem];
-  const hints: Partial<Record<FlowProblem, Record<SourceMethod, string>>> = sourcesCopy.problemHints;
-  const hint = hints[problem]?.[method];
-  return hint ? `${base} ${hint}` : base;
-}
 
 function Busy({ text }: { text: string }) {
   return (
@@ -35,7 +28,7 @@ function Busy({ text }: { text: string }) {
   );
 }
 
-/** What NINFA found in the file, before anything is imported. */
+/** What NINFA found in an invoice file, before anything is imported. */
 function PreviewSummary({ preview }: { preview: ImportPreviewResponse }) {
   return (
     <div className="struttura-flow__summary">
@@ -84,29 +77,34 @@ export interface StrutturaImportDialogProps {
   domain: DataSourceDomain;
   /** The property-local day (YYYY-MM-DD) a labor file is dated as of. */
   snapshotLocalDate: string;
+  /** "edit": the person asked to look at the columns again ("Modifica associazioni"). */
+  mode?: "import" | "edit";
   /** An import SUCCEEDED: the cards are re-read from the backend. */
   onImported: () => void;
   onClose: () => void;
 }
 
 /**
- * Putting a file into NINFA, one step at a time: choose the file -> NINFA looks at it -> confirm -> the
- * result. The backend does every check and the import itself (the same services the pilot's tooling uses);
- * this dialog shows what the backend found and what it did, in plain Italian.
+ * Putting a file into NINFA, one step at a time. A file the hotel already has (CSV or Excel) is read, its
+ * columns are matched ("Abbina le colonne"), the whole file is tried in a preview and only then imported;
+ * a layout NINFA has seen before skips the matching. Invoices (XML) keep their own short path.
  *
- * Opening it, choosing a file and looking at it write nothing: the data source behind the card comes to
- * exist only when the confirmed import succeeds. Closing the dialog at any earlier step (or an import
- * that fails) therefore leaves the card exactly as it was.
+ * The backend does every check and the import itself (the same services the pilot's tooling uses); this
+ * dialog shows what the backend found and what it did, in plain Italian. Opening it, choosing a file, matching
+ * the columns and looking at the preview write nothing: the data source behind the card - and the remembered
+ * configuration - come to exist only when the confirmed import succeeds. Closing the dialog at any earlier
+ * step (or an import that fails) therefore leaves the card exactly as it was.
  */
 export function StrutturaImportDialog({
   propertyId,
   timeZone,
   domain,
   snapshotLocalDate,
+  mode = "import",
   onImported,
   onClose,
 }: StrutturaImportDialogProps) {
-  const flow = useImportFlow({ propertyId, domain, snapshotLocalDate, onImported });
+  const flow = useImportFlow({ propertyId, domain, snapshotLocalDate, mode, onImported });
   const { state, method } = flow;
   const [templateFailed, setTemplateFailed] = useState(false);
   const hasTemplate = domain !== "COSTS";
@@ -163,7 +161,7 @@ export function StrutturaImportDialog({
                 <input
                   type="file"
                   className="visually-hidden"
-                  accept={method === "CSV" ? ".csv,text/csv" : ".xml,text/xml,application/xml"}
+                  accept={ACCEPT_OF_DOMAIN[domain]}
                   onChange={handlePick}
                 />
               </label>
@@ -173,6 +171,49 @@ export function StrutturaImportDialog({
         ) : null}
 
         {state.step === "checking" ? <Busy text={COPY.checking} /> : null}
+
+        {state.step === "sheet" ? (
+          <>
+            <p className="struttura-flow__file">{COPY.chosen(state.file.name)}</p>
+            <h3 className="struttura-flow__subtitle">{sourcesCopy.match.sheetTitle}</h3>
+            <p>{sourcesCopy.match.sheetIntro}</p>
+            <div className="struttura-flow__actions">
+              {state.sheets.map((sheet) => (
+                <StrutturaButton key={sheet} variant="outline" onClick={() => void flow.chooseSheet(sheet)}>
+                  {sheet}
+                </StrutturaButton>
+              ))}
+            </div>
+            <div className="struttura-flow__actions">
+              <StrutturaButton variant="outline" onClick={flow.reset}>
+                {COPY.chooseOther}
+              </StrutturaButton>
+            </div>
+          </>
+        ) : null}
+
+        {state.step === "mapping" ? (
+          <StrutturaImportMapping
+            step={state}
+            onField={flow.setColumnField}
+            onConstant={flow.setConstant}
+            onDateOrder={flow.setDateOrder}
+            onDecimalStyle={flow.setDecimalStyle}
+            onContinue={() => void flow.continueToPreview()}
+            onChooseOther={flow.reset}
+          />
+        ) : null}
+
+        {state.step === "ready" ? (
+          <StrutturaImportPreview
+            step={state}
+            timeZone={timeZone}
+            onSave={flow.setSave}
+            onImport={() => void flow.confirm()}
+            onReview={flow.reviewColumns}
+            onChooseOther={flow.reset}
+          />
+        ) : null}
 
         {state.step === "preview" ? (
           <>
@@ -184,9 +225,7 @@ export function StrutturaImportDialog({
               </>
             ) : (
               <div className="struttura-flow__problem" role="alert">
-                <p>
-                  {problemText(state.preview.problem ?? "GENERIC", method)}
-                </p>
+                <p>{problemText(state.preview.problem ?? "GENERIC", method)}</p>
                 {state.preview.missing_columns.length > 0 ? (
                   <>
                     <p>{COPY.missingTitle}</p>
@@ -222,10 +261,11 @@ export function StrutturaImportDialog({
         {state.step === "done" ? (
           <>
             <h3 className="struttura-flow__subtitle">{COPY.doneTitle}</h3>
-            <p className="struttura-flow__found">
-              {COPY.rowsFound(state.result.rows_total, method)}
-            </p>
+            <p className="struttura-flow__found">{COPY.rowsFound(state.result.rows_total, method)}</p>
             <p>{COPY.doneCounts(state.result.created, state.result.updated, state.result.unchanged)}</p>
+            {"configuration_saved" in state.result && state.result.configuration_saved ? (
+              <p className="struttura-flow__note">{COPY.configurationSaved}</p>
+            ) : null}
             <p className="struttura-flow__note">{COPY.doneNote}</p>
             <div className="struttura-flow__actions">
               <StrutturaButton variant="primary" onClick={onClose}>
