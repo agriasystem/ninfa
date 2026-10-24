@@ -397,7 +397,9 @@ async def understand_import(
 ) -> FileInspectionResponse:
     body = await _read_json(request, UnderstandRequest)
     content = body.content()
-    service = DataSourcesService(session, scope.tenant)
+    service = DataSourcesService(
+        session, scope.tenant, getattr(request.app.state, "import_understanding_resolver", None)
+    )
     inspection = await run_in_threadpool(
         lambda: service.understand_file(
             scope.property_id,

@@ -72,6 +72,7 @@ class OriginKind(StrEnum):
     USER = "USER"  # what the person said
     LEARNED = "LEARNED"  # a word the person taught NINFA before
     PROPERTY = "PROPERTY"  # the hotel's own settings (its currency)
+    ASSISTANT = "ASSISTANT"  # suggested by the optional assistant: always to be checked
     GRID = "GRID"  # the days of a grid
 
 

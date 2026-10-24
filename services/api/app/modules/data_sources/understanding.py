@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
+from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
 from app.modules.bookings.errors import BookingImportError
 from app.modules.bookings.mapping import normalize_header
 from app.modules.bookings.normalization import DateOrder
@@ -63,6 +64,12 @@ from app.modules.data_sources.semantics_bookings import BOOKINGS
 from app.modules.data_sources.semantics_costs import COSTS
 from app.modules.data_sources.semantics_labor import LABOR, hourly_or_known_exclusion
 from app.modules.data_sources.smart_import import Formats, SmartImportService, problem_of_error
+from app.modules.data_sources.understanding_ai import (
+    apply_resolution,
+    build_evidence,
+    fit_function,
+    needs_help,
+)
 from app.modules.data_sources.understanding_costs import (
     CostsPlan,
     category_question,
@@ -163,10 +170,17 @@ class _Candidate:
 
 
 class UnderstandingService:
-    def __init__(self, session: Session, tenant: TenantContext, smart: SmartImportService) -> None:
+    def __init__(
+        self,
+        session: Session,
+        tenant: TenantContext,
+        smart: SmartImportService,
+        resolver: ImportUnderstandingResolver | None = None,
+    ) -> None:
         self._session = session
         self._tenant = tenant
         self._smart = smart
+        self._resolver = resolver
 
     # --- public -----------------------------------------------------------------------------------
 
@@ -262,6 +276,42 @@ class UnderstandingService:
         proposal = _with_answers(proposal, overrides)
         if costs_plan is not None:
             proposal = promote(proposal, costs_plan.confirmed)
+
+        # The optional assistant: asked only when the rules left something open it could help with,
+        # and what it says is a SUGGESTION (MEDIUM at most) that the person still confirms.
+        ai_headers: frozenset[str] = frozenset()
+        if (
+            self._resolver is not None
+            and self._resolver.enabled
+            and needs_help(proposal, adapter.groups, questions)
+        ):
+            evidence = build_evidence(
+                expected=domain,
+                semantics=_SEMANTICS,
+                sheets=[
+                    (
+                        s.name,
+                        s.role.value if isinstance(s.role, SheetRole) else str(s.role),
+                        s.last_row,
+                    )
+                    for s in document.sheets
+                ],
+                title=chosen.selection.title,
+                proposal=proposal,
+                questions=questions,
+            )
+            resolution = self._resolver.resolve(evidence, fit_function(_SEMANTICS, proposal))
+            proposal, questions, ai_headers = apply_resolution(
+                proposal, questions, resolution, domain
+            )
+            if ai_headers and {"role", "labor_category"} & set(proposal.assigned()):
+                # the assistant found the department column: "which department are all the rows?"
+                # is no longer a question
+                questions = [
+                    q
+                    for q in questions
+                    if q.kind not in (QuestionKind.DEPARTMENT_ROWS, QuestionKind.DEPARTMENT_CONFIRM)
+                ]
         constants: dict[str, str | int] = {}
         if (
             domain == DataSourceDomain.LABOR
@@ -354,7 +404,15 @@ class UnderstandingService:
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         recognized = self._recognized(
-            proposal, decision, layout, origin, origin_level, recognized_by_profile, answers, table
+            proposal,
+            decision,
+            layout,
+            origin,
+            origin_level,
+            recognized_by_profile,
+            answers,
+            table,
+            ai_headers,
         )
         level = self._level(
             adapter,
@@ -714,6 +772,7 @@ class UnderstandingService:
         by_profile: bool,
         answers: UnderstandAnswers,
         table: LayoutTable,
+        ai_headers: frozenset[str] = frozenset(),
     ) -> list[Recognized]:
         out: list[Recognized] = []
         decided = {c.header: c.field for c in decision.columns if c.field is not None}
@@ -724,6 +783,8 @@ class UnderstandingService:
             kind = OriginKind.PROFILE if by_profile else OriginKind.COLUMN
             if column.header in answers.column_fields:
                 kind = OriginKind.USER
+            elif column.header in ai_headers and not by_profile:
+                kind = OriginKind.ASSISTANT
             example = None if column.locked or column.pii else _example(column)
             if layout.department is not None and column.header == _synthetic_header(
                 table, layout.department.kind

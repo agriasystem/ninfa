@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
 from app.db.locks import LockWaitTimeoutError, hold_source_import_lock
+from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
 from app.modules.bookings.errors import BookingImportError
 from app.modules.bookings.mapping import CanonicalField, header_index, normalize_header
 from app.modules.bookings.models import ChannelType
@@ -123,7 +124,12 @@ class MappedImport:
 
 
 class DataSourcesService:
-    def __init__(self, session: Session, tenant: TenantContext) -> None:
+    def __init__(
+        self,
+        session: Session,
+        tenant: TenantContext,
+        resolver: ImportUnderstandingResolver | None = None,
+    ) -> None:
         self._session = session
         self._tenant = tenant
         self._sources = DataSourceRepository(session, tenant)
@@ -131,7 +137,7 @@ class DataSourcesService:
         self._files = ImportFileRepository(session, tenant)
         self._channels = BookingChannelRepository(session, tenant)
         self._smart = SmartImportService(session, tenant)
-        self._understanding = UnderstandingService(session, tenant, self._smart)
+        self._understanding = UnderstandingService(session, tenant, self._smart, resolver)
 
     # --- reading ------------------------------------------------------------------------------
 

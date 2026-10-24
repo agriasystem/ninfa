@@ -7,7 +7,10 @@ from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.meta import SERVICE_NAME, get_version
 from app.core.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
-from app.modules.ai.gateway.factory import build_language_model_provider
+from app.modules.ai.gateway.factory import (
+    build_import_understanding_resolver,
+    build_language_model_provider,
+)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -35,6 +38,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # process-wide global either. `app.api.v1.decisions.deps.get_language_model_provider` reads
     # it back, the same pattern `get_request_settings` already established above.
     app.state.language_model_provider = build_language_model_provider(settings)
+    # The optional assistant of Smart Import V3: no provider unless explicitly selected.
+    app.state.import_understanding_resolver = build_import_understanding_resolver(settings)
 
     # Middleware added last is outermost: RequestId must wrap CORS so every response carries the ID.
     if settings.cors_origins:

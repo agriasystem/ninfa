@@ -584,6 +584,7 @@ def costs_amount_only_xlsx() -> bytes:
 
 
 __all__ = [
+    "eval_rows",
     "COSTS_SUPPLIERS",
     "PEOPLE",
     "STAFF_HEADER",
@@ -617,3 +618,55 @@ __all__ = [
     "staff_weekly_summary_xlsx",
     "two_tables_xlsx",
 ]
+
+
+# --- cases for the evaluation of the optional AI step ---------------------------------------------
+
+
+def eval_rows() -> list[tuple[str, str, list[list[object]], dict[str, str]]]:
+    """(name, domain, rows, {unreadable header: the field it really is}): a column whose header no
+    rule can read, over values that make clear what it is."""
+    day = datetime(2026, 10, 26)
+    staff: list[list[object]] = [["Giorno", "Gruppo di lavoro", "Ore previste"]]
+    for offset in range(3):
+        for person in PEOPLE[:6]:
+            staff.append([day + timedelta(days=offset), person[1], person[3]])
+    bookings: list[list[object]] = [
+        [
+            "Codice prenotazione",
+            "Data prenotazione",
+            "Arrivo",
+            "Partenza",
+            "Stato",
+            "Camere",
+            "Ricavo camera",
+            "Via",
+        ]
+    ]
+    channels = ["Booking.com", "Expedia", "Diretto", "Airbnb"]
+    for index in range(8):
+        arrival = datetime(2026, 11, 14 + index)
+        bookings.append(
+            [
+                f"RES-{index}",
+                datetime(2026, 10, 14 + index),
+                arrival,
+                arrival + timedelta(days=2),
+                "Confermata",
+                1,
+                120.0 + index,
+                channels[index % 4],
+            ]
+        )
+    costs: list[list[object]] = [
+        ["Numero fattura", "Data", "Controparte", "Descrizione", "Imponibile"]
+    ]
+    for index, (name, _category, description) in enumerate(COSTS_SUPPLIERS * 2):
+        costs.append(
+            [f"FT-{index}", datetime(2026, 10, 14 + index), name, description, 1000.0 + 10 * index]
+        )
+    return [
+        ("staff", "LABOR", staff, {"Gruppo di lavoro": "role"}),
+        ("bookings", "BOOKINGS", bookings, {"Via": "channel"}),
+        ("costs", "COSTS", costs, {"Controparte": "supplier_name"}),
+    ]

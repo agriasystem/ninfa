@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     # exception message.
     ask_ninfa_provider: Literal["unconfigured", "anthropic"] = "unconfigured"
     anthropic_api_key: SecretStr | None = None
+    # The OPTIONAL assistant of Smart Import V3 (it suggests what a column means when the rules
+    # found nothing). Off by default, selected explicitly like the provider above, and never
+    # needed: Smart Import reads files completely without it.
+    import_understanding_provider: Literal["unconfigured", "anthropic"] = "unconfigured"
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -82,6 +86,12 @@ class Settings(BaseSettings):
             key = self.anthropic_api_key
             if key is None or not key.get_secret_value().strip():
                 raise ValueError("ANTHROPIC_API_KEY is required when ASK_NINFA_PROVIDER=anthropic")
+        if self.import_understanding_provider == "anthropic":
+            key = self.anthropic_api_key
+            if key is None or not key.get_secret_value().strip():
+                raise ValueError(
+                    "ANTHROPIC_API_KEY is required when IMPORT_UNDERSTANDING_PROVIDER=anthropic"
+                )
         return self
 
     @property
