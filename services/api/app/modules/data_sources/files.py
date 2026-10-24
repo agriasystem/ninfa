@@ -50,6 +50,11 @@ class ImportProblem(StrEnum):
     INVALID_ROWS = "INVALID_ROWS"
     UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
     SAME_DAY_CONFLICT = "SAME_DAY_CONFLICT"
+    # Smart Import: matching the columns of a file the person already has.
+    MAPPING_INCOMPLETE = "MAPPING_INCOMPLETE"  # the matching misses something or contradicts itself
+    FORMAT_UNCLEAR = "FORMAT_UNCLEAR"  # dates or numbers are written in a way NINFA cannot tell
+    PROFILE_NOT_USABLE = "PROFILE_NOT_USABLE"  # the saved configuration cannot read this file
+    SHEET_REQUIRED = "SHEET_REQUIRED"  # an Excel file with several sheets: one must be chosen
     GENERIC = "GENERIC"
 
 

@@ -139,6 +139,15 @@ class BookingMappingProfileRepository:
         self._session.flush()
         return profile
 
+    def delete_for_data_source(self, data_source_id: UUID) -> bool:
+        """Forget the confirmed mapping (configuration only: no imported data is touched)."""
+        profile = self.get_for_data_source(data_source_id)
+        if profile is None:
+            return False
+        self._session.delete(profile)
+        self._session.flush()
+        return True
+
 
 # --- staging ---------------------------------------------------------------------------------
 

@@ -47,6 +47,14 @@ class CanonicalField(StrEnum):
 
 
 F = CanonicalField
+
+# The version of the canonical field set and rules a confirmed mapping was made against. It is
+# stored in the profile (`FormatOptions.schema_version`); a profile of another version is never
+# applied silently, the person is asked to look at it again. A profile saved before versions
+# existed (the canonical identity mapping of the first data-source flow) has none and counts as
+# version 1.
+MAPPING_SCHEMA_VERSION = 1
+
 REQUIRED_FIELDS = frozenset(
     {
         F.SOURCE_RECORD_ID,
@@ -115,6 +123,8 @@ class FormatOptions(BaseModel):
     sheet_name: str | None = None
     delimiter: Literal[",", ";", "\t"] | None = None
     encoding: Literal["utf-8", "cp1252"] | None = None
+    # The MAPPING_SCHEMA_VERSION the profile was confirmed against (None: saved before versions).
+    schema_version: int | None = None
     date_formats: dict[CanonicalField, str] = {}
     decimal_separator: Literal[".", ","] | None = None
     thousands_separator: Literal[",", ".", " ", "'"] | None = None

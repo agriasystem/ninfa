@@ -133,6 +133,22 @@ class BookingImportResult:
 
 
 @dataclass(frozen=True)
+class BookingDryRun:
+    """What importing a file WOULD do with a given mapping. Nothing was written anywhere."""
+
+    file_type: str
+    rows_total: int
+    rows_valid: int
+    rows_invalid: int
+    # How many rows have each problem (stable codes, never row content).
+    row_error_summary: dict[str, int]
+    # The canonical form of the first valid rows, as the import would store them.
+    sample_payloads: list[dict[str, Any]]
+    # (row number, [{field, code}...]) of the first rows that would be refused.
+    invalid_rows: list[tuple[int, list[dict[str, str]]]]
+
+
+@dataclass(frozen=True)
 class _Ids:
     """Plain ids, captured up front: safe to use after a rollback expired the ORM objects."""
 
@@ -252,6 +268,65 @@ class BookingImportService:
         )
         return profile
 
+    # --- dry run ------------------------------------------------------------------------------
+
+    def dry_run(
+        self,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: MappingConfig,
+        sample_size: int = 5,
+        invalid_sample_size: int = 5,
+    ) -> BookingDryRun:
+        """Read, map, normalise and validate a file exactly as the import would, and write
+        NOTHING: no job, no staged row, no booking, no profile. It needs no data source, so a
+        first file can be looked at before any source exists.
+
+        Raises BookingImportError for what stops the import before any row is judged (an
+        unreadable file, a mapped column that is not there, a date or number format that has to
+        be chosen). Every other problem is a row problem and is counted in the result.
+        """
+        prop = self._properties.get(property_id)
+        if prop is None or prop.archived_at is not None:
+            raise BookingImportError(
+                BookingErrorCode.INVALID_DATA_SOURCE,
+                "The property cannot be used for booking imports",
+                details={"reason": "property_unavailable"},
+            )
+        timezone = self._timezone(prop)
+        detect_file_type(filename, content)
+        table = open_table(content, filename, mapping.format_options)
+        schema = check_schema(mapping, compute_header_signature(table.headers), table.headers)
+        if not schema.compatible:
+            raise BookingImportError(
+                BookingErrorCode.SOURCE_SCHEMA_CHANGED,
+                "The file does not have the columns the mapping refers to",
+                details={
+                    "reason": "mapped_columns_missing",
+                    "missing_columns": list(schema.missing_columns),
+                },
+            )
+        extracted = self._extract(table, mapping)
+        context = NormalizationContext(timezone, mapping)
+        self._require_explicit_formats(extracted, mapping, context)
+        staged, summary = self._validate(extracted, context)
+        valid = [row for row in staged if row.validation_status == ImportRowStatus.VALID]
+        invalid = [row for row in staged if row.validation_status == ImportRowStatus.INVALID]
+        return BookingDryRun(
+            file_type=table.file_type,
+            rows_total=len(staged),
+            rows_valid=len(valid),
+            rows_invalid=len(invalid),
+            row_error_summary=summary,
+            sample_payloads=[dict(row.normalized_payload or {}) for row in valid[:sample_size]],
+            invalid_rows=[
+                (row.row_number, [dict(issue) for issue in row.validation_errors])
+                for row in invalid[:invalid_sample_size]
+            ],
+        )
+
     # --- import -------------------------------------------------------------------------------
 
     def import_file(
@@ -262,11 +337,16 @@ class BookingImportService:
         content: bytes,
         mime_type: str | None = None,
         property_id: UUID | None = None,
+        mapping_override: MappingConfig | None = None,
     ) -> BookingImportResult:
         """Import one booking file into the canonical model, atomically and idempotently.
 
         `property_id` is optional: pass it when the caller works on a specific property, and a
         data source of any other property is refused.
+
+        `mapping_override` reads THIS file with a mapping the caller has just built from it,
+        instead of the data source's saved profile, and saves nothing: the caller decides whether
+        to keep it, once the import has succeeded.
 
         Raises BookingImportError(BOOKING_INVALID_DATA_SOURCE) when the data source cannot be
         used (nothing is created). Every later problem ends as a FAILED ImportJob and a returned
@@ -295,7 +375,7 @@ class BookingImportService:
         self._log("booking import started", ids)
 
         try:
-            result = self._run(ids, filename, content, timezone, duplicate_of)
+            result = self._run(ids, filename, content, timezone, duplicate_of, mapping_override)
         except BookingImportError as error:
             result = self._fail(ids, error.error_code, error.message, error.details, duplicate_of)
         except Exception as error:  # a bug or infrastructure problem: never leave the job RUNNING
@@ -331,26 +411,34 @@ class BookingImportService:
         content: bytes,
         timezone: ZoneInfo,
         duplicate_of: UUID | None,
+        mapping_override: MappingConfig | None = None,
     ) -> BookingImportResult:
         detect_file_type(filename, content)  # unsupported types first, before anything else
-        profile = self._profiles.get_for_data_source(ids.data_source)
-        if profile is None:
-            raise BookingImportError(
-                BookingErrorCode.MAPPING_REQUIRED,
-                "This data source has no confirmed mapping yet: suggest and confirm one first",
-                details={"reason": "no_confirmed_mapping"},
+        stored_signature: str | None = None
+        if mapping_override is not None:
+            config = mapping_override
+        else:
+            profile = self._profiles.get_for_data_source(ids.data_source)
+            if profile is None:
+                raise BookingImportError(
+                    BookingErrorCode.MAPPING_REQUIRED,
+                    "This data source has no confirmed mapping yet: suggest and confirm one first",
+                    details={"reason": "no_confirmed_mapping"},
+                )
+            config = MappingConfig.parse(
+                {
+                    "column_mapping": profile.column_mapping,
+                    "status_mapping": profile.status_mapping,
+                    "channel_mapping": profile.channel_mapping,
+                    "format_options": profile.format_options,
+                }
             )
-        config = MappingConfig.parse(
-            {
-                "column_mapping": profile.column_mapping,
-                "status_mapping": profile.status_mapping,
-                "channel_mapping": profile.channel_mapping,
-                "format_options": profile.format_options,
-            }
-        )
+            stored_signature = profile.header_signature
 
         table = open_table(content, filename, config.format_options)
-        schema = check_schema(config, profile.header_signature, table.headers)
+        schema = check_schema(
+            config, stored_signature or compute_header_signature(table.headers), table.headers
+        )
         if not schema.compatible:
             raise BookingImportError(
                 BookingErrorCode.SOURCE_SCHEMA_CHANGED,

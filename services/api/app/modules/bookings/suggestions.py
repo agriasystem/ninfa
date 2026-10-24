@@ -2,29 +2,34 @@
 
 A suggestion is only a proposal shown to the customer. It never becomes a mapping by itself:
 only an explicitly saved profile does (`BookingImportService.save_mapping`).
+
+The ranking itself is shared with the other file domains (`app.modules.ingestion.suggestions`);
+this module only brings the booking fields and the known names of their columns.
 """
 
-import difflib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 
-from app.modules.bookings.mapping import FIELD_ORDER, CanonicalField, normalize_header
+from app.modules.bookings.mapping import FIELD_ORDER, CanonicalField
+from app.modules.ingestion.suggestions import (
+    LOW_THRESHOLD,
+    MEDIUM_THRESHOLD,
+    SuggestionConfidence,
+    SuggestionReason,
+    suggest_fields,
+)
 
 F = CanonicalField
 
-
-class SuggestionConfidence(StrEnum):
-    HIGH = "HIGH"  # the header is a known alias of the field
-    MEDIUM = "MEDIUM"  # very similar to a known alias
-    LOW = "LOW"  # somewhat similar to a known alias
-    NONE = "NONE"  # nothing suggested
-
-
-class SuggestionReason(StrEnum):
-    KNOWN_ALIAS = "KNOWN_ALIAS"
-    FUZZY_MATCH = "FUZZY_MATCH"
-    NO_MATCH = "NO_MATCH"
+__all__ = [
+    "FIELD_ALIASES",
+    "LOW_THRESHOLD",
+    "MEDIUM_THRESHOLD",
+    "MappingSuggestion",
+    "SuggestionConfidence",
+    "SuggestionReason",
+    "suggest_mapping",
+]
 
 
 @dataclass(frozen=True)
@@ -223,38 +228,6 @@ FIELD_ALIASES: Mapping[CanonicalField, tuple[str, ...]] = {
     ),
 }
 
-_NORMALISED_ALIASES: dict[CanonicalField, tuple[str, ...]] = {
-    field: tuple(normalize_header(alias) for alias in aliases)
-    for field, aliases in FIELD_ALIASES.items()
-}
-
-MEDIUM_THRESHOLD = 0.88
-LOW_THRESHOLD = 0.78
-
-
-@dataclass(frozen=True)
-class _Candidate:
-    field: CanonicalField
-    header: str
-    score: float
-    exact: bool
-
-
-def _candidates(headers: Sequence[str]) -> list[_Candidate]:
-    result: list[_Candidate] = []
-    for header in headers:
-        key = normalize_header(header)
-        if not key:
-            continue
-        for field, aliases in _NORMALISED_ALIASES.items():
-            if key in aliases:
-                result.append(_Candidate(field, header, 1.0, exact=True))
-                continue
-            best = max(difflib.SequenceMatcher(None, key, alias).ratio() for alias in aliases)
-            if best >= LOW_THRESHOLD:
-                result.append(_Candidate(field, header, best, exact=False))
-    return result
-
 
 def suggest_mapping(headers: Sequence[str]) -> list[MappingSuggestion]:
     """One suggestion per canonical field (in canonical order), each header used at most once.
@@ -262,51 +235,13 @@ def suggest_mapping(headers: Sequence[str]) -> list[MappingSuggestion]:
     Known aliases outrank fuzzy matches; among equals the canonical field order and the file's
     column order decide, so the result is fully deterministic.
     """
-    order = {field: position for position, field in enumerate(FIELD_ORDER)}
-    column = {header: position for position, header in reversed(list(enumerate(headers)))}
-    ranked = sorted(
-        _candidates(headers),
-        key=lambda c: (not c.exact, -c.score, order[c.field], column[c.header]),
-    )
-
-    chosen: dict[CanonicalField, _Candidate] = {}
-    used_headers: set[str] = set()
-    for candidate in ranked:
-        if candidate.field in chosen or candidate.header in used_headers:
-            continue
-        chosen[candidate.field] = candidate
-        used_headers.add(candidate.header)
-
-    suggestions: list[MappingSuggestion] = []
-    for field in FIELD_ORDER:
-        pick = chosen.get(field)
-        if pick is None:
-            suggestions.append(
-                MappingSuggestion(field, None, SuggestionConfidence.NONE, SuggestionReason.NO_MATCH)
-            )
-        elif pick.exact:
-            suggestions.append(
-                MappingSuggestion(
-                    field,
-                    pick.header,
-                    SuggestionConfidence.HIGH,
-                    SuggestionReason.KNOWN_ALIAS,
-                    1.0,
-                )
-            )
-        else:
-            confidence = (
-                SuggestionConfidence.MEDIUM
-                if pick.score >= MEDIUM_THRESHOLD
-                else SuggestionConfidence.LOW
-            )
-            suggestions.append(
-                MappingSuggestion(
-                    field,
-                    pick.header,
-                    confidence,
-                    SuggestionReason.FUZZY_MATCH,
-                    pick.score,
-                )
-            )
-    return suggestions
+    return [
+        MappingSuggestion(
+            suggestion.field,
+            suggestion.column,
+            suggestion.confidence,
+            suggestion.reason,
+            suggestion.score,
+        )
+        for suggestion in suggest_fields(headers, aliases=FIELD_ALIASES, order=FIELD_ORDER)
+    ]

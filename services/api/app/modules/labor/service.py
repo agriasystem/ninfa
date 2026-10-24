@@ -135,6 +135,22 @@ class LaborImportResult:
 
 
 @dataclass(frozen=True)
+class LaborDryRun:
+    """What importing a file WOULD do with a given mapping. Nothing was written anywhere."""
+
+    file_type: str
+    rows_total: int
+    rows_valid: int
+    rows_invalid: int
+    # How many rows have each problem (stable codes, never row content).
+    row_error_summary: dict[str, int]
+    # The canonical form of the first valid rows, as the import would stage them.
+    sample_payloads: list[dict[str, Any]]
+    # (row number, [{field, code}...]) of the first rows that would be refused.
+    invalid_rows: list[tuple[int, list[dict[str, str]]]]
+
+
+@dataclass(frozen=True)
 class _Ids:
     """Plain ids, captured up front: safe to use after a rollback expired the ORM objects."""
 
@@ -237,6 +253,65 @@ class LaborImportService:
         )
         return profile
 
+    # --- dry run ------------------------------------------------------------------------------
+
+    def dry_run(
+        self,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: LaborMappingConfig,
+        sample_size: int = 5,
+        invalid_sample_size: int = 5,
+    ) -> LaborDryRun:
+        """Read, map, normalise, classify and validate a file exactly as the import would, and
+        write NOTHING: no job, no staged row, no snapshot, no profile. It needs no data source, so
+        a first file can be looked at before any source exists.
+
+        Raises LaborImportError for what stops the import before any row is judged (an unreadable
+        file, a mapped column that is not there, a date or number format that has to be chosen).
+        Every other problem is a row problem and is counted in the result.
+        """
+        prop = self._properties.get(property_id)
+        if prop is None or prop.archived_at is not None:
+            raise LaborImportError(
+                LaborErrorCode.INVALID_DATA_SOURCE,
+                "The property cannot be used for labor imports",
+                details={"reason": "property_unavailable"},
+            )
+        options = mapping.format_options
+        table = self._open_table(content, filename, options.sheet_name, options=options)
+        schema = check_schema(mapping, compute_header_signature(table.headers), table.headers)
+        if not schema.compatible:
+            raise LaborImportError(
+                LaborErrorCode.SOURCE_SCHEMA_CHANGED,
+                "The file does not have the columns the mapping refers to",
+                details={
+                    "reason": "mapped_columns_missing",
+                    "missing_columns": list(schema.missing_columns),
+                },
+            )
+        raw_rows = extract(table, mapping)
+        if not raw_rows:
+            raise LaborImportError(LaborErrorCode.EMPTY_FILE, "The file has a header but no rows")
+        require_explicit_formats(raw_rows, mapping)
+        staged, summary = _stage(parse_structured(raw_rows, mapping))
+        valid = [row for row in staged if row.validation_status == ImportRowStatus.VALID]
+        invalid = [row for row in staged if row.validation_status == ImportRowStatus.INVALID]
+        return LaborDryRun(
+            file_type=table.file_type,
+            rows_total=len(staged),
+            rows_valid=len(valid),
+            rows_invalid=len(invalid),
+            row_error_summary=summary,
+            sample_payloads=[dict(row.normalized_payload or {}) for row in valid[:sample_size]],
+            invalid_rows=[
+                (row.source_row_number, [dict(issue) for issue in row.validation_errors])
+                for row in invalid[:invalid_sample_size]
+            ],
+        )
+
     # --- import -------------------------------------------------------------------------------
 
     def import_file(
@@ -248,11 +323,16 @@ class LaborImportService:
         snapshot_local_date: date,
         mime_type: str | None = None,
         property_id: UUID | None = None,
+        mapping_override: LaborMappingConfig | None = None,
     ) -> LaborImportResult:
         """Import one labor file into the canonical model, atomically and idempotently.
 
         `snapshot_local_date` must be an explicit `date` (never a `datetime`, never inferred):
         it is the local day NINFA's knowledge is dated as of.
+
+        `mapping_override` reads THIS file with a mapping the caller has just built from it,
+        instead of the data source's saved profile, and saves nothing: the caller decides whether
+        to keep it, once the import has succeeded.
         """
         if type(snapshot_local_date) is not date:
             raise LaborImportError(
@@ -282,7 +362,9 @@ class LaborImportService:
         self._log("labor import started", ids)
 
         try:
-            result = self._run(ids, filename, content, snapshot_local_date, duplicate_of, prop)
+            result = self._run(
+                ids, filename, content, snapshot_local_date, duplicate_of, prop, mapping_override
+            )
         except LaborImportError as error:
             result = self._fail(ids, error.error_code, error.message, _details(error), duplicate_of)
         except Exception as error:  # a bug or infrastructure problem: never leave the job RUNNING
@@ -318,24 +400,33 @@ class LaborImportService:
         snapshot_local_date: date,
         duplicate_of: UUID | None,
         prop: Property,
+        mapping_override: LaborMappingConfig | None = None,
     ) -> LaborImportResult:
-        profile = self._profiles.get_for_data_source(ids.data_source)
-        if profile is None:
-            raise LaborImportError(
-                LaborErrorCode.MAPPING_REQUIRED,
-                "This data source has no confirmed mapping yet: describe the file and confirm one",
-                details={"reason": "no_confirmed_mapping"},
+        stored_signature: str | None = None
+        if mapping_override is not None:
+            config = mapping_override
+        else:
+            profile = self._profiles.get_for_data_source(ids.data_source)
+            if profile is None:
+                raise LaborImportError(
+                    LaborErrorCode.MAPPING_REQUIRED,
+                    "This data source has no confirmed mapping yet: "
+                    "describe the file and confirm one",
+                    details={"reason": "no_confirmed_mapping"},
+                )
+            config = LaborMappingConfig.parse(
+                {
+                    "column_mapping": profile.column_mapping,
+                    "role_mapping": profile.role_mapping,
+                    "format_options": profile.format_options,
+                }
             )
-        config = LaborMappingConfig.parse(
-            {
-                "column_mapping": profile.column_mapping,
-                "role_mapping": profile.role_mapping,
-                "format_options": profile.format_options,
-            }
-        )
+            stored_signature = profile.header_signature
         options = config.format_options
         table = self._open_table(content, filename, options.sheet_name, options=options)
-        schema = check_schema(config, profile.header_signature, table.headers)
+        schema = check_schema(
+            config, stored_signature or compute_header_signature(table.headers), table.headers
+        )
         if not schema.compatible:
             raise LaborImportError(
                 LaborErrorCode.SOURCE_SCHEMA_CHANGED,
@@ -633,4 +724,4 @@ def _constraint_name(error: Exception) -> str | None:
     return None
 
 
-__all__ = ["LaborFileDescription", "LaborImportResult", "LaborImportService"]
+__all__ = ["LaborDryRun", "LaborFileDescription", "LaborImportResult", "LaborImportService"]

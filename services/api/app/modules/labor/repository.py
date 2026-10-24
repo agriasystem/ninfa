@@ -108,6 +108,15 @@ class LaborMappingProfileRepository:
             )
         )
 
+    def delete_for_data_source(self, data_source_id: UUID) -> bool:
+        """Forget the confirmed mapping (configuration only: no imported data is touched)."""
+        profile = self.get_for_data_source(data_source_id)
+        if profile is None:
+            return False
+        self._session.delete(profile)
+        self._session.flush()
+        return True
+
     def upsert(
         self, data_source: DataSource, *, stored: dict[str, dict[str, Any]], header_signature: str
     ) -> LaborMappingProfile:
