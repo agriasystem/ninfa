@@ -595,3 +595,23 @@ def test_a_column_that_writes_its_dates_two_ways_is_refused_with_the_reason(
     body = understand(api_client, env, LABOR, "turni.csv", corpus.csv_of(rows))
 
     assert _level(body) == "BLOCKED" and _blockers(body) == ["MIXED_FORMATS"]
+
+
+def test_any_day_of_the_week_names_the_week_of_a_grid(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    content = corpus.staff_grid_xlsx(period_in_title=False)
+
+    # Wednesday 28 October 2026, not the Monday: the week is the one that contains it
+    answered = understand(
+        api_client,
+        env,
+        LABOR,
+        "turni.xlsx",
+        content,
+        {"grid_hours": "planned_hours", "period_start": "2026-10-28"},
+    )
+
+    assert _level(answered) == "READY"
+    tried = _tried(api_client, env, content, answered)
+    assert tried["summary"]["date_from"] == "2026-10-26"  # the Monday of that week

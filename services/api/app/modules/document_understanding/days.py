@@ -145,6 +145,14 @@ def resolve_days(
         anchor, source = title_start, "TITLE"
     if anchor is None or source is None:
         return None
+    if source == "PERSON":
+        # The person names ANY day of the week the file is about: the week starts on the weekday of
+        # the grid's first column, on or before that day.
+        first = next(
+            (d.weekday for d in grid.columns if d.kind != "DATE" and d.weekday is not None), None
+        )
+        if first is not None:
+            anchor -= timedelta(days=(anchor.weekday() - first) % 7)
     resolved: list[tuple[int, date]] = []
     cursor = anchor
     for day in grid.columns:

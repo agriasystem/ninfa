@@ -19,6 +19,7 @@ import hashlib
 import logging
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import PurePath
 from typing import Any
 from uuid import UUID
@@ -146,6 +147,8 @@ class BookingDryRun:
     sample_payloads: list[dict[str, Any]]
     # (row number, [{field, code}...]) of the first rows that would be refused.
     invalid_rows: list[tuple[int, list[dict[str, str]]]]
+    # What the valid rows add up to: from the validated, normalised rows - never from raw cells.
+    summary: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -325,6 +328,7 @@ class BookingImportService:
                 (row.row_number, [dict(issue) for issue in row.validation_errors])
                 for row in invalid[:invalid_sample_size]
             ],
+            summary=_dry_run_summary(valid),
         )
 
     # --- import -------------------------------------------------------------------------------
@@ -761,3 +765,27 @@ def _constraint_name(error: Exception) -> str | None:
         name = getattr(diag, "constraint_name", None)
         return name if isinstance(name, str) else None
     return None
+
+
+def _dry_run_summary(valid: list[Any]) -> dict[str, Any]:
+    """The totals of the bookings that passed validation: when they arrive, through how many
+    channels, for how much (the room revenue the file states)."""
+    arrivals: list[str] = []
+    channels: set[str] = set()
+    revenue = Decimal(0)
+    has_revenue = False
+    for row in valid:
+        payload = row.normalized_payload or {}
+        if payload.get("check_in"):
+            arrivals.append(str(payload["check_in"]))
+        if payload.get("channel_name"):
+            channels.add(str(payload["channel_name"]))
+        if payload.get("room_revenue") is not None:
+            revenue += Decimal(str(payload["room_revenue"]))
+            has_revenue = True
+    return {
+        "date_from": min(arrivals) if arrivals else None,
+        "date_to": max(arrivals) if arrivals else None,
+        "channels": len(channels),
+        "revenue": format(revenue, "f") if has_revenue else None,
+    }

@@ -7,6 +7,7 @@ analysis really needs is not in the file.
 """
 
 from collections.abc import Callable
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -292,3 +293,17 @@ def test_unknown_booking_statuses_are_asked_once_and_remembered(
     questions = [q for q in asked["understanding"]["questions"] if q["kind"] == "VALUE_LABELS"]
     assert [q["document"] for q in questions] == ["status_mapping"]
     assert {item["label"] for item in questions[0]["labels"]} == {"OK", "Annullata da cliente"}
+
+
+def test_the_dry_run_adds_up_the_bookings_from_the_validated_rows(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    content = corpus.bookings_xlsx(title="REGISTRO PRENOTAZIONI", total=True)
+    body = understand(api_client, env, BOOKINGS, "pren.xlsx", content)
+
+    tried = validation(api_client, env, BOOKINGS, content, body["proposal"], name="pren.xlsx")
+
+    summary = tried["summary"]
+    assert tried["can_import"] is True and tried["rows_total"] == 8
+    assert summary["channels"] == 4 and Decimal(summary["revenue"]) == Decimal("988.00")
+    assert (summary["date_from"], summary["date_to"]) == ("2026-11-02", "2026-11-09")

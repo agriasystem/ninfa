@@ -325,6 +325,12 @@ class BookingsDomain(FileDomain):
             result.row_error_summary,
             result.sample_payloads,
             result.invalid_rows,
+            summary=DryRunSummary(
+                date_from=result.summary.get("date_from"),
+                date_to=result.summary.get("date_to"),
+                channels=result.summary.get("channels"),
+                revenue=result.summary.get("revenue"),
+            ),
         )
 
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]:
