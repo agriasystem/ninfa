@@ -30,6 +30,8 @@ export interface StrutturaButtonProps {
   /** Overrides the accessible name when the visible text alone is ambiguous (two "Collega fonte"). */
   ariaLabel?: string;
   disabled?: boolean;
+  /** A button that opens or closes something: whether it is open now. */
+  expanded?: boolean;
   children: ReactNode;
 }
 
@@ -39,6 +41,7 @@ export function StrutturaButton({
   onClick,
   ariaLabel,
   disabled,
+  expanded,
   children,
 }: StrutturaButtonProps) {
   return (
@@ -46,6 +49,7 @@ export function StrutturaButton({
       type="button"
       className={`struttura-button struttura-button--${variant}`}
       aria-label={ariaLabel}
+      aria-expanded={expanded}
       disabled={disabled}
       onClick={onClick}
     >

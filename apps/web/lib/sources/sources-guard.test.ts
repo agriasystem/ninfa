@@ -146,6 +146,7 @@ describe("Fonti dati sources", () => {
       "POST",
       "POST",
       "POST",
+      "POST",
     ]);
     // opening a dialog and choosing "Importa file" only changes what is shown
     const dialogs = withoutComments(read("components/struttura-source-dialogs.tsx"));
@@ -200,6 +201,9 @@ describe("Smart Import: the page decides nothing about the data", () => {
     "lib/sources/problem-text.ts",
     "components/struttura-import-mapping.tsx",
     "components/struttura-import-preview.tsx",
+    "components/struttura-import-question.tsx",
+    "components/struttura-import-understood.tsx",
+    "lib/sources/understanding-format.ts",
     "components/struttura-import-dialog.tsx",
     "components/struttura-manage-dialog.tsx",
   ];

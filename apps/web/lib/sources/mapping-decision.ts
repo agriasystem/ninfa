@@ -4,6 +4,7 @@ import type {
   ImportColumnInfo,
   ImportFieldKey,
   ImportMapping,
+  UnderstandAnswers,
 } from "@ninfa/contracts";
 
 /**
@@ -123,4 +124,22 @@ export function withDecimalStyle(decision: ImportMapping, style: "COMMA" | "POIN
 /** Same decision, same text: used to tell whether an answer still belongs to what is on screen. */
 export function sameDecision(a: ImportMapping, b: ImportMapping): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** What the person has said so far plus the answer just given: a column or a word answered earlier stays
+ * answered, and anything else is replaced by the newer answer. */
+export function mergeAnswers(
+  base: UnderstandAnswers,
+  patch: Partial<UnderstandAnswers>,
+): UnderstandAnswers {
+  const labels: Record<string, Record<string, string>> = { ...(base.labels ?? {}) };
+  for (const [document, words] of Object.entries(patch.labels ?? {})) {
+    labels[document] = { ...(labels[document] ?? {}), ...words };
+  }
+  return {
+    ...base,
+    ...patch,
+    column_fields: { ...(base.column_fields ?? {}), ...(patch.column_fields ?? {}) },
+    labels,
+  };
 }

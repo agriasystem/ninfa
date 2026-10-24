@@ -6033,6 +6033,99 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   margin: 0;
 }
 
+/* NINFA understood the whole document ("File riconosciuto") and, when it must, asks ONE thing at a time. */
+.struttura-understood {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--struttura-border);
+  border-radius: 12px;
+  background: var(--struttura-soft);
+}
+
+.struttura-understood__kind {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-understood__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.struttura-understood__facts li {
+  padding: 4px 12px;
+  border: 1px solid var(--struttura-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--home-ink);
+}
+
+.struttura-understood__table th,
+.struttura-understood__table td {
+  white-space: normal;
+}
+
+.struttura-understood__table .struttura-badge {
+  margin-left: 8px;
+}
+
+.struttura-question {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--struttura-border);
+  border-radius: 12px;
+}
+
+.struttura-question__progress {
+  font-size: 0.75rem;
+  color: var(--home-greeting);
+}
+
+.struttura-question__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.struttura-question__choices--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.struttura-question__date {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8125rem;
+  color: var(--home-ink);
+}
+
+.struttura-question__date input {
+  max-width: 220px;
+  padding: 7px 10px;
+  border: 1px solid var(--struttura-border);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--home-ink);
+  background: #fff;
+}
+
+.struttura-question__date input:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
 .struttura-manage__configuration {
   display: flex;
   flex-direction: column;

@@ -52,6 +52,11 @@ vi.mock("@/lib/api/data-sources", () => ({
   previewImport: (...args: unknown[]) => previewImportMock(...args),
   importFile: (...args: unknown[]) => importFileMock(...args),
   inspectFile: (...args: unknown[]) => inspectFileMock(...args),
+  // Smart Import V3: the page asks NINFA to understand the document. These tests describe the classic
+  // matching, so the mocked backend answers with a plain inspection - no `understanding` - and the page
+  // falls back to matching the columns, exactly as before.
+  understandFile: (args: { propertyId: string; domain: string; file: File; answers: { sheet_name?: string | null } }) =>
+    inspectFileMock(args.propertyId, args.domain, args.file, args.answers.sheet_name ?? undefined),
   checkMapping: (...args: unknown[]) => checkMappingMock(...args),
   validateImport: (...args: unknown[]) => validateImportMock(...args),
   importMatchedFile: (...args: unknown[]) => importMatchedFileMock(...args),

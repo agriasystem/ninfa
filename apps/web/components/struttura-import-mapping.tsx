@@ -169,6 +169,9 @@ export function StrutturaImportMapping({
       <p className="struttura-flow__file">{FLOW.chosen(step.file.name)}</p>
       <h3 className="struttura-flow__subtitle">{COPY.title}</h3>
       <p>{COPY.intro}</p>
+      {step.understanding !== null ? (
+        <p className="struttura-flow__note">{sourcesCopy.understanding.manualIntro}</p>
+      ) : null}
       {savedNote !== null ? <p className="struttura-flow__note">{savedNote}</p> : null}
 
       <div className="struttura-flow__sample struttura-match" role="region" aria-label={COPY.tableLabel} tabIndex={0}>

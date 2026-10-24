@@ -9,13 +9,12 @@ import {
   bookingsViaFile,
   channelManagerConnected,
   costsViaXml,
-  csvFile,
   failure,
   laborViaCsv,
   nothingConfigured,
   ok,
   PROPERTY_ID,
-  previewOf,
+  previewOf,
   sources,
   xmlFile,
 } from "@/test/sources-support";
@@ -37,6 +36,7 @@ vi.mock("@/lib/api/data-sources", () => ({
   previewImport: (...args: unknown[]) => previewImportMock(...args),
   importFile: (...args: unknown[]) => importFileMock(...args),
   inspectFile: vi.fn(),
+  understandFile: vi.fn(),
   checkMapping: vi.fn(),
   validateImport: vi.fn(),
   importMatchedFile: vi.fn(),
@@ -376,18 +376,24 @@ describe("Fonti dati - from 'Importa file' to the result", () => {
     expect(screen.queryByRole("dialog", { name: "Importa i dati del personale" })).toBeNull();
   });
 
-  it("costs take FatturaPA XML only: its own hint, no template, no labor date", async () => {
+  it("costs take FatturaPA XML or a register: their own hint, no template, no labor date", async () => {
     const user = userEvent.setup({ applyAccept: false });
     await renderBlock(costsViaXml());
     await user.click(within(cardOf("Contabilità")).getByRole("button", { name: "Carica nuovo file Contabilità" }));
 
     const box = await screen.findByRole("dialog", { name: "Importa le fatture" });
-    expect(within(box).getByText("Utilizza fatture elettroniche in formato XML (FatturaPA).")).not.toBeNull();
+    expect(
+      within(box).getByText(
+        "Carica le fatture elettroniche (XML) oppure il registro dei costi che hai già, in formato CSV o Excel (.xlsx).",
+      ),
+    ).not.toBeNull();
     expect(within(box).queryByRole("button", { name: /modello/iu })).toBeNull();
     expect(within(box).queryByText(/data di oggi/u)).toBeNull();
 
-    await user.upload(within(box).getByLabelText("Seleziona file"), csvFile("costi.csv"));
-    expect(within(box).getByRole("alert").textContent).toBe("Scegli un file con estensione .xml.");
+    await user.upload(within(box).getByLabelText("Seleziona file"), new File(["x"], "costi.txt"));
+    expect(within(box).getByRole("alert").textContent).toBe(
+      "Scegli un file XML, CSV o Excel (con estensione .xml, .csv o .xlsx).",
+    );
 
     previewImportMock.mockResolvedValue(ok(previewOf({ method: "XML", rows_total: 1, sample_columns: [], sample_rows: [] })));
     await user.upload(within(box).getByLabelText("Seleziona file"), xmlFile());
