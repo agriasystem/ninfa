@@ -85,6 +85,15 @@ def open_table(content: bytes, filename: str, options: FormatOptions | None = No
         )
     options = options or FormatOptions()
     file_type = detect_file_type(filename, content)
+    layout = getattr(options, "layout", None)
+    if layout is not None:
+        # Smart Import V3: the document's own structure (title, totals, sections, day grids, one
+        # sheet per department...) turned into the plain table the importers read.
+        from app.modules.document_understanding.apply import open_layout_table
+
+        return open_layout_table(
+            content, filename, layout, delimiter=options.delimiter, encoding=options.encoding
+        )
     table = (
         csv_parser.read_csv(content, options)
         if file_type == "csv"

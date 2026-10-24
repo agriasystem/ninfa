@@ -483,6 +483,7 @@ class LaborImportService:
             sheet_name=sheet_name,
             delimiter=None if options is None else options.delimiter,
             encoding=None if options is None else options.encoding,
+            layout=None if options is None else options.layout,
         )
         try:
             return open_table(content, filename, booking_options)
