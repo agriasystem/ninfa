@@ -81,7 +81,7 @@ wait → `IMPORT_IN_PROGRESS`).
 | Persistence | `data_sources` (workspace, property, name, **domain** BOOKINGS / COSTS / LABOR, **source_type** FILE_UPLOAD, `is_active`), `import_jobs` (PENDING → RUNNING → SUCCEEDED / FAILED, `finished_at`), `import_files` (name, sha256). `DataSourceRepository.deactivate()` ("switched off, never deleted"). |
 | Import services | `BookingImportService`, `LaborImportService`, `InvoiceImportService`: parsing, validation, idempotency (same file twice never doubles), all-or-nothing per file. **Reachable only from the pilot CLI** (`app.cli.imports`): there was no HTTP route for a file. |
 | Format | ONE canonical CSV per domain (headers = the services' own field names, UTF-8, `,`, dates `YYYY-MM-DD`, decimals `.`) and FatturaPA XML for invoices (`docs/architecture/pilot-readiness-v1.md`, "Data intake"). |
-| Mapping | The services contain a mapping-suggestion engine and saved mapping profiles, **not exposed anywhere** (no HTTP, no UI). The production convention is the canonical identity mapping. → follow-up "Smart Import V2". |
+| Mapping | The services contain a mapping-suggestion engine and saved mapping profiles. V1 did not expose them: the production convention was the canonical identity mapping. **Exposed by Smart Import V2** (`docs/architecture/smart-import-v2.md`): `/imports` here keeps the canonical convention and the routes of V2 sit next to it. |
 | Integrations | **None.** The PMS / Channel Manager / OTA / Contabilità / Personale cards of Struttura V1 were drawings. |
 | Freshness | `PropertySources` / run provenance already state "last successful import"; reused. |
 
@@ -162,14 +162,14 @@ tenants (tests). No secret exists in V1; none is stored in the browser or logged
 
 ## Not supported (explicit)
 
-Any automatic integration; CSV for **costs** (invoices are FatturaPA XML only: a CSV would need a mapping NINFA does not
-offer); Excel; a generic column mapping; per-source credentials; telling a PMS from a Channel Manager when a bookings file
+Any automatic integration; CSV for **costs** (invoices are FatturaPA XML only; the invoice import service can read a
+structured file, but NINFA offers no column matching for it yet: Smart Import V2.1); per-source credentials; telling a PMS from a Channel Manager when a bookings file
 arrives (one bookings source per property); an age threshold / "dati vecchi" warning (no backend threshold exists).
 
 ## Follow-ups
 
-- **Smart Import V2**: let the user map the columns of an arbitrary CSV/Excel once, save the mapping, and make the next uploads
-  automatic. The services already hold a suggestion engine and mapping profiles; nothing is exposed yet.
+- **Smart Import V2** (done after V1, see `docs/architecture/smart-import-v2.md`): the hotel's own CSV / Excel file, its
+  columns matched once, the matching remembered and recognised on the next file. Bookings and staff; costs stay XML.
 - **Provider kind (needs a migration, NOT done)**: to remember that a bookings source is a PMS *or* a Channel Manager, and
   which one, `data_sources` would need e.g. `provider_kind` + `provider_name` (nullable). Alternatives without a migration:
   none that is honest (the free-text `name` must not carry structure). Impact: one additive migration, no change to analysis.
