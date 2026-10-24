@@ -64,9 +64,16 @@ A file is never stored by the API.
   `import-mapping-check`. Bookings: eight single required fields. Labor: the date; *at least one of* planned/actual hours;
   *at least one of* role/category. A fixed value ("same on every row") is accepted only where the model allows it
   (`CONSTANT_FIELDS`: bookings status/rooms/channel, labor category/currency).
-- **A team in the hotel's words is a role**: "Reception", "Cucina" go to `role` and are read into NINFA's categories by the
-  deterministic classifier (unknown -> `OTHER`, never invalid). The *category* field is only for a column that already holds
-  NINFA's own category names.
+- **What `role` really is** (audited against the canonical staff model): `labor_category` is the department / operational
+  area and the ONLY label the Decision Engine reads (`intelligence/labor`, `data_overview`); `role_raw` / `role_normalized` are
+  the *free text the file used for the shift* ("Reception", "Cuoco", "Turno A"), stored as written, never a person's name, and
+  read by nothing downstream - they exist to work the department out. So a hotel's department-or-job column is mapped to
+  `role` and shown to the person as **"Reparto o mansione"** (not "ruolo": it is not a professional role); the deterministic
+  classifier derives the department. The *category* field ("Reparto (nome standard di NINFA)") is only for a column that
+  already holds NINFA's own category names. What cannot be classified stays `OTHER` (never invalid) - and `OTHER` is not
+  actionable and counts against the 70 % classification coverage the staffing analysis needs, so the dry run **counts those
+  rows over the whole file** (`rows_unclassified`) and the preview says so before the import ("verranno importate come
+  «Altro»"). Teaching NINFA what a label means (the profile already has a `role_mapping` document) is V2.1.
 - **Planned and actual are different facts** (the staffing analysis reads PLANNED minutes), so a bare "Ore" / "Costo" is never
   suggested: only names that say which one they are.
 - **NINFA keeps no employee identity and has no hourly rate**: a column of names ("Nome dipendente") and an hourly rate
@@ -149,7 +156,9 @@ still equals NINFA's proposal; no confidence number is ever shown.
 2. **The version lives in the saved JSON** (`format_options.schema_version`), not in a column - this is what avoids a migration.
    A column (`schema_version`, plus a `name` and several profiles per source) is the V2.1 migration to approve.
 3. **The profile has no user-chosen name.** The brief's "Turni personale" would need a column; V2.0 shows the matching itself
-   ("Giorno -> Data...") in Gestisci. Excel is shown as "Import CSV" on the card (the card's wording is unchanged).
+   ("Giorno -> Data...") in Gestisci. The card of a file source says **"Import file"** (it receives CSV and Excel over time, and the
+   card only knows the method of the source, not the format of the last file); every place that offers the upload says
+   "CSV o Excel (.xlsx)". Costs stay "Import fatture XML".
 4. **Costs from CSV/Excel stay out.** The invoice service can read a structured file (line level, 20 fields), but a hotelier
    column matching for it is a V2.1 product decision.
 
@@ -158,6 +167,6 @@ still equals NINFA's proposal; no confidence number is ever shown.
 - **V2.0 (this PR)**: bookings and staff; CSV and Excel; suggestions (names, similarity, one value-based date hint); matching
   UI; backend-owned requirements and fixed values; date/number questions; whole-file dry run; saved configuration, recognition,
   versioning, manage/forget; isolation and limits.
-- **V2.1**: status/channel/role *value* matching; a name and several profiles per source and a `schema_version` column
+- **V2.1**: status/channel/role *value* matching (including "this label is the Kitchen" for labels NINFA cannot classify); a name and several profiles per source and a `schema_version` column
   (migration); costs from CSV/Excel; an hourly rate or employee-level data if the product wants it; a "Formato riconosciuto"
   line on the card; row-level fixing instead of "fix the file".

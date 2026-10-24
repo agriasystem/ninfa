@@ -840,6 +840,11 @@ export interface ImportValidationResponse {
   row_problems: ImportRowProblem[];
   invalid_rows: ImportInvalidRow[];
   already_imported: boolean;
+  /**
+   * Staff files: valid rows whose department NINFA could not work out. They are kept as "Altro", which no
+   * staffing decision uses. Counted over the whole file. Always 0 for the other kinds of data.
+   */
+  rows_unclassified: number;
 }
 
 export interface MappedImportResultResponse extends ImportResultResponse {

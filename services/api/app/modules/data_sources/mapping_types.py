@@ -218,6 +218,9 @@ class DryRun:
     row_problems: tuple[RowProblemCount, ...] = ()
     invalid_rows: tuple[InvalidRow, ...] = ()
     already_imported: bool = False
+    # Valid rows NINFA could not assign to a department (kept as "Altro", which no staffing decision
+    # uses). Staff files only; always 0 elsewhere.
+    rows_unclassified: int = 0
 
     @property
     def can_import(self) -> bool:

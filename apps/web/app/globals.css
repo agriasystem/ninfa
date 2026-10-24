@@ -6016,6 +6016,23 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   padding: 0;
 }
 
+/* Something to know BEFORE importing that does not stop the import (not a warning colour: it is information). */
+.struttura-preview__attention {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--struttura-border);
+  border-radius: 10px;
+  background: var(--struttura-soft);
+  color: var(--home-ink);
+  font-size: 0.8125rem;
+}
+
+.struttura-preview__attention p {
+  margin: 0;
+}
+
 .struttura-manage__configuration {
   display: flex;
   flex-direction: column;

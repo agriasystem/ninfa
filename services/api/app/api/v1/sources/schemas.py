@@ -173,6 +173,7 @@ class DryRunResponse(BaseModel):
     row_problems: list[RowProblemResponse]
     invalid_rows: list[InvalidRowResponse]
     already_imported: bool
+    rows_unclassified: int
 
 
 class SavedColumnResponse(BaseModel):

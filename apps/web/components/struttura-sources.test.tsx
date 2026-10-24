@@ -165,7 +165,7 @@ describe("Fonti dati - every card says what the backend says", () => {
     await renderBlock(laborViaCsv("2026-10-18T10:00:00Z"));
 
     expect(flat(cardOf("Personale"))).toBe(
-      "Personale Import CSV Configurato Ultimo aggiornamento 18 ottobre 2026 Carica nuovo file Gestisci",
+      "Personale Import file Configurato Ultimo aggiornamento 18 ottobre 2026 Carica nuovo file Gestisci",
     );
     // the introduction is only for an empty section
     expect(screen.queryByText(/Collega le fonti utilizzate dalla struttura/u)).toBeNull();
@@ -175,7 +175,7 @@ describe("Fonti dati - every card says what the backend says", () => {
     await renderBlock(laborViaCsv(null));
 
     expect(flat(cardOf("Personale"))).toBe("Personale Nessuna fonte collegata Non configurato Collega fonte");
-    expect(document.body.textContent).not.toMatch(/Mai importato|Configurato|Import CSV/u);
+    expect(document.body.textContent).not.toMatch(/Mai importato|Configurato|Import file/u);
     expect(within(cardOf("Personale")).getByRole("button", { name: "Collega fonte Personale" })).not.toBeNull();
     expect(screen.getByText(/Collega le fonti utilizzate dalla struttura/u)).not.toBeNull(); // still an empty section
   });
@@ -492,7 +492,7 @@ describe("Fonti dati - 'Gestisci' and 'Rimuovi fonte'", () => {
 
     const box = screen.getByRole("dialog", { name: "Gestisci Personale" });
     expect(flat(box.querySelector("dl") as HTMLElement)).toBe(
-      "Come arrivano i dati Import CSV Ultimo aggiornamento 18 ottobre 2026",
+      "Come arrivano i dati Import file Ultimo aggiornamento 18 ottobre 2026",
     );
     expect(within(box).getByRole("button", { name: "Carica nuovo file" })).not.toBeNull();
     expect(within(box).getByRole("button", { name: "Rimuovi fonte" })).not.toBeNull();
@@ -546,7 +546,7 @@ describe("Fonti dati - 'Gestisci' and 'Rimuovi fonte'", () => {
     await user.click(within(dialog()).getByRole("button", { name: "Rimuovi fonte" }));
 
     expect(flat(await within(dialog()).findByRole("alert"))).toBe(
-      "NINFA non è riuscita a leggere questa fonte. Riprova oppure utilizza un file CSV.",
+      "NINFA non è riuscita a leggere questa fonte. Riprova oppure carica un altro file.",
     );
     expect(getDataSourcesMock).toHaveBeenCalledTimes(1);
   });

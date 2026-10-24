@@ -379,6 +379,7 @@ export function validationOf(overrides: Partial<ImportValidationResponse> = {}):
     row_problems: [],
     invalid_rows: [],
     already_imported: false,
+    rows_unclassified: 0,
     ...overrides,
   };
 }

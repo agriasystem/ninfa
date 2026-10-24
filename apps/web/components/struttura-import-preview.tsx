@@ -84,6 +84,13 @@ export function StrutturaImportPreview({
         <p className="struttura-flow__note">{COPY.numbersRead[decimalStyle]}</p>
       ) : null}
 
+      {validation.rows_unclassified > 0 && validation.rows_invalid === 0 ? (
+        <div className="struttura-preview__attention" role="note">
+          <p>{COPY.unclassified(validation.rows_unclassified)}</p>
+          <p className="struttura-flow__note">{COPY.unclassifiedHelp}</p>
+        </div>
+      ) : null}
+
       {validation.rows_invalid > 0 ? (
         <div className="struttura-flow__problem" role="alert">
           <h4 className="struttura-flow__subtitle">{COPY.blockedTitle}</h4>

@@ -27,8 +27,10 @@ export const sourcesCopy = {
     ACCOUNTING: "Contabilità",
     STAFF: "Personale",
   } satisfies Record<SourceCardKey, string>,
+  // The "CSV" method is the file import of bookings and staff: a CSV or an Excel (.xlsx) file, so the label
+  // names no single format (a source can receive both over time).
   methodLabels: {
-    CSV: "Import CSV",
+    CSV: "Import file",
     XML: "Import fatture XML",
   } satisfies Record<SourceMethod, string>,
   // --- the state of a card -------------------------------------------------------------------------
@@ -112,12 +114,12 @@ export const sourcesCopy = {
   methods: {
     bookingsCsv: {
       title: "Importa da file",
-      body: "Carica il file delle prenotazioni che hai già, in formato CSV o Excel: NINFA ti aiuta ad abbinare le colonne.",
+      body: "Carica il file delle prenotazioni che hai già, in formato CSV o Excel (.xlsx): NINFA ti aiuta ad abbinare le colonne.",
       cta: "Importa file",
     },
     channelCsv: {
       title: "Importa da file",
-      body: "Carica il file delle prenotazioni: i canali (Booking.com, Expedia e altri) sono già al suo interno.",
+      body: "Carica il file delle prenotazioni, in formato CSV o Excel (.xlsx): i canali (Booking.com, Expedia e altri) sono già al suo interno.",
       cta: "Importa file",
     },
     invoicesXml: {
@@ -127,7 +129,7 @@ export const sourcesCopy = {
     },
     laborCsv: {
       title: "Importa da file",
-      body: "Ore, reparti e costi del personale: usa il file che hai già, in formato CSV o Excel.",
+      body: "Ore, reparti e costi del personale: usa il file che hai già, in formato CSV o Excel (.xlsx).",
       cta: "Importa file",
     },
   },
@@ -221,13 +223,16 @@ export const sourcesCopy = {
     PROFILE_NOT_USABLE:
       "La configurazione salvata non funziona con questo file: controlla le colonne e abbinale di nuovo.",
     SHEET_REQUIRED: "Il file Excel ha più fogli con dati: scegli quale importare.",
-    GENERIC: "NINFA non è riuscita a leggere questa fonte. Riprova oppure utilizza un file CSV.",
+    GENERIC: "NINFA non è riuscita a leggere questa fonte. Riprova oppure carica un altro file.",
   } satisfies Record<ImportProblem, string>,
   // what to do next, by method (appended to the sentence of the problem where it helps)
   problemHints: {
-    UNSUPPORTED_FILE: { CSV: "Usa un file CSV.", XML: "Usa un file XML di fattura elettronica." },
+    UNSUPPORTED_FILE: {
+      CSV: "Usa un file CSV o Excel (.xlsx).",
+      XML: "Usa un file XML di fattura elettronica.",
+    },
     UNREADABLE_FILE: {
-      CSV: "Controlla che sia un CSV in formato UTF-8.",
+      CSV: "Controlla che sia un file CSV (in formato UTF-8) o Excel (.xlsx) valido.",
       XML: "Controlla che sia una fattura elettronica XML valida.",
     },
   } satisfies Partial<Record<ImportProblem, Record<SourceMethod, string>>>,
@@ -240,9 +245,8 @@ export const sourcesCopy = {
   // --- "Abbina le colonne": the file the hotel already has -------------------------------------------
   match: {
     title: "Abbina le colonne del tuo file",
-    intro: "NINFA ha riconosciuto alcune colonne. Controlla che siano corrette prima di importare i dati.",
-    introNothing:
-      "NINFA non ha riconosciuto le colonne di questo file: scegli tu cosa significa ciascuna.",
+    // Always true, whatever NINFA could or could not recognise: the per-column badges say which is which.
+    intro: "NINFA ha analizzato le colonne del file. Controlla gli abbinamenti prima di continuare.",
     // shown when a saved configuration exists but was not applied to this file
     savedNotApplied: {
       COLUMNS_CHANGED:
@@ -326,7 +330,9 @@ export const sourcesCopy = {
     room_type: "Tipo di camera",
     rate_plan: "Tariffa",
     work_date: "Data",
-    role: "Reparto o ruolo",
+    // The free text a staff file uses for a shift: a department ("Reception", "Cucina") or a job ("Cuoco").
+    // NINFA only reads it to work out the department; the name itself is never used elsewhere.
+    role: "Reparto o mansione",
     labor_category: "Reparto (nome standard di NINFA)",
     planned_hours: "Ore previste",
     actual_hours: "Ore lavorate",
@@ -396,6 +402,13 @@ export const sourcesCopy = {
       POINT: "I numeri con i decimali sono letti con il punto.",
     },
     alreadyImported: "Questo file è già stato importato: caricarlo di nuovo non duplica i dati.",
+    // Staff files only: rows whose department NINFA could not work out. They import (as "Altro"), but no
+    // staffing decision uses "Altro", so the person is told BEFORE importing, not left to find out.
+    unclassified: (count: number) =>
+      count === 1
+        ? "Per 1 riga NINFA non riconosce il reparto: verrà importata come «Altro» e non potrà essere usata nelle analisi sul personale."
+        : `Per ${count} righe NINFA non riconosce il reparto: verranno importate come «Altro» e non potranno essere usate nelle analisi sul personale.`,
+    unclassifiedHelp: "Se il reparto è scritto in un'altra colonna, usa «Controlla colonne».",
     blockedTitle: "Alcune righe non possono essere importate",
     blockedBody:
       "NINFA importa un file solo se tutte le righe sono valide: finché non le correggi nel file, non viene importato nulla.",

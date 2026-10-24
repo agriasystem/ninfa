@@ -67,6 +67,8 @@ class DryRunData:
     error_summary: dict[str, int]
     sample_payloads: list[dict[str, Any]]
     invalid_rows: list[tuple[int, list[dict[str, str]]]]
+    # Valid rows whose category could not be worked out (labor only; 0 for every other domain).
+    rows_unclassified: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -455,6 +457,7 @@ class LaborDomain(FileDomain):
             result.row_error_summary,
             result.sample_payloads,
             result.invalid_rows,
+            result.rows_unclassified,
         )
 
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]:

@@ -242,7 +242,7 @@ describe("Abbina le colonne: the staff file of the brief", () => {
     const box = dialog();
     expect(within(box).getByText("File selezionato: turni-settimana-43.csv")).not.toBeNull();
     expect(
-      within(box).getByText("NINFA ha riconosciuto alcune colonne. Controlla che siano corrette prima di importare i dati."),
+      within(box).getByText("NINFA ha analizzato le colonne del file. Controlla gli abbinamenti prima di continuare."),
     ).not.toBeNull();
     const table = within(box).getByRole("region", { name: "Colonne del file" });
     expect(within(table).getAllByRole("columnheader").map(flat)).toEqual([
@@ -259,7 +259,7 @@ describe("Abbina le colonne: the staff file of the brief", () => {
     expect(options).toEqual([
       "Ignora questa colonna",
       "Data",
-      "Reparto o ruolo",
+      "Reparto o mansione",
       "Reparto (nome standard di NINFA)",
       "Ore previste",
       "Ore lavorate",
@@ -283,7 +283,7 @@ describe("Abbina le colonne: the staff file of the brief", () => {
     await openMapping();
 
     expect(await within(dialog()).findByText("Manca ancora 1 informazione necessaria:")).not.toBeNull();
-    expect(within(dialog()).getByText("Reparto (nome standard di NINFA) oppure Reparto o ruolo")).not.toBeNull();
+    expect(within(dialog()).getByText("Reparto (nome standard di NINFA) oppure Reparto o mansione")).not.toBeNull();
     expect((within(dialog()).getByRole("button", { name: "Continua" }) as HTMLButtonElement).disabled).toBe(true);
     expect(checkMappingMock).toHaveBeenCalled();
     expect(checkMappingMock.mock.calls[0]?.slice(0, 2)).toEqual([PROPERTY_ID, "LABOR"]);
@@ -358,7 +358,7 @@ describe("Abbina le colonne: headers NINFA does not know", () => {
     await within(dialog()).findByRole("heading", { level: 3, name: "Abbina le colonne del tuo file" });
 
     expect(
-      within(dialog()).getByText("NINFA non ha riconosciuto le colonne di questo file: scegli tu cosa significa ciascuna."),
+      within(dialog()).getByText("NINFA ha analizzato le colonne del file. Controlla gli abbinamenti prima di continuare."),
     ).not.toBeNull();
     expect(meaningOf("Colonna A").value).toBe("");
     expect(within(dialog()).queryByText("Riconosciuto")).toBeNull();
@@ -366,7 +366,7 @@ describe("Abbina le colonne: headers NINFA does not know", () => {
 
     await user.selectOptions(meaningOf("Colonna A"), "Data");
     await user.selectOptions(meaningOf("Colonna B"), "Ore previste");
-    await user.selectOptions(meaningOf("Colonna C"), "Reparto o ruolo");
+    await user.selectOptions(meaningOf("Colonna C"), "Reparto o mansione");
 
     const decision = checkMappingMock.mock.calls.at(-1)?.[2] as ImportMapping;
     expect(decision.columns).toEqual([
@@ -549,6 +549,29 @@ describe("Anteprima importazione", () => {
       "28/10/2026 Cucina 8",
     ]);
     expect(within(box).getByText("Le date sono lette come giorno/mese/anno.")).not.toBeNull();
+  });
+
+  it("says, before importing, how many rows have a department NINFA does not recognise (they would be 'Altro')", async () => {
+    await toThePreview(validationOf({ rows_unclassified: 2 }));
+
+    const note = within(dialog()).getByRole("note");
+    expect(flat(note)).toContain(
+      "Per 2 righe NINFA non riconosce il reparto: verranno importate come «Altro» e non potranno essere usate nelle analisi sul personale.",
+    );
+    expect(flat(note)).toContain("Se il reparto è scritto in un'altra colonna, usa «Controlla colonne».");
+    expect(within(dialog()).getByRole("button", { name: "Importa dati" })).not.toBeNull(); // information, not a block
+  });
+
+  it("uses the singular for a single row", async () => {
+    await toThePreview(validationOf({ rows_unclassified: 1 }));
+
+    expect(flat(within(dialog()).getByRole("note"))).toContain("Per 1 riga NINFA non riconosce il reparto: verrà importata come «Altro»");
+  });
+
+  it("says nothing about departments when every one was recognised", async () => {
+    await toThePreview(validationOf({ rows_unclassified: 0 }));
+    expect(within(dialog()).queryByRole("note")).toBeNull();
+    expect(document.body.textContent).not.toContain("non riconosce il reparto");
   });
 
   it("offers to remember the matching, already ticked, and the import - and imports nothing yet", async () => {
@@ -832,10 +855,10 @@ describe("Excel and bookings", () => {
 
 describe("when a file cannot be used, or the import fails", () => {
   it.each([
-    ["UNREADABLE_FILE", "NINFA non riesce a leggere questo file. Controlla che sia un CSV in formato UTF-8."],
+    ["UNREADABLE_FILE", "NINFA non riesce a leggere questo file. Controlla che sia un file CSV (in formato UTF-8) o Excel (.xlsx) valido."],
     ["EMPTY_FILE", "Il file è vuoto."],
     ["DUPLICATE_COLUMNS", "Il file ha colonne con lo stesso nome: rinomina o elimina quelle duplicate."],
-    ["UNSUPPORTED_FILE", "Questo tipo di file non è supportato. Usa un file CSV."],
+    ["UNSUPPORTED_FILE", "Questo tipo di file non è supportato. Usa un file CSV o Excel (.xlsx)."],
     ["FILE_TOO_LARGE", "Il file è troppo grande."],
   ] as const)("a file that cannot be read (%s) is explained in one plain sentence", async (problem, sentence) => {
     const user = await openStaffImport();
@@ -856,7 +879,7 @@ describe("when a file cannot be used, or the import fails", () => {
     await pick(user, csvFile());
 
     const alert = await within(dialog()).findByRole("alert");
-    expect(flat(alert)).toContain("NINFA non è riuscita a leggere questa fonte. Riprova oppure utilizza un file CSV.");
+    expect(flat(alert)).toContain("NINFA non è riuscita a leggere questa fonte. Riprova oppure carica un altro file.");
     expect(document.body.textContent).not.toContain("technical message");
     expect(document.body.textContent).not.toMatch(/422|500|NETWORK_ERROR|validation error|connector failed/iu);
   });
@@ -1031,7 +1054,7 @@ describe("a source exists only after a successful import", () => {
     await waitFor(() => expect(getDataSourcesMock).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(flat(cardOf("Personale"))).toBe(
-        "Personale Import CSV Configurato Ultimo aggiornamento 18 ottobre 2026 Carica nuovo file Gestisci",
+        "Personale Import file Configurato Ultimo aggiornamento 18 ottobre 2026 Carica nuovo file Gestisci",
       ),
     );
   });
@@ -1088,7 +1111,7 @@ describe("Gestisci > Configurazione import", () => {
     expect(within(section).getAllByRole("listitem").map(flat)).toEqual([
       "Giorno → Data",
       "Ore turno → Ore previste",
-      "Reparto → Reparto o ruolo",
+      "Reparto → Reparto o mansione",
     ]);
     expect(within(section).getByText(/Ultimo utilizzo: 22 ottobre 2026/u)).not.toBeNull();
     expect(within(section).getByRole("button", { name: "Modifica associazioni" })).not.toBeNull();

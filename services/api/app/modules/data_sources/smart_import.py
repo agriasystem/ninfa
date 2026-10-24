@@ -597,6 +597,7 @@ class SmartImportService:
             row_problems=tuple(problems),
             invalid_rows=tuple(invalid),
             already_imported=already_imported,
+            rows_unclassified=data.rows_unclassified,
         )
 
     # --- the saved configuration -----------------------------------------------------------------

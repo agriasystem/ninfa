@@ -71,6 +71,7 @@ from app.modules.labor.repository import (
     LaborSnapshotRepository,
     StagedRow,
 )
+from app.modules.labor.roles import LaborClassificationMethod
 from app.modules.labor.structured import (
     ParsedLaborRow,
     extract,
@@ -148,6 +149,9 @@ class LaborDryRun:
     sample_payloads: list[dict[str, Any]]
     # (row number, [{field, code}...]) of the first rows that would be refused.
     invalid_rows: list[tuple[int, list[dict[str, str]]]]
+    # Valid rows whose category NINFA could not work out from the role label (they would be kept as
+    # OTHER, which no staffing decision uses). Counted over the WHOLE file, not just the samples.
+    rows_unclassified: int = 0
 
 
 @dataclass(frozen=True)
@@ -310,6 +314,12 @@ class LaborImportService:
                 (row.source_row_number, [dict(issue) for issue in row.validation_errors])
                 for row in invalid[:invalid_sample_size]
             ],
+            rows_unclassified=sum(
+                1
+                for row in valid
+                if (row.normalized_payload or {}).get("classification_method")
+                == LaborClassificationMethod.UNCLASSIFIED.value
+            ),
         )
 
     # --- import -------------------------------------------------------------------------------

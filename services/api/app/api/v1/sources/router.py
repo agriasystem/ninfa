@@ -233,6 +233,7 @@ def _dry_run_response(result: DryRun) -> DryRunResponse:
             for row in result.invalid_rows
         ],
         already_imported=result.already_imported,
+        rows_unclassified=result.rows_unclassified,
     )
 
 
