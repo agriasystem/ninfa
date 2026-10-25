@@ -68,6 +68,13 @@ def console_summary(data: dict[str, Any]) -> str:
         ):
             lines.append(f"  {key:32s} {pct(m[key])}")
         lines.append(f"  false automation cases          {m['false_automation_count']}")
+        if "questions_per_import" in m:
+            q = m["questions_per_import"]
+            lines.append(
+                f"  questions per import            mean {q['mean']:.2f} median {q['median']:.0f} "
+                f"p95 {q['p95']:.0f} max {q['max']:.0f} ({q['documents']} importable files)"
+            )
+            lines.append(f"  zero-question rate, valid files {pct(m['zero_question_rate_valid'])}")
         lines.append(f"  pii value leaks                 {m['pii_value_leaks']}")
         lines.append(f"  cases by worst severity         {m['cases_by_worst_severity']}")
         lines.append(f"  levels                          {m['levels']}")

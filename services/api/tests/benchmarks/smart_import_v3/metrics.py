@@ -43,6 +43,21 @@ def performance(values: list[float]) -> dict[str, float]:
     }
 
 
+def questions_per_import(results: Sequence[CaseResult]) -> dict[str, Any]:
+    """How many different questions a person answers to import a file that CAN be imported (the
+    truth says READY or ASK): over the whole conversation, not only the first screen."""
+    importable = [r for r in results if r.outcome in {"READY", "ASK"} and r.error is None]
+    counts = [float(len(r.questions_asked)) for r in importable]
+    return {
+        "documents": len(importable),
+        "mean": statistics.fmean(counts) if counts else 0.0,
+        "median": statistics.median(counts) if counts else 0.0,
+        "p95": _percentile(counts, 0.95),
+        "max": max(counts) if counts else 0.0,
+        "with_no_question": sum(1 for c in counts if c == 0),
+    }
+
+
 def aggregate(
     results: Sequence[CaseResult],
     timings: dict[str, float],
@@ -134,6 +149,17 @@ def aggregate(
         "zero_question_coverage": ratio(len(automatic), n),
         "zero_question_correctness": ratio(
             sum(1 for r in automatic if r.fully_correct), len(automatic)
+        ),
+        # (the same documents, judged on the facts a business decision rests on only)
+        "zero_question_critical_correctness": ratio(
+            sum(1 for r in automatic if not r.false_automation_reasons and not _unsafe(r)),
+            len(automatic),
+        ),
+        "questions_per_import": questions_per_import(results),
+        # Of the documents the truth says can be imported with no question at all, how many are.
+        "zero_question_rate_valid": ratio(
+            sum(1 for r in results if r.outcome == "READY" and r.automatic),
+            sum(1 for r in results if r.outcome == "READY"),
         ),
         "false_automation_count": len(false_automation),
         "false_automation_rate": ratio(len(false_automation), n),
