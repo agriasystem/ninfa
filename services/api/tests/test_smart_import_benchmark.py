@@ -18,7 +18,7 @@ from tests.benchmarks.smart_import_v3.corpus import (
     validate,
 )
 from tests.benchmarks.smart_import_v3.driver import evaluate
-from tests.benchmarks.smart_import_v3.match import header_matches
+from tests.benchmarks.smart_import_v3.match import header_key, header_matches, norm
 from tests.benchmarks.smart_import_v3.model import (
     Golden,
     Source,
@@ -286,10 +286,58 @@ def test_the_period_of_a_day_grid_is_read_from_the_dates_the_importer_would_find
         (("Ore",), "Ore (2)", True),  # a repeated header, renamed
         (("Ore prog.",), "Ore previste", False),
         (("Data\n(gg/mm/aaaa)",), "Data (gg/mm/aaaa)", True),
+        # a symbol that says what the column IS is part of its identity
+        (("Commissione %",), "Commissione %", True),
+        (("Commissione %",), "Commissione", False),
+        (("Commissione",), "Commissione %", False),
+        (("Commissione",), "Commissione (2)", True),  # ...the second one, renamed
+        (("Res #",), "Res #", True),
+        (("Res #",), "Res", False),
     ],
 )
 def test_header_matching(parts: tuple[str, ...], observed: str, expected: bool) -> None:
     assert header_matches(parts, observed) is expected
+
+
+def test_a_percent_sign_is_part_of_the_identity_of_a_column() -> None:
+    assert norm("Commissione %") == norm("Commissione")  # words and values: lossy on purpose
+    assert header_key("Commissione %") != header_key("Commissione")  # the identity of a column: not
+    assert header_key("Re​parto") == header_key("REPARTO")  # (still case, accents, invisible)
+
+
+def test_the_commission_rate_and_the_commission_amount_of_b25_are_two_different_columns(
+    docs: list[Any],
+) -> None:
+    golden = next(d for d in docs if d.id.startswith("B25_")).golden
+    rate, amount = golden.fields["commission_rate"], golden.fields["commission_amount"]
+    assert rate.header == ("Commissione %",) and amount.header == ("Commissione",)
+
+    def observed(claims: list[OClaim], names: list[str]) -> Observed:
+        state = Observed(level="READY", claims=claims, columns=[], payload="{}")
+        state.columns = [OColumn(i, n, None, None, None, ()) for i, n in enumerate(names)]
+        return state
+
+    # the percentage column is the rate and the amount is the column that follows - which the
+    # system calls "Commissione (2)", as it renames a header that repeats once folded
+    right = observed(
+        [
+            OClaim("commission_rate", "COLUMN", "Commissione %", "HIGH"),
+            OClaim("commission_amount", "COLUMN", "Commissione (2)", "HIGH"),
+        ],
+        ["Commissione %", "Commissione (2)"],
+    )
+    # the percentage column read as the amount (what the first version of NINFA did)
+    swapped = observed(
+        [OClaim("commission_amount", "COLUMN", "Commissione %", "HIGH")],
+        ["Commissione %", "Commissione (2)"],
+    )
+
+    def wrong(state: Observed) -> list[str]:
+        found = score_case(_entry("B25"), golden, state).findings
+        return [f.field or "" for f in found if f.category == "FIELD_WRONG"]
+
+    assert wrong(right) == []
+    assert wrong(swapped) == ["commission_amount"]
 
 
 # --- the run -----------------------------------------------------------------------------------

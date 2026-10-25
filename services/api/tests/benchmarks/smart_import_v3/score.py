@@ -27,7 +27,12 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from tests.benchmarks.smart_import_v3.match import _strip_suffix, header_matches, norm
+from tests.benchmarks.smart_import_v3.match import (
+    _strip_suffix,
+    header_key,
+    header_matches,
+    norm,
+)
 from tests.benchmarks.smart_import_v3.model import CRITICAL_FIELDS, Golden, Source
 from tests.benchmarks.smart_import_v3.observe import Observed, OClaim, OQuestion
 
@@ -158,7 +163,7 @@ class CaseResult:
 
 
 def _stripped(header: str) -> str:
-    return norm(_strip_suffix(header))
+    return header_key(_strip_suffix(header))
 
 
 def _rank(observed: Observed, header: str) -> int:
@@ -201,7 +206,7 @@ def _describe_claim(claim: OClaim) -> str:
 
 def _under_question(claim: OClaim, observed: Observed) -> bool:
     return any(
-        q.column is not None and norm(q.column) == norm(claim.header or "\0")
+        q.column is not None and header_key(q.column) == header_key(claim.header or "\0")
         for q in observed.questions
     )
 
