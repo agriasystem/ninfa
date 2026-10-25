@@ -9,7 +9,7 @@ be shown - without a database, a model, or the network.
 """
 
 import io
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, datetime, timedelta
 from typing import Any
 from uuid import UUID
@@ -58,6 +58,25 @@ def xlsx(
         worksheet.append(list(row))
     for merged in merges:
         worksheet.merge_cells(merged)
+    buffer = io.BytesIO()
+    book.save(buffer)
+    return buffer.getvalue()
+
+
+def xlsx_sheets(
+    sheets: Mapping[str, Iterable[Sequence[Any]]],
+    *,
+    merges: Mapping[str, Sequence[str]] | None = None,
+) -> bytes:
+    """A workbook with several sheets, each with its rows (and, optionally, its merged ranges)."""
+    book = Workbook()
+    book.remove(book.active)
+    for name, rows in sheets.items():
+        worksheet = book.create_sheet(name)
+        for row in rows:
+            worksheet.append(list(row))
+        for merged in (merges or {}).get(name, ()):
+            worksheet.merge_cells(merged)
     buffer = io.BytesIO()
     book.save(buffer)
     return buffer.getvalue()
