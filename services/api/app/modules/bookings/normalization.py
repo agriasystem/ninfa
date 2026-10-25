@@ -24,6 +24,11 @@ from app.modules.bookings.mapping import DATETIME_FIELDS, CanonicalField, Mappin
 from app.modules.bookings.models import MAX_MONEY, BookingStatus, ChannelType
 from app.modules.bookings.parsers import Cell
 from app.modules.bookings.statuses import resolve_status
+from app.modules.ingestion.value_text import (
+    split_weekday,
+    strip_currency,
+    weekday_agrees,
+)
 
 F = CanonicalField
 _CENT = Decimal("0.01")
@@ -196,18 +201,26 @@ class _FieldError(Exception):
 
 
 def _parse_datetime_string(field: CanonicalField, text: str, ctx: NormalizationContext) -> datetime:
-    """Read a date/datetime text by the configured pattern or an ISO form. May be naive."""
+    """Read a date/datetime text by the configured pattern or an ISO form. May be naive. A weekday
+    written in front of the date ("Lun 26/10/2026") is allowed, if it is that date's weekday."""
+    text, weekday = split_weekday(text)
     pattern = ctx.date_formats.get(field)
     try:
         if pattern is not None:
-            return datetime.strptime(text, pattern)
-        if _ISO_DATE.match(text):
-            return datetime.fromisoformat(text.replace("/", "-", 2))
+            parsed = datetime.strptime(text, pattern)
+        elif _ISO_DATE.match(text):
+            parsed = datetime.fromisoformat(text.replace("/", "-", 2))
+        else:
+            raise _FieldError(
+                _date_code(field), "unrecognised date format (configure a date format)"
+            )
     except ValueError:
         raise _FieldError(
             _date_code(field), "value does not match the expected date format"
         ) from None
-    raise _FieldError(_date_code(field), "unrecognised date format (configure a date format)")
+    if not weekday_agrees(parsed.date(), weekday):
+        raise _FieldError(_date_code(field), "the weekday written does not belong to the date")
+    return parsed
 
 
 def _date_code(field: CanonicalField) -> BookingErrorCode:
@@ -288,7 +301,7 @@ def parse_decimal_string(
     Without configuration only plain "1234" / "1234.56" is accepted. With a decimal separator
     configured, digit grouping is optional but must be exactly three digits when present.
     """
-    cleaned = text.replace(" ", " ").strip()
+    cleaned = strip_currency(text.replace(" ", " ").strip())
     decimal = decimal_separator or "."
     if decimal == thousands_separator:
         raise _FieldError(

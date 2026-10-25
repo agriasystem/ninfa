@@ -27,11 +27,13 @@ from app.modules.document_understanding.grid import MergedRange, SheetScan
 from app.modules.document_understanding.lexicon import (
     HEADER_STEMS,
     NOTE_PREFIXES,
+    PAGE_BREAK_WORDS,
     SECTION_WORDS,
     TOTAL_WORDS,
 )
 from app.modules.document_understanding.text import fold, stem, tokens
 from app.modules.document_understanding.values import CellKind, kind_of, text_of
+from app.modules.ingestion.value_text import strip_currency
 
 HEADER_SEARCH_ROWS = 150
 MAX_TABLES_PER_SHEET = 3
@@ -45,6 +47,8 @@ class RowKind(StrEnum):
     TOTAL = "TOTAL"
     SECTION = "SECTION"
     NOTE = "NOTE"
+    # The header again, at the top of a new page of a printed report: not a record, not the end.
+    HEADER = "HEADER"
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,6 +213,17 @@ def is_note_text(text: str) -> bool:
     return any(folded == fold(p) or folded.startswith(fold(p) + " ") for p in NOTE_PREFIXES)
 
 
+def is_page_break_text(text: str) -> bool:
+    """ "--- pagina successiva ---", "Pagina 2 di 3", "continua": words of a page break only, or a
+    line of dashes."""
+    words = fold(text).split()
+    if not words:
+        return bool(text.strip()) and not any(ch.isalnum() for ch in text)
+    return all(
+        word in PAGE_BREAK_WORDS or word.isdigit() or word in {"di", "of"} for word in words
+    ) and any(word in PAGE_BREAK_WORDS for word in words)
+
+
 _SECTION_FILLER = frozenset({"e", "ed", "di", "del", "della", "dei", "delle", "and", "da", "per"})
 
 
@@ -244,7 +259,7 @@ def classify_row(
         return RowKind.TOTAL
     if row.n == 1 and kind_of(row.cells[row.positions[0]]) == CellKind.TEXT:
         text = text_of(row.cells[row.positions[0]])
-        if is_note_text(text) or len(text) > 80:
+        if is_note_text(text) or is_page_break_text(text) or len(text) > 80:
             return RowKind.NOTE
         followed = any(f.n >= 2 and (f.n_value or f.n_date) for f in followers)
         if followed and looks_like_section(text, merged_wide=merged_wide):
@@ -289,12 +304,20 @@ def _group_labels(
     """The upper header line spread over the columns it covers, or None when that row is not one.
 
     A group row sits directly above the label row, is made of text only, has at least two groups
+    (or one, merged over some of the columns below it: "Importi" over Imponibile / IVA / Totale)
     and is told apart from a title by a merged block over several columns, a group written once per
     column, or labels underneath that repeat ("Ore", "Costo", "Ore", "Costo")."""
-    if group.n < 2 or group.n_value or group.n_date:
+    if group.n < 1 or group.n_value or group.n_date:
         return None
     width = (header.positions[-1] + 1) if header.positions else 0
     merged_spans = [span for span in spans.get(group.number, []) if span[1] > span[0]]
+    if group.n < 2 and not any(
+        1 < end - start + 1 < width and end < len(header.cells) and header.cells[start] is not None
+        for start, end in merged_spans
+    ):
+        # (a single group needs a merged block over SOME of the columns below it: one over all of
+        # them is the title of the table)
+        return None
     texts = [text_of(group.cells[p]) for p in group.positions]
     repeated = (
         any(a == b for a, b in zip(texts, texts[1:], strict=False)) and group.n >= width * 0.6
@@ -363,6 +386,95 @@ def _is_dense(row: _Row, width: int) -> bool:
     return row.n >= max(2, ceil(0.5 * width))
 
 
+def header_labels(columns: Sequence[Column]) -> frozenset[str]:
+    """Every word the header rows are made of (both lines of a two-level header), folded."""
+    found: set[str] = set()
+    for column in columns:
+        for text in (text_of(column.raw), column.group or "", column.label):
+            if text and fold(text):
+                found.add(fold(text))
+    return frozenset(found)
+
+
+def is_repeated_header(row: _Row, labels: frozenset[str]) -> bool:
+    """The header written again inside the table (a printed report repeats it on every page): a row
+    of text whose cells are, for the most part, the labels of the header."""
+    if row.n < 2 or row.n_text != row.n:
+        return False
+    same = sum(1 for text in row.texts if fold(text) in labels)
+    return same >= max(2, ceil(0.6 * row.n))
+
+
+def _single_text(row: _Row) -> bool:
+    return row.n == 1 and kind_of(row.cells[row.positions[0]]) == CellKind.TEXT
+
+
+def _page_break(row: _Row) -> bool:
+    """A line of its own that is the page break of a printed report."""
+    return _single_text(row) and is_page_break_text(row.first_text)
+
+
+class BodyReader:
+    """Tells, one row after the other, what each row of a table body is.
+
+    Used when a sheet is scanned AND when it is streamed for the import, so the table NINFA
+    describes is exactly the table it reads. Besides the plain rules of `classify_row` it knows
+    two things about printed reports:
+
+    * a line such as "--- pagina successiva ---" in the middle of the records is a page break, not
+      the end of the table - when more records follow it (a note at the END still ends the table);
+    * the header written again at the top of a page is the header, not a record and not another
+      table - but only straight after a record or a page break: a header that comes after a title
+      ("Settimana 43", "FATTURE EMESSE") or a blank space starts ANOTHER table, and that is a
+      question for the person.
+    """
+
+    def __init__(self, columns: Sequence[Column], header_row: int) -> None:
+        self.width = len(columns)
+        self.labels = header_labels(columns)
+        self.ended = False
+        self._furniture = False  # in the lines printed at the top of a new page
+        self._after = "RECORD"  # what the last line was: RECORD | BREAK | OTHER
+        self._after_row = header_row
+
+    def kind(self, row: _Row, followers: Sequence[_Row], *, merged_wide: bool = False) -> RowKind:
+        if self.ended:
+            return RowKind.NOTE
+        if is_repeated_header(row, self.labels) and (
+            self._after == "BREAK"
+            or (self._after == "RECORD" and row.number == self._after_row + 1)
+        ):
+            self._after = "BREAK"
+            return RowKind.HEADER
+        kind = classify_row(row, followers, self.width, merged_wide=merged_wide)
+        if kind == RowKind.DATA and self._furniture and _single_text(row):
+            return RowKind.NOTE  # the running title printed on the new page
+        if kind == RowKind.NOTE:
+            if self._resumes(row, followers):
+                self._after, self._furniture = "BREAK", True
+            else:
+                self.ended = True
+            return kind
+        if kind in (RowKind.DATA, RowKind.TOTAL, RowKind.SECTION):
+            self._after, self._after_row, self._furniture = "RECORD", row.number, False
+        return kind
+
+    def _resumes(self, note: _Row, followers: Sequence[_Row]) -> bool:
+        """More records follow the note: straight away, or - for a page break - after the running
+        title and the header printed again."""
+        for follower in followers:
+            if _page_break(note) and (
+                is_repeated_header(follower, self.labels) or _single_text(follower)
+            ):
+                continue
+            return (
+                _is_dense(follower, self.width)
+                and not _label_row(follower)
+                and classify_row(follower, (), self.width) == RowKind.DATA
+            )
+        return False
+
+
 def _total_check(
     row: _Row,
     rows: dict[int, _Row],
@@ -407,7 +519,7 @@ def as_decimal(cell: Cell) -> Decimal | None:
             return Decimal(str(cell))
         except InvalidOperation:
             return None
-    text = str(cell).strip().replace("€", "").replace(" ", "")
+    text = strip_currency(str(cell).strip()).replace(" ", "")
     if "," in text and "." in text:
         text = text.replace(".", "").replace(",", ".")
     elif "," in text:
@@ -434,18 +546,18 @@ def _walk_body(
     data_since_total: list[int] = []
     last_total_or_section = first - 1
     last_dense = 0
-    note_started = False
+    reader = BodyReader(columns, first - 1)
     for position, number in enumerate(numbers):
         row = rows[number]
         if row.n == 0:
             continue
-        if note_started:
-            body.skipped.append(SkippedRow(number, RowKind.NOTE, _preview(row.first_text)))
-            continue
         wide = _wide(spans.get(number, []), width)
         followers = [rows[m] for m in numbers[position + 1 : position + 6] if rows[m].n]
-        kind = classify_row(row, followers, width, merged_wide=wide)
+        kind = reader.kind(row, followers, merged_wide=wide)
         first_text = row.first_text
+        if kind == RowKind.HEADER:
+            body.skipped.append(SkippedRow(number, RowKind.HEADER, _preview(first_text)))
+            continue
         if kind == RowKind.TOTAL:
             body.totals.append(
                 _total_check(row, rows, data_since_total, last_total_or_section, columns)
@@ -455,7 +567,6 @@ def _walk_body(
             data_since_total = []
             continue
         if kind == RowKind.NOTE:
-            note_started = True
             body.skipped.append(SkippedRow(number, RowKind.NOTE, _preview(first_text)))
             continue
         if kind == RowKind.SECTION:
@@ -539,7 +650,7 @@ def _best_table(
         group = rows.get(number - 1) if not inside(number - 1) else None
         group_labels = _group_labels(group, row, spans) if group is not None else None
         columns, renamed = _build_columns(row, group_labels, row.positions[-1] + 1)
-        stop = _next_header(rows, ordered, number, row, spans)
+        stop = _next_header(rows, ordered, number, row, spans, header_labels(columns))
         next_claimed = min((start for start, _ in claimed if start > number), default=None)
         if next_claimed is not None:
             stop = next_claimed if stop is None else min(stop, next_claimed)
@@ -591,21 +702,80 @@ def _value_texts(row: _Row) -> tuple[str, ...]:
     )
 
 
+def _is_page_header(
+    rows: dict[int, _Row], ordered: list[int], number: int, labels: frozenset[str]
+) -> bool:
+    """The header printed again at the top of a page (and not the header of another table): it
+    comes straight after a record, or after a page break and the running title."""
+    if not is_repeated_header(rows[number], labels):
+        return False
+    before = [n for n in ordered if n < number]
+    if not before:
+        return False
+    previous = rows[before[-1]]
+    if before[-1] == number - 1 and previous.n >= 2 and not _label_row(previous):
+        return True
+    for n in reversed(before[-3:]):  # a page break, then the title printed on the new page
+        if _page_break(rows[n]):
+            return True
+        if not _single_text(rows[n]):
+            return False
+    return False
+
+
+def _kinds(row: _Row, positions: set[int]) -> list[CellKind]:
+    return [
+        kind_of(row.cells[p]) if p < len(row.cells) else CellKind.EMPTY for p in sorted(positions)
+    ]
+
+
+def _like_the_records_above(
+    rows: dict[int, _Row], ordered: list[int], header_row: int, candidate: int
+) -> bool:
+    """A row that has dates or numbers in the very places where the record just above it has them
+    is a record - however many of its words are words of a header ("Booking.com", "Walk-in",
+    "Check-in" as a channel). The header of another table is text where the records hold values."""
+    row = rows[candidate]
+    if not (row.n_date or row.n_value):
+        return False
+    above = next(
+        (
+            rows[n]
+            for n in reversed([n for n in ordered if header_row < n < candidate])
+            if rows[n].n >= 2 and not _label_row(rows[n])
+        ),
+        None,
+    )
+    if above is None:
+        return False
+    positions = set(row.positions) | set(above.positions)
+    same = sum(
+        a == b for a, b in zip(_kinds(row, positions), _kinds(above, positions), strict=True)
+    )
+    return same >= ceil(0.8 * len(positions))
+
+
 def _next_header(
     rows: dict[int, _Row],
     ordered: list[int],
     number: int,
     header: _Row,
     spans: dict[int, list[tuple[int, int]]],
+    labels: frozenset[str] = frozenset(),
 ) -> int | None:
-    """The row where ANOTHER table starts below this header (a label row with data under it)."""
+    """The row where ANOTHER table starts below this header (a label row with data under it). The
+    header written again at the top of a page is not another table."""
     later = [n for n in ordered if n > number]
     for index, candidate in enumerate(later):
         row = rows[candidate]
         if not _label_row(row) or row.n < max(3, ceil(0.5 * header.n)):
             continue
+        if _is_page_header(rows, ordered, candidate, labels):
+            continue
         if _lexicon_ratio(row) < 0.5:
             continue
+        if _like_the_records_above(rows, ordered, number, candidate):
+            continue  # a record whose channel is "Booking.com" is not the header of a new table
         under = [rows[m] for m in later[index + 1 : index + 4]]
         if any(r.n >= 2 and (r.n_value or r.n_date) for r in under):
             return (
@@ -617,6 +787,7 @@ def _next_header(
 
 
 __all__ = [
+    "BodyReader",
     "Column",
     "Row",
     "RowKind",

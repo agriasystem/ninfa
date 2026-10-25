@@ -30,11 +30,22 @@ F = LaborField
 
 _HOURS = "ore ora hours hour"
 _PLANNED = (
-    "previste previsto pianificate programmate programmed planned scheduled budget preventivo"
+    "previste previsto pianificate programmate prog pian prev programmed planned scheduled "
+    "budget preventivo"
 )
-_ACTUAL = "effettive effettivo lavorate reali reale consuntivo timbrate actual worked effettuate"
+_ACTUAL = (
+    "effettive effettivo eff lavorate svolte svolto reali reale consuntivo timbrate actual worked "
+    "effettuate"
+)
 _COST = "costo costi cost"
 _NOT_A_LABEL = "ore costo data totale"
+# Hours that are neither the plan nor the time worked: a column of them is not "hours that do not
+# say which" - it is another thing, and it is left alone.
+_OTHER_HOURS = (
+    "contratto contratti contrattuali contractual contract straordinario straordinari overtime "
+    "ferie permessi permesso malattia assenza assenze pausa pause break notturne notturno festive "
+    "festivo recupero residue residuo saldo cumulate cumulato"
+)
 
 _CATEGORY_NAMES = frozenset(category.value for category in LaborCategory)
 
@@ -73,7 +84,7 @@ LABOR = DomainSem(
             _exact(F.ROLE),
             (
                 rule(
-                    "reparto dipartimento department dept area settore squadra team",
+                    "reparto dipartimento department dept rep area settore squadra team",
                     none=_NOT_A_LABEL,
                     weight=0.95,
                 ),
@@ -134,11 +145,12 @@ LABOR = DomainSem(
         PiiKind.TAX_CODE: "IDENTITY",
         PiiKind.IBAN: "IDENTITY",
     },
+    financial=frozenset({F.PLANNED_COST.value, F.ACTUAL_COST.value}),
     ambiguous=(
         AmbiguousColumn(
             "HOURS",
             stems(_HOURS),
-            stems(f"{_PLANNED} {_ACTUAL} {_COST} orario tariffa"),
+            stems(f"{_PLANNED} {_ACTUAL} {_COST} orario tariffa {_OTHER_HOURS}"),
             (F.PLANNED_HOURS.value, F.ACTUAL_HOURS.value),
             fit_hours,
         ),

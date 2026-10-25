@@ -17,6 +17,7 @@ from typing import Any
 from app.core.iso4217 import ISO_4217_CODES
 from app.modules.bookings.parsers import Cell, SourceTable
 from app.modules.bookings.text import normalize_key
+from app.modules.ingestion.value_text import split_weekday, strip_currency, weekday_agrees
 from app.modules.labor.canonical import CanonicalEntry, hours_to_minutes
 from app.modules.labor.classification import classify_role
 from app.modules.labor.errors import LaborErrorCode, LaborImportError, RowIssue
@@ -137,16 +138,20 @@ def _date(cell: Cell, field: LaborField, config: LaborMappingConfig) -> date | N
         return cell
     if not isinstance(cell, str):
         raise _BadValueError(LaborErrorCode.INVALID_DATE)
-    text = cell.strip()
+    text, weekday = split_weekday(cell.strip())  # "Lun 26/10/2026": the weekday is allowed
     pattern = config.format_options.date_formats.get(field)
     try:
         if pattern is not None:
-            return datetime.strptime(text, pattern).date()
-        if _ISO_DATE.match(text):
-            return datetime.fromisoformat(text.replace("/", "-", 2)).date()
+            parsed = datetime.strptime(text, pattern).date()
+        elif _ISO_DATE.match(text):
+            parsed = datetime.fromisoformat(text.replace("/", "-", 2)).date()
+        else:
+            raise _BadValueError(LaborErrorCode.INVALID_DATE)
     except ValueError:
         raise _BadValueError(LaborErrorCode.INVALID_DATE) from None
-    raise _BadValueError(LaborErrorCode.INVALID_DATE)
+    if not weekday_agrees(parsed, weekday):
+        raise _BadValueError(LaborErrorCode.INVALID_DATE)
+    return parsed
 
 
 def _decimal(cell: Cell, config: LaborMappingConfig) -> Decimal | None:
@@ -171,7 +176,7 @@ def _decimal(cell: Cell, config: LaborMappingConfig) -> Decimal | None:
 
 def _parse_decimal_text(text: str, config: LaborMappingConfig) -> Decimal:
     """`"7.5"`, `"7,5"` as configured; never guessed."""
-    cleaned = text.strip()
+    cleaned = strip_currency(text.strip())
     decimal = config.format_options.decimal_separator or "."
     thousands = config.format_options.thousands_separator
     dec = re.escape(decimal)

@@ -30,11 +30,11 @@ from app.modules.document_understanding.document import DocumentUnderstanding, S
 from app.modules.document_understanding.grid import ensure_columns, iter_rows, scan_workbook
 from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.document_understanding.structure import (
+    BodyReader,
     Column,
     Row,
     RowKind,
     as_decimal,
-    classify_row,
     row_features,
 )
 from app.modules.document_understanding.text import fold
@@ -188,26 +188,16 @@ def generate(
     for table, mapping in zip(plan.selection.tables, plan.sources, strict=True):
         sheet = table.sheet or None
         scan_sections = dict(table.sections)
-        width = len(table.columns)
         section: str | None = None
-        note_started = False
+        reader = BodyReader(table.columns, table.header_rows[-1])
         stream = iter_rows(content, filename, sheet, delimiter=delimiter, encoding=encoding)
         for row, followers in _followers(stream, table.header_rows[-1] + 1, table.last_row):
-            if note_started:
-                continue
-            kind = (
-                RowKind.SECTION
-                if row.number in scan_sections
-                else classify_row(row, followers, width)
-            )
+            kind = RowKind.SECTION if row.number in scan_sections else reader.kind(row, followers)
             if kind == RowKind.SECTION:
                 section = row.first_text
                 continue
-            if kind == RowKind.NOTE:
-                note_started = True
-                continue
             if kind != RowKind.DATA:
-                continue
+                continue  # a total, a note, a page break, the header again: never a record
             cells: tuple[Cell, ...] = row.cells
             base: list[Cell] = [
                 cells[index] if index is not None and index < len(cells) else None

@@ -85,6 +85,8 @@ from app.modules.data_sources.mapping_types import (
 )
 from app.modules.data_sources.service import DataSourcesService, MappedImport
 from app.modules.data_sources.types import SourcesOverview
+from app.modules.data_sources.understanding_redaction import redact_inspection
+from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.ingestion.models import DataSourceDomain
 
 router = APIRouter(prefix="/properties/{property_id}/data-sources", tags=["data-sources"])
@@ -147,6 +149,10 @@ async def _read_json[ModelT: BaseModel](request: Request, model: type[ModelT]) -
 
 
 def _inspection_response(inspection: FileInspection) -> FileInspectionResponse:
+    # The gate every answer about a file passes before it is serialised: an e-mail address, a
+    # telephone number, a tax code or an IBAN never reaches the browser, from whichever service
+    # the answer comes (the service that read the file also removes the names it found).
+    inspection = redact_inspection(inspection, PersonalDataGuard())
     profile = inspection.profile
     return FileInspectionResponse(
         domain=inspection.domain.value,

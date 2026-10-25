@@ -30,6 +30,9 @@ from app.modules.document_understanding.text import fold, tokens
 _LEVEL_RANK = {Level.HIGH: 3, Level.MEDIUM: 2, Level.LOW: 1}
 _VALUE_ONLY_FIT = 0.9
 
+# `ColumnProposal.ambiguous_group` of a column that competes with a look-alike for ONE field.
+CONTESTED = "CONTESTED"
+
 
 @dataclass(frozen=True, slots=True)
 class ColumnProposal:
@@ -44,6 +47,8 @@ class ColumnProposal:
     locked: str | None = None
     pii: PiiKind | None = None
     # A column that is "hours" or "an amount" without saying which: the group and what it may be.
+    # Or (group CONTESTED) one of several columns that say the same thing about ONE field - an
+    # original and an adjusted amount, two VAT rates: NINFA does not pick one.
     ambiguous_group: str | None = None
     ambiguous_fields: tuple[str, ...] = ()
 
@@ -69,6 +74,9 @@ def propose(
 
     # 1. what is never read
     locked: dict[int, tuple[str, PiiKind | None]] = {}
+    # Personal data in a column the kind of data does not lock (a supplier's e-mail, a name in a
+    # cost register): it may be read, but it is never shown, whatever the page does with it.
+    personal: dict[int, PiiKind] = {}
     for index, sample in enumerate(samples):
         reason = excluded_reason(sample.header)
         finding = detect_pii(sample.header, stats[index])
@@ -83,9 +91,13 @@ def propose(
                     break
         if reason is not None:
             locked[index] = (reason, pii)
+        elif pii is not None:
+            personal[index] = pii
 
     # 2. every column against every field
     entries: list[tuple[int, float, int, int, str, NameMatch, float | None, Level]] = []
+    # What each (column, field) pair came to, for telling look-alike columns apart below.
+    scored: dict[tuple[int, str], tuple[Candidate, Level]] = {}
     have_name: set[str] = set()
     for index, sample in enumerate(samples):
         if index in locked:
@@ -99,6 +111,7 @@ def propose(
             if fit is not None and stats[index].n >= MIN_EVIDENCE and fit < 0.2:
                 continue  # the values contradict the name
             level = level_of(candidate.name, candidate.score, fit, stats[index])
+            scored[(index, candidate.field)] = (candidate, level)
             order = sem.order.index(candidate.field) if candidate.field in sem.order else 99
             entries.append(
                 (
@@ -156,6 +169,30 @@ def propose(
         chosen[index] = (key, name, fit, level)
         del rank
 
+    # 4b. a field that two columns claim in the same words - "Ore previste" and "Ore previste
+    #     (rev.)", "Imponibile" and "Imponibile (rettificato)", one net per VAT rate - is a CHOICE,
+    #     and not NINFA's: neither of them is taken for it (the person is asked, or matches by hand)
+    contested: dict[int, str] = {}
+    for index, (key, _name, _fit, _level) in chosen.items():
+        mine = scored.get((index, key))
+        if mine is None or mine[0].rule is None:
+            continue
+        rivals = [
+            other
+            for other in range(len(samples))
+            if other != index
+            and other not in locked
+            # (a column already placed elsewhere is explained - unless that was only a weak guess)
+            and (other not in chosen or chosen[other][3] == Level.LOW)
+            and _look_alike(mine[0], scored.get((other, key)))
+        ]
+        if rivals:
+            for member in (index, *rivals):
+                contested[member] = key
+    for index in [i for i in chosen if i in contested]:
+        taken_fields.discard(chosen[index][0])
+        del chosen[index]
+
     # 5. columns that confirm each other
     for (field_a, header_a), (field_b, header_b) in sem.pairs:
         a = next((i for i, c in chosen.items() if c[0] == field_a), None)
@@ -183,7 +220,31 @@ def propose(
             continue
         if index in chosen:
             key, name, fit, level = chosen[index]
-            out.append(ColumnProposal(index, sample.header, stats[index], key, level, name, fit))
+            out.append(
+                ColumnProposal(
+                    index,
+                    sample.header,
+                    stats[index],
+                    key,
+                    level,
+                    name,
+                    fit,
+                    pii=personal.get(index),
+                )
+            )
+            continue
+        if index in contested:
+            out.append(
+                ColumnProposal(
+                    index,
+                    sample.header,
+                    stats[index],
+                    name=scored[(index, contested[index])][0].name,
+                    ambiguous_group=CONTESTED,
+                    ambiguous_fields=(contested[index],),
+                    pii=personal.get(index),
+                )
+            )
             continue
         group = _ambiguous(sem, sample.header, stats[index], taken_fields)
         if group is not None:
@@ -194,11 +255,25 @@ def propose(
                     stats[index],
                     ambiguous_group=group[0],
                     ambiguous_fields=group[1],
+                    pii=personal.get(index),
                 )
             )
             continue
-        out.append(ColumnProposal(index, sample.header, stats[index]))
+        out.append(ColumnProposal(index, sample.header, stats[index], pii=personal.get(index)))
     return Proposal(tuple(out))
+
+
+def _look_alike(mine: Candidate, other: tuple[Candidate, Level] | None) -> bool:
+    """Another column that satisfies the very same rule of the same field, and would itself be a
+    fair proposal for it: it says the same thing in other words."""
+    if other is None:
+        return False
+    candidate, level = other
+    return (
+        candidate.name in (NameMatch.EXACT, NameMatch.TOKEN)
+        and candidate.rule == mine.rule
+        and level != Level.LOW
+    )
 
 
 def _ambiguous_words(sem: DomainSem, header: str) -> bool:
@@ -221,4 +296,4 @@ def _ambiguous(
     return None
 
 
-__all__ = ["Candidate", "ColumnProposal", "Level", "Proposal", "propose"]
+__all__ = ["CONTESTED", "Candidate", "ColumnProposal", "Level", "Proposal", "propose"]

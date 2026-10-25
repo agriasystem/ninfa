@@ -37,7 +37,8 @@ class PiiFinding:
 
 _PERSON_WORDS = stems(
     "nome cognome name dipendente collaboratore operatore risorsa nominativo ospite guest cliente "
-    "customer intestatario staff employee persona referente"
+    "customer intestatario staff employee persona referente addetto addetta lavoratore lavoratrice "
+    "collega"
 )
 # Words that make a header NOT a column of names even with a person word in it.
 _NOT_A_NAME = stems(
@@ -77,6 +78,30 @@ _COMMON_WORDS = stems(
 )
 
 
+# Given names, Italian and the ones a hotel meets everywhere. A column whose values are written
+# "Name Surname" or "Surname Name" with one of these in it is a column of people - even when the
+# same person appears on many rows (a roster lists each person once a day), which the shape alone
+# cannot tell from a column of room types or rate plans ("Front Office", "Best Available").
+_GIVEN_NAME_LIST = """
+Alessandra Alessandro Alessia Alessio Alice Alberto Andrea Angela Angelo Anna Antonella Antonio
+Arianna Barbara Beatrice Benedetta Bruno Camilla Carla Carlo Carmela Caterina Chiara Cinzia
+Claudia Claudio Cristian Cristiana Cristina Daniela Daniele Daniel Davide Debora Diego Dario
+Domenico Donatella Edoardo Elena Eleonora Elisa Elisabetta Emanuele Emanuela Emilia Emma Enrico
+Enzo Erika Eugenio Fabio Fabrizio Federica Federico Filippo Francesca Francesco Franco Gabriele
+Gabriella Gaia Gianluca Gianni Giacomo Giada Giorgia Giorgio Giovanna Giovanni Giulia Giuliano
+Giulio Giuseppe Giuseppina Gloria Grazia Greta Ilaria Irene Isabella Jacopo Lara Laura Leonardo
+Letizia Lorenzo Loredana Luca Lucia Luciano Luigi Luisa Manuela Marco Margherita Maria Mariano
+Marina Mario Marta Martina Massimo Matteo Maurizio Michela Michele Mirko Monica Nadia Nicola
+Nicoletta Nicolo Noemi Olga Paola Paolo Patrizia Pietro Raffaella Raffaele Renato Riccardo
+Roberta Roberto Rosa Rosanna Salvatore Samuele Sandra Sara Serena Sergio Silvia Silvio Simona
+Simone Sofia Stefania Stefano Tommaso Teresa Tiziana Tiziano Umberto Valentina Valentino Valeria
+Valerio Vanessa Veronica Vincenzo Viola Virginia Vittoria Vittorio Walter Yuri Zoe
+Adam Adrian Alex Amanda Ben Charles David Emily Hans Helen James Jean John Julia Karl Kate
+Laurent Lisa Mark Michael Nina Oliver Paul Peter Pierre Robert Sarah Sophie Thomas William
+"""
+_GIVEN_NAMES = frozenset(fold(name) for name in _GIVEN_NAME_LIST.split())
+
+
 def _header_tokens(header: str) -> frozenset[str]:
     return tokens(header)
 
@@ -98,21 +123,39 @@ def _phone_numbers(stats: ColumnStats) -> bool:
     return phones / len(strings) >= 0.8
 
 
-def _looks_like_names(stats: ColumnStats) -> bool:
-    """Many different values, each two to four capitalised words that are not department, channel or
-    room words: what a column of people's names looks like."""
-    texts = stats.texts
-    if stats.n < 5 or len(texts) < 4 or stats.text_fraction < 0.8 or stats.distinct_ratio < 0.5:
+def _name_shaped(text: str) -> bool:
+    """Two to four capitalised words, none of them a department, channel or room word."""
+    words = text.split()
+    if not 2 <= len(words) <= 4 or not all(_NAME_WORD.match(word) for word in words):
         return False
-    named = 0
-    for text in texts:
-        words = text.split()
-        if not 2 <= len(words) <= 4 or not all(_NAME_WORD.match(word) for word in words):
-            continue
-        if any(stem(fold(word)) in _COMMON_WORDS for word in words):
-            continue
-        named += 1
-    return named / len(texts) >= 0.8
+    return not any(stem(fold(word)) in _COMMON_WORDS for word in words)
+
+
+def _has_given_name(text: str) -> bool:
+    """ "Giulia Ferretti" and "Ferretti Giulia": a given name first or last."""
+    words = fold(text).split()
+    return bool(words) and (words[0] in _GIVEN_NAMES or words[-1] in _GIVEN_NAMES)
+
+
+def looks_like_person(text: str) -> bool:
+    """One value that reads as a person: "Giulia Ferretti", "Ferretti Giulia", or a bare given
+    name. (Not a department, a channel, a room: the shape rules out the words a hotel uses.)"""
+    return _name_shaped(text) or fold(text) in _GIVEN_NAMES
+
+
+def looks_like_names(stats: ColumnStats) -> bool:
+    """What a column of people's names looks like: values that are two to four capitalised words
+    which are not department, channel or room words - and either carry a given name (then the
+    same person may well come back on many rows) or are all different from row to row."""
+    texts = stats.texts
+    if stats.n < 3 or len(texts) < 3 or stats.text_fraction < 0.8:
+        return False
+    shaped = [text for text in texts if _name_shaped(text)]
+    if len(shaped) / len(texts) < 0.8:
+        return False
+    if sum(1 for text in shaped if _has_given_name(text)) / len(shaped) >= 0.6:
+        return True
+    return stats.n >= 5 and len(texts) >= 4 and stats.distinct_ratio >= 0.5
 
 
 def detect_pii(header: str, stats: ColumnStats) -> PiiFinding | None:
@@ -133,9 +176,9 @@ def detect_pii(header: str, stats: ColumnStats) -> PiiFinding | None:
         if stats.n == 0 or stats.text_fraction >= 0.6:
             return PiiFinding(PiiKind.PERSON_NAME, "HEADER", True)
         return None
-    if _looks_like_names(stats):
+    if looks_like_names(stats):
         return PiiFinding(PiiKind.PERSON_NAME, "VALUES", False)
     return None
 
 
-__all__ = ["PiiFinding", "PiiKind", "detect_pii"]
+__all__ = ["PiiFinding", "PiiKind", "detect_pii", "looks_like_names", "looks_like_person"]

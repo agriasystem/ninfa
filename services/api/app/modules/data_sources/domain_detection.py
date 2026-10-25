@@ -18,7 +18,7 @@ or that points nowhere, is asked about.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from app.modules.data_sources.proposal import Proposal
+from app.modules.data_sources.proposal import CONTESTED, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level
 from app.modules.document_understanding.text import tokens
 from app.modules.ingestion.models import DataSourceDomain
@@ -53,12 +53,22 @@ def score_domain(
 ) -> DomainScore:
     """How well a document fits one kind of data. `extra_fields` are fields the document supplies
     without a column of their own (a department that is a line or a sheet, the days of a grid)."""
+    # (columns that say the same thing in the same words - an original and an adjusted amount, the
+    # October and the November block - still tell what KIND of document this is)
+    contested = {
+        field
+        for c in proposal.columns
+        if c.ambiguous_group == CONTESTED
+        for field in c.ambiguous_fields
+    }
     assigned = {c.field for c in proposal.columns if c.field is not None} | set(extra_fields)
+    assigned |= contested
     sure = {
         c.field
         for c in proposal.columns
         if c.field is not None and c.level in (Level.HIGH, Level.MEDIUM)
     } | set(extra_fields)
+    sure |= contested
     satisfied = sum(1 for group in groups if any(field in sure for field in group))
     coverage = satisfied / len(groups) if groups else 0.0
     breadth = min(1.0, len(assigned) / max(4, len(groups)))

@@ -18,7 +18,7 @@ from app.modules.ai.import_understanding.types import (
     UnderstandingEvidence,
 )
 from app.modules.ai.import_understanding.validator import FitOf
-from app.modules.data_sources.proposal import ColumnProposal, Proposal
+from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
 from app.modules.data_sources.understanding_types import OriginKind, Question, QuestionKind
 from app.modules.document_understanding.lexicon import HEADER_STEMS, SECTION_WORDS
@@ -192,6 +192,7 @@ def apply_resolution(
             and column.field is None
             and column.locked is None
             and column.pii is None
+            and column.ambiguous_group != CONTESTED  # a choice between look-alikes is the person's
             and field not in taken
         ):
             taken.add(field)

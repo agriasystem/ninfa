@@ -21,6 +21,7 @@ from typing import Literal
 
 from app.modules.bookings.normalization import DateOrder, detect_date_order
 from app.modules.bookings.parsers import Cell, SourceTable
+from app.modules.ingestion.value_text import split_weekday, strip_currency
 
 SCAN_ROWS = 2000
 EXAMPLES_PER_COLUMN = 3
@@ -87,7 +88,13 @@ _SLASHED_DATE = re.compile(
 
 
 def _texts(values: Sequence[Cell]) -> list[str]:
-    return [value.strip() for value in values if isinstance(value, str) and value.strip()]
+    """The text cells, without a weekday written before a date or the hotel's currency written
+    next to an amount (the importers read them without, so the evidence must too)."""
+    return [
+        strip_currency(split_weekday(value.strip())[0])
+        for value in values
+        if isinstance(value, str) and value.strip()
+    ]
 
 
 def looks_like_dates(values: Sequence[Cell]) -> bool:
@@ -98,10 +105,10 @@ def looks_like_dates(values: Sequence[Cell]) -> bool:
     for value in values:
         if isinstance(value, datetime | date):
             continue
-        if isinstance(value, str) and (
-            _ISO_DATE.match(value.strip()) or _SLASHED_DATE.match(value.strip())
-        ):
-            continue
+        if isinstance(value, str):
+            dated = split_weekday(value.strip())[0]
+            if _ISO_DATE.match(dated) or _SLASHED_DATE.match(dated):
+                continue
         return False
     return True
 

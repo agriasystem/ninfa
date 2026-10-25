@@ -11,6 +11,7 @@ from decimal import Decimal
 from enum import StrEnum
 
 from app.modules.bookings.parsers import Cell
+from app.modules.ingestion.value_text import split_weekday
 
 
 class CellKind(StrEnum):
@@ -45,7 +46,8 @@ def kind_of(cell: Cell) -> CellKind:
     text = str(cell).strip()
     if not text:
         return CellKind.EMPTY
-    if _ISO_DATE.match(text) or _SLASHED_DATE.match(text):
+    dated = split_weekday(text)[0]  # "gio 29/10/2026" is a date with its weekday in front
+    if _ISO_DATE.match(dated) or _SLASHED_DATE.match(dated):
         return CellKind.DATE
     if _TIME.match(text):
         return CellKind.TIME
