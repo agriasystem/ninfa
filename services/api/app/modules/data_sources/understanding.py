@@ -73,6 +73,7 @@ from app.modules.data_sources.understanding_ai import (
 from app.modules.data_sources.understanding_bookings import (
     channel_by_taught,
     check_stay,
+    identifier_by_context,
     lone_total_is_room_revenue,
 )
 from app.modules.data_sources.understanding_costs import (
@@ -271,7 +272,7 @@ class UnderstandingService:
         samples = sample_columns(table)
         proposal = propose(sem, samples, excluded_reason=self._excluded(domain))
         if domain == DataSourceDomain.BOOKINGS:
-            proposal = lone_total_is_room_revenue(proposal)
+            proposal = identifier_by_context(lone_total_is_room_revenue(proposal))
             proposal = channel_by_taught(proposal, frozenset(taught.get("channel_mapping", {})))
         overrides = dict(asked_fields)
         if layout.department is not None:
@@ -1230,10 +1231,24 @@ _ABOUT_MEANING = frozenset(
 def _without_premature(questions: list[Question], blockers: list[Blocker]) -> list[Question]:
     """While the file lacks something the import cannot do without (or is a kind of document it
     cannot read), asking what its columns and words mean changes nothing: the person matches the
-    columns by hand first, and the questions come back as soon as they can change the result."""
+    columns by hand first, and the questions come back as soon as they can change the result.
+    The basis of an amount is kept only when the amount is what is missing (its answer settles
+    it)."""
     if not blockers:
         return questions
-    return [q for q in questions if q.kind not in _ABOUT_MEANING]
+    amount_is_missing = any(
+        ("line_total",) in blocker.groups
+        for blocker in blockers
+        if blocker.code == BlockerCode.MISSING_REQUIRED
+    )
+    return [
+        q
+        for q in questions
+        if q.kind not in _ABOUT_MEANING
+        and not (q.kind == QuestionKind.AMOUNT_BASIS and not amount_is_missing)
+    ]
+
+
 def _dedupe(questions: list[Question]) -> list[Question]:
     seen: set[str] = set()
     out: list[Question] = []

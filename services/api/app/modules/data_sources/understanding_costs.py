@@ -23,7 +23,7 @@ from typing import Final, Literal
 from app.modules.bookings.text import normalize_key
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
 from app.modules.data_sources.semantics import Level, NameMatch
-from app.modules.data_sources.semantics_costs import NET_WORDS
+from app.modules.data_sources.semantics_costs import GROSS_WORDS, NET_WORDS
 from app.modules.data_sources.understanding_types import (
     Blocker,
     BlockerCode,
@@ -170,6 +170,11 @@ def _says_net(column: ColumnProposal) -> bool:
     return column.name == NameMatch.EXACT or bool(tokens(column.header) & NET_WORDS)
 
 
+def _says_gross(column: ColumnProposal) -> bool:
+    """The header itself says the amount includes VAT ("Totale IVA inclusa", "Importo lordo")."""
+    return bool(tokens(column.header) & GROSS_WORDS)
+
+
 def _decimals(rows: Sequence[Sequence[object]], position: int) -> list[Decimal | None]:
     return [as_decimal(row[position]) if position < len(row) else None for row in rows]  # type: ignore[arg-type]
 
@@ -230,7 +235,8 @@ def plan_costs(
     bare = net if net is not None else gross
     if bare is None:
         return CostsPlan(amounts=check)  # no amount at all: the required-field check says so
-    if asked_basis == "GROSS":
+    if asked_basis == "GROSS" or (asked_basis is None and _says_gross(bare)):
+        # (said by the person, or written in the header: either way it is not asked)
         return CostsPlan(blockers=(Blocker(BlockerCode.AMOUNT_NOT_NET),), amounts=check)
     if asked_basis == "NET":
         return CostsPlan(assigned={bare.header: "line_total"}, amounts=check)

@@ -80,6 +80,35 @@ def lone_total_is_room_revenue(proposal: Proposal) -> Proposal:
     )
 
 
+# --- a loose reservation code ---------------------------------------------------------------------
+
+_DATES_OF_A_STAY = frozenset({"booked_at", "check_in", "check_out"})
+_ALL_DIFFERENT = 0.95
+
+
+def identifier_by_context(proposal: Proposal) -> Proposal:
+    """A loose name for the reservation code ("Cod.", "Codice") over values that are all different
+    - whole numbers or text, never amounts - in a file that is plainly a list of reservations
+    (when it was booked, arrival and departure all recognised by their own names) IS the code: as
+    sure as a header that says "reservation code". The words alone ("Codice" of what?) were the
+    doubt; the rest of the file answers it."""
+    assigned = proposal.assigned()
+    code = assigned.get("source_record_id")
+    if code is None or code.level != Level.MEDIUM or code.name != NameMatch.TOKEN:
+        return proposal
+    if any(
+        (column := assigned.get(field)) is None or column.level != Level.HIGH
+        for field in _DATES_OF_A_STAY
+    ):
+        return proposal
+    stats = code.stats
+    if not stats.enough() or (code.fit or 0.0) < _ALL_DIFFERENT or stats.integral < stats.numeric:
+        return proposal
+    return Proposal(
+        tuple(replace(c, level=Level.HIGH) if c is code else c for c in proposal.columns)
+    )
+
+
 # --- a channel the hotel has already taught -------------------------------------------------------
 
 _MOST = 0.6
@@ -103,6 +132,8 @@ def channel_by_taught(proposal: Proposal, taught: frozenset[str]) -> Proposal:
     return Proposal(
         tuple(replace(c, level=Level.HIGH) if c is column else c for c in proposal.columns)
     )
+
+
 # --- a stay that ends before it begins ------------------------------------------------------------
 
 _ISO = re.compile(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ]\d{1,2}:\d{2}(?::\d{2})?)?$")
@@ -186,4 +217,10 @@ def check_stay(
     return demoted, question
 
 
-__all__ = ["check_stay", "lone_total_is_room_revenue", "stay_is_reversed"]
+__all__ = [
+    "channel_by_taught",
+    "check_stay",
+    "identifier_by_context",
+    "lone_total_is_room_revenue",
+    "stay_is_reversed",
+]

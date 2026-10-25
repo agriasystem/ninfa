@@ -51,7 +51,7 @@ BOOKINGS = DomainSem(
             _exact(F.SOURCE_RECORD_ID),
             (
                 rule(
-                    "prenotazione prenotazioni reservation booking conferma confirmation pren",
+                    "prenotazione prenotazioni reservation booking book conferma confirmation pren",
                     "codice id numero riferimento rif code reference number",
                     weight=0.9,
                 ),
@@ -75,7 +75,7 @@ BOOKINGS = DomainSem(
                     weight=0.9,
                 ),
                 rule(
-                    "creata creato prenotato booked inserita bkd bkg",
+                    "creata creato created prenotato booked inserita bkd bkg",
                     none="cancellata",
                     weight=0.8,
                 ),

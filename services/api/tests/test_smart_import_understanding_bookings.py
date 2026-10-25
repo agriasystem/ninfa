@@ -8,11 +8,13 @@ analysis really needs is not in the file.
 
 from collections.abc import Callable
 from decimal import Decimal
+from io import BytesIO
 from typing import Any
 from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
+from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -119,10 +121,31 @@ def test_dal_and_al_are_an_arrival_and_a_departure_only_as_a_pair(
     assert arrival["level"] == "MEDIUM"  # never "recognised" on the strength of one word
 
 
-def test_a_bare_code_column_is_confirmed_with_one_question_and_the_answer_is_enough(
+def test_a_bare_code_column_over_different_codes_in_a_list_of_reservations_is_the_code(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
-    content = corpus.bookings_dal_al_xlsx()
+    # "Codice" alone is only a maybe - but over codes that are all different, beside the date it
+    # was booked and the dates of the stay, the rest of the file answers what the word could not
+    body = understand(api_client, env, BOOKINGS, "pren.xlsx", corpus.bookings_dal_al_xlsx())
+
+    assert _field_by_header(body)["Codice"] == "source_record_id"
+    assert body["understanding"]["level"] == "READY" and _kinds(body) == []
+
+
+def _with_repeated_codes() -> bytes:
+    book = load_workbook(BytesIO(corpus.bookings_dal_al_xlsx()))
+    sheet = book.active
+    for row in sheet.iter_rows(min_row=2, min_col=7, max_col=7):
+        row[0].value = "B1"  # the same code on every row: not a reservation's own
+    out = BytesIO()
+    book.save(out)
+    return out.getvalue()
+
+
+def test_a_bare_code_column_over_repeated_values_is_confirmed_with_one_question(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    content = _with_repeated_codes()
 
     asked = understand(api_client, env, BOOKINGS, "pren.xlsx", content)
 
