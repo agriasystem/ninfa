@@ -402,11 +402,30 @@ def test_a_configured_datetime_pattern_reads_time_in_the_property_timezone() -> 
 
 @pytest.mark.parametrize(
     "value",
-    ["2026-02-30", "2026-13-01", "not a date", "20260310", "10 luglio 2026", 46213, 1.5, True],
+    [
+        "2026-02-30",
+        "2026-13-01",
+        "not a date",
+        "20260310",
+        # a month written as a name needs its four-digit year and a real day (hardening 2)
+        "10 luglio",
+        "10 lug 26",
+        "31 febbraio 2026",
+        46213,
+        1.5,
+        True,
+    ],
 )
 def test_impossible_or_unrecognised_dates_are_invalid(value: Any) -> None:
     assert (F.CHECK_IN.value, BookingErrorCode.INVALID_DATE) in codes(
         issues_of(good_row(check_in=value))
+    )
+
+
+@pytest.mark.parametrize("value", ["10 luglio 2026", "10 lug 2026", "10 July 2026", "10-Jul-2026"])
+def test_a_month_written_as_a_name_is_read_without_a_pattern(value: str) -> None:
+    assert normalize_ok(good_row(check_in=value, check_out="2026-07-12")).check_in == dt.date(
+        2026, 7, 10
     )
 
 

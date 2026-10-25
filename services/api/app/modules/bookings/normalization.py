@@ -25,6 +25,7 @@ from app.modules.bookings.models import MAX_MONEY, BookingStatus, ChannelType
 from app.modules.bookings.parsers import Cell
 from app.modules.bookings.statuses import resolve_status
 from app.modules.ingestion.value_text import (
+    month_name_date,
     split_weekday,
     strip_currency,
     weekday_agrees,
@@ -202,11 +203,16 @@ class _FieldError(Exception):
 
 def _parse_datetime_string(field: CanonicalField, text: str, ctx: NormalizationContext) -> datetime:
     """Read a date/datetime text by the configured pattern or an ISO form. May be naive. A weekday
-    written in front of the date ("Lun 26/10/2026") is allowed, if it is that date's weekday."""
+    written in front of the date ("Lun 26/10/2026") is allowed, if it is that date's weekday;
+    so is a month written as a name ("26 ottobre 2026"), which needs no pattern: there is nothing
+    to tell day from month."""
     text, weekday = split_weekday(text)
     pattern = ctx.date_formats.get(field)
+    named = month_name_date(text)
     try:
-        if pattern is not None:
+        if named is not None:
+            parsed = named
+        elif pattern is not None:
             parsed = datetime.strptime(text, pattern)
         elif _ISO_DATE.match(text):
             parsed = datetime.fromisoformat(text.replace("/", "-", 2))

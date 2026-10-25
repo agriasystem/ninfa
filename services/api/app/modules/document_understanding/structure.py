@@ -33,7 +33,7 @@ from app.modules.document_understanding.lexicon import (
 )
 from app.modules.document_understanding.text import fold, stem, tokens
 from app.modules.document_understanding.values import CellKind, kind_of, text_of
-from app.modules.ingestion.value_text import strip_currency
+from app.modules.ingestion.value_text import strip_currency, strip_hours_unit
 
 HEADER_SEARCH_ROWS = 150
 MAX_TABLES_PER_SHEET = 3
@@ -519,7 +519,7 @@ def as_decimal(cell: Cell) -> Decimal | None:
             return Decimal(str(cell))
         except InvalidOperation:
             return None
-    text = strip_currency(str(cell).strip()).replace(" ", "")
+    text = strip_hours_unit(strip_currency(str(cell).strip())).replace(" ", "")
     if "," in text and "." in text:
         text = text.replace(".", "").replace(",", ".")
     elif "," in text:

@@ -70,6 +70,10 @@ from app.modules.data_sources.understanding_ai import (
     fit_function,
     needs_help,
 )
+from app.modules.data_sources.understanding_bookings import (
+    check_stay,
+    lone_total_is_room_revenue,
+)
 from app.modules.data_sources.understanding_costs import (
     CostsPlan,
     category_question,
@@ -262,6 +266,8 @@ class UnderstandingService:
         layout = built_layout
         samples = sample_columns(table)
         proposal = propose(sem, samples, excluded_reason=self._excluded(domain))
+        if domain == DataSourceDomain.BOOKINGS:
+            proposal = lone_total_is_room_revenue(proposal)
         overrides = dict(asked_fields)
         if layout.department is not None:
             header = _synthetic_header(table, layout.department.kind)
@@ -281,6 +287,13 @@ class UnderstandingService:
         proposal = _with_answers(proposal, overrides)
         if costs_plan is not None:
             proposal = promote(proposal, costs_plan.confirmed)
+        if domain == DataSourceDomain.BOOKINGS and not {"check_in", "check_out"} & set(
+            overrides.values()
+        ):
+            # a stay does not end before it begins: when it does on every row, look before going on
+            proposal, reversed_dates = check_stay(proposal, _sample_rows(table))
+            if reversed_dates is not None:
+                questions.append(reversed_dates)
 
         # The optional assistant: asked only when the rules left something open it could help with,
         # and what it says is a SUGGESTION (MEDIUM at most) that the person still confirms.
@@ -410,6 +423,8 @@ class UnderstandingService:
                     skip.add("role")
                 if any(q.kind == QuestionKind.AMOUNT_BASIS for q in questions):
                     skip.add("line_total")  # the amount is asked about as an amount, not twice
+                if any(q.kind == QuestionKind.DATES_REVERSED for q in questions):
+                    skip.update({"check_in", "check_out"})  # looked at together, not one by one
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         recognized = self._recognized(

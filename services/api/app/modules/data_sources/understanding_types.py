@@ -35,6 +35,9 @@ class QuestionKind(StrEnum):
     DATE_ORDER = "DATE_ORDER"
     # 1,234 is one thousand two hundred or one and a bit: only the person knows (COMMA / POINT).
     DECIMAL_STYLE = "DECIMAL_STYLE"
+    # The arrival is after the departure on (nearly) every row: the two columns may be swapped.
+    # `column` is the arrival's header, the only choice the departure's.
+    DATES_REVERSED = "DATES_REVERSED"
 
 
 class UnderstandingLevel(StrEnum):

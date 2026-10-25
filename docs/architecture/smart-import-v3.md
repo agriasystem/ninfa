@@ -113,6 +113,7 @@ Category words are NINFA's own lexicon (Utenze, Lavanderia, Consulenze...) plus 
 | `GRID_HOURS`, `PERIOD` | a grid: planned or actual; which week | the choice / a date |
 | `AMOUNT_BASIS` | an amount that does not say whether VAT is in it | net / gross |
 | `DATE_ORDER`, `DECIMAL_STYLE` | `03/10/2026`, `1,234`: the values cannot prove it | the choice |
+| `DATES_REVERSED` | the arrival is after the departure on (nearly) every row | "Controlla le colonne" (the matching screen); nothing is swapped |
 
 Blockers: `NO_TABLE`, `MISSING_REQUIRED`, `PERIOD_SUMMARY_ONLY`, `GRID_NOT_SUPPORTED`, `GRID_NOT_HOURS`, `AMOUNT_NOT_NET`,
 `MIXED_FORMATS`. What the person says is never asked again (`answers`).
@@ -195,6 +196,20 @@ Nothing here uses the optional assistant, and nothing changes the corpus or its 
 - **Weekday dates and amounts with the currency** (`Lun 26/10/2026`, `1.250,00 EUR`) are read by the understanding AND by the
   three importers (`ingestion/value_text.py`): the weekday must be the date's, another currency is never read as euros, and the
   remainder still has to match the pattern the person confirmed.
+
+## Deterministic hardening 2
+
+The five valid files that hardening 1 left in the matching screen (`docs/benchmarks/smart-import-v3-hardening-2.md`). Deterministic,
+no assistant, and none of the prudence of hardening 1 given up (the documents that carry its guarantees are byte-identical in the benchmark).
+
+- **Value readings shared by the understanding and the importers** (`ingestion/value_text.py`): a month written as a NAME with a four-digit
+  year (`26 ottobre 2026`, `26-Oct-2026`; no year, a short year or a day that does not exist is not a date) and hours with their unit (`8 h`,
+  `7,5 ore`, `6 hrs`; not `8:30`, a range, a rate). The labor importer strips the unit for the two HOURS fields only; the understanding counts
+  such values as hours (`ColumnStats.hours_unit`) - a column of them is never money, a percentage or a count.
+- **`Prev.` / `Eff.`** are the plan and the time worked when they stand together over columns of hours (`DomainSem.pairs`); alone, a maybe.
+- **Bookings, across columns** (`understanding_bookings.py`): a lone `Total` of a list of reservations is PROPOSED as the room revenue (MEDIUM,
+  one confirmation) only if nothing else holds money; an arrival after the departure on (nearly) every row asks `DATES_REVERSED` ("the columns
+  look swapped - check them"), distrusts both columns and swaps nothing.
 
 ## Tests
 

@@ -330,6 +330,19 @@ export function StrutturaImportQuestion({ step, domain, flow }: StrutturaImportQ
         </>
       );
       break;
+    case "DATES_REVERSED":
+      body = (
+        <>
+          {heading(COPY.DATES_REVERSED.title(question.column ?? "", question.choices[0]?.value ?? ""))}
+          <p className="struttura-flow__note">{COPY.DATES_REVERSED.why}</p>
+          <div className="struttura-question__choices">
+            <StrutturaButton variant="primary" onClick={flow.matchByHand}>
+              {COPY.DATES_REVERSED.check}
+            </StrutturaButton>
+          </div>
+        </>
+      );
+      break;
     case "DECIMAL_STYLE":
       body = (
         <>
