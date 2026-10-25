@@ -2,12 +2,25 @@
 
 Branch `fix/smart-import-v3-hardening-1`, started from `main` = `48a1a656` with the two benchmark commits (`1c039aa`, `3386957`)
 brought in unchanged. The measure is `Smart Import Intelligence Benchmark V1`: 240 synthetic documents, the same corpus
-(sha256 `6262d3b06dfe9db6...`, identical before and after) and the same hand-written truth - `git diff 3386957 --
-services/api/tests/benchmarks docs/benchmarks` is empty. The optional assistant stays off
+(sha256 `6262d3b06dfe9db6...`, identical before and after) and the same hand-written truth: the manifest, the corpus and the
+model are byte-identical to the benchmark commit `3386957` (`git diff 3386957 --` on them is empty). Only the EVALUATOR changed,
+once (`match.py`, `score.py`: see "Benchmark methodology correction"). The optional assistant stays off
 (`IMPORT_UNDERSTANDING_PROVIDER=unconfigured`): no model was called, before or after.
 
-Result files: baseline `services/api/tests/benchmarks/results/smart-import-v3-benchmark-v1.json`, after
-`services/api/tests/benchmarks/results/smart-import-v3-benchmark-v1-hardening-1.json`. Rerun, from `services/api`:
+**Both columns of the table below were measured with the SAME evaluator** - the one with the column-identity correction (see
+"Benchmark methodology correction"): the baseline is `main` (`48a1a656`) run in a temporary worktree with the corrected scorer
+overlaid, the "after" is this branch.
+
+Result files (in `services/api/tests/benchmarks/results/`):
+
+| File | What |
+|---|---|
+| `smart-import-v3-benchmark-v1-baseline-corrected.json` | `main` 48a1a656, corrected evaluator - the BEFORE column |
+| `smart-import-v3-benchmark-v1-hardening-1-corrected.json` | this branch, corrected evaluator - the AFTER column |
+| `smart-import-v3-benchmark-v1.json` | the historical baseline, first evaluator (kept) |
+| `smart-import-v3-benchmark-v1-hardening-1.json` | the first rerun of this branch, first evaluator (kept; superseded) |
+
+The two corrected files differ from the two historical ones in ONE document (`B25`), see below. Rerun, from `services/api`:
 `python -m tests.benchmarks.smart_import_v3 --json <file> --markdown <file>` (always name the two outputs: by default the runner
 overwrites the baseline files).
 
@@ -16,7 +29,7 @@ overwrites the baseline files).
 | Metric | Before | After |
 |---|---|---|
 | False automation rate | 2.1% (5/240) | **0.0% (0/240)** |
-| Zero-question correctness | 91.4% (74/81) | 97.8% (87/89) |
+| Zero-question correctness | 91.4% (74/81) | 98.9% (88/89) |
 | Zero-question documents | 81 | 89 |
 | Personal columns left out (PII exclusion) | 99.1% (107/108) | **100.0% (108/108)** |
 | Personal values in the browser answer | 12 (3 documents) | **0 (0 documents)** |
@@ -32,11 +45,13 @@ overwrites the baseline files).
 | Necessary-question recall | 96.0% (24/25) | 100.0% (25/25) |
 | Unnecessary-question rate | 79.6% (117/147) | 78.2% (115/147) |
 | Wrong-card probe (uploaded on another card) | 182/182 asked, 0 automatic | 182/182 asked, 0 automatic |
-| Documents whose worst finding is P0 / P1 | 10 / 26 | 1 / 5 |
-| Time per document, mean / p95 / max (ms) | 124 / 168 / 1686 | 130 / 177 / 1839 |
+| Documents whose worst finding is P0 / P1 | 11 / 26 | **0** / 5 |
+| Findings P0 / P1 | 16 / 41 | 0 / 10 |
+| Time per document, mean / p95 / max (ms) (one run each, machine not isolated) | 111 / 155 / 1501 | 144 / 188 / 2061 |
 
-The only P0-labelled finding left (`B25`) is an artefact of the benchmark's scorer, not a wrong reading: see "A case to look at".
-The two zero-question documents that are not "fully correct" (`B25`, `C17`) differ in a field that is not business-critical.
+No P0 finding is left. The one zero-question document that is not "fully correct" (`C17`, the category words `luce`, `acqua`,
+`gas` under `Voce`) misses a field that is not business-critical. Under the corrected evaluator the baseline has ONE more P0 than the
+first measure showed (`B25`, below): its wrong reading is now visible.
 
 ## P0 - closed, one by one
 
@@ -103,14 +118,29 @@ never touched: the import matches the file by them.
 | `C40` two-level header | a single group (`Importi`) over a merged block of some of the columns is a two-level header; a title merged over the whole table is still a title |
 | `C43`, `CO03` junk | `Centro di costo` is never a category of spend (`FieldSem.veto`) and stays out |
 
-## A case to look at - `B25_ota_channels_with_commission_columns`
+## Benchmark methodology correction - `B25_ota_channels_with_commission_columns`
 
-The file has two columns, `Commissione %` (the rate) and `Commissione` (the amount). The scorer normalises headers by dropping
-punctuation, so the truth writes both as "Commissione, first occurrence" and cannot tell them apart. In the baseline NINFA mapped the
-**percentage column as the commission amount** (counted "correct" by the scorer) and missed the rate. Now `Commissione %` is the
-rate and the second column the amount - what the file says - and the scorer, which expects the amount in the first column of that
-name, prints `FIELD_WRONG commission_amount` (labelled P0 because the document is automatic). The truth was not changed and the
-code was not bent to it; the comparison of this case is a measurement defect of the benchmark (`match.norm` drops `%`).
+**Cause.** The scorer identified a column by a header normalised without punctuation (`match.norm` keeps `[0-9a-z&]` only), so
+`Commissione %` (the rate) and `Commissione` (the amount) were the same string to it. The truth names both as "Commissione,
+first occurrence" and the scorer could not tell the two columns apart: it accepted whichever came first.
+
+| | `commission_rate` | `commission_amount` |
+|---|---|---|
+| Truth | `Commissione %` | `Commissione` |
+| NINFA before hardening (`main`) | not found | the `Commissione %` column (a percentage read as an amount) |
+| First evaluator, `main` | missed (P2) | "correct" - by accident |
+| Corrected evaluator, `main` | missed (P2) | **`FIELD_WRONG`, P0** - what NINFA really did |
+| NINFA after hardening | `Commissione %` | the second column, which NINFA calls `Commissione (2)` |
+| First evaluator, hardening | correct | `FIELD_WRONG` (the right reading looked wrong) |
+| Corrected evaluator, hardening | correct | **correct** - no finding, `READY`, fully correct |
+
+**Correction (evaluator only).** `match.header_key` is the identity of a column: like `norm` (case, accents, punctuation, spacing and
+invisible characters are ignored) but `%`, `#` and the currency signs are part of what a column is. `header_matches` and the
+occurrence count use it; `norm` stays lossy for words and values (department words, labels). The system's own renaming of a
+repeated header (`Commissione (2)`) is still read through. The truth, the manifest, the corpus (hash `6262d3b06dfe9db6...`) and the
+values were not touched, and neither was production code: re-scoring the same observations changes ONE document in each run
+(`B25`) - checked document by document against the first evaluator. The corpus scan found no other pair of headers that differ only by
+a dropped symbol. Self-tests: `test_smart_import_benchmark.py` (header matching with `%` and `#`, and B25's two columns).
 
 ## Remaining
 
