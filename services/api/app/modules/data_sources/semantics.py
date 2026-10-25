@@ -206,7 +206,7 @@ def fit_hours(stats: ColumnStats) -> float:
 
 
 def fit_money(stats: ColumnStats, *, allow_negative: bool = False) -> float:
-    if not stats.n:
+    if not stats.n or stats.hours_unit:  # "120 h" is hours, not euros
         return 0.0
     if stats.negatives and not allow_negative:
         return 0.3 * stats.numeric_fraction
@@ -215,7 +215,7 @@ def fit_money(stats: ColumnStats, *, allow_negative: bool = False) -> float:
 
 def fit_small_integer(maximum: int) -> FitFunction:
     def fit(stats: ColumnStats) -> float:
-        if not stats.n or stats.maximum is None or stats.minimum is None:
+        if not stats.n or stats.maximum is None or stats.minimum is None or stats.hours_unit:
             return 0.0
         if stats.minimum < 0 or stats.maximum > maximum or stats.integral < stats.numeric:
             return 0.0
@@ -225,7 +225,7 @@ def fit_small_integer(maximum: int) -> FitFunction:
 
 
 def fit_percentage(stats: ColumnStats) -> float:
-    if not stats.n or stats.maximum is None or stats.minimum is None:
+    if not stats.n or stats.maximum is None or stats.minimum is None or stats.hours_unit:
         return 0.0
     return stats.numeric_fraction if stats.minimum >= 0 and stats.maximum <= 100 else 0.0
 

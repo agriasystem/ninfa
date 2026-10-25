@@ -17,7 +17,13 @@ from typing import Any
 from app.core.iso4217 import ISO_4217_CODES
 from app.modules.bookings.parsers import Cell, SourceTable
 from app.modules.bookings.text import normalize_key
-from app.modules.ingestion.value_text import split_weekday, strip_currency, weekday_agrees
+from app.modules.ingestion.value_text import (
+    month_name_date,
+    split_weekday,
+    strip_currency,
+    strip_hours_unit,
+    weekday_agrees,
+)
 from app.modules.labor.canonical import CanonicalEntry, hours_to_minutes
 from app.modules.labor.classification import classify_role
 from app.modules.labor.errors import LaborErrorCode, LaborImportError, RowIssue
@@ -140,8 +146,11 @@ def _date(cell: Cell, field: LaborField, config: LaborMappingConfig) -> date | N
         raise _BadValueError(LaborErrorCode.INVALID_DATE)
     text, weekday = split_weekday(cell.strip())  # "Lun 26/10/2026": the weekday is allowed
     pattern = config.format_options.date_formats.get(field)
+    named = month_name_date(text)  # "26 ottobre 2026": a month written as a name needs no pattern
     try:
-        if pattern is not None:
+        if named is not None:
+            parsed = named.date()
+        elif pattern is not None:
             parsed = datetime.strptime(text, pattern).date()
         elif _ISO_DATE.match(text):
             parsed = datetime.fromisoformat(text.replace("/", "-", 2)).date()
@@ -154,7 +163,7 @@ def _date(cell: Cell, field: LaborField, config: LaborMappingConfig) -> date | N
     return parsed
 
 
-def _decimal(cell: Cell, config: LaborMappingConfig) -> Decimal | None:
+def _decimal(cell: Cell, config: LaborMappingConfig, *, hours: bool = False) -> Decimal | None:
     if cell is None:
         return None
     if isinstance(cell, bool):
@@ -166,7 +175,7 @@ def _decimal(cell: Cell, config: LaborMappingConfig) -> Decimal | None:
     elif isinstance(cell, float):
         value = Decimal(repr(cell))  # Excel doubles: through the shortest repr, never the binary
     elif isinstance(cell, str):
-        value = _parse_decimal_text(cell, config)
+        value = _parse_decimal_text(cell, config, hours=hours)
     else:
         raise _BadValueError(LaborErrorCode.INVALID_NUMBER)
     if not value.is_finite():
@@ -174,9 +183,12 @@ def _decimal(cell: Cell, config: LaborMappingConfig) -> Decimal | None:
     return value
 
 
-def _parse_decimal_text(text: str, config: LaborMappingConfig) -> Decimal:
-    """`"7.5"`, `"7,5"` as configured; never guessed."""
+def _parse_decimal_text(text: str, config: LaborMappingConfig, *, hours: bool = False) -> Decimal:
+    """`"7.5"`, `"7,5"` as configured; never guessed. Hours may carry their unit (`"8 h"`,
+    `"7,5 ore"`); an amount may not."""
     cleaned = strip_currency(text.strip())
+    if hours:
+        cleaned = strip_hours_unit(cleaned)
     decimal = config.format_options.decimal_separator or "."
     thousands = config.format_options.thousands_separator
     dec = re.escape(decimal)
@@ -273,7 +285,7 @@ class ParsedLaborRow:
 
     def _hours(self, field: F) -> Decimal | None:
         try:
-            value = _decimal(self._values.get(field), self._config)
+            value = _decimal(self._values.get(field), self._config, hours=True)
         except _BadValueError as bad:
             self._add(field, bad.code)
             return None

@@ -135,3 +135,108 @@ def test_another_currency_is_not_read_as_euros(text: str) -> None:
         invoices._parse_decimal_text(text, _INVOICES)
     with pytest.raises(labor._BadValueError):
         labor._parse_decimal_text(text, _LABOR)
+
+
+# --- a month written as a name (hardening 2) -----------------------------------------------------
+
+NAMED = [
+    "26 ottobre 2026",
+    "26 ott 2026",
+    "26 October 2026",
+    "26 Oct 2026",
+    "26-Oct-2026",
+    "26.ott.2026",
+    "lun 26 ottobre 2026",
+    "Monday 26 Oct 2026",
+]
+
+
+@pytest.mark.parametrize("text", NAMED)
+def test_all_three_importers_read_a_date_whose_month_is_a_name(text: str) -> None:
+    monday = date(2026, 10, 26)
+
+    assert parse_date_value(CanonicalField.CHECK_IN, text, _BOOKINGS) == monday
+    assert labor._date(text, LaborField.WORK_DATE, _LABOR) == monday
+    assert invoices._date(text, InvoiceField.INVOICE_DATE, _INVOICES) == monday
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "26 ottobre",
+        "26 ott 26",
+        "ottobre 2026",
+        "31 febbraio 2026",
+        "26 foo 2026",
+        "mar 26 ottobre 2026",
+    ],
+)
+def test_a_date_without_a_year_a_short_year_or_a_day_that_does_not_exist_is_refused(
+    text: str,
+) -> None:
+    with pytest.raises(_FieldError):
+        parse_date_value(CanonicalField.CHECK_IN, text, _BOOKINGS)
+    with pytest.raises(labor._BadValueError):
+        labor._date(text, LaborField.WORK_DATE, _LABOR)
+    with pytest.raises(invoices._BadValueError):
+        invoices._date(text, InvoiceField.INVOICE_DATE, _INVOICES)
+
+
+# --- hours written with their unit (hardening 2) -------------------------------------------------
+
+_LABOR_POINT = LaborMappingConfig.model_validate(
+    {
+        "column_mapping": {
+            "work_date": {"column": "Giorno"},
+            "role": {"column": "Reparto"},
+            "planned_hours": {"column": "Ore"},
+        },
+        "format_options": {"decimal_separator": "."},
+    }
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "hours"),
+    [
+        ("8 h", "8"),
+        ("8h", "8"),
+        ("7,5 h", "7.5"),
+        ("8 ore", "8"),
+        ("8 ora", "8"),
+        ("8 hours", "8"),
+        ("8 hrs", "8"),
+        ("8", "8"),
+    ],
+)
+def test_labor_reads_hours_with_their_unit(text: str, hours: str) -> None:
+    assert labor._parse_decimal_text(text, _LABOR, hours=True) == Decimal(hours)
+
+
+def test_labor_reads_a_point_as_the_decimal_mark_when_it_was_confirmed() -> None:
+    assert labor._parse_decimal_text("7.5 h", _LABOR_POINT, hours=True) == Decimal("7.5")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "8:30",
+        "08:00-16:00",
+        "mezza giornata",
+        "turno completo",
+        "8 h 30",
+        "14 €/h",
+        "14 eur/h",
+        "h 8",
+    ],
+)
+def test_what_is_not_a_number_of_hours_is_refused(text: str) -> None:
+    with pytest.raises(labor._BadValueError):
+        labor._parse_decimal_text(text, _LABOR, hours=True)
+
+
+def test_an_amount_never_carries_the_unit_of_hours() -> None:
+    with pytest.raises(labor._BadValueError):
+        labor._parse_decimal_text("120 h", _LABOR)  # a cost column: not hours, not euros
+    with pytest.raises(labor._BadValueError):
+        labor._decimal("8 ore", _LABOR)

@@ -22,7 +22,12 @@ from uuid import UUID
 
 from app.modules.bookings.parsers import Cell, SourceTable
 from app.modules.bookings.text import normalize_key
-from app.modules.ingestion.value_text import split_weekday, strip_currency, weekday_agrees
+from app.modules.ingestion.value_text import (
+    month_name_date,
+    split_weekday,
+    strip_currency,
+    weekday_agrees,
+)
 from app.modules.invoices.canonical import (
     MAX_DECIMALS,
     RawLine,
@@ -169,8 +174,11 @@ def _date(cell: Cell, field: InvoiceField, config: InvoiceMappingConfig) -> date
         raise _BadValueError(InvoiceErrorCode.INVALID_DATE)
     text, weekday = split_weekday(cell.strip())  # "Lun 26/10/2026": the weekday is allowed
     pattern = config.format_options.date_formats.get(field)
+    named = month_name_date(text)  # "26 ottobre 2026": a month written as a name needs no pattern
     try:
-        if pattern is not None:
+        if named is not None:
+            parsed = named.date()
+        elif pattern is not None:
             parsed = datetime.strptime(text, pattern).date()
         elif _ISO_DATE.match(text):
             parsed = datetime.fromisoformat(text.replace("/", "-", 2)).date()

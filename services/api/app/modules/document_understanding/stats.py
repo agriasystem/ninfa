@@ -15,6 +15,7 @@ from app.modules.bookings.parsers import Cell
 from app.modules.document_understanding.structure import as_decimal
 from app.modules.document_understanding.text import fold
 from app.modules.document_understanding.values import CellKind, kind_of, text_of
+from app.modules.ingestion.value_text import has_hours_unit
 
 MAX_TEXTS = 300
 MIN_EVIDENCE = 3  # fewer values than this never make a column "certain" (one sample proves nothing)
@@ -35,6 +36,9 @@ class ColumnStats:
     # Up to MAX_TEXTS distinct cells that were WRITTEN as text, even when they read as a number
     # ("+39 333 1234567"): what the personal-data check needs, kept nowhere.
     strings: tuple[str, ...] = ()
+    # Values written as hours with their unit ("8 h", "7,5 ore"): numbers, but numbers of HOURS -
+    # a column of them is not an amount, a percentage or a count.
+    hours_unit: int = 0
 
     def fraction(self, kind: CellKind) -> float:
         return self.kinds.get(kind, 0) / self.n if self.n else 0.0
@@ -66,6 +70,7 @@ def column_stats(values: Sequence[Cell]) -> ColumnStats:
     strings: dict[str, str] = {}
     lengths: list[int] = []
     numbers: list[Decimal] = []
+    hours_unit = 0
     n = 0
     for value in values:
         kind = kind_of(value)
@@ -77,6 +82,8 @@ def column_stats(values: Sequence[Cell]) -> ColumnStats:
         key = fold(shown)
         if isinstance(value, str) and len(strings) < MAX_TEXTS:
             strings.setdefault(value.strip(), value.strip())
+        if isinstance(value, str) and has_hours_unit(value):
+            hours_unit += 1
         if len(seen) < 5000:
             seen.add(key)
         if kind == CellKind.TEXT:
@@ -99,6 +106,7 @@ def column_stats(values: Sequence[Cell]) -> ColumnStats:
         negatives=sum(1 for number in numbers if number < 0),
         texts=tuple(texts.values()),
         strings=tuple(strings.values()),
+        hours_unit=hours_unit,
     )
 
 
