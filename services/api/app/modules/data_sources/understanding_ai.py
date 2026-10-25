@@ -20,7 +20,12 @@ from app.modules.ai.import_understanding.types import (
 from app.modules.ai.import_understanding.validator import FitOf
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
-from app.modules.data_sources.understanding_types import OriginKind, Question, QuestionKind
+from app.modules.data_sources.understanding_types import (
+    Choice,
+    OriginKind,
+    Question,
+    QuestionKind,
+)
 from app.modules.document_understanding.lexicon import HEADER_STEMS, SECTION_WORDS
 from app.modules.document_understanding.stats import ColumnStats
 from app.modules.document_understanding.text import fold, stem
@@ -176,6 +181,7 @@ def apply_resolution(
     questions: list[Question],
     resolution: AiResolution,
     expected: DataSourceDomain,
+    domains: Sequence[str] = (),
 ) -> tuple[Proposal, list[Question], frozenset[str]]:
     """What the model suggested, as suggestions: fields at MEDIUM on columns the rules left alone,
     a likely answer on the questions that were still open. Returns the headers it filled."""
@@ -213,8 +219,6 @@ def apply_resolution(
     suggested: list[Question] = []
     for question in questions:
         choice = resolution.answers.get(question.id)
-        if question.kind == QuestionKind.DOMAIN and question.candidate is None:
-            choice = choice or (resolution.domain if resolution.domain != expected.value else None)
         if (
             choice is not None
             and question.candidate is None
@@ -222,6 +226,23 @@ def apply_resolution(
         ):
             question = replace(question, candidate=choice, origin=OriginKind.ASSISTANT)
         suggested.append(question)
+    guessed = resolution.answers.get("DOMAIN") or resolution.domain
+    if (
+        guessed in domains
+        and guessed != expected.value
+        and not any(q.kind == QuestionKind.DOMAIN for q in suggested)
+    ):
+        # the rules saw nothing that points anywhere, the model thinks this is ANOTHER kind of
+        # data than the one the person chose: that is worth asking, as its suggestion
+        suggested.append(
+            Question(
+                id="DOMAIN",
+                kind=QuestionKind.DOMAIN,
+                candidate=guessed,
+                origin=OriginKind.ASSISTANT,
+                choices=tuple(Choice(value) for value in domains),
+            )
+        )
     return Proposal(tuple(columns)), suggested, frozenset(filled)
 
 

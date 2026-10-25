@@ -7,11 +7,11 @@ guest names is recognised so it can be left out), and a column that says "Ospiti
 whole numbers is a COUNT of guests, not a name.
 """
 
-from app.modules.bookings.channels import KNOWN_CHANNEL_TYPES
 from app.modules.bookings.mapping import FIELD_ORDER, CanonicalField
 from app.modules.bookings.statuses import BUILTIN_STATUS_KEYS
 from app.modules.bookings.suggestions import FIELD_ALIASES
 from app.modules.bookings.text import normalize_key
+from app.modules.data_sources.channel_words import fit_channel
 from app.modules.data_sources.semantics import (
     AmbiguousColumn,
     DomainSem,
@@ -32,8 +32,6 @@ from app.modules.ingestion.models import DataSourceDomain
 
 F = CanonicalField
 
-_CHANNEL_KEYS = frozenset(KNOWN_CHANNEL_TYPES)
-
 
 def _exact(field: CanonicalField, *extra: str) -> tuple[str, ...]:
     return (*FIELD_ALIASES.get(field, ()), *extra, field.value)
@@ -41,11 +39,6 @@ def _exact(field: CanonicalField, *extra: str) -> tuple[str, ...]:
 
 def _is_status(text: str) -> bool:
     return normalize_key(text) in BUILTIN_STATUS_KEYS
-
-
-def _is_channel(text: str) -> bool:
-    key = normalize_key(text)
-    return any(known in key for known in _CHANNEL_KEYS if known)
 
 
 _OTHER_DATES = "arrivo partenza arrival departure check cancellazione cancellato annullamento"
@@ -156,7 +149,7 @@ BOOKINGS = DomainSem(
                     weight=0.9,
                 ),
             ),
-            fit_vocabulary(_is_channel),
+            fit_channel,
         ),
         F.GUESTS.value: FieldSem(
             F.GUESTS.value,

@@ -19,8 +19,9 @@ from dataclasses import replace
 from datetime import date, datetime
 
 from app.modules.bookings.parsers import Cell
+from app.modules.data_sources.channel_words import channel_share
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
-from app.modules.data_sources.semantics import Level
+from app.modules.data_sources.semantics import Level, NameMatch
 from app.modules.data_sources.understanding_types import Choice, OriginKind, Question, QuestionKind
 from app.modules.document_understanding.stats import ColumnStats
 from app.modules.document_understanding.text import fold, stems, tokens
@@ -79,6 +80,29 @@ def lone_total_is_room_revenue(proposal: Proposal) -> Proposal:
     )
 
 
+# --- a channel the hotel has already taught -------------------------------------------------------
+
+_MOST = 0.6
+
+
+def channel_by_taught(proposal: Proposal, taught: frozenset[str]) -> Proposal:
+    """What the hotel has already told NINFA about its channels ("BDC" is Booking.com) counts as
+    one more word for them: a channel column, named as one, whose values are for the most part
+    channels NINFA knows - by its own words or by that mapping - is a channel for certain. The
+    mapping belongs to the property (it is read from the saved source, never shared)."""
+    column = proposal.assigned().get("channel")
+    if (
+        column is None
+        or column.level != Level.MEDIUM
+        or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
+        or not column.stats.enough()
+        or not taught
+        or channel_share(column.stats.texts, taught) < _MOST
+    ):
+        return proposal
+    return Proposal(
+        tuple(replace(c, level=Level.HIGH) if c is column else c for c in proposal.columns)
+    )
 # --- a stay that ends before it begins ------------------------------------------------------------
 
 _ISO = re.compile(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ]\d{1,2}:\d{2}(?::\d{2})?)?$")

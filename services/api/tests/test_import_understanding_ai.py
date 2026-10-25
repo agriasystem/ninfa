@@ -695,7 +695,24 @@ def test_a_provider_that_fails_never_blocks_the_import(
     assert len(failing.requests) == 1
 
 
-def test_a_kind_of_file_nothing_points_at_gets_a_suggested_answer_not_a_decision(
+def test_a_kind_of_file_nothing_points_at_is_asked_about_only_if_the_model_says_it_is_another(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    rows: list[list[object]] = [
+        ["Colore", "Forma", "Peso"],
+        *[["rosso", "tondo", 3 + i] for i in range(6)],
+    ]
+    provider = FakeProvider([guess("COSTS", answers=[("DOMAIN", "COSTS")])])
+    _with_provider(api_client, provider)
+
+    body = understand(api_client, env, "LABOR", "altro.csv", corpus.csv_of(rows))
+
+    question = next(q for q in body["understanding"]["questions"] if q["kind"] == "DOMAIN")
+    assert question["candidate"] == "COSTS" and question["origin"] == "ASSISTANT"
+    assert body["understanding"]["level"] != "READY"  # still the person's call
+
+
+def test_a_model_that_agrees_with_the_card_adds_no_question(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
     rows: list[list[object]] = [
@@ -707,9 +724,8 @@ def test_a_kind_of_file_nothing_points_at_gets_a_suggested_answer_not_a_decision
 
     body = understand(api_client, env, "LABOR", "altro.csv", corpus.csv_of(rows))
 
-    question = next(q for q in body["understanding"]["questions"] if q["kind"] == "DOMAIN")
-    assert question["candidate"] == "LABOR" and question["origin"] == "ASSISTANT"
-    assert body["understanding"]["level"] != "READY"  # still the person's call
+    assert all(q["kind"] != "DOMAIN" for q in body["understanding"]["questions"])
+    assert body["understanding"]["level"] == "MANUAL"
 
 
 def test_the_model_is_asked_at_most_twice_however_long_the_file_is(

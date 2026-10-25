@@ -524,7 +524,7 @@ def test_a_staff_file_chosen_as_bookings_is_asked_about_and_the_answer_is_not_as
     assert "DOMAIN" not in _kinds(confirmed)
 
 
-def test_a_file_that_looks_like_nothing_known_asks_what_kind_of_data_it_is(
+def test_a_file_that_looks_like_nothing_known_is_not_asked_what_it_is_and_is_not_imported(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
     rows: list[list[object]] = [
@@ -535,9 +535,11 @@ def test_a_file_that_looks_like_nothing_known_asks_what_kind_of_data_it_is(
     body = understand(api_client, env, LABOR, "altro.csv", corpus.csv_of(rows))
 
     assert body["understanding"]["detection"]["level"] == "LOW"
-    question = next(q for q in body["understanding"]["questions"] if q["kind"] == "DOMAIN")
-    assert question["candidate"] is None  # nothing stands out: the person says what it is
-    assert {c["value"] for c in question["choices"]} == {"BOOKINGS", "LABOR", "COSTS"}
+    # the card the person chose is a weak prior: nothing contradicts it, so there is no question
+    # ("what is this?" would change nothing) - but nothing proves it either, so it is not imported
+    assert "DOMAIN" not in _kinds(body)
+    assert body["understanding"]["level"] == "MANUAL"
+    assert [b["code"] for b in body["understanding"]["blockers"]] == ["MISSING_REQUIRED"]
 
 
 def test_a_staff_file_chosen_as_staff_is_never_asked_what_kind_of_file_it_is(
