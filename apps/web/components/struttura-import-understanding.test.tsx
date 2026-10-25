@@ -476,6 +476,24 @@ describe("ONE question at a time", () => {
     expect(checkMappingMock.mock.calls[0]?.[2]).toMatchObject({ layout: { version: 1 } });
   });
 
+  it("says that the arrival and the departure look swapped, and opens the matching to look", async () => {
+    const swapped = questionOf("DATES_REVERSED", {
+      id: "DATES_REVERSED",
+      column: "Arrivo",
+      choices: [{ value: "Partenza", count: null, sheets: [], columns: [] }],
+    });
+    understandFileMock.mockResolvedValue(ok(understoodInspection({ level: "ASK", questions: [swapped] })));
+    const user = await openStaffImport();
+    await pick(user, xlsxFile());
+
+    await within(dialog()).findByText("Le colonne «Arrivo» e «Partenza» sembrano invertite. Vuoi controllarle?");
+    expect(flat(dialog())).toContain("NINFA non le scambia da sola");
+    await user.click(within(dialog()).getByRole("button", { name: "Controlla le colonne" }));
+
+    expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
+    expect(understandFileMock).toHaveBeenCalledTimes(1); // nothing was swapped or answered for the person
+  });
+
   it("asks whether an amount is net of VAT, and a 'no' ends in the plain explanation", async () => {
     understandFileMock.mockResolvedValueOnce(
       ok(

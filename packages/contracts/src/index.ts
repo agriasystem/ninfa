@@ -836,7 +836,9 @@ export type UnderstandingQuestionKind =
   | "PERIOD"
   | "AMOUNT_BASIS"
   | "DATE_ORDER"
-  | "DECIMAL_STYLE";
+  | "DECIMAL_STYLE"
+  /** The arrival is after the departure on (nearly) every row: `column` is the arrival, the one choice the departure. */
+  | "DATES_REVERSED";
 
 export type UnderstandingOriginKind =
   | "COLUMN"

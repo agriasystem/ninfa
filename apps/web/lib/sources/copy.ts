@@ -636,6 +636,12 @@ export const sourcesCopy = {
       },
       DATE_ORDER: { title: "Come sono scritte le date di questo file?" },
       DECIMAL_STYLE: { title: "Come sono scritti i numeri con i decimali?" },
+      DATES_REVERSED: {
+        title: (arrival: string, departure: string) =>
+          `Le colonne «${arrival}» e «${departure}» sembrano invertite. Vuoi controllarle?`,
+        why: "In quasi tutte le righe la data di arrivo viene dopo quella di partenza. NINFA non le scambia da sola e non importa il file così com'è.",
+        check: "Controlla le colonne",
+      },
     },
     // --- a file that cannot be imported as it is ---
     blocked: {
