@@ -83,10 +83,11 @@ from app.modules.data_sources.understanding_costs import (
     promote,
 )
 from app.modules.data_sources.understanding_labor import (
-    classifies,
     column_labels,
     known_labels,
     label_question,
+    lexicon_roles,
+    names_a_department,
     plan_labor,
 )
 from app.modules.data_sources.understanding_redaction import guard_for, redact_inspection
@@ -257,8 +258,10 @@ class UnderstandingService:
             questions.extend(plan.questions)
             blockers.extend(plan.blockers)
             origin, origin_level = plan.department_origin, plan.department_level
+            department_words = plan.words
         else:
             origin, origin_level = None, None
+            department_words = ()
 
         wanted_layout = layout
         table, built_layout = self._table_for(
@@ -371,6 +374,20 @@ class UnderstandingService:
                 decision_labels["category_mapping"] = {
                     **words,
                     **decision_labels.get("category_mapping", {}),
+                }
+
+        if domain == DataSourceDomain.LABOR:
+            role_column = proposal.assigned().get("role")
+            lexicon = lexicon_roles(
+                column_labels(samples[role_column.position])
+                if role_column is not None
+                else department_words,
+                taught_roles,
+            )
+            if lexicon:
+                decision_labels["role_mapping"] = {
+                    **lexicon,
+                    **decision_labels.get("role_mapping", {}),
                 }
 
         decision = MappingInput(
@@ -755,7 +772,9 @@ class UnderstandingService:
             known = known_labels(
                 dict(taught.get("role_mapping", {})), answers.labels.get("role_mapping", {})
             )
-            question = label_question(column_labels(samples[assigned["role"].position]), known)
+            question = label_question(
+                column_labels(samples[assigned["role"].position]), known, lexicon=True
+            )
             if question is not None:
                 questions.append(question)
         if domain == DataSourceDomain.COSTS and "cost_category" in assigned:
@@ -1107,7 +1126,7 @@ def _with_known_departments(
         or column.level == Level.HIGH
         or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
         or any(q.kind == QuestionKind.VALUE_LABELS for q in asked)
-        or label_question(column_labels(samples[column.position]), known) is not None
+        or label_question(column_labels(samples[column.position]), known, lexicon=True) is not None
     ):
         return proposal
     return Proposal(
@@ -1170,7 +1189,7 @@ def _supplied(domain: DataSourceDomain, selection: Selection) -> frozenset[str]:
     if (
         selection.first.sections
         or selection.partition
-        or any(classifies(name, {}) for name in names)
+        or any(names_a_department(name) for name in names)
     ):
         found.add("role")
     if selection.day_grid is not None:

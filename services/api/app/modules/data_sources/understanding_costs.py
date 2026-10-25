@@ -45,13 +45,25 @@ _COHERENT = 0.9
 _PENNY = Decimal("0.02")
 
 # NINFA's own words for the cost categories, by their comparison key. Deliberately small: a word
-# that could mean two categories is not here.
+# that could mean two categories is not here ("Food & Beverage" is food OR beverage, "Forniture" is
+# amenities, cleaning or food: those are asked once, and remembered).
 _LEXICON: Final[dict[CostCategory, tuple[str, ...]]] = {
     CostCategory.PERSONNEL: ("personale", "stipendi", "salari", "dipendenti", "payroll", "staff"),
     CostCategory.LAUNDRY: ("lavanderia", "laundry", "biancheria"),
-    CostCategory.CLEANING: ("pulizie", "pulizia", "cleaning"),
+    CostCategory.CLEANING: ("pulizie", "pulizia", "cleaning", "housekeeping", "detersivi"),
     CostCategory.AMENITIES: ("amenities", "cortesia", "articoli di cortesia", "cortesie"),
-    CostCategory.FOOD: ("alimentari", "cibo", "food", "derrate", "generi alimentari"),
+    CostCategory.FOOD: (
+        "alimentari",
+        "cibo",
+        "food",
+        "derrate",
+        "generi alimentari",
+        "colazioni",
+        "colazione",
+        "prima colazione",
+        "breakfast",
+        "ristorazione",
+    ),
     CostCategory.BEVERAGE: ("bevande", "beverage", "beverages", "vini"),
     CostCategory.UTILITIES: (
         "utenze",
@@ -61,11 +73,21 @@ _LEXICON: Final[dict[CostCategory, tuple[str, ...]]] = {
         "gas",
         "acqua",
         "utilities",
+        "energia elettrica",
+        "riscaldamento",
+        "metano",
     ),
     CostCategory.MAINTENANCE: ("manutenzione", "manutenzioni", "riparazioni", "maintenance"),
     CostCategory.SOFTWARE: ("software", "licenze software", "saas", "abbonamenti software"),
     CostCategory.MARKETING: ("marketing", "pubblicita", "advertising", "promozione"),
-    CostCategory.OTA_COMMISSIONS: ("commissioni ota", "commissioni", "ota commissions"),
+    CostCategory.OTA_COMMISSIONS: (
+        "commissioni ota",
+        "commissioni",
+        "ota commissions",
+        "commissioni booking",
+        "commissioni booking com",
+        "commissioni expedia",
+    ),
     CostCategory.PROFESSIONAL_SERVICES: (
         "consulenze",
         "consulenza",
