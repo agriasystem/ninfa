@@ -60,15 +60,29 @@ def rule(*all_of: str, none: str = "", weight: float = 0.9) -> TokenRule:
 def rule_score(header_words: frozenset[str], rules: Sequence[TokenRule]) -> float:
     """The best weight among the rules the header satisfies, a little less for each word of the
     header the rule does not explain (a long header with an incidental match is not as good)."""
-    best = 0.0
-    for candidate in rules:
+    return _best_rule(header_words, rules)[0]
+
+
+def rule_index(header_words: frozenset[str], rules: Sequence[TokenRule]) -> int | None:
+    """WHICH rule scored best (None when the header satisfies none). Two headers that satisfy the
+    same rule say the same thing in different words: "Ore previste", "Ore previste (rev.)"."""
+    return _best_rule(header_words, rules)[1]
+
+
+def _best_rule(
+    header_words: frozenset[str], rules: Sequence[TokenRule]
+) -> tuple[float, int | None]:
+    best, which = 0.0, None
+    for position, candidate in enumerate(rules):
         if candidate.none_of & header_words:
             continue
         if all(group & header_words for group in candidate.all_of):
             explained = frozenset().union(*candidate.all_of)
             extra = len(header_words - explained)
-            best = max(best, candidate.weight - min(0.06, 0.02 * extra))
-    return best
+            score = candidate.weight - min(0.06, 0.02 * extra)
+            if score > best:
+                best, which = score, position
+    return best, which
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +95,9 @@ class FieldSem:
     fit: FitFunction | None = None
     # A column may be proposed from its values alone, when it is the only one that fits.
     value_only: bool = False
+    # A header with one of these words is never this field, whatever else it says: "Centro di
+    # costo" is where a cost is booked, not what it was spent on.
+    veto: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +126,9 @@ class DomainSem:
     # Two columns that confirm each other: ((field, folded header), (field, folded header)).
     # "Dal" alone is only a maybe; "Dal" next to "Al", both dates, is an arrival and a departure.
     pairs: tuple[tuple[tuple[str, str], tuple[str, str]], ...] = ()
+    # Fields that are MONEY: a choice between two columns for one of them is never made by NINFA
+    # and never asked as a yes/no - the person matches the columns by hand.
+    financial: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +136,8 @@ class Candidate:
     field: str
     name: NameMatch
     score: float
+    # The rule of the field the header satisfies (None: an alias, or a likeness of letters).
+    rule: int | None = None
 
 
 def name_candidates(sem: DomainSem, header: str) -> list[Candidate]:
@@ -123,19 +145,24 @@ def name_candidates(sem: DomainSem, header: str) -> list[Candidate]:
     key = normalize_header(header)
     words = tokens(header)
     found: list[Candidate] = []
+    percentage = "perc" in words  # "Commissione %": a rate, whatever the amount is called
     for spec in sem.fields.values():
-        if key in {normalize_header(name) for name in spec.exact}:
-            found.append(Candidate(spec.key, NameMatch.EXACT, 1.0))
+        if spec.veto & words:
+            continue
+        # (a header with a standing "%" is not the name of an amount, whatever else it says)
+        names_a_rate = not percentage or any("perc" in tokens(name) for name in spec.exact)
+        if names_a_rate and key in {normalize_header(name) for name in spec.exact}:
+            found.append(Candidate(spec.key, NameMatch.EXACT, 1.0, rule_index(words, spec.rules)))
             continue
         score = rule_score(words, spec.rules)
         if score:
-            found.append(Candidate(spec.key, NameMatch.TOKEN, score))
+            found.append(Candidate(spec.key, NameMatch.TOKEN, score, rule_index(words, spec.rules)))
             continue
         names = [normalize_header(name) for name in spec.exact]
         best = max(
             (difflib.SequenceMatcher(None, key, name).ratio() for name in names), default=0.0
         )
-        if best >= LOW_THRESHOLD and key:
+        if best >= LOW_THRESHOLD and key and names_a_rate:
             found.append(Candidate(spec.key, NameMatch.FUZZY, best))
     return sorted(
         found, key=lambda c: (-c.score, sem.order.index(c.field) if c.field in sem.order else 99)
@@ -270,6 +297,7 @@ __all__ = [
     "level_of",
     "name_candidates",
     "rule",
+    "rule_index",
     "rule_score",
     "MIN_EVIDENCE",
 ]

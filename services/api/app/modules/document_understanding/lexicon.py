@@ -59,6 +59,12 @@ NOTE_PREFIXES: tuple[str, ...] = (
     "attenzione",
 )
 
+# A line made of these words is the page break of a printed report ("--- pagina successiva ---",
+# "continua", "Pagina 2 di 3"): not a record, and not the end of the table.
+PAGE_BREAK_WORDS: frozenset[str] = frozenset(
+    {"pagina", "pag", "page", "successiva", "segue", "continua", "continued", "riporto", "prosegue"}
+)
+
 # Words of a SECTION line (a department, a team, a channel group) written alone on a row.
 SECTION_WORDS: frozenset[str] = stems(
     """
@@ -174,6 +180,7 @@ __all__ = [
     "HEADER_STEMS",
     "MONTHS",
     "NOTE_PREFIXES",
+    "PAGE_BREAK_WORDS",
     "SECTION_WORDS",
     "SUMMARY_SHEET_WORDS",
     "TOTAL_WORDS",

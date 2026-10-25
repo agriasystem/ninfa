@@ -159,6 +159,43 @@ No migration, no new column; a file is never stored; names are counted in memory
 imported, shown or sent to a model; a cell is data (formulas, `=`, `@`, hostile text); the question endpoints write nothing; the
 import is all-or-nothing and idempotent as before.
 
+## Deterministic hardening 1
+
+What the Smart Import Intelligence Benchmark V1 found (`docs/benchmarks/smart-import-v3-benchmark-v1.md`, 240 documents,
+5 offered as automatic with a wrong or incomplete reading, 3 with personal values in the answer), and how it is now closed.
+Nothing here uses the optional assistant, and nothing changes the corpus or its truth.
+
+- **A page break is not the end of the table.** `structure.BodyReader` is the ONE reader of a table body, used both when a sheet
+  is scanned and when it is streamed for the import (so the table described is the table read). A one-cell line such as
+  `--- pagina successiva ---` ends the table only when no record follows it; the header printed again at the top of a page is
+  not a record - but only straight after a record or a page break. A header that comes after a title or a blank line
+  (`Settimana 43`, `FATTURE EMESSE`) still starts ANOTHER table (and the `TABLE` question). A row with dates and numbers in the
+  places where the record above has them is a record, whatever its channel is called (`Booking.com`, `Walk-in`).
+- **Two columns that say the same thing are a choice, not a guess.** When two columns satisfy the same rule of the same field
+  (`Ore previste` / `Ore previste (rev.)`, `Imponibile` / `Imponibile (rettificato)`, one net per VAT rate) neither is taken
+  (`proposal.CONTESTED`). For a field the import needs: each column is asked about (`COLUMN_MEANING`, "is X the planned hours?");
+  for a field that is MONEY (`DomainSem.financial`) nothing is asked as a yes/no and the person matches the columns by hand
+  (`MANUAL`, no blocker); more than three questions of this kind also go to the matching screen. A field nobody needs is
+  left out. A column and a look-alike that satisfy DIFFERENT rules (`Reparto` / `Mansione`) are not a choice.
+- **A column that may be what the import needs is never dropped quietly.** "Hours that do not say which" is asked about even
+  when the other hours column is there (`Ore prog.` is now the planned hours; an unknown abbreviation is asked); hours of
+  another kind (`Ore da contratto`, straordinario, ferie...) are left alone.
+- **The personal-data gate.** Detection by shape no longer needs the people to be all different (a roster lists the same person
+  every day): a column of "Name Surname"/"Surname Name" with given names is a column of people, whatever its header. A
+  personal column that is not locked (a cost register) is still never shown. `PersonalDataGuard` then reads every text an
+  answer would SHOW (examples, department words, title, sheet names, question labels) and replaces e-mail addresses,
+  international / mobile telephone numbers, tax codes, IBANs (by their country's length) and the names / numbers of the
+  personal columns of THIS file. It runs at the end of `understand()` and again in the route (`_inspection_response`).
+  Headers, field names, question ids and the decision are never touched: the import matches the file by them.
+- **Words and values of a hotel's own export.** Abbreviations (`Res #`, `Bkd`, `Arr`, `Dep`, `Src`, `Cod.`, `Can.`, `Imp.`,
+  `Ref.`, `Rep.`, `Ore prog.`, `Fatt. n.`, `Item`, `Intestatario`...), `#` as "number" and a standing `%` as "percentage",
+  a header with `excl. VAT` as the net, `Centro di costo` as NOT a category of spend (`FieldSem.veto`), a lone `Numero` / `Doc.`
+  as the document number unless the values are a row counter. A single group over a merged block (`Importi` over three
+  columns) is a two-level header; a title merged over the whole table is still a title.
+- **Weekday dates and amounts with the currency** (`Lun 26/10/2026`, `1.250,00 EUR`) are read by the understanding AND by the
+  three importers (`ingestion/value_text.py`): the weekday must be the date's, another currency is never read as euros, and the
+  remainder still has to match the pattern the person confirmed.
+
 ## Tests
 
 Synthetic corpus (`tests/understanding_support.py`: realistic staff file, title+summary, sheet per department, sections, grids,
@@ -173,5 +210,9 @@ port with a fake provider (cleaning, evidence, validation, call limits, injectio
 - A grid with several blocks of days (planned and actual together) is refused, not guessed.
 - A register without a description per line is refused: the description is required by the invoice model and is not invented.
 - Optional columns the rules cannot read are not asked about (the AI step only runs for what a required field needs).
+- Look-alike columns are asked about one by one ("is X the planned hours?"): a single question that lists them all, and a sum
+  of the net amounts of a register with one column per VAT rate, are not built.
+- Hours written with their unit (`8 h`), dates written with a month name and a table whose arrival is after its departure on
+  every row are not understood yet (the benchmark's remaining P1).
 - Cost registers in several currencies per file follow the invoice model's rules (one currency per document).
 - The AI step is built and tested with a fake provider only; its quality on a real model is unmeasured.

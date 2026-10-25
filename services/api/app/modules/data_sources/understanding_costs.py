@@ -21,7 +21,7 @@ from decimal import Decimal
 from typing import Final, Literal
 
 from app.modules.bookings.text import normalize_key
-from app.modules.data_sources.proposal import ColumnProposal, Proposal
+from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
 from app.modules.data_sources.semantics import Level, NameMatch
 from app.modules.data_sources.semantics_costs import NET_WORDS
 from app.modules.data_sources.understanding_types import (
@@ -185,6 +185,13 @@ def plan_costs(
 
     # the person already named the net column: nothing to ask
     if "line_total" in asked_columns.values():
+        return CostsPlan()
+    # two columns say "net" in the same words (an original and an adjusted net, one per VAT rate):
+    # which one counts - or whether any single one does - is not a yes/no about a column
+    if any(
+        c.ambiguous_group == CONTESTED and "line_total" in c.ambiguous_fields
+        for c in proposal.columns
+    ):
         return CostsPlan()
 
     check: AmountsCheck | None = None

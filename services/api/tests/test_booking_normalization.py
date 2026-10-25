@@ -458,6 +458,10 @@ def amount(value: Any, **format_options: Any) -> Decimal:
         ("1 234,56", {"decimal_separator": ",", "thousands_separator": " "}, "1234.56"),
         ("1 234,56", {"decimal_separator": ",", "thousands_separator": " "}, "1234.56"),
         ("120,5", {"decimal_separator": ","}, "120.50"),
+        # the hotel's own currency next to the amount is not part of it (Smart Import V3 hardening)
+        ("1.250,00 EUR", {"decimal_separator": ",", "thousands_separator": "."}, "1250.00"),
+        ("€ 100,00", {"decimal_separator": ","}, "100.00"),
+        ("100 EUR", {}, "100.00"),
     ],
 )
 def test_decimal_formats_are_read_only_as_configured(
@@ -477,8 +481,8 @@ def test_decimal_formats_are_read_only_as_configured(
         ("1,234.56", {"decimal_separator": ","}),
         ("12,34.56", {"decimal_separator": ".", "thousands_separator": ","}),  # bad grouping
         ("1.23.456,7", {"decimal_separator": ",", "thousands_separator": "."}),
-        ("€ 100,00", {"decimal_separator": ","}),  # currency symbols are not accepted
-        ("100 EUR", {}),
+        ("$ 100,00", {"decimal_separator": ","}),  # another currency is never read as euros
+        ("100 USD", {}),
         ("abc", {}),
         ("", {}),
         ("1e3", {}),

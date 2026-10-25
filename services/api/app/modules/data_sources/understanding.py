@@ -58,7 +58,7 @@ from app.modules.data_sources.mapping_types import (
     ProfileStatus,
     SuggestionLevel,
 )
-from app.modules.data_sources.proposal import ColumnProposal, Proposal, propose
+from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal, propose
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
 from app.modules.data_sources.semantics_bookings import BOOKINGS
 from app.modules.data_sources.semantics_costs import COSTS
@@ -84,6 +84,7 @@ from app.modules.data_sources.understanding_labor import (
     label_question,
     plan_labor,
 )
+from app.modules.data_sources.understanding_redaction import guard_for, redact_inspection
 from app.modules.data_sources.understanding_types import (
     Blocker,
     BlockerCode,
@@ -116,6 +117,7 @@ from app.modules.document_understanding.document import (
 )
 from app.modules.document_understanding.grid import WorkbookScan, scan_workbook
 from app.modules.document_understanding.layout import GridLayout, LayoutSpec
+from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.document_understanding.structure import RowKind
 from app.modules.document_understanding.text import fold
 from app.modules.document_understanding.values import text_of
@@ -209,7 +211,10 @@ class UnderstandingService:
         base = self._base_layout(answers, saved_decision_layout)
         document = understand(scan, base)
         if document.chosen is None:
-            return self._without_table(domain, scan, document, already_imported)
+            return redact_inspection(
+                self._without_table(domain, scan, document, already_imported),
+                PersonalDataGuard(),
+            )
 
         candidates = self._candidates(content, filename, document, domain)
         detection = self._detect(candidates)
@@ -352,10 +357,14 @@ class UnderstandingService:
 
         # --- what is still missing, as questions or as an honest "this is not in the file" --------
         extra_questions, extra_blockers = self._missing(
-            domain, proposal, check.missing, layout, chosen.selection, questions
+            domain, proposal, check.missing, layout, chosen.selection
         )
         questions.extend(extra_questions)
         blockers.extend(extra_blockers)
+        # A column that is clearly hours / an amount but not WHICH, or that says the same as
+        # another column: a question - or, for money, the matching screen - never a quiet guess.
+        ambiguity, hold = _ambiguity_questions(sem, adapter.groups, proposal)
+        questions.extend(ambiguity)
         value_questions = self._value_questions(domain, proposal, samples, taught, answers)
         questions.extend(value_questions)
         proposal = _with_known_departments(proposal, samples, taught_roles, value_questions)
@@ -424,6 +433,7 @@ class UnderstandingService:
             blockers,
             recognized_by_profile,
             origin_level,
+            hold and not recognized_by_profile,
         )
         columns = tuple(
             self._column_info(sample, cp)
@@ -447,19 +457,23 @@ class UnderstandingService:
             for c in columns
             if c.field is not None
         )
-        return FileInspection(
-            domain,
-            file_type="XLSX" if scan.file_type == "xlsx" else "CSV",
-            sheet_name=table.sheet_name,
-            columns=columns,
-            fields=tuple(adapter.fields),
-            requirement_groups=tuple(adapter.groups),
-            suggestion_complete=complete,
-            already_canonical=canonical,
-            profile=profile,
-            already_imported=already_imported,
-            understanding=understanding,
-            proposal=decision,
+        # The last gate: nothing personal in this file goes out, whatever put it in the answer.
+        return redact_inspection(
+            FileInspection(
+                domain,
+                file_type="XLSX" if scan.file_type == "xlsx" else "CSV",
+                sheet_name=table.sheet_name,
+                columns=columns,
+                fields=tuple(adapter.fields),
+                requirement_groups=tuple(adapter.groups),
+                suggestion_complete=complete,
+                already_canonical=canonical,
+                profile=profile,
+                already_imported=already_imported,
+                understanding=understanding,
+                proposal=decision,
+            ),
+            guard_for(samples, proposal),
         )
 
     # --- the saved configuration ------------------------------------------------------------------
@@ -656,12 +670,10 @@ class UnderstandingService:
         missing: tuple[tuple[str, ...], ...],
         layout: LayoutSpec,
         selection: Selection,
-        asked: list[Question],
     ) -> tuple[list[Question], list[Blocker]]:
         questions: list[Question] = []
         blockers: list[Blocker] = []
         lacking: list[tuple[str, ...]] = []
-        have_question = {q.id for q in asked}
         for group in missing:
             if set(group) == {"role", "labor_category"}:
                 continue  # the department question (or context) already covers it
@@ -671,24 +683,10 @@ class UnderstandingService:
                 and (group == ("work_date",) or set(group) == {"planned_hours", "actual_hours"})
             ):
                 continue  # the grid (its hours, its week) answers it, once asked
-            ambiguous = [
-                c
-                for c in proposal.columns
-                if c.ambiguous_group and set(c.ambiguous_fields) & set(group)
-            ]
-            if ambiguous:
-                for column in ambiguous:
-                    qid = f"MEANING:{column.header}"
-                    if qid not in have_question:
-                        questions.append(
-                            Question(
-                                id=qid,
-                                kind=QuestionKind.COLUMN_MEANING,
-                                column=column.header,
-                                choices=tuple(Choice(f) for f in column.ambiguous_fields),
-                            )
-                        )
-                continue
+            if any(
+                c.ambiguous_group and set(c.ambiguous_fields) & set(group) for c in proposal.columns
+            ):
+                continue  # a column that may be it: asked about (or matched by hand), not "missing"
             if (
                 domain == DataSourceDomain.LABOR
                 and group == ("work_date",)
@@ -830,6 +828,7 @@ class UnderstandingService:
         blockers: list[Blocker],
         by_profile: bool,
         context_level: Level | None,
+        hold: bool = False,
     ) -> UnderstandingLevel:
         hard = {
             BlockerCode.NO_TABLE,
@@ -845,7 +844,7 @@ class UnderstandingService:
             return UnderstandingLevel.MANUAL
         if questions:
             return UnderstandingLevel.ASK
-        if not valid:
+        if not valid or hold:
             return UnderstandingLevel.MANUAL
         if by_profile:
             return UnderstandingLevel.READY
@@ -938,7 +937,8 @@ class UnderstandingService:
             period_end=period.end.isoformat() if period and period.end else None,
             skipped=SkippedSummary(
                 totals=counts.get(RowKind.TOTAL, 0),
-                notes=counts.get(RowKind.NOTE, 0),
+                # (a header written again on a new page is a line left out, like a note)
+                notes=counts.get(RowKind.NOTE, 0) + counts.get(RowKind.HEADER, 0),
                 sections=counts.get(RowKind.SECTION, 0),
             ),
             totals=totals,
@@ -981,7 +981,49 @@ class UnderstandingService:
 # A column NINFA is only fairly sure about is confirmed with ONE question - unless there are so many
 # that the person is better off with the matching screen in front of them.
 _MAX_CONFIRMATIONS = 2
+# ...and so is a column that may be one of two things, or one of two look-alikes.
+_MAX_AMBIGUITY_QUESTIONS = 3
 _AMOUNT_CHECK_ROWS = 400
+
+
+def _ambiguity_questions(
+    sem: DomainSem, groups: Sequence[tuple[str, ...]], proposal: Proposal
+) -> tuple[list[Question], bool]:
+    """One question per column that may be something the import needs and that NINFA will not
+    decide: a column that is "hours" or "an amount" without saying which, or one of several columns
+    that say the same thing about one field ("Ore previste" / "Ore previste (rev.)").
+
+    Money is never put as a yes/no: when the columns in competition are amounts the import needs,
+    nothing is asked and the second value says so - the person matches the columns by hand,
+    seeing all of them. So it is when there would be more questions than a person should be
+    asked one by one (the matching screen is better then). What the import does not need (a
+    column nobody required) is left out, as before."""
+    needed = {field for group in groups for field in group}
+    questions: list[Question] = []
+    hold = False
+    for column in proposal.columns:
+        if not column.ambiguous_group:
+            continue
+        fields = tuple(column.ambiguous_fields)
+        if not needed & set(fields):
+            continue
+        if column.ambiguous_group == CONTESTED and fields[0] in sem.financial:
+            hold = True
+            continue
+        question = Question(
+            id=f"MEANING:{column.header}",
+            kind=QuestionKind.COLUMN_MEANING,
+            column=column.header,
+            choices=tuple(Choice(f) for f in fields),
+        )
+        if len(fields) == 1:  # "Is «Ore prog.» the planned hours?" - yes, or not this
+            question = replace(
+                question, field=fields[0], candidate=fields[0], origin=OriginKind.COLUMN
+            )
+        questions.append(question)
+    if len(questions) > _MAX_AMBIGUITY_QUESTIONS:
+        return [], True
+    return questions, hold
 
 
 def _confirm_questions(
@@ -1141,6 +1183,16 @@ def _with_answers(proposal: Proposal, overrides: Mapping[str, str]) -> Proposal:
             )
         elif column.field in taken:
             columns.append(replace(column, field=None, level=None, name=None, fit=None))
+        elif column.ambiguous_group and set(column.ambiguous_fields) & taken:
+            # some of what this column might have been is settled by the person's answers
+            left = tuple(f for f in column.ambiguous_fields if f not in taken)
+            columns.append(
+                replace(
+                    column,
+                    ambiguous_group=column.ambiguous_group if left else None,
+                    ambiguous_fields=left,
+                )
+            )
         else:
             columns.append(column)
     return Proposal(tuple(columns))

@@ -70,8 +70,26 @@ def stem(word: str) -> str:
 
 
 def token_list(text: str) -> tuple[str, ...]:
-    """The meaningful stemmed words of a header, in order ("Costo previsto" -> cost, previst)."""
-    return tuple(stem(word) for word in fold(text).split() if word not in STOP_WORDS)
+    """The meaningful stemmed words of a header, in order ("Costo previsto" -> cost, previst).
+    A "#" is the word "number" ("Res #") and a "%" on its own the word "percentage" ("Commissione
+    %"); the "22%" of "Imponibile 22%" is a rate that names the amount, not a column of
+    percentages."""
+    words = tuple(stem(word) for word in fold(text).split() if word not in STOP_WORDS)
+    extra = [
+        word
+        for sign, word in (("#", "numer"), ("%", "perc"))
+        if word not in words and _standing_sign(text, sign)
+    ]
+    return (*words, *extra)
+
+
+def _standing_sign(text: str, sign: str) -> bool:
+    """The sign is written, and not glued to a digit ("22%")."""
+    return any(
+        position == 0 or not text[position - 1].isdigit()
+        for position, ch in enumerate(text)
+        if ch == sign
+    )
 
 
 def tokens(text: str) -> frozenset[str]:

@@ -23,6 +23,7 @@ from app.modules.data_sources.semantics import (
     fit_vocabulary,
     rule,
 )
+from app.modules.document_understanding.pii import looks_like_names
 from app.modules.document_understanding.stats import ColumnStats
 from app.modules.document_understanding.text import stems
 from app.modules.ingestion.models import DataSourceDomain
@@ -33,7 +34,8 @@ from app.modules.invoices.suggestions import FIELD_ALIASES
 F = InvoiceField
 
 # Words that say the amount is NET (before VAT) / GROSS (with VAT).
-NET_WORDS = stems("imponibile netto net")
+# ("Amount excl. VAT", "Importo IVA esclusa": the amount says it leaves the VAT out)
+NET_WORDS = stems("imponibile netto net excl excluding esclusa escluso")
 GROSS_WORDS = stems("lordo gross inclusa compresa")
 _NOT_A_NUMBER_OF_THE_DOCUMENT = "iva imposta vat tax lordo gross inclusa compresa aliquota"
 _VAT_NUMBER = re.compile(r"^[A-Za-z]{0,2}\s?\d{8,12}$")
@@ -56,6 +58,29 @@ def _is_category_name(text: str) -> bool:
     return text.strip().upper() in _CATEGORY_NAMES
 
 
+def _fit_document_number(stats: ColumnStats) -> float:
+    """A document number: different from row to row, and not a row counter (1, 2, 3...)."""
+    base = fit_identifier(stats)
+    if (
+        stats.n
+        and stats.numeric == stats.n
+        and stats.integral == stats.n
+        and stats.minimum is not None
+        and stats.maximum is not None
+        and stats.minimum <= 1
+        and stats.maximum <= stats.n + 1
+    ):
+        return 0.1  # the values contradict the name: it is not a document number
+    return base
+
+
+def _fit_supplier(stats: ColumnStats) -> float:
+    """A supplier is a business or a professional; a column of people's names is more likely
+    the holder of an account or an employee - to be checked, never certain."""
+    base = fit_text(stats)
+    return 0.6 * base if looks_like_names(stats) else base
+
+
 def _fit_tax_amount(stats: ColumnStats) -> float:
     """VAT amounts are money, not small percentages: a column of 22, 22, 10 is a RATE."""
     if not stats.n or stats.maximum is None:
@@ -74,8 +99,10 @@ COSTS = DomainSem(
             (
                 rule("fornitore supplier vendor emittente cedente", weight=0.93),
                 rule("ragione denominazione", "sociale fornitore societa", weight=0.9),
+                rule("intestatario titolare", weight=0.8),
+                rule("chi", weight=0.75),  # "Da chi": a hand-made sheet
             ),
-            fit_text,
+            _fit_supplier,
         ),
         F.SUPPLIER_VAT_NUMBER.value: FieldSem(
             F.SUPPLIER_VAT_NUMBER.value,
@@ -97,11 +124,14 @@ COSTS = DomainSem(
             F.INVOICE_NUMBER.value,
             _exact(F.INVOICE_NUMBER),
             (
-                rule("fattura invoice documento doc", "numero n num nr no id", weight=0.93),
-                rule("numero n num nr", "fattura invoice documento doc", weight=0.93),
+                rule("fattura invoice documento doc fatt", "numero n num nr no id", weight=0.93),
+                rule("numero n num nr", "fattura invoice documento doc fatt", weight=0.93),
                 rule("protocollo", weight=0.8),
+                # "Numero", "Num.", "N.", "Doc." alone, in a register of invoices
+                rule("numero", none="riga linea line prot protocollo", weight=0.8),
+                rule("doc documento", none="tipo tipologia data date", weight=0.8),
             ),
-            fit_identifier,
+            _fit_document_number,
         ),
         F.INVOICE_DATE.value: FieldSem(
             F.INVOICE_DATE.value,
@@ -148,7 +178,7 @@ COSTS = DomainSem(
             (
                 rule(
                     "iva vat imposta tax",
-                    none="aliquota rate percentuale perc",
+                    none="aliquota rate percentuale perc excl excluding esclusa escluso",
                     weight=0.92,
                 ),
             ),
@@ -176,7 +206,8 @@ COSTS = DomainSem(
             _exact(F.LINE_DESCRIPTION),
             (
                 rule("descrizione description oggetto causale dettaglio", weight=0.93),
-                rule("voce articolo prodotto servizio", none="costo spesa", weight=0.8),
+                rule("voce articolo prodotto servizio item", none="costo spesa", weight=0.8),
+                rule("cosa", weight=0.75),  # a hand-made sheet
             ),
             fit_text,
         ),
@@ -196,6 +227,13 @@ COSTS = DomainSem(
             F.LINE_TOTAL.value,
             _exact(F.LINE_TOTAL),
             (
+                # "Amount excl. VAT": says it is net, in words that also name the VAT.
+                rule(
+                    "excl excluding esclusa escluso",
+                    "vat iva tax",
+                    none="incl including inclusa compresa lordo gross",
+                    weight=0.93,
+                ),
                 # Says it is NET: sure.
                 rule(
                     "imponibile netto net",
@@ -223,9 +261,11 @@ COSTS = DomainSem(
             (
                 rule("categoria category", none="documento fiscale", weight=0.93),
                 rule("tipo tipologia", "costo spesa", weight=0.9),
-                rule("centro conto voce", "costo spesa", weight=0.85),
+                rule("conto voce", "costo spesa", weight=0.85),
             ),
             fit_vocabulary(_is_category_name),
+            # Where a cost is booked is not what it was spent on.
+            veto=stems("centro cdc"),
         ),
     },
     order=tuple(field.value for field in InvoiceField),
@@ -236,6 +276,17 @@ COSTS = DomainSem(
     # A supplier is a business: its name, VAT number and IBAN are what an invoice IS. Nothing is
     # locked here (NINFA keeps suppliers); a column that is not mapped is dropped at import anyway.
     locked={},
+    # Every amount of a register: which one is the net, the tax, the total is never guessed.
+    financial=frozenset(
+        {
+            F.INVOICE_NET_AMOUNT.value,
+            F.INVOICE_TAX_AMOUNT.value,
+            F.INVOICE_GROSS_AMOUNT.value,
+            F.LINE_TOTAL.value,
+            F.UNIT_PRICE.value,
+            F.VAT_RATE.value,
+        }
+    ),
 )
 
 __all__ = ["COSTS", "GROSS_WORDS", "NET_WORDS"]

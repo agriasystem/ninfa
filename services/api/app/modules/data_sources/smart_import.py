@@ -22,7 +22,7 @@ ONE data source of ONE property of ONE workspace and is reachable only through i
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
 from uuid import UUID
@@ -74,6 +74,11 @@ from app.modules.data_sources.mapping_types import (
 )
 from app.modules.data_sources.understanding_costs import category_question
 from app.modules.data_sources.understanding_labor import label_question
+from app.modules.data_sources.understanding_redaction import (
+    guard_for_samples,
+    personal_columns,
+    redact_inspection,
+)
 from app.modules.data_sources.understanding_types import Question
 from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.ingestion.models import DataSource, DataSourceDomain
@@ -249,17 +254,26 @@ class SmartImportService:
             if c.field is not None
         )
         profile = self._profile_info(adapter, source, table)
-        return FileInspection(
-            domain,
-            file_type="XLSX" if table.file_type == "xlsx" else "CSV",
-            sheet_name=table.sheet_name,
-            columns=columns,
-            fields=tuple(adapter.fields),
-            requirement_groups=tuple(adapter.groups),
-            suggestion_complete=complete,
-            already_canonical=canonical,
-            profile=profile,
-            already_imported=already_imported,
+        # A column of people is never shown as an example, whatever its header says.
+        personal = personal_columns(samples)
+        columns = tuple(
+            replace(column, examples=()) if column.position in personal else column
+            for column in columns
+        )
+        return redact_inspection(
+            FileInspection(
+                domain,
+                file_type="XLSX" if table.file_type == "xlsx" else "CSV",
+                sheet_name=table.sheet_name,
+                columns=columns,
+                fields=tuple(adapter.fields),
+                requirement_groups=tuple(adapter.groups),
+                suggestion_complete=complete,
+                already_canonical=canonical,
+                profile=profile,
+                already_imported=already_imported,
+            ),
+            guard_for_samples(samples, personal),
         )
 
     def _proposal(

@@ -22,6 +22,7 @@ from uuid import UUID
 
 from app.modules.bookings.parsers import Cell, SourceTable
 from app.modules.bookings.text import normalize_key
+from app.modules.ingestion.value_text import split_weekday, strip_currency, weekday_agrees
 from app.modules.invoices.canonical import (
     MAX_DECIMALS,
     RawLine,
@@ -166,16 +167,20 @@ def _date(cell: Cell, field: InvoiceField, config: InvoiceMappingConfig) -> date
         return cell
     if not isinstance(cell, str):
         raise _BadValueError(InvoiceErrorCode.INVALID_DATE)
-    text = cell.strip()
+    text, weekday = split_weekday(cell.strip())  # "Lun 26/10/2026": the weekday is allowed
     pattern = config.format_options.date_formats.get(field)
     try:
         if pattern is not None:
-            return datetime.strptime(text, pattern).date()
-        if _ISO_DATE.match(text):
-            return datetime.fromisoformat(text.replace("/", "-", 2)).date()
+            parsed = datetime.strptime(text, pattern).date()
+        elif _ISO_DATE.match(text):
+            parsed = datetime.fromisoformat(text.replace("/", "-", 2)).date()
+        else:
+            raise _BadValueError(InvoiceErrorCode.INVALID_DATE)
     except ValueError:
         raise _BadValueError(InvoiceErrorCode.INVALID_DATE) from None
-    raise _BadValueError(InvoiceErrorCode.INVALID_DATE)
+    if not weekday_agrees(parsed, weekday):
+        raise _BadValueError(InvoiceErrorCode.INVALID_DATE)
+    return parsed
 
 
 def _decimal(cell: Cell, config: InvoiceMappingConfig) -> Decimal | None:
@@ -202,7 +207,7 @@ def _decimal(cell: Cell, config: InvoiceMappingConfig) -> Decimal | None:
 
 def _parse_decimal_text(text: str, config: InvoiceMappingConfig) -> Decimal:
     """ "1234.56", "1,234.56", "1234,56" or "1.234,56" as configured; never guessed."""
-    cleaned = text.replace(" ", " ").strip()
+    cleaned = strip_currency(text.replace(" ", " ").strip())
     decimal = config.format_options.decimal_separator or "."
     thousands = config.format_options.thousands_separator
     dec = re.escape(decimal)
