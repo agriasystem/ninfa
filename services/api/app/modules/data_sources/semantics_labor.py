@@ -105,13 +105,20 @@ LABOR = DomainSem(
         F.PLANNED_HOURS.value: FieldSem(
             F.PLANNED_HOURS.value,
             _exact(F.PLANNED_HOURS),
-            (rule(_HOURS, _PLANNED, none=_COST, weight=0.93),),
+            (
+                rule(_HOURS, _PLANNED, none=_COST, weight=0.93),
+                # "Prev." alone is only a maybe; with "Eff." next to it, it is the plan (`pairs`)
+                rule("prev", none=_COST, weight=0.7),
+            ),
             fit_hours,
         ),
         F.ACTUAL_HOURS.value: FieldSem(
             F.ACTUAL_HOURS.value,
             _exact(F.ACTUAL_HOURS),
-            (rule(_HOURS, _ACTUAL, none=_COST, weight=0.93),),
+            (
+                rule(_HOURS, _ACTUAL, none=_COST, weight=0.93),
+                rule("eff", none=_COST, weight=0.7),
+            ),
             fit_hours,
         ),
         F.PLANNED_COST.value: FieldSem(
@@ -146,6 +153,9 @@ LABOR = DomainSem(
         PiiKind.IBAN: "IDENTITY",
     },
     financial=frozenset({F.PLANNED_COST.value, F.ACTUAL_COST.value}),
+    # "Prev." and "Eff." together, both columns of hours: the plan and the time worked. Alone, each
+    # is a maybe (one confirmation): they have no word for hours of their own.
+    pairs=(((F.PLANNED_HOURS.value, "prev"), (F.ACTUAL_HOURS.value, "eff")),),
     ambiguous=(
         AmbiguousColumn(
             "HOURS",
