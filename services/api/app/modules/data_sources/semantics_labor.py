@@ -29,13 +29,15 @@ from app.modules.labor.suggestions import FIELD_ALIASES, excluded_reason
 F = LaborField
 
 _HOURS = "ore ora hours hour"
+# ("H previste": the letter is a word for hours only next to the plan or the time worked)
+_HOURS_WORDS = f"{_HOURS} h"
 _PLANNED = (
     "previste previsto pianificate programmate prog pian prev programmed planned scheduled "
     "budget preventivo"
 )
 _ACTUAL = (
-    "effettive effettivo eff lavorate svolte svolto reali reale consuntivo timbrate actual worked "
-    "effettuate"
+    "effettive effettivo eff lavorate lav svolte svolto reali reale consuntivo timbrate actual "
+    "worked effettuate"
 )
 _COST = "costo costi cost"
 _NOT_A_LABEL = "ore costo data totale"
@@ -70,7 +72,7 @@ LABOR = DomainSem(
             _exact(F.WORK_DATE),
             (
                 rule(
-                    "data giorno date day",
+                    "data giorno gg date day",
                     none="nascita assunzione scadenza cessazione fattura prenotazione",
                     weight=0.9,
                 ),
@@ -93,6 +95,8 @@ LABOR = DomainSem(
                     none=_NOT_A_LABEL,
                     weight=0.88,
                 ),
+                # "Centro operativo": where the work is done - the department, if its values say so
+                rule("centro unita struttura", "operativo operativa", weight=0.85),
             ),
             fit_vocabulary(_is_department),
         ),
@@ -106,7 +110,7 @@ LABOR = DomainSem(
             F.PLANNED_HOURS.value,
             _exact(F.PLANNED_HOURS),
             (
-                rule(_HOURS, _PLANNED, none=_COST, weight=0.93),
+                rule(_HOURS_WORDS, _PLANNED, none=_COST, weight=0.93),
                 # "Prev." alone is only a maybe; with "Eff." next to it, it is the plan (`pairs`)
                 rule("prev", none=_COST, weight=0.7),
             ),
@@ -116,7 +120,7 @@ LABOR = DomainSem(
             F.ACTUAL_HOURS.value,
             _exact(F.ACTUAL_HOURS),
             (
-                rule(_HOURS, _ACTUAL, none=_COST, weight=0.93),
+                rule(_HOURS_WORDS, _ACTUAL, none=_COST, weight=0.93),
                 rule("eff", none=_COST, weight=0.7),
             ),
             fit_hours,

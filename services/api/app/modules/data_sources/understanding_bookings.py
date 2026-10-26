@@ -19,8 +19,9 @@ from dataclasses import replace
 from datetime import date, datetime
 
 from app.modules.bookings.parsers import Cell
+from app.modules.data_sources.channel_words import channel_share
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
-from app.modules.data_sources.semantics import Level
+from app.modules.data_sources.semantics import Level, NameMatch
 from app.modules.data_sources.understanding_types import Choice, OriginKind, Question, QuestionKind
 from app.modules.document_understanding.stats import ColumnStats
 from app.modules.document_understanding.text import fold, stems, tokens
@@ -76,6 +77,60 @@ def lone_total_is_room_revenue(proposal: Proposal) -> Proposal:
             replace(c, field="room_revenue", level=Level.MEDIUM) if c is total else c
             for c in proposal.columns
         )
+    )
+
+
+# --- a loose reservation code ---------------------------------------------------------------------
+
+_DATES_OF_A_STAY = frozenset({"booked_at", "check_in", "check_out"})
+_ALL_DIFFERENT = 0.95
+
+
+def identifier_by_context(proposal: Proposal) -> Proposal:
+    """A loose name for the reservation code ("Cod.", "Codice") over values that are all different
+    - whole numbers or text, never amounts - in a file that is plainly a list of reservations
+    (when it was booked, arrival and departure all recognised by their own names) IS the code: as
+    sure as a header that says "reservation code". The words alone ("Codice" of what?) were the
+    doubt; the rest of the file answers it."""
+    assigned = proposal.assigned()
+    code = assigned.get("source_record_id")
+    if code is None or code.level != Level.MEDIUM or code.name != NameMatch.TOKEN:
+        return proposal
+    if any(
+        (column := assigned.get(field)) is None or column.level != Level.HIGH
+        for field in _DATES_OF_A_STAY
+    ):
+        return proposal
+    stats = code.stats
+    if not stats.enough() or (code.fit or 0.0) < _ALL_DIFFERENT or stats.integral < stats.numeric:
+        return proposal
+    return Proposal(
+        tuple(replace(c, level=Level.HIGH) if c is code else c for c in proposal.columns)
+    )
+
+
+# --- a channel the hotel has already taught -------------------------------------------------------
+
+_MOST = 0.6
+
+
+def channel_by_taught(proposal: Proposal, taught: frozenset[str]) -> Proposal:
+    """What the hotel has already told NINFA about its channels ("BDC" is Booking.com) counts as
+    one more word for them: a channel column, named as one, whose values are for the most part
+    channels NINFA knows - by its own words or by that mapping - is a channel for certain. The
+    mapping belongs to the property (it is read from the saved source, never shared)."""
+    column = proposal.assigned().get("channel")
+    if (
+        column is None
+        or column.level != Level.MEDIUM
+        or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
+        or not column.stats.enough()
+        or not taught
+        or channel_share(column.stats.texts, taught) < _MOST
+    ):
+        return proposal
+    return Proposal(
+        tuple(replace(c, level=Level.HIGH) if c is column else c for c in proposal.columns)
     )
 
 
@@ -162,4 +217,10 @@ def check_stay(
     return demoted, question
 
 
-__all__ = ["check_stay", "lone_total_is_room_revenue", "stay_is_reversed"]
+__all__ = [
+    "channel_by_taught",
+    "check_stay",
+    "identifier_by_context",
+    "lone_total_is_room_revenue",
+    "stay_is_reversed",
+]

@@ -65,9 +65,11 @@ file -> every sheet scanned (bounded) -> the table found (title, summary, totals
 ## Kind of data
 
 Scored from the words of the title and sheet names and, above all, from how much of what that kind of import REQUIRES the
-columns can supply. HIGH / MEDIUM / LOW is never a percentage on screen. The person's own card is the confirmation: a verdict
-that agrees asks nothing; one that differs ("Questo sembra un file dei costi. Corretto?") or that points nowhere ("Che tipo di
-dati contiene questo file?") is asked about - and a file of another kind is never imported through this card.
+columns can supply. HIGH / MEDIUM / LOW is never a percentage on screen. The person's own card is a WEAK PRIOR, not a
+confirmation: a verdict that agrees asks nothing; one that differs ("Questo sembra un file dei costi. Corretto?") is asked
+about - alone, because everything else depends on the answer - and a file of another kind is never imported through this card.
+A file that points NOWHERE is not asked "what is this?" (no answer would change anything): the card is not evidence, so it is
+never `READY`, and it ends in the matching screen with what it lacks.
 
 ## Staff (Personale)
 
@@ -105,7 +107,7 @@ Category words are NINFA's own lexicon (Utenze, Lavanderia, Consulenze...) plus 
 
 | Question | When | Answer |
 | --- | --- | --- |
-| `DOMAIN` | the file is another kind than the card, or nothing stands out | a kind (the same as the card, or guidance to the right card) |
+| `DOMAIN` | the file is clearly another kind than the card (asked alone) | a kind (the same as the card, or guidance to the right card) |
 | `TABLE` | two comparable tables | the table |
 | `DEPARTMENT_ROWS` / `DEPARTMENT_CONFIRM` | no department anywhere / only in the title | a department |
 | `VALUE_LABELS` | words NINFA does not know (department, category, status) | one meaning per word, one word per screen |
@@ -211,6 +213,28 @@ no assistant, and none of the prudence of hardening 1 given up (the documents th
   one confirmation) only if nothing else holds money; an arrival after the departure on (nearly) every row asks `DATES_REVERSED` ("the columns
   look swapped - check them"), distrusts both columns and swaps nothing.
 
+## Question reduction 1
+
+Fewer questions, no less prudence (`docs/benchmarks/smart-import-v3-question-reduction-1.md`). The rule: **SAFE + PROVEN -> silent;
+AMBIGUOUS + BUSINESS-CRITICAL -> ask; UNSUPPORTED -> manual / blocked.** A question is asked only if the answer can change the mapping, the
+validation, the safety or the result of the import. No assistant, no migration.
+
+- **Channel = header AND values** (`channel_words.py`): a channel header over values that are, for the most part, the words a hotel uses for how
+  a booking arrived (OTAs, the website, phone, e-mail, walk-in, agencies; whole words only) is certain. Over countries it is not a channel at all;
+  over words nobody knows it stays a maybe. Codes of a channel manager (`BDC`, `EXP`) count only next to a header that already says "channel". A
+  channel the hotel taught (`channel_mapping`) is one more word for the column.
+- **The card is a weak prior** (see Kind of data). While the file cannot be imported (a blocker), questions about the MEANING of its columns and words
+  are premature and are not asked; they come back when the person has matched what was missing.
+- **Departments and categories**: a short list of department words on top of the import's own rules, and more cost-category words, each with ONE
+  category. They travel in the decision (`labels`) so the import files them the same way. A word that could be two (`Food & Beverage`, `MAN`) or a
+  code only this hotel uses (`HK`) is asked, once, and remembered. Only the unknown words are asked about, never the known ones with them.
+- **A loose name over proving values**: `Cod.` / `Codice` over reservation codes that are all different, in a list of reservations whose stay dates are
+  all recognised, IS the code. `Totale IVA inclusa` says the amount is gross: it is not asked, it is not imported.
+- **Two columns that claim one field** are still a choice - unless all but one of them is, by its own words, the name of another field nobody has taken
+  ("Importo camere" and "Totale soggiorno": the room revenue and the total).
+- **What stays asked**: a lone `Total`, an amount that does not say what it holds, competing look-alike columns, an arrival after the departure, an
+  ambiguous date order, an unknown department or category, several plausible tables, a file that looks like another kind of data.
+
 ## Tests
 
 Synthetic corpus (`tests/understanding_support.py`: realistic staff file, title+summary, sheet per department, sections, grids,
@@ -227,7 +251,7 @@ port with a fake provider (cleaning, evidence, validation, call limits, injectio
 - Optional columns the rules cannot read are not asked about (the AI step only runs for what a required field needs).
 - Look-alike columns are asked about one by one ("is X the planned hours?"): a single question that lists them all, and a sum
   of the net amounts of a register with one column per VAT rate, are not built.
-- Hours written with their unit (`8 h`), dates written with a month name and a table whose arrival is after its departure on
-  every row are not understood yet (the benchmark's remaining P1).
+- A department written as a label and a value in the header block of a sheet ("Reparto: Spa") is not read as the department (one question).
+- Hotel codes for departments (`HK`, `FO`) and for booking statuses (`OK`, `CANC`) are the hotel's own: asked once, then remembered.
 - Cost registers in several currencies per file follow the invoice model's rules (one currency per document).
 - The AI step is built and tested with a fake provider only; its quality on a real model is unmeasured.

@@ -51,9 +51,14 @@ STOP_WORDS = frozenset(
 
 
 def fold(text: str) -> str:
-    """Lower case, no accents, punctuation as single spaces ("N° Camere" -> "n camere")."""
+    """Lower case, no accents, punctuation as single spaces ("N° Camere" -> "n camere"). Characters
+    that print nothing (a zero-width space copied in with a header) are not there at all."""
     decomposed = unicodedata.normalize("NFKD", text)
-    plain = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    plain = "".join(
+        ch
+        for ch in decomposed
+        if not unicodedata.combining(ch) and unicodedata.category(ch) != "Cf"
+    )
     return _NON_WORD.sub(" ", plain.casefold()).strip()
 
 

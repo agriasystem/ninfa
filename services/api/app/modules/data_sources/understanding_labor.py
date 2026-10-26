@@ -19,9 +19,11 @@ A word NINFA does not know ("HK", "Turno A") is never guessed: it is asked, once
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Final
 
 from app.modules.bookings.text import normalize_key
 from app.modules.data_sources.column_profile import ColumnSample
+from app.modules.data_sources.mapping_types import MAX_LABEL_LENGTH
 from app.modules.data_sources.proposal import Proposal
 from app.modules.data_sources.semantics import Level
 from app.modules.data_sources.understanding_types import (
@@ -44,7 +46,7 @@ from app.modules.document_understanding.layout import (
 )
 from app.modules.document_understanding.titles import department_words
 from app.modules.document_understanding.values import CellKind, kind_of, text_of
-from app.modules.labor.classification import classify_role
+from app.modules.labor.classification import classify_role, matching_categories
 from app.modules.labor.roles import LaborCategory, LaborClassificationMethod
 
 MAX_LABELS_ASKED = 12
@@ -62,20 +64,103 @@ def known_labels(*documents: Mapping[str, str]) -> dict[str, str]:
     return merged
 
 
-def classifies(label: str, taught: Mapping[str, str]) -> bool:
-    """Does NINFA know which department this word is (its own rules, or it was taught)?"""
+# The words of a staff file that name a department or a job and nothing else - on top of the small
+# dictionary the import itself classifies with (`labor.classification.RULES`). They are used only
+# to READ a department column (or line, sheet, title): a word that is also in the import's rules, or
+# that could be two departments, is not here. Whole words, by the comparison key. Codes ("HK",
+# "FO", "REC") are deliberately NOT here: they are the hotel's own, asked once and remembered.
+_LEXICON: Final[dict[LaborCategory, tuple[str, ...]]] = {
+    LaborCategory.HOUSEKEEPING: (
+        "governante",
+        "governanti",
+        "pulizie",
+        "camerista",
+        "cameriste",
+        "addetta alle pulizie",
+    ),
+    LaborCategory.FRONT_OFFICE: (
+        "ricevimento",
+        "portineria",
+        "portiere",
+        "concierge",
+        "front desk",
+        "booking",
+    ),
+    LaborCategory.FOOD_BEVERAGE: (
+        "ristorante",
+        "ristorazione",
+        "barista",
+        "barman",
+        "maitre",
+        "banqueting",
+        "colazioni",
+    ),
+    LaborCategory.KITCHEN: ("sous chef", "commis", "pizzaiolo", "lavapiatti"),
+    LaborCategory.MAINTENANCE: ("manutentore", "manutentori"),
+    LaborCategory.MANAGEMENT: (
+        "amministrazione",
+        "direttore",
+        "direttrice",
+        "general manager",
+        "ufficio amministrativo",
+    ),
+    LaborCategory.SPA_WELLNESS: ("centro benessere", "benessere", "estetista", "massaggiatrice"),
+}
+
+
+def _lexicon_matches(key: str) -> set[LaborCategory]:
+    padded = f" {key} "
+    return {
+        category
+        for category, phrases in _LEXICON.items()
+        if any(f" {normalize_key(phrase)} " in padded for phrase in phrases)
+    }
+
+
+def _read_by_words(key: str, *, lexicon: bool) -> LaborCategory | None:
+    """The one department the words of this label point at - by the import's own rules, and with
+    NINFA's list on top when `lexicon` (not for a label too long to travel in the decision: the
+    import would not know it) - or None when none does or two do."""
+    with_list = lexicon and len(key) <= MAX_LABEL_LENGTH
+    found = {*matching_categories(key), *(_lexicon_matches(key) if with_list else ())}
+    return next(iter(found)) if len(found) == 1 else None
+
+
+def names_a_department(label: str) -> bool:
+    """Is this label a department by the import's own rules alone? The name of a SHEET is evidence
+    of what kind of file it is only for these: "Booking" or "Amministrazione" also name sheets of
+    reservation and cost files."""
+    return classify_role(normalize_key(label)).method != LaborClassificationMethod.UNCLASSIFIED
+
+
+def classifies(label: str, taught: Mapping[str, str], *, lexicon: bool = False) -> bool:
+    """Does NINFA know which department this word is (the import's rules, or it was taught - and
+    with `lexicon`, NINFA's own list too: what the understanding carries into the decision)?"""
     key = normalize_key(label)
-    if key in taught:
-        return True
-    return classify_role(key).method != LaborClassificationMethod.UNCLASSIFIED
+    return key in taught or _read_by_words(key, lexicon=lexicon) is not None
 
 
-def category_of(label: str, taught: Mapping[str, str]) -> str | None:
+def category_of(label: str, taught: Mapping[str, str], *, lexicon: bool = False) -> str | None:
     key = normalize_key(label)
     if key in taught:
         return taught[key]
-    found = classify_role(key)
-    return None if found.method == LaborClassificationMethod.UNCLASSIFIED else found.category.value
+    found = _read_by_words(key, lexicon=lexicon)
+    return None if found is None else found.value
+
+
+def lexicon_roles(labels: Sequence[tuple[str, int]], taught: Mapping[str, str]) -> dict[str, str]:
+    """The words NINFA reads by its OWN list but that the import's rules alone would leave as
+    "other": they travel in the decision so the import, which only reads its rules and confirmed
+    words, files them under the same department."""
+    found: dict[str, str] = {}
+    for label, _count in labels:
+        key = normalize_key(label)
+        if key in taught or classify_role(key).method != LaborClassificationMethod.UNCLASSIFIED:
+            continue
+        category = _read_by_words(key, lexicon=True)
+        if category is not None:
+            found[label] = category.value
+    return found
 
 
 def department_choices() -> tuple[Choice, ...]:
@@ -86,9 +171,13 @@ def label_question(
     labels: Sequence[tuple[str, int]],
     taught: Mapping[str, str],
     question_id: str = "LABELS:role_mapping",
+    *,
+    lexicon: bool = False,
 ) -> Question | None:
     """ONE question about the department words NINFA does not know (the most frequent first)."""
-    unknown = [(label, count) for label, count in labels if not classifies(label, taught)]
+    unknown = [
+        (label, count) for label, count in labels if not classifies(label, taught, lexicon=lexicon)
+    ]
     if not unknown:
         return None
     unknown.sort(key=lambda item: (-item[1], item[0]))
@@ -118,6 +207,8 @@ class LaborPlan:
     # Where the department comes from when it is not a column, and how sure that is.
     department_origin: Origin | None = None
     department_level: Level | None = None
+    # The department words of lines, sheets or a title (a column's words are read from its cells).
+    words: tuple[tuple[str, int], ...] = ()
 
 
 def _sheet_scan(scan: WorkbookScan, name: str) -> SheetScan | None:
@@ -218,12 +309,12 @@ def plan_labor(
     elif selection.partition and sheets:
         kind, labels = "SHEET", [(name, 1) for name in sheets]
         origin, level = Origin(OriginKind.SHEET), Level.HIGH
-    elif len(sheets) == 1 and classifies(sheets[0], taught):
+    elif len(sheets) == 1 and classifies(sheets[0], taught, lexicon=True):
         kind, labels = "SHEET", [(sheets[0], 1)]
         origin, level = Origin(OriginKind.SHEET, sheets[0]), Level.HIGH
     else:
         words = department_words(selection.preamble)
-        if len(words) == 1 and classifies(words[0], taught):
+        if len(words) == 1 and classifies(words[0], taught, lexicon=True):
             if asked_department_from == "TITLE":
                 kind, labels = "TITLE", [(words[0], 1)]
                 origin, level = Origin(OriginKind.TITLE, words[0]), Level.HIGH
@@ -233,7 +324,7 @@ def plan_labor(
                         id="DEPARTMENT_CONFIRM",
                         kind=QuestionKind.DEPARTMENT_CONFIRM,
                         field="role",
-                        candidate=category_of(words[0], taught),
+                        candidate=category_of(words[0], taught, lexicon=True),
                         origin=OriginKind.TITLE,
                         choices=department_choices(),
                         labels=(LabelCount(words[0], 1),),
@@ -250,11 +341,11 @@ def plan_labor(
             )
     if kind is not None:
         layout = layout.model_copy(update={"department": DepartmentContext(kind=kind)})
-        pending = label_question(labels, taught)
+        pending = label_question(labels, taught, lexicon=True)
         if pending is not None:
             questions.append(pending)
     del document
-    return LaborPlan(layout, tuple(questions), tuple(blockers), origin, level)
+    return LaborPlan(layout, tuple(questions), tuple(blockers), origin, level, tuple(labels))
 
 
 __all__ = [
@@ -266,5 +357,7 @@ __all__ = [
     "department_choices",
     "known_labels",
     "label_question",
+    "names_a_department",
+    "lexicon_roles",
     "plan_labor",
 ]

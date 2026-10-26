@@ -71,7 +71,9 @@ from app.modules.data_sources.understanding_ai import (
     needs_help,
 )
 from app.modules.data_sources.understanding_bookings import (
+    channel_by_taught,
     check_stay,
+    identifier_by_context,
     lone_total_is_room_revenue,
 )
 from app.modules.data_sources.understanding_costs import (
@@ -82,10 +84,11 @@ from app.modules.data_sources.understanding_costs import (
     promote,
 )
 from app.modules.data_sources.understanding_labor import (
-    classifies,
     column_labels,
     known_labels,
     label_question,
+    lexicon_roles,
+    names_a_department,
     plan_labor,
 )
 from app.modules.data_sources.understanding_redaction import guard_for, redact_inspection
@@ -256,8 +259,10 @@ class UnderstandingService:
             questions.extend(plan.questions)
             blockers.extend(plan.blockers)
             origin, origin_level = plan.department_origin, plan.department_level
+            department_words = plan.words
         else:
             origin, origin_level = None, None
+            department_words = ()
 
         wanted_layout = layout
         table, built_layout = self._table_for(
@@ -267,7 +272,8 @@ class UnderstandingService:
         samples = sample_columns(table)
         proposal = propose(sem, samples, excluded_reason=self._excluded(domain))
         if domain == DataSourceDomain.BOOKINGS:
-            proposal = lone_total_is_room_revenue(proposal)
+            proposal = identifier_by_context(lone_total_is_room_revenue(proposal))
+            proposal = channel_by_taught(proposal, frozenset(taught.get("channel_mapping", {})))
         overrides = dict(asked_fields)
         if layout.department is not None:
             header = _synthetic_header(table, layout.department.kind)
@@ -303,6 +309,13 @@ class UnderstandingService:
             and self._resolver.enabled
             and needs_help(proposal, adapter.groups, questions)
         ):
+            # where the rules saw nothing at all, the model may say it is ANOTHER kind of data (the
+            # person is asked only if it does: the card they chose is what NINFA goes by)
+            offered = (
+                tuple(kind.value for kind in _SEMANTICS)
+                if detection.domain is None and not confirmed_domain
+                else ()
+            )
             evidence = build_evidence(
                 expected=domain,
                 semantics=_SEMANTICS,
@@ -316,11 +329,18 @@ class UnderstandingService:
                 ],
                 title=chosen.selection.title,
                 proposal=proposal,
-                questions=questions,
+                questions=[
+                    *questions,
+                    *(
+                        [Question(id="DOMAIN", kind=QuestionKind.DOMAIN, choices=_domain_choices())]
+                        if offered
+                        else []
+                    ),
+                ],
             )
             resolution = self._resolver.resolve(evidence, fit_function(_SEMANTICS, proposal))
             proposal, questions, ai_headers = apply_resolution(
-                proposal, questions, resolution, domain
+                proposal, questions, resolution, domain, offered
             )
             if ai_headers and {"role", "labor_category"} & set(proposal.assigned()):
                 # the assistant found the department column: "which department are all the rows?"
@@ -357,6 +377,20 @@ class UnderstandingService:
                     **decision_labels.get("category_mapping", {}),
                 }
 
+        if domain == DataSourceDomain.LABOR:
+            role_column = proposal.assigned().get("role")
+            lexicon = lexicon_roles(
+                column_labels(samples[role_column.position])
+                if role_column is not None
+                else department_words,
+                taught_roles,
+            )
+            if lexicon:
+                decision_labels["role_mapping"] = {
+                    **lexicon,
+                    **decision_labels.get("role_mapping", {}),
+                }
+
         decision = MappingInput(
             sheet_name=None,
             layout=layout if _has_layout(layout) else LayoutSpec(),
@@ -377,6 +411,9 @@ class UnderstandingService:
         # A column that is clearly hours / an amount but not WHICH, or that says the same as
         # another column: a question - or, for money, the matching screen - never a quiet guess.
         ambiguity, hold = _ambiguity_questions(sem, adapter.groups, proposal)
+        # (a document that points at no kind of data is never imported without a person, even if
+        # its columns happen to fit the card: the card alone is not evidence)
+        hold = hold or (detection.domain is None and not confirmed_domain)
         questions.extend(ambiguity)
         value_questions = self._value_questions(domain, proposal, samples, taught, answers)
         questions.extend(value_questions)
@@ -426,6 +463,7 @@ class UnderstandingService:
                 if any(q.kind == QuestionKind.DATES_REVERSED for q in questions):
                     skip.update({"check_in", "check_out"})  # looked at together, not one by one
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
+        questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         recognized = self._recognized(
             proposal,
@@ -585,22 +623,24 @@ class UnderstandingService:
     def _domain_question(
         detection: DomainVerdict, domain: DataSourceDomain, confirmed: bool
     ) -> list[Question]:
+        # The card the person came from is a weak prior: it is argued with only when the document
+        # points at ANOTHER kind of data. A document that points nowhere is not asked "what is
+        # this?" - the answer would change nothing; it is just not enough to import (see `_level`).
         if confirmed:
             return []
-        choices = tuple(Choice(kind.value) for kind in _SEMANTICS)
-        if detection.domain is not None and detection.level in (Level.HIGH, Level.MEDIUM):
-            if detection.domain != domain:
-                return [
-                    Question(
-                        id="DOMAIN",
-                        kind=QuestionKind.DOMAIN,
-                        candidate=detection.domain.value,
-                        choices=choices,
-                    )
-                ]
-            return []  # it agrees with what the person chose
-        if detection.domain is None:
-            return [Question(id="DOMAIN", kind=QuestionKind.DOMAIN, choices=choices)]
+        if (
+            detection.domain is not None
+            and detection.level in (Level.HIGH, Level.MEDIUM)
+            and detection.domain != domain
+        ):
+            return [
+                Question(
+                    id="DOMAIN",
+                    kind=QuestionKind.DOMAIN,
+                    candidate=detection.domain.value,
+                    choices=_domain_choices(),
+                )
+            ]
         return []
 
     @staticmethod
@@ -733,7 +773,9 @@ class UnderstandingService:
             known = known_labels(
                 dict(taught.get("role_mapping", {})), answers.labels.get("role_mapping", {})
             )
-            question = label_question(column_labels(samples[assigned["role"].position]), known)
+            question = label_question(
+                column_labels(samples[assigned["role"].position]), known, lexicon=True
+            )
             if question is not None:
                 questions.append(question)
         if domain == DataSourceDomain.COSTS and "cost_category" in assigned:
@@ -1085,7 +1127,7 @@ def _with_known_departments(
         or column.level == Level.HIGH
         or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
         or any(q.kind == QuestionKind.VALUE_LABELS for q in asked)
-        or label_question(column_labels(samples[column.position]), known) is not None
+        or label_question(column_labels(samples[column.position]), known, lexicon=True) is not None
     ):
         return proposal
     return Proposal(
@@ -1148,7 +1190,7 @@ def _supplied(domain: DataSourceDomain, selection: Selection) -> frozenset[str]:
     if (
         selection.first.sections
         or selection.partition
-        or any(classifies(name, {}) for name in names)
+        or any(names_a_department(name) for name in names)
     ):
         found.add("role")
     if selection.day_grid is not None:
@@ -1160,6 +1202,51 @@ def _has_layout(layout: LayoutSpec) -> bool:
     return bool(
         layout.sheets or layout.department or layout.grid or layout.table_key or layout.period_start
     )
+
+
+def _domain_choices() -> tuple[Choice, ...]:
+    return tuple(Choice(kind.value) for kind in _SEMANTICS)
+
+
+def _domain_first(questions: list[Question]) -> list[Question]:
+    """A file that looks like ANOTHER kind of data is asked about that, and only that: what else it
+    would need depends on the answer (a department for the "staff rows" of a bookings file, the
+    basis of an amount that is not a cost). Once the person has said, the rest follows."""
+    if any(q.kind == QuestionKind.DOMAIN for q in questions):
+        return [q for q in questions if q.kind == QuestionKind.DOMAIN]
+    return questions
+
+
+# What a question about the MEANING of columns and words can change - and nothing else.
+_ABOUT_MEANING = frozenset(
+    {
+        QuestionKind.COLUMN_MEANING,
+        QuestionKind.VALUE_LABELS,
+        QuestionKind.DEPARTMENT_ROWS,
+        QuestionKind.DEPARTMENT_CONFIRM,
+    }
+)
+
+
+def _without_premature(questions: list[Question], blockers: list[Blocker]) -> list[Question]:
+    """While the file lacks something the import cannot do without (or is a kind of document it
+    cannot read), asking what its columns and words mean changes nothing: the person matches the
+    columns by hand first, and the questions come back as soon as they can change the result.
+    The basis of an amount is kept only when the amount is what is missing (its answer settles
+    it)."""
+    if not blockers:
+        return questions
+    amount_is_missing = any(
+        ("line_total",) in blocker.groups
+        for blocker in blockers
+        if blocker.code == BlockerCode.MISSING_REQUIRED
+    )
+    return [
+        q
+        for q in questions
+        if q.kind not in _ABOUT_MEANING
+        and not (q.kind == QuestionKind.AMOUNT_BASIS and not amount_is_missing)
+    ]
 
 
 def _dedupe(questions: list[Question]) -> list[Question]:

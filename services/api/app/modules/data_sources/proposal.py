@@ -29,6 +29,8 @@ from app.modules.document_understanding.text import fold, tokens
 
 _LEVEL_RANK = {Level.HIGH: 3, Level.MEDIUM: 2, Level.LOW: 1}
 _VALUE_ONLY_FIT = 0.9
+# A name that points at another field this firmly settles a contest between look-alike columns.
+_STRONG_ALTERNATIVE = 0.85
 
 # `ColumnProposal.ambiguous_group` of a column that competes with a look-alike for ONE field.
 CONTESTED = "CONTESTED"
@@ -98,6 +100,7 @@ def propose(
     entries: list[tuple[int, float, int, int, str, NameMatch, float | None, Level]] = []
     # What each (column, field) pair came to, for telling look-alike columns apart below.
     scored: dict[tuple[int, str], tuple[Candidate, Level]] = {}
+    fits: dict[tuple[int, str], float | None] = {}
     have_name: set[str] = set()
     for index, sample in enumerate(samples):
         if index in locked:
@@ -112,6 +115,7 @@ def propose(
                 continue  # the values contradict the name
             level = level_of(candidate.name, candidate.score, fit, stats[index])
             scored[(index, candidate.field)] = (candidate, level)
+            fits[(index, candidate.field)] = fit
             order = sem.order.index(candidate.field) if candidate.field in sem.order else 99
             entries.append(
                 (
@@ -173,10 +177,10 @@ def propose(
     #     (rev.)", "Imponibile" and "Imponibile (rettificato)", one net per VAT rate - is a CHOICE,
     #     and not NINFA's: neither of them is taken for it (the person is asked, or matches by hand)
     contested: dict[int, str] = {}
-    for index, (key, _name, _fit, _level) in chosen.items():
+    for index, (key, _name, _fit, _level) in list(chosen.items()):
         mine = scored.get((index, key))
-        if mine is None or mine[0].rule is None:
-            continue
+        if mine is None or mine[0].rule is None or chosen.get(index, (None,))[0] != key:
+            continue  # (no rule to compare, or a contest already settled for this column)
         rivals = [
             other
             for other in range(len(samples))
@@ -186,9 +190,24 @@ def propose(
             and (other not in chosen or chosen[other][3] == Level.LOW)
             and _look_alike(mine[0], scored.get((other, key)))
         ]
-        if rivals:
-            for member in (index, *rivals):
-                contested[member] = key
+        if not rivals:
+            continue
+        members = (index, *rivals)
+        placed = _settle(members, key, scored, fits, taken_fields)
+        if placed is not None:
+            # the contest ends by itself: one column is only this, the others are something else
+            for member, (member_field, member_level) in placed.items():
+                mine_member = scored[(member, member_field)]
+                chosen[member] = (
+                    member_field,
+                    mine_member[0].name,
+                    fits.get((member, member_field)),
+                    member_level,
+                )
+                taken_fields.add(member_field)
+            continue
+        for member in members:
+            contested[member] = key
     for index in [i for i in chosen if i in contested]:
         taken_fields.discard(chosen[index][0])
         del chosen[index]
@@ -261,6 +280,50 @@ def propose(
             continue
         out.append(ColumnProposal(index, sample.header, stats[index], pii=personal.get(index)))
     return Proposal(tuple(out))
+
+
+def _settle(
+    members: Sequence[int],
+    key: str,
+    scored: dict[tuple[int, str], tuple[Candidate, Level]],
+    fits: dict[tuple[int, str], float | None],
+    taken: set[str],
+) -> dict[int, tuple[str, Level]] | None:
+    """Columns that claim one field in the same words are a choice - unless all but one of them
+    is, by its own words, ALSO the name of another field that nobody has taken: "Importo camere"
+    and "Totale soggiorno" both satisfy the room revenue, but only the second says "total" and
+    the room revenue has no other claimant. Then nothing is left to choose between: the one
+    that is only this field keeps it, the others go where their words point. Returns where each
+    member goes, or None when the contest is a real one."""
+    placed: dict[int, tuple[str, Level]] = {}
+    anchors = 0
+    claimed: set[str] = set()
+    for member in members:
+        alternatives = sorted(
+            (
+                (candidate.score, field, level)
+                for (index, field), (candidate, level) in scored.items()
+                if index == member
+                and field != key
+                and field not in taken
+                and candidate.name in (NameMatch.EXACT, NameMatch.TOKEN)
+                and candidate.score >= _STRONG_ALTERNATIVE
+                and level != Level.LOW
+            ),
+            reverse=True,
+        )
+        if not alternatives:
+            anchors += 1
+            placed[member] = (key, scored[(member, key)][1])
+            continue
+        if len(alternatives) > 1 and alternatives[0][0] == alternatives[1][0]:
+            return None  # it could be two other things: still a choice
+        _score, field, level = alternatives[0]
+        if field in claimed:
+            return None
+        claimed.add(field)
+        placed[member] = (field, level)
+    return placed if anchors == 1 else None
 
 
 def _look_alike(mine: Candidate, other: tuple[Candidate, Level] | None) -> bool:
