@@ -764,6 +764,19 @@ export interface ImportLayout {
 }
 
 /** The whole decision: what each column means, fixed values for what the file lacks, how it is written. */
+/**
+ * Where a decision the SERVER issued comes from: the answers its understanding of the file was made with.
+ * It is not a claim the page makes - it tells the server WHICH reading to verify. Before a decision that
+ * carries it is judged or imported, the server reads the file again with these answers (without any model)
+ * and accepts it only if that reading is READY and gives exactly this mapping; otherwise it answers 409
+ * (`UNRESOLVED_IMPORT_QUESTIONS`, `IMPORT_DECISION_CHANGED`). The page carries it back unchanged and drops
+ * it only when the person takes over and matches the columns by hand.
+ */
+export interface ImportSmartImportRef {
+  answers: Record<string, unknown>;
+  confirmed_domain: boolean;
+}
+
 export interface ImportMapping {
   sheet_name?: string | null;
   columns: ImportColumnChoice[];
@@ -777,6 +790,8 @@ export interface ImportMapping {
   layout?: ImportLayout | null;
   /** The words the person taught NINFA: `{ role_mapping: { HK: "HOUSEKEEPING" } }`. */
   labels?: Record<string, Record<string, string>>;
+  /** Set by the server on the decisions it issues; absent on a matching the person builds by hand. */
+  smart_import?: ImportSmartImportRef | null;
 }
 
 export type ImportSuggestionLevel = "RECOGNIZED" | "TO_CHECK";

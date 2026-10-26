@@ -9,7 +9,7 @@ column's values prove about how dates and numbers are written. The page only sho
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -25,6 +25,7 @@ MAX_CONSTANT_LENGTH = 200
 MAX_LABEL_DOCUMENTS = 4
 MAX_LABELS = 200
 MAX_LABEL_LENGTH = 120
+MAX_DECISION_ANSWERS = 12
 
 
 # --- what the person decides (the request) --------------------------------------------------------
@@ -37,6 +38,25 @@ class ColumnChoice(BaseModel):
 
     header: str = Field(min_length=1, max_length=MAX_HEADER_LENGTH)
     field: str | None = Field(default=None, max_length=64)
+
+
+class SmartImportDecision(BaseModel):
+    """Where a decision comes from: the understanding the SERVER made of this file, with the answers
+    the person had given when it made it.
+
+    A decision that carries this is not taken on trust. Before it is judged or imported the server
+    reads the file again (without any model), with these answers, and the decision is accepted only
+    if that reading is READY - no question open, nothing refusing - and gives exactly this mapping.
+    So it cannot be turned from "asked" into "ready" by posting it again, by copying the suggested
+    matching, or by saying it is confirmed: the only way is to answer the questions, which the
+    server checks. Nothing here is a claim the client makes about itself; it only says WHICH
+    reading to verify. A matching the person builds by hand does not carry it (the manual
+    contract)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    answers: dict[str, Any] = Field(default_factory=dict, max_length=MAX_DECISION_ANSWERS)
+    confirmed_domain: bool = False
 
 
 class MappingInput(BaseModel):
@@ -60,6 +80,9 @@ class MappingInput(BaseModel):
     # The words the person taught NINFA: {"role_mapping": {"HK": "HOUSEKEEPING"}} (a department
     # label, a status, a cost category). Kept in the configuration of THIS source only.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # Set by the server on the decisions IT issues (see `SmartImportDecision`); absent on a matching
+    # the person builds by hand.
+    smart_import: SmartImportDecision | None = None
 
     @field_validator("labels")
     @classmethod

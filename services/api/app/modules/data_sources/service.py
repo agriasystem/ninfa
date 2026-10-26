@@ -17,6 +17,7 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
@@ -32,8 +33,11 @@ from app.modules.data_sources.errors import (
     AmbiguousSourceError,
     DataSourceNotFoundError,
     FileTooLargeError,
+    ImportDecisionChangedError,
     ImportInProgressError,
+    InvalidImportRequestError,
     InvalidSnapshotDateError,
+    UnresolvedImportQuestionsError,
 )
 from app.modules.data_sources.files import (
     MAX_FILE_BYTES,
@@ -138,6 +142,9 @@ class DataSourcesService:
         self._channels = BookingChannelRepository(session, tenant)
         self._smart = SmartImportService(session, tenant)
         self._understanding = UnderstandingService(session, tenant, self._smart, resolver)
+        # The reading a decision is VERIFIED against: the same understanding, never with a model
+        # (a model can only suggest; what is ready never depends on it).
+        self._settling = UnderstandingService(session, tenant, self._smart, None)
 
     # --- reading ------------------------------------------------------------------------------
 
@@ -309,6 +316,60 @@ class DataSourcesService:
         needs no file and writes nothing."""
         return self._smart.check(domain, mapping)
 
+    def _settled(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        filename: str,
+        content: bytes,
+        mapping: MappingInput | None,
+    ) -> MappingInput | None:
+        """The decision to use for a posted matching.
+
+        A matching the person built by hand carries no reference and is judged on its merits, as it
+        always was. One that carries the reference of the understanding the server made
+        (`SmartImportDecision`) is never trusted: the server reads the file again with the answers
+        it names, without any model, and accepts the decision only if that reading is READY and
+        gives exactly this mapping. The mapping that is used is then the server's own.
+        """
+        reference = None if mapping is None else mapping.smart_import
+        if mapping is None or reference is None:
+            return mapping
+        try:
+            answers = UnderstandAnswers.model_validate(reference.answers)
+        except ValidationError as error:
+            raise InvalidImportRequestError() from error
+        hotel = PropertyRepository(self._session, self._tenant).get(property_id)
+        inspection = self._settling.understand(
+            domain,
+            filename,
+            content,
+            answers,
+            reference.confirmed_domain,
+            self._source_for_domain(property_id, domain),
+            self._already_imported(property_id, domain, content),
+            currency=None if hotel is None else hotel.currency,
+        )
+        info = inspection.understanding
+        settled = inspection.proposal
+        if (
+            info is None
+            or settled is None
+            or info.level.value != "READY"
+            or info.questions
+            or info.blockers
+        ):
+            raise UnresolvedImportQuestionsError(
+                level="NONE" if info is None else info.level.value,
+                questions=[] if info is None else [q.id for q in info.questions],
+                blockers=[] if info is None else [b.code.value for b in info.blockers],
+            )
+        if settled.model_dump(exclude={"smart_import"}) != mapping.model_dump(
+            exclude={"smart_import"}
+        ):
+            raise ImportDecisionChangedError()
+        return settled.model_copy(update={"smart_import": None})
+
     def dry_run(
         self,
         property_id: UUID,
@@ -320,8 +381,10 @@ class DataSourcesService:
         period_start: date | None = None,
     ) -> DryRun:
         """Judge every row of the file with this decision exactly as the import will, and write
-        NOTHING. `mapping=None` uses the configuration saved for this kind of data."""
+        NOTHING. `mapping=None` uses the configuration saved for this kind of data. A decision that
+        carries the reference of the server's own understanding is verified first (`_settled`)."""
         self._check_size(content)
+        mapping = self._settled(property_id, domain, filename, content, mapping)
         return self._smart.dry_run(
             property_id,
             domain,
@@ -405,9 +468,15 @@ class DataSourcesService:
         then sees what the first left behind. Other properties and other kinds of data never wait.
 
         `mapped` reads a CSV / Excel file through the person's own matching of columns (Smart
-        Import) instead of NINFA's canonical column names; without it nothing changes.
+        Import) instead of NINFA's canonical column names; without it nothing changes. A matching
+        that carries the reference of the server's own understanding is verified first.
         """
         self._check_size(content)
+        if mapped is not None and mapped.mapping is not None:
+            # a decision NINFA issued is verified BEFORE anything else - before a source is
+            # created or switched on, before any job exists: an unresolved one writes nothing
+            settled = self._settled(property_id, domain, filename, content, mapped.mapping)
+            mapped = replace(mapped, mapping=settled)
         if domain == DataSourceDomain.LABOR and snapshot_local_date is None:
             # The day the file is dated as of is never guessed (the labor service insists) - and a
             # request that cannot be imported must not even switch a source on.

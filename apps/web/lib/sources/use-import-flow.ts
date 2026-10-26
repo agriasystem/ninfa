@@ -252,9 +252,13 @@ export function useImportFlow({
     (
       file: File,
       inspection: FileInspectionResponse,
-      decision: ImportMapping,
+      proposed: ImportMapping,
       extra: Partial<Pick<MappingStep, "hints" | "notice" | "understanding">> = {},
     ) => {
+      // The person takes over: a matching built by hand is theirs and carries no reference to the
+      // server's understanding. (A decision that carries it is only imported if the server, reading
+      // the file again with those answers, finds it READY and unaltered.)
+      const decision: ImportMapping = { ...proposed, smart_import: null };
       setState({
         step: "mapping",
         file,

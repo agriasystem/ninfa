@@ -152,6 +152,8 @@ describe("a file NINFA understands by itself", () => {
     expect(await within(dialog()).findByRole("heading", { level: 3, name: "Importazione completata" })).not.toBeNull();
     const args = importMatchedFileMock.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(args.mapping).toEqual(proposalOf()); // the layout travels with it
+    // ...and so does the reference of the understanding it comes from: the server verifies it
+    expect(args.mapping).toMatchObject({ smart_import: { answers: {}, confirmed_domain: false } });
     expect(args.saveConfiguration).toBe(true);
     expect(args.snapshotLocalDate).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
     expect(validateImportMock.mock.calls[0]?.[0]).toMatchObject({ mapping: proposalOf() });
@@ -474,6 +476,28 @@ describe("ONE question at a time", () => {
     // the classic matching, starting from NINFA's proposal (the layout is kept)
     expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
     expect(checkMappingMock.mock.calls[0]?.[2]).toMatchObject({ layout: { version: 1 } });
+  });
+
+  it("hands the decision to the person with no reference to the server's reading when they match by hand", async () => {
+    const confirmQuestion = questionOf("COLUMN_MEANING", {
+      id: "CONFIRM:Codice",
+      column: "Codice",
+      field: "source_record_id",
+      candidate: "source_record_id",
+      choices: [{ value: "source_record_id", count: null, sheets: [], columns: [] }],
+    });
+    understandFileMock.mockResolvedValue(ok(understoodInspection({ level: "ASK", questions: [confirmQuestion] })));
+    const user = await openStaffImport();
+    await pick(user, xlsxFile());
+
+    await within(dialog()).findByText("La colonna «Codice» è «Numero della prenotazione»?");
+    await user.click(within(dialog()).getByRole("button", { name: "No, controllo le colonne" }));
+
+    // the classic matching works on a copy of the proposal that the person now owns: a matching built by
+    // hand is judged on its merits, and the reference the server put on ITS decision is not part of it
+    expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
+    expect(checkMappingMock.mock.calls[0]?.[2]).toMatchObject({ smart_import: null });
+    expect(importMatchedFileMock).not.toHaveBeenCalled();
   });
 
   it("says that the arrival and the departure look swapped, and opens the matching to look", async () => {

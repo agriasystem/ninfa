@@ -430,6 +430,8 @@ export function proposalOf(overrides: Partial<ImportMapping> = {}): ImportMappin
     date_order: null,
     decimal_style: null,
     layout: { version: 1 },
+    // the server issues its decisions with the reference of the understanding they come from
+    smart_import: { answers: {}, confirmed_domain: false },
     labels: {},
     ...overrides,
   };

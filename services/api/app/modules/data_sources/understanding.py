@@ -56,6 +56,7 @@ from app.modules.data_sources.mapping_types import (
     FileInspection,
     MappingInput,
     ProfileStatus,
+    SmartImportDecision,
     SuggestionLevel,
 )
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal, propose
@@ -418,6 +419,10 @@ class UnderstandingService:
             labels=decision_labels,
             date_order=answers.date_order,
             decimal_style=answers.decimal_style,
+            smart_import=SmartImportDecision(
+                answers=answers.model_dump(mode="json", exclude_defaults=True),
+                confirmed_domain=confirmed_domain,
+            ),
         )
         check = self._smart.check(domain, decision)
 
