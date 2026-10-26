@@ -1511,6 +1511,8 @@ def _conflict_questions(
                 kind=QuestionKind.COLUMN_MEANING,
                 column=conflict.header,
                 field=conflict.field,
+                # "is «Ore A» still the planned hours?" - yes, or the person looks at the columns
+                candidate=conflict.field,
                 origin=OriginKind.PROFILE,
                 choices=(Choice(conflict.field),),
             )

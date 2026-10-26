@@ -189,6 +189,39 @@ def test_the_reused_decision_imports_and_confirms_nothing_new(
     assert learned is not None and (learned.revision, learned.trust) == (1, Trust.PERSON)
 
 
+def test_what_the_person_said_once_about_the_whole_file_is_kept_and_verified_by_the_server(
+    api_client: TestClient, db_session: Session, env: SourcesEnv
+) -> None:
+    columns = {"Giorno": "day", "Gruppo di lavoro": "dept", "Ore previste": "planned"}
+    october = xlsx_of(columns, month=10)
+    asked = understand(api_client, env, LABOR, "turni-ottobre.xlsx", october)
+    assert _kinds(asked) == ["DEPARTMENT_ROWS"]
+    answered = understand(
+        api_client, env, LABOR, "turni-ottobre.xlsx", october, {"department_value": "FRONT_OFFICE"}
+    )
+    done = import_mapped(
+        api_client, env, LABOR, "turni-ottobre.xlsx", october, answered["proposal"],
+        snapshot="2026-10-30",
+    )  # fmt: skip
+    assert done.json()["succeeded"] is True
+    learned = _memory(db_session, env)
+    assert learned is not None and learned.answers == {"department_value": "FRONT_OFFICE"}
+
+    november = xlsx_of(columns, month=11, rows=20)
+    body = understand(api_client, env, LABOR, "turni-novembre.xlsx", november)
+
+    assert body["understanding"]["level"] == "READY" and body["understanding"]["questions"] == []
+    assert body["proposal"]["constants"]["labor_category"] == "FRONT_OFFICE"
+    # the decision carries the server's own reference: it is verified and imported like any other
+    again = import_mapped(
+        api_client, env, LABOR, "turni-novembre.xlsx", november, body["proposal"],
+        snapshot="2026-11-30",
+    )  # fmt: skip
+    assert again.json()["succeeded"] is True
+    reused = _memory(db_session, env)
+    assert reused is not None and reused.revision == 1  # nothing new was confirmed
+
+
 # --- harmless changes ---
 
 
@@ -294,6 +327,11 @@ def test_a_column_that_now_holds_something_else_is_asked_about_not_reused(
     u = body["understanding"]
     assert u["level"] == "ASK"  # a contradiction is a question, never an automatic reading
     assert [q["id"] for q in u["questions"]] == ["CONFIRM:Ore A"]
+    # "is «Ore A» still the planned hours?" - the person answers yes, or looks at the columns
+    assert (u["questions"][0]["kind"], u["questions"][0]["candidate"]) == (
+        "COLUMN_MEANING",
+        "planned_hours",
+    )
     reused = {r["field"] for r in u["recognized"] if r["origin"]["kind"] == "PROFILE"}
     assert reused == {"actual_hours"}  # "Ore B" is still proven; "Ore A" is not
     match = _inspect(db_session, env, DataSourceDomain.LABOR, later).learning.match  # type: ignore[union-attr]
