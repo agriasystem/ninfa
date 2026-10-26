@@ -24,6 +24,7 @@ from app.modules.data_sources.semantics import (
     rule_score,
 )
 from app.modules.document_understanding.pii import PiiKind, detect_pii
+from app.modules.document_understanding.pii_text import header_word_sets
 from app.modules.document_understanding.stats import MIN_EVIDENCE, ColumnStats, column_stats
 from app.modules.document_understanding.text import fold, tokens
 
@@ -86,9 +87,10 @@ def propose(
         if reason is None and finding is not None:
             reason = sem.locked.get(finding.kind)
         if reason is None:
-            words = tokens(sample.header)
+            # every reading of the header: a rate that was typed with an invisible character
+            # inside is still a rate
             for code, never in sem.never:
-                if rule_score(words, (never,)):
+                if any(rule_score(words, (never,)) for words in header_word_sets(sample.header)):
                     reason = code
                     break
         if reason is not None:

@@ -19,6 +19,7 @@ from app.modules.data_sources.semantics import (
     rule,
 )
 from app.modules.document_understanding.pii import PiiKind
+from app.modules.document_understanding.pii_text import header_variants
 from app.modules.document_understanding.text import fold, stems
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.labor.classification import matching_categories
@@ -210,6 +211,17 @@ _MONEY_WORDS = frozenset(
 
 
 def hourly_or_known_exclusion(header: str) -> str | None:
+    """A column that is never read, whatever way its header was typed: an invisible character
+    inside it, words glued together or look-alike letters do not hide an hourly rate or a person
+    (every reading of the header is tried, see `pii_text.header_variants`)."""
+    for variant in header_variants(header):
+        reason = _exclusion(variant)
+        if reason is not None:
+            return reason
+    return None
+
+
+def _exclusion(header: str) -> str | None:
     """V2's exact lists first (hourly rates and person columns by name), then the sign of a rate
     per hour written as a symbol ("EUR/h", "euro / ora")."""
     known = excluded_reason(header)

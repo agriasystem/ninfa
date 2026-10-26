@@ -15,8 +15,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
+from app.modules.document_understanding.pii_text import header_word_sets
 from app.modules.document_understanding.stats import ColumnStats
-from app.modules.document_understanding.text import fold, stem, stems, tokens
+from app.modules.document_understanding.text import fold, stem, stems
 
 
 class PiiKind(StrEnum):
@@ -38,7 +39,7 @@ class PiiFinding:
 _PERSON_WORDS = stems(
     "nome cognome name dipendente collaboratore operatore risorsa nominativo ospite guest cliente "
     "customer intestatario staff employee persona referente addetto addetta lavoratore lavoratrice "
-    "collega"
+    "collega surname"
 )
 # Words that make a header NOT a column of names even with a person word in it.
 _NOT_A_NAME = stems(
@@ -48,6 +49,8 @@ _NOT_A_NAME = stems(
 _EMAIL_WORDS = stems("email mail pec")
 _PHONE_WORDS = stems("telefono cellulare tel phone mobile cell")
 _TAX_WORDS = stems("fiscale cf codfisc")
+# "Tax" alone is the VAT of an invoice; "Tax Code" / "Tax ID" is a person's fiscal code.
+_TAX_QUALIFIERS = stems("code id codice")
 _IBAN_WORDS = stems("iban")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
@@ -102,8 +105,8 @@ Laurent Lisa Mark Michael Nina Oliver Paul Peter Pierre Robert Sarah Sophie Thom
 _GIVEN_NAMES = frozenset(fold(name) for name in _GIVEN_NAME_LIST.split())
 
 
-def _header_tokens(header: str) -> frozenset[str]:
-    return tokens(header)
+def _says_tax_code(words: frozenset[str]) -> bool:
+    return bool(words & _TAX_WORDS) or ("tax" in words and bool(words & _TAX_QUALIFIERS))
 
 
 def _fraction(texts: tuple[str, ...], pattern: re.Pattern[str]) -> float:
@@ -159,16 +162,25 @@ def looks_like_names(stats: ColumnStats) -> bool:
 
 
 def detect_pii(header: str, stats: ColumnStats) -> PiiFinding | None:
-    """The personal data a column carries, or None."""
-    words = _header_tokens(header)
+    """The personal data a column carries, or None. The header is read every way a person could
+    have meant it - an invisible character inside it, words glued together, look-alike letters
+    (see `pii_text`) - and the first reading that says "personal" wins."""
+    for words in header_word_sets(header):
+        finding = _classify(words, stats)
+        if finding is not None:
+            return finding
+    return _classify(frozenset(), stats)
+
+
+def _classify(words: frozenset[str], stats: ColumnStats) -> PiiFinding | None:
     texts = stats.texts
 
     if words & _EMAIL_WORDS or _fraction(texts, _EMAIL) >= 0.6:
         return PiiFinding(PiiKind.EMAIL, "HEADER" if words & _EMAIL_WORDS else "VALUES", True)
     if words & _IBAN_WORDS or _fraction(texts, _IBAN) >= 0.6:
         return PiiFinding(PiiKind.IBAN, "HEADER" if words & _IBAN_WORDS else "VALUES", True)
-    if words & _TAX_WORDS or _fraction(texts, _TAX_CODE) >= 0.6:
-        return PiiFinding(PiiKind.TAX_CODE, "HEADER" if words & _TAX_WORDS else "VALUES", True)
+    if _says_tax_code(words) or _fraction(texts, _TAX_CODE) >= 0.6:
+        return PiiFinding(PiiKind.TAX_CODE, "HEADER" if _says_tax_code(words) else "VALUES", True)
     if words & _PHONE_WORDS or _phone_numbers(stats):
         return PiiFinding(PiiKind.PHONE, "HEADER" if words & _PHONE_WORDS else "VALUES", True)
     if words & _PERSON_WORDS and not words & _NOT_A_NAME:

@@ -20,11 +20,12 @@ the import matches the file by them.
 """
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Final
 
 from app.modules.document_understanding.pii import PiiKind, looks_like_person
+from app.modules.document_understanding.pii_text import mask_matches, normalize
 
 MARK: Final = "•••"
 _MAX_VALUES = 4000
@@ -66,10 +67,10 @@ _PHONES: Final = (
 )
 
 
-def _iban_sub(match: re.Match[str]) -> str:
+def _iban_accepts(match: re.Match[str]) -> bool:
     compact = re.sub(r"\s", "", match.group(0))
     length = _IBAN_LENGTHS.get(match.group(1).upper())
-    return MARK if length is not None and len(compact) == length else match.group(0)
+    return length is not None and len(compact) == length
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +88,7 @@ class PersonalDataGuard:
         found: set[str] = set()
         for kind, texts in columns:
             for raw in texts:
-                text = " ".join(raw.split())
+                text = " ".join(normalize(raw).split())  # the same value hidden in another way
                 if len(text) < _MIN_VALUE_LENGTH or len(found) >= _MAX_VALUES:
                     continue
                 if kind == PiiKind.PERSON_NAME and not looks_like_person(text):
@@ -99,14 +100,17 @@ class PersonalDataGuard:
         """The text with every personal value replaced by a mark."""
         if not text:
             return text
-        cleaned = _EMAIL.sub(MARK, text)
-        cleaned = _TAX_CODE.sub(MARK, cleaned)
-        cleaned = _IBAN.sub(_iban_sub, cleaned)
-        for pattern in _PHONES:
-            cleaned = pattern.sub(MARK, cleaned)
+        # Read as a person reads it - invisible characters gone, look-alike letters Latin - and
+        # masked in the text as it was: a zero-width space inside an address hides nothing.
+        rules: list[tuple[re.Pattern[str], Callable[[re.Match[str]], bool] | None]] = [
+            (_EMAIL, None),
+            (_TAX_CODE, None),
+            (_IBAN, _iban_accepts),
+            *((pattern, None) for pattern in _PHONES),
+        ]
         if self.known is not None:
-            cleaned = self.known.sub(MARK, cleaned)
-        return cleaned
+            rules.append((self.known, None))
+        return mask_matches(text, rules, MARK)
 
     def clean_all(self, texts: Iterable[str]) -> tuple[str, ...]:
         return tuple(self.clean(text) for text in texts)
