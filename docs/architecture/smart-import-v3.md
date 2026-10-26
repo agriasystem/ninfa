@@ -141,6 +141,10 @@ One profile per source (no new table). It remembers the columns, the formats, th
 key) and the words the person taught (`role_mapping`, `status_mapping`, `category_mapping`). It never holds a value, a title, a
 name or a date of a file. What one hotel taught is not known by another.
 
+Since Source Learning the profile also remembers **what a person confirmed** about the structure of the source (a `learning` section
+of `format_options`): a trusted memory pre-answers, column by column and only where the current file still proves it, what the person
+already decided - see `smart-import-v3-source-learning.md`. A profile the engine read alone is never trusted.
+
 ## The optional AI
 
 Smart Import works fully without it; `IMPORT_UNDERSTANDING_PROVIDER` defaults to `unconfigured` (an API key existing is never

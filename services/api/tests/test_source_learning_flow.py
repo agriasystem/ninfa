@@ -710,6 +710,35 @@ def test_nothing_personal_is_remembered_about_a_source(
     assert all("rossi" not in key for key, _ in learned.shape)
 
 
+def test_headers_that_are_the_names_of_people_are_never_kept_in_the_structure(
+    api_client: TestClient, db_session: Session, env: SourcesEnv
+) -> None:
+    # a roster with one column per employee: the HEADERS are names
+    columns = {
+        "Giorno": "day",
+        "Ore A": "planned",
+        "Ore B": "actual",
+        "Mario Rossi": "junk",
+        "Giulia Bianchi": "junk",
+        "Settore": "dept",
+    }
+    content = xlsx_of(columns, month=10)
+    answered = understand(api_client, env, LABOR, "turni.xlsx", content, ANSWERS)
+    done = import_mapped(api_client, env, LABOR, "turni.xlsx", content, answered["proposal"])
+    assert done.json()["succeeded"] is True
+
+    (profile,) = profiles_of(db_session, env, LaborMappingProfile)
+    learned = parse_memory(profile.format_options["learning"])
+    assert learned is not None
+    blob = json.dumps(profile.format_options, ensure_ascii=False).casefold()
+    for fragment in ("mario", "rossi", "giulia", "bianchi"):
+        assert fragment not in blob
+    assert [key for key, _ in learned.shape].count("~") == 2  # two placeholders, no names
+    # next month the same roster is the same source
+    body = understand(api_client, env, LABOR, "turni2.xlsx", xlsx_of(columns, month=11))
+    assert body["understanding"]["level"] == "READY" and body["understanding"]["questions"] == []
+
+
 def test_a_personal_data_column_never_becomes_a_remembered_mapping(
     api_client: TestClient, db_session: Session, env: SourcesEnv
 ) -> None:

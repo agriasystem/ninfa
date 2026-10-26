@@ -42,8 +42,11 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app.modules.bookings.mapping import normalize_header
 from app.modules.data_sources.proposal import Proposal
 from app.modules.data_sources.semantics import DomainSem
+from app.modules.document_understanding.lexicon import HEADER_STEMS, SECTION_WORDS
+from app.modules.document_understanding.pii import looks_like_person
 from app.modules.document_understanding.pii_text import normalize
 from app.modules.document_understanding.stats import ColumnStats
+from app.modules.document_understanding.text import fold, stem
 from app.modules.document_understanding.values import CellKind
 
 # The placeholder of a column of personal data in a structure: its header is never kept.
@@ -188,9 +191,18 @@ class ColumnView:
     fit_for: Callable[[str], float | None] = lambda _field: None
 
 
+def _names_a_person(header: str, sem: DomainSem) -> bool:
+    """A header that is a person's name (a roster with one column per employee), unless it is made
+    of words NINFA's own vocabulary knows ("Booker Name", "Book Number")."""
+    vocabulary = set(HEADER_STEMS) | set(SECTION_WORDS) | set(sem.title_words)
+    known = any(stem(word) in vocabulary for word in fold(header).split())
+    return looks_like_person(header) and not known
+
+
 def column_views(sem: DomainSem, proposal: Proposal) -> list[ColumnView]:
     """The columns of a file, read by the engine ALONE (no memory), as the matcher sees them. A
-    column the engine locks or flags as personal data is a placeholder: nothing of it is kept."""
+    column the engine locks or flags as personal data, or whose HEADER is a person's name, is a
+    placeholder: nothing of it is kept."""
     views: list[ColumnView] = []
     for column in proposal.columns:
 
@@ -203,7 +215,11 @@ def column_views(sem: DomainSem, proposal: Proposal) -> list[ColumnView]:
                 header=column.header,
                 key=header_key(column.header),
                 kind=value_class(column.stats),
-                personal=column.pii is not None or column.locked is not None,
+                personal=(
+                    column.pii is not None
+                    or column.locked is not None
+                    or _names_a_person(column.header, sem)
+                ),
                 field=column.field,
                 level=None if column.level is None else column.level.value,
                 fit_for=fit_for,
