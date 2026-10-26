@@ -1,0 +1,4872 @@
+{
+ "benchmark": "smart-import-v3-ai-readiness-v1",
+ "baseline_main": "1479a8d92e03f3eba8603aaa4a468bdd08227b3e",
+ "assistant": "stand-in providers only; IMPORT_UNDERSTANDING_PROVIDER stays unconfigured",
+ "scope": "FIRST SCREEN ONLY: each document is understood once, as a person's first upload, and scored against the truth WITHOUT the conversation rounds. P0/P1 and the other counts here are NOT comparable with the official full-flow benchmark (docs/benchmarks/smart-import-v3-question-reduction-1.md), which also plays the answers a careful person gives. What this benchmark compares is each mode against the SAME run with no model.",
+ "corpus": {
+  "documents": 240
+ },
+ "variants": {
+  "documents": 148
+ },
+ "modes": {
+  "corpus": {
+   "oracle": {
+    "mode": "oracle",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 56.4,
+      "p50": 46.0,
+      "p95": 103.0,
+      "max": 103.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 2,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 2,
+     "accepted_as_medium": 0,
+     "discarded": 2,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 2,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": [
+      "L27_grid_real_dates_basis_unstated",
+      "L31_grid_weekdays_without_period"
+     ]
+    }
+   },
+   "plausible_wrong": {
+    "mode": "plausible_wrong",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 213.8,
+      "p50": 186.5,
+      "p95": 388.0,
+      "max": 715.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "BLOCKED": 13,
+     "MANUAL": 39
+    },
+    "level_transitions": {
+     "MANUAL->BLOCKED": 2
+    },
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 18,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 58,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 27,
+    "model_suggestions": {
+     "proposed_columns": 71,
+     "accepted_as_medium": 36,
+     "discarded": 35,
+     "right": 0,
+     "wrong": 36,
+     "wrong_on_critical_fields": 13,
+     "documents_with_a_wrong_suggestion": 18,
+     "questions_precompiled": 6,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": [
+      "L27_grid_real_dates_basis_unstated",
+      "L30_grid_weekdays_week_number_only",
+      "L31_grid_weekdays_without_period",
+      "L32_grid_generic_day_columns",
+      "L34_grid_shift_codes_not_hours",
+      "L35_grid_time_ranges_not_hours",
+      "L65_neg_restaurant_menu_other_domain",
+      "LO02_payroll_monthly_summary_by_qualifica",
+      "B37_duplicate_date_columns",
+      "B49_neg_nights_instead_of_checkout",
+      "BO02_arrivals_by_day_sections_no_ids",
+      "BO14_two_months_side_by_side",
+      "C48_neg_bank_statement",
+      "CO02_payment_schedule_not_a_register",
+      "CO04_vat_register_two_rates_two_dates",
+      "CO05_cash_book_not_invoices",
+      "CO06_utilities_summary_without_number_or_supplier",
+      "CO13_category_by_month_matrix_not_a_register"
+     ]
+    }
+   },
+   "wrong": {
+    "mode": "wrong",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 278.6,
+      "p50": 214.0,
+      "p95": 486.0,
+      "max": 880.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "BLOCKED": 12,
+     "MANUAL": 40
+    },
+    "level_transitions": {
+     "MANUAL->BLOCKED": 1
+    },
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 12,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 58,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 27,
+    "model_suggestions": {
+     "proposed_columns": 100,
+     "accepted_as_medium": 25,
+     "discarded": 75,
+     "right": 0,
+     "wrong": 25,
+     "wrong_on_critical_fields": 13,
+     "documents_with_a_wrong_suggestion": 12,
+     "questions_precompiled": 6,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": [
+      "L27_grid_real_dates_basis_unstated",
+      "L30_grid_weekdays_week_number_only",
+      "L31_grid_weekdays_without_period",
+      "L32_grid_generic_day_columns",
+      "L34_grid_shift_codes_not_hours",
+      "L35_grid_time_ranges_not_hours",
+      "B37_duplicate_date_columns",
+      "BO02_arrivals_by_day_sections_no_ids",
+      "C49_neg_payroll_with_names",
+      "CO05_cash_book_not_invoices",
+      "CO06_utilities_summary_without_number_or_supplier",
+      "CO13_category_by_month_matrix_not_a_register"
+     ]
+    }
+   },
+   "sure_and_wrong": {
+    "mode": "sure_and_wrong",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 48,
+     "max_per_file": 2,
+     "mean_per_file": 0.2,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 3271.4,
+      "p50": 3166.5,
+      "p95": 3706.0,
+      "max": 4288.0
+     },
+     "response_chars": {
+      "mean": 540.5,
+      "p50": 416.0,
+      "p95": 940.0,
+      "max": 1700.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 3271.4,
+     "p50": 3166.5,
+     "p95": 3706.0,
+     "max": 4288.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 200,
+     "accepted_as_medium": 0,
+     "discarded": 200,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "obeys_injection": {
+    "mode": "obeys_injection",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 48,
+     "max_per_file": 2,
+     "mean_per_file": 0.2,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 3276.1,
+      "p50": 3171.0,
+      "p95": 3711.0,
+      "max": 4293.0
+     },
+     "response_chars": {
+      "mean": 560.7,
+      "p50": 436.0,
+      "p95": 932.0,
+      "max": 2002.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 3276.1,
+     "p50": 3171.0,
+     "p95": 3711.0,
+     "max": 4293.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 202,
+     "accepted_as_medium": 0,
+     "discarded": 202,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "says_another_kind": {
+    "mode": "says_another_kind",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 25,
+     "max_per_file": 2,
+     "mean_per_file": 0.104,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.042,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 23,
+     "INVALID": 1
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1723.0,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 4289.0
+     },
+     "response_chars": {
+      "mean": 315.4,
+      "p50": 209.5,
+      "p95": 478.0,
+      "max": 1872.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1723.0,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 4289.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 8,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 60,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 29,
+    "model_suggestions": {
+     "proposed_columns": 117,
+     "accepted_as_medium": 0,
+     "discarded": 117,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 8,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": [
+      "L32_grid_generic_day_columns",
+      "L65_neg_restaurant_menu_other_domain",
+      "BO02_arrivals_by_day_sections_no_ids",
+      "C48_neg_bank_statement",
+      "C49_neg_payroll_with_names",
+      "CO05_cash_book_not_invoices",
+      "CO06_utilities_summary_without_number_or_supplier",
+      "CO13_category_by_month_matrix_not_a_register"
+     ]
+    }
+   },
+   "agrees": {
+    "mode": "agrees",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 44.8,
+      "p50": 44.0,
+      "p95": 47.0,
+      "max": 47.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "malformed": {
+    "mode": "malformed",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 48,
+     "max_per_file": 2,
+     "mean_per_file": 0.2,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 3268.8,
+      "p50": 3164.0,
+      "p95": 3703.0,
+      "max": 4286.0
+     },
+     "response_chars": {
+      "mean": 141.5,
+      "p50": 140.0,
+      "p95": 146.0,
+      "max": 146.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 3268.8,
+     "p50": 3164.0,
+     "p95": 3703.0,
+     "max": 4286.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "not_json": {
+    "mode": "not_json",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 48,
+     "max_per_file": 2,
+     "mean_per_file": 0.2,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 3268.8,
+      "p50": 3164.0,
+      "p95": 3703.0,
+      "max": 4286.0
+     },
+     "response_chars": {
+      "mean": 92.0,
+      "p50": 92.0,
+      "p95": 92.0,
+      "max": 92.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 3268.8,
+     "p50": 3164.0,
+     "p95": 3703.0,
+     "max": 4286.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "nothing": {
+    "mode": "nothing",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 48,
+     "max_per_file": 2,
+     "mean_per_file": 0.2,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 3268.8,
+      "p50": 3164.0,
+      "p95": 3703.0,
+      "max": 4286.0
+     },
+     "response_chars": {
+      "mean": 8.0,
+      "p50": 8.0,
+      "p95": 8.0,
+      "max": 8.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 3268.8,
+     "p50": 3164.0,
+     "p95": 3703.0,
+     "max": 4286.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "unsupported_field": {
+    "mode": "unsupported_field",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 48,
+     "max_per_file": 2,
+     "mean_per_file": 0.2,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 3271.4,
+      "p50": 3166.5,
+      "p95": 3706.0,
+      "max": 4288.0
+     },
+     "response_chars": {
+      "mean": 293.8,
+      "p50": 306.0,
+      "p95": 312.0,
+      "max": 312.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 3271.4,
+     "p50": 3166.5,
+     "p95": 3706.0,
+     "max": 4288.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 90,
+     "accepted_as_medium": 0,
+     "discarded": 90,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "heavy_answer": {
+    "mode": "heavy_answer",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 48,
+     "max_per_file": 2,
+     "mean_per_file": 0.2,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 3270.1,
+      "p50": 3165.0,
+      "p95": 3705.0,
+      "max": 4287.0
+     },
+     "response_chars": {
+      "mean": 487867.5,
+      "p50": 487866.0,
+      "p95": 487872.0,
+      "max": 487872.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 3270.1,
+     "p50": 3165.0,
+     "p95": 3705.0,
+     "max": 4287.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 240000,
+     "accepted_as_medium": 0,
+     "discarded": 240000,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "timeout": {
+    "mode": "timeout",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "http_429": {
+    "mode": "http_429",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "http_500": {
+    "mode": "http_500",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "raw_exception": {
+    "mode": "raw_exception",
+    "documents": 240,
+    "documents_where_the_model_was_asked": 24,
+    "calls": {
+     "total": 24,
+     "max_per_file": 1,
+     "mean_per_file": 0.1,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 24
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 1861.6,
+      "p50": 1704.5,
+      "p95": 2513.0,
+      "max": 3387.0
+     },
+     "approx_input_tokens": {
+      "mean": 1633.5,
+      "p50": 1581.0,
+      "p95": 1851.0,
+      "max": 2142.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 1861.6,
+     "p50": 1704.5,
+     "p95": 2513.0,
+     "max": 3387.0
+    },
+    "approx_input_tokens": {
+     "mean": 1633.5,
+     "p50": 1581.0,
+     "p95": 1851.0,
+     "max": 2142.0
+    },
+    "levels": {
+     "READY": 150,
+     "ASK": 38,
+     "MANUAL": 41,
+     "BLOCKED": 11
+    },
+    "level_transitions": {},
+    "automatic": 150,
+    "automatic_at_baseline": 150,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 1,
+    "p1": 2,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 58,
+     "den": 58,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 24,
+     "den": 25,
+     "value": 0.96
+    },
+    "questions_asked": 52,
+    "questions_asked_at_baseline": 52,
+    "questions_unnecessary": 21,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "no_model": {
+    "questions_asked": 52,
+    "automatic": 150
+   }
+  },
+  "variants": {
+   "oracle": {
+    "mode": "oracle",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 108.2,
+      "p50": 107.0,
+      "p95": 107.0,
+      "max": 164.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 147,
+     "MANUAL": 1
+    },
+    "level_transitions": {
+     "BLOCKED->ASK": 1,
+     "MANUAL->ASK": 45
+    },
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 49,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 160,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 159,
+    "model_suggestions": {
+     "proposed_columns": 51,
+     "accepted_as_medium": 49,
+     "discarded": 2,
+     "right": 49,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 50,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": [
+      "L12_reordered_with_junk_columns~hidden-work_date",
+      "L26_grid_real_dates_basis_stated~hidden-department",
+      "L28_grid_weekdays_period_in_title~hidden-department",
+      "L29_grid_three_weekdays_period_in_title~hidden-department",
+      "B02_npren_prenotato_il_dal_al~hidden-source_record_id",
+      "B04_english_reservation_id_creation_date~hidden-source_record_id",
+      "B06_ref_portale_totale_soggiorno~hidden-source_record_id",
+      "B07_room_revenue_and_total_stay_both~hidden-source_record_id",
+      "B08_abbreviated_headers~hidden-source_record_id",
+      "B09_mixed_italian_english_headers~hidden-source_record_id",
+      "B10_guest_name_email_phone_notes~hidden-source_record_id",
+      "B11_guest_column_holds_names_not_a_count~hidden-source_record_id",
+      "B12_guests_count_column_and_guest_name~hidden-source_record_id",
+      "B13_pax_and_num_ospiti~hidden-source_record_id",
+      "B15_title_before_table~hidden-source_record_id",
+      "B16_notes_below_the_table~hidden-source_record_id",
+      "B17_summary_block_before_table~hidden-source_record_id",
+      "B18_totals_row_and_channel_subtotals~hidden-source_record_id",
+      "B19_dashboard_bookings_and_legend_sheets~hidden-source_record_id",
+      "B22_status_and_cancellation_date~hidden-source_record_id",
+      "B24_channels_direct_phone_email_walkin~hidden-source_record_id",
+      "B25_ota_channels_with_commission_columns~hidden-source_record_id",
+      "B26_amounts_thousands_dot_comma_decimal~hidden-source_record_id",
+      "B28_amounts_with_euro_sign_text~hidden-source_record_id",
+      "B29_amounts_excel_currency_format~hidden-source_record_id",
+      "B30_dates_text_italian~hidden-source_record_id",
+      "B33_dates_dotted_and_day_month_name~hidden-source_record_id",
+      "B34_dates_day_month_name_text~hidden-source_record_id",
+      "B36_two_level_header~hidden-source_record_id",
+      "B38_reordered_columns_with_junk~hidden-source_record_id",
+      "B39_ids_with_leading_zeros_and_numeric~hidden-source_record_id",
+      "B40_office_pms_export_colored_header~hidden-source_record_id",
+      "B42_office_front_desk_monthly_report~hidden-source_record_id",
+      "B43_office_repeated_header_every_page~hidden-source_record_id",
+      "B60_adv_hidden_sheet_with_older_bookings~hidden-source_record_id",
+      "B61_adv_instructions_in_guest_notes~hidden-source_record_id",
+      "B62_adv_formulas_and_html_in_cells~hidden-source_record_id",
+      "B63_adv_total_word_in_a_notes_column~hidden-source_record_id",
+      "B65_adv_very_long_cells_and_unicode~hidden-source_record_id",
+      "B66_large_year_of_bookings~hidden-source_record_id",
+      "BO01_channel_written_as_codes~hidden-source_record_id",
+      "BO05_kpi_block_beside_the_table~hidden-source_record_id",
+      "BO06_table_starts_in_column_c_frozen_panes~hidden-source_record_id",
+      "BO07_weekday_prefixed_dates~hidden-source_record_id",
+      "BO08_room_and_breakfast_revenue_columns~hidden-source_record_id",
+      "BO09_status_written_as_ok_canc_ns~hidden-source_record_id",
+      "BO11_header_cells_with_line_breaks~hidden-source_record_id",
+      "BO12_channel_merged_down_the_column~hidden-source_record_id",
+      "BO13_blank_row_between_every_record~hidden-source_record_id"
+     ]
+    }
+   },
+   "plausible_wrong": {
+    "mode": "plausible_wrong",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 118.6,
+      "p50": 103.0,
+      "p95": 165.0,
+      "max": 225.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 103,
+     "MANUAL": 45
+    },
+    "level_transitions": {
+     "BLOCKED->ASK": 1,
+     "MANUAL->ASK": 1
+    },
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 8,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 2,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 11,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 112,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 111,
+    "model_suggestions": {
+     "proposed_columns": 62,
+     "accepted_as_medium": 8,
+     "discarded": 54,
+     "right": 0,
+     "wrong": 8,
+     "wrong_on_critical_fields": 2,
+     "documents_with_a_wrong_suggestion": 8,
+     "questions_precompiled": 2,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": [
+      "L12_reordered_with_junk_columns~hidden-work_date",
+      "B06_ref_portale_totale_soggiorno~hidden-source_record_id",
+      "B22_status_and_cancellation_date~hidden-source_record_id",
+      "B39_ids_with_leading_zeros_and_numeric~hidden-source_record_id",
+      "B40_office_pms_export_colored_header~hidden-source_record_id",
+      "B65_adv_very_long_cells_and_unicode~hidden-source_record_id",
+      "BO05_kpi_block_beside_the_table~hidden-source_record_id",
+      "BO08_room_and_breakfast_revenue_columns~hidden-source_record_id"
+     ]
+    }
+   },
+   "wrong": {
+    "mode": "wrong",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 117.7,
+      "p50": 100.0,
+      "p95": 214.0,
+      "max": 214.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 103,
+     "BLOCKED": 1,
+     "MANUAL": 44
+    },
+    "level_transitions": {
+     "MANUAL->ASK": 2
+    },
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 2,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 2,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 11,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 112,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 111,
+    "model_suggestions": {
+     "proposed_columns": 64,
+     "accepted_as_medium": 2,
+     "discarded": 62,
+     "right": 0,
+     "wrong": 2,
+     "wrong_on_critical_fields": 2,
+     "documents_with_a_wrong_suggestion": 2,
+     "questions_precompiled": 2,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": [
+      "BO05_kpi_block_beside_the_table~hidden-source_record_id",
+      "BO08_room_and_breakfast_revenue_columns~hidden-source_record_id"
+     ]
+    }
+   },
+   "sure_and_wrong": {
+    "mode": "sure_and_wrong",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 98,
+     "max_per_file": 2,
+     "mean_per_file": 0.662,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 3368.5,
+      "p50": 3332.0,
+      "p95": 3599.0,
+      "max": 3747.0
+     },
+     "response_chars": {
+      "mean": 230.1,
+      "p50": 196.0,
+      "p95": 416.0,
+      "max": 416.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 3368.5,
+     "p50": 3332.0,
+     "p95": 3599.0,
+     "max": 3747.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 128,
+     "accepted_as_medium": 0,
+     "discarded": 128,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "obeys_injection": {
+    "mode": "obeys_injection",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 98,
+     "max_per_file": 2,
+     "mean_per_file": 0.662,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 3373.0,
+      "p50": 3337.0,
+      "p95": 3603.0,
+      "max": 3751.0
+     },
+     "response_chars": {
+      "mean": 252.4,
+      "p50": 218.0,
+      "p95": 454.0,
+      "max": 454.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 3373.0,
+     "p50": 3337.0,
+     "p95": 3603.0,
+     "max": 3751.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 128,
+     "accepted_as_medium": 0,
+     "discarded": 128,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "says_another_kind": {
+    "mode": "says_another_kind",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 113.6,
+      "p50": 97.0,
+      "p95": 205.0,
+      "max": 214.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 64,
+     "accepted_as_medium": 0,
+     "discarded": 64,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "agrees": {
+    "mode": "agrees",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "OK": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 46.8,
+      "p50": 47.0,
+      "p95": 47.0,
+      "max": 47.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "malformed": {
+    "mode": "malformed",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 98,
+     "max_per_file": 2,
+     "mean_per_file": 0.662,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 3365.8,
+      "p50": 3330.0,
+      "p95": 3596.0,
+      "max": 3744.0
+     },
+     "response_chars": {
+      "mean": 145.5,
+      "p50": 146.0,
+      "p95": 146.0,
+      "max": 146.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 3365.8,
+     "p50": 3330.0,
+     "p95": 3596.0,
+     "max": 3744.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "not_json": {
+    "mode": "not_json",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 98,
+     "max_per_file": 2,
+     "mean_per_file": 0.662,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 3365.8,
+      "p50": 3330.0,
+      "p95": 3596.0,
+      "max": 3744.0
+     },
+     "response_chars": {
+      "mean": 92.0,
+      "p50": 92.0,
+      "p95": 92.0,
+      "max": 92.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 3365.8,
+     "p50": 3330.0,
+     "p95": 3596.0,
+     "max": 3744.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "nothing": {
+    "mode": "nothing",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 98,
+     "max_per_file": 2,
+     "mean_per_file": 0.662,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 3365.8,
+      "p50": 3330.0,
+      "p95": 3596.0,
+      "max": 3744.0
+     },
+     "response_chars": {
+      "mean": 8.0,
+      "p50": 8.0,
+      "p95": 8.0,
+      "max": 8.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 3365.8,
+     "p50": 3330.0,
+     "p95": 3596.0,
+     "max": 3744.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "unsupported_field": {
+    "mode": "unsupported_field",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 98,
+     "max_per_file": 2,
+     "mean_per_file": 0.662,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 3368.5,
+      "p50": 3332.0,
+      "p95": 3599.0,
+      "max": 3747.0
+     },
+     "response_chars": {
+      "mean": 226.2,
+      "p50": 202.0,
+      "p95": 312.0,
+      "max": 312.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 3368.5,
+     "p50": 3332.0,
+     "p95": 3599.0,
+     "max": 3747.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 120,
+     "accepted_as_medium": 0,
+     "discarded": 120,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "heavy_answer": {
+    "mode": "heavy_answer",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 98,
+     "max_per_file": 2,
+     "mean_per_file": 0.662,
+     "p95_per_file": 2.0,
+     "mean_per_asked_file": 2.0,
+     "p95_per_asked_file": 2.0
+    },
+    "resolutions_by_reason": {
+     "INVALID": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 3367.0,
+      "p50": 3331.0,
+      "p95": 3597.0,
+      "max": 3745.0
+     },
+     "response_chars": {
+      "mean": 487871.5,
+      "p50": 487872.0,
+      "p95": 487872.0,
+      "max": 487872.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 3367.0,
+     "p50": 3331.0,
+     "p95": 3597.0,
+     "max": 3745.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 490000,
+     "accepted_as_medium": 0,
+     "discarded": 490000,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "timeout": {
+    "mode": "timeout",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "http_429": {
+    "mode": "http_429",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "http_500": {
+    "mode": "http_500",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "raw_exception": {
+    "mode": "raw_exception",
+    "documents": 148,
+    "documents_where_the_model_was_asked": 49,
+    "calls": {
+     "total": 49,
+     "max_per_file": 1,
+     "mean_per_file": 0.331,
+     "p95_per_file": 1.0,
+     "mean_per_asked_file": 1.0,
+     "p95_per_asked_file": 1.0
+    },
+    "resolutions_by_reason": {
+     "UNAVAILABLE": 49
+    },
+    "egress": {
+     "payload_chars": {
+      "mean": 2007.3,
+      "p50": 1953.0,
+      "p95": 2353.0,
+      "max": 2575.0
+     },
+     "approx_input_tokens": {
+      "mean": 1682.0,
+      "p50": 1664.0,
+      "p95": 1797.0,
+      "max": 1871.0
+     },
+     "response_chars": {
+      "mean": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "max": 0.0
+     },
+     "hard_limit_chars": 6000,
+     "over_the_limit": 0,
+     "reduced_to_fit": 0,
+     "blocked_calls": 0,
+     "blocked_documents": [],
+     "false_positive_blocked_calls": 0,
+     "actual_pii_leaks": 0,
+     "documents_with_an_actual_pii_leak": 0
+    },
+    "payload_chars": {
+     "mean": 2007.3,
+     "p50": 1953.0,
+     "p95": 2353.0,
+     "max": 2575.0
+    },
+    "approx_input_tokens": {
+     "mean": 1682.0,
+     "p50": 1664.0,
+     "p95": 1797.0,
+     "max": 1871.0
+    },
+    "levels": {
+     "ASK": 101,
+     "BLOCKED": 1,
+     "MANUAL": 46
+    },
+    "level_transitions": {},
+    "automatic": 0,
+    "automatic_at_baseline": 0,
+    "documents_whose_screen_changed": 0,
+    "newly_automatic": [],
+    "raised_to_ready": [],
+    "false_automation": 0,
+    "false_automation_at_baseline": 0,
+    "ai_caused": {
+     "false_automation_documents": [],
+     "new_p0": 0,
+     "new_p1": 0,
+     "automatic_imports": 0
+    },
+    "p0": 6,
+    "p1": 9,
+    "browser_pii_leaked_values": 0,
+    "model_payload_violations": 0,
+    "documents_with_model_payload_violations": 0,
+    "safe_fallback": {
+     "num": 148,
+     "den": 148,
+     "value": 1.0
+    },
+    "necessary_question_recall": {
+     "num": 0,
+     "den": 0,
+     "value": null
+    },
+    "questions_asked": 110,
+    "questions_asked_at_baseline": 110,
+    "questions_unnecessary": 109,
+    "model_suggestions": {
+     "proposed_columns": 0,
+     "accepted_as_medium": 0,
+     "discarded": 0,
+     "right": 0,
+     "wrong": 0,
+     "wrong_on_critical_fields": 0,
+     "documents_with_a_wrong_suggestion": 0,
+     "questions_precompiled": 0,
+     "all_at_medium": true
+    },
+    "ids": {
+     "changed": []
+    }
+   },
+   "no_model": {
+    "questions_asked": 110,
+    "automatic": 0
+   }
+  }
+ },
+ "value": {
+  "corpus": {
+   "documents_the_model_was_asked_about": 24,
+   "documents_really_improved": 2,
+   "questions_precompiled": 2,
+   "suggestions_accepted_at_medium": 0,
+   "manual_to_ask": 0,
+   "blocked_to_ask": 0,
+   "ask_to_ask_with_a_confirmation_instead_of_an_open_question": 2,
+   "new_automatic_imports": 0,
+   "documents": [
+    {
+     "id": "L27_grid_real_dates_basis_unstated",
+     "truth": "ASK",
+     "baseline_level": "ASK",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [
+      "GRID_HOURS"
+     ],
+     "with_a_perfect_model_questions": [
+      "GRID_HOURS"
+     ],
+     "improved": true,
+     "suggestions": 0,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L30_grid_weekdays_week_number_only",
+     "truth": "ASK",
+     "baseline_level": "ASK",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [
+      "PERIOD"
+     ],
+     "with_a_perfect_model_questions": [
+      "PERIOD"
+     ],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L31_grid_weekdays_without_period",
+     "truth": "ASK",
+     "baseline_level": "ASK",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [
+      "GRID_HOURS"
+     ],
+     "with_a_perfect_model_questions": [
+      "GRID_HOURS"
+     ],
+     "improved": true,
+     "suggestions": 0,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L32_grid_generic_day_columns",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L34_grid_shift_codes_not_hours",
+     "truth": "REJECT",
+     "baseline_level": "BLOCKED",
+     "with_a_perfect_model_level": "BLOCKED",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L35_grid_time_ranges_not_hours",
+     "truth": "REJECT",
+     "baseline_level": "BLOCKED",
+     "with_a_perfect_model_level": "BLOCKED",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L59_neg_no_hours_at_all",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L65_neg_restaurant_menu_other_domain",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "LO01_reception_roster_bare_ore_title_department",
+     "truth": "ASK",
+     "baseline_level": "ASK",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [
+      "DEPARTMENT_CONFIRM",
+      "COLUMN_MEANING"
+     ],
+     "with_a_perfect_model_questions": [
+      "DEPARTMENT_CONFIRM",
+      "COLUMN_MEANING"
+     ],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "LO02_payroll_monthly_summary_by_qualifica",
+     "truth": "REJECT",
+     "baseline_level": "BLOCKED",
+     "with_a_perfect_model_level": "BLOCKED",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "LO03_clock_in_out_times_no_hours",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B37_duplicate_date_columns",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B44_office_airbnb_style_export_no_channel_column",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B49_neg_nights_instead_of_checkout",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO02_arrivals_by_day_sections_no_ids",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO04_front_desk_arrivals_list_no_booking_date",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO14_two_months_side_by_side",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "C48_neg_bank_statement",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "C49_neg_payroll_with_names",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "CO02_payment_schedule_not_a_register",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "CO04_vat_register_two_rates_two_dates",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "CO05_cash_book_not_invoices",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "CO06_utilities_summary_without_number_or_supplier",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "CO13_category_by_month_matrix_not_a_register",
+     "truth": "REJECT",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "MANUAL",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [],
+     "improved": false,
+     "suggestions": 0,
+     "questions_precompiled": 0,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    }
+   ]
+  },
+  "variants": {
+   "documents_the_model_was_asked_about": 49,
+   "documents_really_improved": 49,
+   "questions_precompiled": 50,
+   "suggestions_accepted_at_medium": 49,
+   "manual_to_ask": 45,
+   "blocked_to_ask": 1,
+   "ask_to_ask_with_a_confirmation_instead_of_an_open_question": 3,
+   "new_automatic_imports": 0,
+   "documents": [
+    {
+     "id": "L12_reordered_with_junk_columns~hidden-work_date",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "BLOCKED",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L26_grid_real_dates_basis_stated~hidden-department",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "ASK",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [
+      "DEPARTMENT_ROWS"
+     ],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L28_grid_weekdays_period_in_title~hidden-department",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "ASK",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [
+      "DEPARTMENT_ROWS"
+     ],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "L29_grid_three_weekdays_period_in_title~hidden-department",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "ASK",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [
+      "DEPARTMENT_ROWS"
+     ],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B02_npren_prenotato_il_dal_al~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B04_english_reservation_id_creation_date~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B06_ref_portale_totale_soggiorno~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B07_room_revenue_and_total_stay_both~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B08_abbreviated_headers~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B09_mixed_italian_english_headers~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B10_guest_name_email_phone_notes~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B11_guest_column_holds_names_not_a_count~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B12_guests_count_column_and_guest_name~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B13_pax_and_num_ospiti~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B15_title_before_table~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B16_notes_below_the_table~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B17_summary_block_before_table~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B18_totals_row_and_channel_subtotals~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B19_dashboard_bookings_and_legend_sheets~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B22_status_and_cancellation_date~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B24_channels_direct_phone_email_walkin~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B25_ota_channels_with_commission_columns~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B26_amounts_thousands_dot_comma_decimal~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B28_amounts_with_euro_sign_text~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B29_amounts_excel_currency_format~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B30_dates_text_italian~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B33_dates_dotted_and_day_month_name~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B34_dates_day_month_name_text~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B36_two_level_header~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B38_reordered_columns_with_junk~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B39_ids_with_leading_zeros_and_numeric~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B40_office_pms_export_colored_header~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B42_office_front_desk_monthly_report~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING",
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B43_office_repeated_header_every_page~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B60_adv_hidden_sheet_with_older_bookings~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B61_adv_instructions_in_guest_notes~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B62_adv_formulas_and_html_in_cells~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B63_adv_total_word_in_a_notes_column~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B65_adv_very_long_cells_and_unicode~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "B66_large_year_of_bookings~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO01_channel_written_as_codes~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING",
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO05_kpi_block_beside_the_table~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO06_table_starts_in_column_c_frozen_panes~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO07_weekday_prefixed_dates~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO08_room_and_breakfast_revenue_columns~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO09_status_written_as_ok_canc_ns~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "VALUE_LABELS",
+      "COLUMN_MEANING",
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 2,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO11_header_cells_with_line_breaks~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO12_channel_merged_down_the_column~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    },
+    {
+     "id": "BO13_blank_row_between_every_record~hidden-source_record_id",
+     "truth": "NOT_AUTOMATIC",
+     "baseline_level": "MANUAL",
+     "with_a_perfect_model_level": "ASK",
+     "baseline_questions": [],
+     "with_a_perfect_model_questions": [
+      "COLUMN_MEANING"
+     ],
+     "improved": true,
+     "suggestions": 1,
+     "questions_precompiled": 1,
+     "automatic_with_the_model": false,
+     "automatic_at_baseline": false
+    }
+   ]
+  }
+ },
+ "residual": {
+  "total": 21,
+  "by_class": {
+   "UNSUPPORTED": 3,
+   "DETERMINISTIC_REQUIRED": 6,
+   "HUMAN_REQUIRED": 9,
+   "AI_HELPFUL": 3
+  },
+  "ai_could_remove_today": 0,
+  "rows": [
+   {
+    "document": "L36_abbreviations_known",
+    "question": "VALUE_LABELS F&B, FO, HK, HSKP, REC",
+    "class": "UNSUPPORTED",
+    "why": "Hotel jargon a model reads - but the closed answer has no 'meaning of a label'; a lexicon would also do it. Codes stay asked by product decision.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "L62_neg_swapped_header_labels",
+    "question": "DEPARTMENT_ROWS",
+    "class": "DETERMINISTIC_REQUIRED",
+    "why": "The headers contradict the values: a contradiction is the rules' to detect, never a model's to smooth over.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "LO07_department_in_a_label_value_block",
+    "question": "DEPARTMENT_ROWS",
+    "class": "DETERMINISTIC_REQUIRED",
+    "why": "'Reparto: X' above the table is structure the parser should read; no model needed.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "LO15_abbreviated_department_header_and_codes",
+    "question": "VALUE_LABELS FO, HK, REC",
+    "class": "UNSUPPORTED",
+    "why": "As L36: a label-meaning capability, or a lexicon. Codes stay asked by product decision.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B14_booker_and_guest_names_two_columns",
+    "question": "COLUMN_MEANING Price",
+    "class": "HUMAN_REQUIRED",
+    "why": "Which amount 'Price' is, is not in the file; money is never guessed (product decision).",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B41_office_channel_manager_extract",
+    "question": "COLUMN_MEANING Total",
+    "class": "HUMAN_REQUIRED",
+    "why": "A bare 'Total': room revenue or the whole stay? Approved to stay MEDIUM + confirm.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B42_office_front_desk_monthly_report",
+    "question": "COLUMN_MEANING Ricavo",
+    "class": "HUMAN_REQUIRED",
+    "why": "Which revenue is not in the file; money is never guessed.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B50_neg_arrival_and_departure_swapped",
+    "question": "DATES_REVERSED Arrivo",
+    "class": "DETERMINISTIC_REQUIRED",
+    "why": "Every arrival after its departure: a value check, and a person decides.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B51_neg_occupancy_calendar_not_bookings",
+    "question": "DOMAIN",
+    "class": "DETERMINISTIC_REQUIRED",
+    "why": "A room-by-day calendar is not bookings: the kind of data is the rules' call.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B55_neg_checkout_before_arrival_rows",
+    "question": "DATES_REVERSED Arrivo",
+    "class": "DETERMINISTIC_REQUIRED",
+    "why": "Departures before arrivals: a value check.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B64_adv_near_identical_date_headers",
+    "question": "COLUMN_MEANING Check-in",
+    "class": "HUMAN_REQUIRED",
+    "why": "Planned and actual check-in side by side: two candidates for one field.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "B64_adv_near_identical_date_headers",
+    "question": "COLUMN_MEANING Check-in effettivo",
+    "class": "HUMAN_REQUIRED",
+    "why": "Same file: the choice between the two is the hotel's.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "BO01_channel_written_as_codes",
+    "question": "COLUMN_MEANING Imp.",
+    "class": "HUMAN_REQUIRED",
+    "why": "An abbreviated amount: which one is not in the file.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "BO03_channel_manager_abbreviations",
+    "question": "COLUMN_MEANING Tot",
+    "class": "HUMAN_REQUIRED",
+    "why": "An abbreviated total: which one is not in the file.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "BO09_status_written_as_ok_canc_ns",
+    "question": "VALUE_LABELS OK, CANC, NS",
+    "class": "UNSUPPORTED",
+    "why": "Status codes: a label-meaning capability or a lexicon.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "BO09_status_written_as_ok_canc_ns",
+    "question": "COLUMN_MEANING Stato",
+    "class": "AI_HELPFUL",
+    "why": "The rules already propose 'status' (MEDIUM): a model would only agree, and agreeing cannot lift MEDIUM.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "C33_credit_notes_negative_amounts",
+    "question": "COLUMN_MEANING Imponibile",
+    "class": "HUMAN_REQUIRED",
+    "why": "Negative amounts: credit note or error - the hotel's convention.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "C38_several_lines_per_invoice",
+    "question": "COLUMN_MEANING N. documento",
+    "class": "DETERMINISTIC_REQUIRED",
+    "why": "The same number on several lines is how invoices are written: a rule, not a model.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "C44_office_accounting_export_header_on_row_five",
+    "question": "COLUMN_MEANING Data reg.",
+    "class": "HUMAN_REQUIRED",
+    "why": "Registration date or invoice date: an accounting convention not in the file.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "C46_office_manual_expense_sheet",
+    "question": "COLUMN_MEANING Da chi",
+    "class": "AI_HELPFUL",
+    "why": "Informal wording ('from whom'): exactly what a model reads - but the rules already propose it at MEDIUM.",
+    "the_model_is_even_asked_about_this_file": false
+   },
+   {
+    "document": "C46_office_manual_expense_sheet",
+    "question": "COLUMN_MEANING Cosa",
+    "class": "AI_HELPFUL",
+    "why": "Informal wording ('what'): as above.",
+    "the_model_is_even_asked_about_this_file": false
+   }
+  ]
+ },
+ "summary": {
+  "scope": "first screen only; see `scope`",
+  "corpus": {
+   "ai_caused_false_automation": 0,
+   "ai_caused_new_p0": 0,
+   "ai_caused_new_p1": 0,
+   "newly_automatic": 0,
+   "raised_to_ready_by_a_wrong_model": 0,
+   "oracle_raised_to_ready": 0,
+   "oracle_newly_automatic": 0,
+   "model_payload_violations": 0,
+   "blocked_calls": 0,
+   "silent_modes_that_changed_a_screen": {
+    "says_another_kind": 8
+   }
+  },
+  "variants": {
+   "ai_caused_false_automation": 0,
+   "ai_caused_new_p0": 0,
+   "ai_caused_new_p1": 4,
+   "newly_automatic": 0,
+   "raised_to_ready_by_a_wrong_model": 0,
+   "oracle_raised_to_ready": 0,
+   "oracle_newly_automatic": 0,
+   "model_payload_violations": 0,
+   "blocked_calls": 0,
+   "silent_modes_that_changed_a_screen": {}
+  }
+ }
+}
