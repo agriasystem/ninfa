@@ -25,9 +25,10 @@ no call is made at all. A provider therefore receives text that has already been
 it is never asked to protect anything.
 """
 
+import json
 import math
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, replace
 
 from app.modules.ai.import_understanding.prompt import evidence_json
@@ -299,12 +300,36 @@ def fit_budget(
 # --- 3. one last read of the final text -----------------------------------------------------------
 
 
+def _leaves(node: object) -> Iterator[str]:
+    """Every string of a decoded document - the keys and the values at any depth - one at a time."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, Mapping):
+        for key, value in node.items():
+            yield str(key)
+            yield from _leaves(value)
+    elif isinstance(node, list | tuple):
+        for item in node:
+            yield from _leaves(item)
+
+
 def verify(document: str, guard: EgressGuard) -> None:
-    """Reads the serialised evidence exactly as it would be sent. Anything shaped like personal
-    data, or any personal value of THIS file, makes the call impossible."""
-    codes = list(personal_shapes_in(document))
-    if guard.scrub(document) != document:
-        codes.append("FILE_VALUE")
+    """Reads the serialised evidence exactly as it would be sent, ONE STRING AT A TIME. Anything
+    shaped like personal data, or any personal value of THIS file, in any single string makes the
+    call impossible.
+
+    The strings are never joined: two innocent neighbours in a list ("@cmd", "fdp.exe") are not an
+    address, and reading the JSON as one text would make them one. Text that is not JSON is read
+    whole (fail closed)."""
+    try:
+        decoded: object = json.loads(document)
+    except ValueError:
+        decoded = document
+    codes: list[str] = []
+    for leaf in _leaves(decoded):
+        codes.extend(personal_shapes_in(leaf))
+        if guard.scrub(leaf) != leaf:
+            codes.append("FILE_VALUE")
     if codes:
         raise EgressViolationError(tuple(dict.fromkeys(codes)))
 

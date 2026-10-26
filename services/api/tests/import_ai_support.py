@@ -58,16 +58,27 @@ class Scenario(StrEnum):
     HEAVY = "HEAVY"  # an answer that weighs far too much
 
 
+def _strings(node: Any) -> list[str]:
+    if isinstance(node, str):
+        return [node]
+    if isinstance(node, dict):
+        return [t for key, value in node.items() for t in [str(key), *_strings(value)]]
+    if isinstance(node, list):
+        return [t for item in node for t in _strings(item)]
+    return []
+
+
 def audit(request: ImportUnderstandingRequest, forbidden: Sequence[str] = ()) -> list[str]:
-    """What is wrong with what a provider was just handed: anything shaped like personal data, any
-    of the personal values of the file (`forbidden`), a file name, instructions with evidence in
-    them. A good request has none."""
-    problems = [f"shape:{code}" for code in personal_shapes_in(request.evidence_json)]
+    """What is wrong with what a provider was just handed: anything shaped like personal data in
+    any ONE string of it (strings are never joined: two neighbours in a list are not an address),
+    any of the personal values of the file (`forbidden`), a file name, instructions with evidence
+    in them. A good request has none."""
+    document = json.loads(request.evidence_json)
+    problems = [f"shape:{code}" for text in _strings(document) for code in personal_shapes_in(text)]
     reading = normalize(request.evidence_json).casefold()
     problems += [
         f"value:{value[:3]}..." for value in forbidden if normalize(value).casefold() in reading
     ]
-    document = json.loads(request.evidence_json)
     if "filename" in document or "file_name" in document:
         problems.append("file name")
     if request.evidence_json in request.system_instructions:
