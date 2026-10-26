@@ -71,6 +71,10 @@ class OfferedQuestion:
     id: str
     kind: str
     choices: tuple[str, ...]
+    # For a question about a column: the index of that column. (The id of a question holds the
+    # header of the column, which is free text from the file; what goes out is an opaque id and
+    # this index - see `egress.prepare`.)
+    column: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +90,8 @@ class UnderstandingEvidence:
     title: str | None = None
     columns: tuple[ColumnEvidence, ...] = ()
     questions: tuple[OfferedQuestion, ...] = ()
+    # opaque question id -> the real one. Never serialised: it stays on this side.
+    aliases: Mapping[str, str] = field(default_factory=dict)
 
     def column(self, index: int) -> ColumnEvidence | None:
         return next((c for c in self.columns if c.index == index), None)

@@ -140,8 +140,14 @@ def build_evidence(
     column, never a long free text: sheet names and the title are reduced to the words NINFA's own
     vocabulary knows."""
     vocabulary = _vocabulary(semantics)
+    position = {c.header: c.position for c in reversed(proposal.columns)}
     offered = tuple(
-        OfferedQuestion(q.id, q.kind.value, tuple(c.value for c in q.choices))
+        OfferedQuestion(
+            q.id,
+            q.kind.value,
+            tuple(c.value for c in q.choices),
+            column=position.get(q.column) if q.column is not None else None,
+        )
         for q in questions
         if q.kind in _ASKABLE and q.choices and q.candidate is None
     )

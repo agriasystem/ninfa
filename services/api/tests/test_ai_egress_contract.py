@@ -37,6 +37,7 @@ from app.modules.ai.import_understanding.sanitize import REMOVED
 from app.modules.ai.import_understanding.types import (
     AiResolution,
     ColumnEvidence,
+    ImportUnderstandingRequest,
     OfferedQuestion,
     ResolutionReason,
     UnderstandingEvidence,
@@ -50,7 +51,7 @@ from app.modules.document_understanding.pii import PiiKind
 from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.ingestion.models import DataSourceDomain
 from tests.hardening_support import PEOPLE, staff, xlsx
-from tests.import_ai_support import Recorder, Scenario, ScenarioProvider, understand_with
+from tests.import_ai_support import Counting, Recorder, Scenario, ScenarioProvider, understand_with
 
 SEMANTICS = {
     DataSourceDomain.BOOKINGS: BOOKINGS,
@@ -206,7 +207,56 @@ def test_a_question_whose_choice_the_cleaning_would_change_is_not_offered() -> N
 
     clean, _ = prepare(evidence, EgressGuard())
 
-    assert [q.id for q in clean.questions] == ["DOMAIN"]
+    assert [q.kind for q in clean.questions] == ["DOMAIN"]
+    assert clean.aliases == {"Q1": "DOMAIN"}  # what goes out is opaque; the real id stays here
+
+
+def test_the_id_of_a_question_about_a_column_never_carries_its_header() -> None:
+    # NINFA's own ids hold the header of the column ("MEANING:Mario Rossi"): free text from the file
+    evidence = _evidence(
+        columns=(
+            ColumnEvidence(0, "Mario Rossi", "NUMBER", 7, 4),
+            ColumnEvidence(1, "Ore", "NUMBER", 7, 4),
+        ),
+        questions=(
+            OfferedQuestion("MEANING:Mario Rossi", "COLUMN_MEANING", ("planned_hours",), column=0),
+            OfferedQuestion("MEANING:Ore", "COLUMN_MEANING", ("planned_hours",), column=1),
+            OfferedQuestion("TABLE", "TABLE", ("Marta Conti#5", "Luca Ferri#5")),
+            OfferedQuestion("MEANING:Colonna 9", "COLUMN_MEANING", ("planned_hours",), column=9),
+        ),
+    )
+
+    clean, _ = prepare(evidence, EgressGuard())
+
+    assert [(q.id, q.kind, q.column) for q in clean.questions] == [
+        ("Q1", "COLUMN_MEANING", 0),
+        ("Q2", "COLUMN_MEANING", 1),
+    ]  # a table (its choices are sheet names) and a question about an unseen column are not asked
+    sent = evidence_json(clean)
+    assert "Mario Rossi" not in sent.replace(REMOVED, "") and "Marta" not in sent
+    assert clean.aliases == {"Q1": "MEANING:Mario Rossi", "Q2": "MEANING:Ore"}
+
+
+def test_the_answer_to_an_opaque_question_comes_back_under_the_real_id() -> None:
+    evidence = _evidence(
+        columns=(ColumnEvidence(0, "Mario Rossi", "NUMBER", 7, 4),),
+        questions=(
+            OfferedQuestion("MEANING:Mario Rossi", "COLUMN_MEANING", ("planned_hours",), column=0),
+        ),
+    )
+
+    def answer(request: ImportUnderstandingRequest) -> object:
+        (question,) = json.loads(request.evidence_json)["questions"]
+        assert question["id"] == "Q1" and question["column"] == 0
+        return {
+            "domain": "LABOR",
+            "columns": [],
+            "answers": [{"question": "Q1", "choice": "planned_hours"}],
+        }
+
+    result = ImportUnderstandingResolver(Counting(answer)).resolve(evidence, _fit)
+
+    assert result.answers == {"MEANING:Mario Rossi": "planned_hours"}
 
 
 def test_a_field_nobody_offered_is_not_passed_on_as_already_placed() -> None:
@@ -456,7 +506,7 @@ def test_every_resolution_leaves_an_audit_line_of_counts_and_never_of_content(
 
     (line,) = [r.getMessage() for r in caplog.records if "resolution" in r.getMessage()]
     assert "reason=OK" in line and "calls=1" in line and "payload_chars=" in line
-    assert "redactions=2" in line and "prompt=import-understanding-v1" in line
+    assert "redactions=2" in line and "prompt=import-understanding-v2" in line
     for content in ("Mario", "Rossi", "mario.rossi", "Reception", "Gruppo"):
         assert content not in line
 

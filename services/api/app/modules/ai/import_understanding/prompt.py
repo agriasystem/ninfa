@@ -18,7 +18,7 @@ from app.modules.ai.import_understanding.types import (
     UnderstandingEvidence,
 )
 
-PROMPT_VERSION = "import-understanding-v1"
+PROMPT_VERSION = "import-understanding-v2"
 
 SYSTEM_INSTRUCTIONS = """\
 You help NINFA, software for hotels, read a spreadsheet a hotel already has (bookings, staff \
@@ -38,7 +38,8 @@ or "UNKNOWN" when the evidence does not say.
 "allowed.fields" for the domain you chose (or "NONE"), and a "confidence" of LOW or MEDIUM. You \
 can never be sure enough for more than MEDIUM.
 - "answers": for a question listed under "questions" whose answer the evidence supports, an item \
-with the question "id" and one of its "choices".
+with the question "id" and one of its "choices". A question about a column carries that \
+column's "index" under "column".
 
 Rules:
 - Use only the values the evidence offers. Never invent a field, a domain or a choice.
@@ -112,7 +113,8 @@ def evidence_json(evidence: UnderstandingEvidence) -> str:
             for c in evidence.columns
         ],
         "questions": [
-            {"id": q.id, "kind": q.kind, "choices": list(q.choices)} for q in evidence.questions
+            {"id": q.id, "kind": q.kind, "column": q.column, "choices": list(q.choices)}
+            for q in evidence.questions
         ],
     }
     return json.dumps(document, ensure_ascii=False, separators=(",", ":"))

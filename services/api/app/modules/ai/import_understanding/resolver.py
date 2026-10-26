@@ -208,12 +208,14 @@ class ImportUnderstandingResolver:
                 hints = invalid.codes
                 continue
             checked = check_guess(guess, evidence, fit_of)
+            # the model answered with opaque ids: back to the ones this side knows
+            answers = {evidence.aliases.get(q, q): choice for q, choice in checked.answers.items()}
             return AiResolution(
                 ResolutionReason.OK,
                 calls,
                 checked.domain,
                 checked.columns,
-                checked.answers,
+                answers,
                 checked.rejected,
                 payload_chars=len(document),
                 input_tokens=spent_in,

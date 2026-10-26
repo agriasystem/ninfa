@@ -63,6 +63,8 @@ _KINDS = frozenset({"TEXT", "NUMBER", "DATE", "MIXED", "EMPTY"})
 # A number is shown only when it cannot be somebody's telephone number: at most seven digits.
 _SMALL_NUMBER = re.compile(r"^-?\d{1,7}(?:\.\d{1,4})?$")
 _IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_]{0,63}$")
+# The kinds of question whose choices are NINFA's own words. (Not TABLE: its choices are sheets.)
+_QUESTION_KINDS = frozenset({"DOMAIN", "COLUMN_MEANING", "GRID_HOURS"})
 
 
 def approx_tokens(chars: int) -> int:
@@ -171,14 +173,29 @@ def _column(
 
 
 def _question(
-    question: OfferedQuestion, guard: EgressGuard, count: _Count
+    question: OfferedQuestion,
+    opaque: str,
+    sent_columns: frozenset[int],
+    guard: EgressGuard,
+    count: _Count,
 ) -> OfferedQuestion | None:
-    """A question is offered only if none of its choices is touched by cleaning: a model must
-    answer with exactly what NINFA holds."""
-    if not _IDENTIFIER.match(question.id) or not _IDENTIFIER.match(question.kind):
+    """A question is offered only if it is of a kind whose choices are NINFA's own vocabulary (a
+    kind of data, a field, planned or actual hours) and every choice is a plain identifier and is
+    untouched by cleaning: a model must answer with exactly what NINFA holds, and a choice made of
+    something typed in the file - the key of a table is its sheet names - never goes out. The id
+    of a question about a column holds that column's header (free text): what goes out is an
+    opaque id and the column's index."""
+    if question.kind not in _QUESTION_KINDS:
+        return None
+    if not all(_IDENTIFIER.match(choice) for choice in question.choices):
         return None
     choices = tuple(_text(choice, guard, count, MAX_CHOICE_CHARS) for choice in question.choices)
-    return question if choices == question.choices else None
+    if choices != question.choices:
+        return None
+    column = question.column if question.column in sent_columns else None
+    if question.kind == "COLUMN_MEANING" and column is None:
+        return None  # a question about a column the model is not shown cannot be asked
+    return OfferedQuestion(opaque, question.kind, question.choices, column)
 
 
 def prepare(
@@ -197,16 +214,23 @@ def prepare(
         )
         for name, role, rows in evidence.sheets
     )
-    questions = tuple(
-        q for q in (_question(item, guard, count) for item in evidence.questions) if q is not None
-    )
+    columns = tuple(_column(c, known_fields, guard, count) for c in evidence.columns)
+    sent_columns = frozenset(c.index for c in columns)
+    questions: list[OfferedQuestion] = []
+    aliases: dict[str, str] = {}
+    for item in evidence.questions:
+        offered = _question(item, f"Q{len(questions) + 1}", sent_columns, guard, count)
+        if offered is not None:
+            questions.append(offered)
+            aliases[offered.id] = item.id
     clean = UnderstandingEvidence(
         expected_domain=evidence.expected_domain,
         fields=evidence.fields,
         sheets=sheets,
         title=title or None,
-        columns=tuple(_column(c, known_fields, guard, count) for c in evidence.columns),
-        questions=questions,
+        columns=columns,
+        questions=tuple(questions),
+        aliases=aliases,
     )
     return clean, count.removed
 
