@@ -67,6 +67,7 @@ from app.modules.data_sources.smart_import import Formats, SmartImportService, p
 from app.modules.data_sources.understanding_ai import (
     apply_resolution,
     build_evidence,
+    egress_guard,
     fit_function,
     needs_help,
 )
@@ -304,9 +305,16 @@ class UnderstandingService:
         # The optional assistant: asked only when the rules left something open it could help with,
         # and what it says is a SUGGESTION (MEDIUM at most) that the person still confirms.
         ai_headers: frozenset[str] = frozenset()
+        # The rules say the document is ANOTHER kind of data than the card the person came from:
+        # they ask which it is, and the model is not asked at all - what the document says wins
+        # over anything anyone suggests.
+        rules_contradict_card = any(
+            q.kind == QuestionKind.DOMAIN and q.candidate is not None for q in questions
+        )
         if (
             self._resolver is not None
             and self._resolver.enabled
+            and not rules_contradict_card
             and needs_help(proposal, adapter.groups, questions)
         ):
             # where the rules saw nothing at all, the model may say it is ANOTHER kind of data (the
@@ -338,7 +346,11 @@ class UnderstandingService:
                     ),
                 ],
             )
-            resolution = self._resolver.resolve(evidence, fit_function(_SEMANTICS, proposal))
+            resolution = self._resolver.resolve(
+                evidence,
+                fit_function(_SEMANTICS, proposal),
+                egress_guard(guard_for(samples, proposal), _SEMANTICS),
+            )
             proposal, questions, ai_headers = apply_resolution(
                 proposal, questions, resolution, domain, offered
             )
