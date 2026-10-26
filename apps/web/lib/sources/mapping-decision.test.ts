@@ -13,6 +13,7 @@ import {
   fieldOfColumn,
   fieldsInUse,
   isLockedColumn,
+  personAnswered,
   sameDecision,
   startingDecision,
   withColumnField,
@@ -145,5 +146,24 @@ describe("where 'Controlla colonne' starts", () => {
     expect(startingDecision(laborInspectionWithoutTeam())).toEqual(
       decisionFromSuggestions(laborInspectionWithoutTeam()),
     );
+  });
+});
+
+describe("did the person answer anything?", () => {
+  it("is false for no answers, and for answers that decide nothing", () => {
+    expect(personAnswered({})).toBe(false);
+    expect(personAnswered({ column_fields: {}, labels: {} })).toBe(false);
+    expect(personAnswered({ period_start: "2026-11-02" })).toBe(false); // the week of THIS file only
+    expect(personAnswered({ sheet_name: null, date_order: null })).toBe(false);
+  });
+
+  it("is true as soon as the person decided a column, a basis, a department or how dates are written", () => {
+    expect(personAnswered({ column_fields: { "Ore A": "planned_hours" } })).toBe(true);
+    expect(personAnswered({ grid_hours: "actual_hours" })).toBe(true);
+    expect(personAnswered({ amount_basis: "NET" })).toBe(true);
+    expect(personAnswered({ date_order: "DMY" })).toBe(true);
+    expect(personAnswered({ decimal_style: "COMMA" })).toBe(true);
+    expect(personAnswered({ department_value: "RECEPTION" })).toBe(true);
+    expect(personAnswered({ table_key: "T2" })).toBe(true);
   });
 });
