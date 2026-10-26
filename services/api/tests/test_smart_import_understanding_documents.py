@@ -22,9 +22,11 @@ from app.modules.labor.roles import LaborCategory
 from tests import understanding_support as corpus
 from tests.data_sources_support import SourcesEnv, sources_env
 from tests.smart_import_support import (
+    by_hand,
     by_header,
     import_mapped,
     profiles_of,
+    refused_as_unresolved,
     understand,
     validation,
     writes,
@@ -66,7 +68,12 @@ def _entries(db_session: Session, env: SourcesEnv) -> list[LaborEntry]:
 def _tried(
     client: TestClient, env: SourcesEnv, content: bytes, body: dict[str, Any], name: str = "t.xlsx"
 ) -> dict[str, Any]:
-    result: dict[str, Any] = validation(client, env, LABOR, content, body["proposal"], name=name)
+    """The dry run of the person's own matching (no reference to the understanding): what the
+    IMPORTER makes of the rows. A decision that carries the reference is refused while it is not
+    READY (see `refused_as_unresolved`)."""
+    result: dict[str, Any] = validation(
+        client, env, LABOR, content, by_hand(body["proposal"]), name=name
+    )
     return result
 
 
@@ -232,9 +239,11 @@ def test_a_department_that_ninfa_cannot_use_is_never_silently_imported(
     content = corpus.staff_unknown_labels_xlsx()
     body = understand(api_client, env, LABOR, "turni.xlsx", content)
 
+    details = refused_as_unresolved(api_client, env, LABOR, "turni.xlsx", content, body["proposal"])
+    assert details["questions"], "the server names what is still open"
     tried = _tried(api_client, env, content, body)
 
-    # the dry run of the UNTAUGHT proposal says what is left, instead of importing "OTHER"
+    # the dry run of the UNTAUGHT matching says what is left, instead of importing "OTHER"
     assert tried["rows_unclassified"] > 0 or tried["questions"]
 
 
@@ -367,9 +376,12 @@ def test_a_weekly_summary_with_no_days_is_refused_with_the_reason_and_writes_not
 
     assert _level(body) == "BLOCKED" and _blockers(body) == ["PERIOD_SUMMARY_ONLY"]
     # hours are NEVER spread over the days of the week: there is nothing to import
+    refused_as_unresolved(api_client, env, LABOR, "riepilogo.xlsx", content, body["proposal"])
     tried = _tried(api_client, env, content, body, "riepilogo.xlsx")
     assert tried["can_import"] is False
-    done = import_mapped(api_client, env, LABOR, "riepilogo.xlsx", content, body["proposal"])
+    done = import_mapped(
+        api_client, env, LABOR, "riepilogo.xlsx", content, by_hand(body["proposal"])
+    )
     assert done.status_code == 200 and done.json()["succeeded"] is False
     assert writes(db_session, env) == before
     assert _entries(db_session, env) == []

@@ -41,6 +41,35 @@ class ImportInProgressError(AppError):
         )
 
 
+class UnresolvedImportQuestionsError(AppError):
+    """The decision came from NINFA's understanding of the file, and read again with the answers it
+    carries that understanding is not READY: a question is still open (or something refuses the
+    import). Posting the proposal again, copying the suggested matching or declaring it confirmed
+    changes nothing - the questions are answered, and the answers checked, by the server. Nothing
+    was written."""
+
+    def __init__(self, level: str, questions: list[str], blockers: list[str]) -> None:
+        super().__init__(
+            "UNRESOLVED_IMPORT_QUESTIONS",
+            "NINFA still has questions about this file: answer them before importing",
+            status_code=HTTPStatus.CONFLICT,
+            details={"level": level, "questions": questions, "blockers": blockers},
+        )
+
+
+class ImportDecisionChangedError(AppError):
+    """A decision that says it comes from NINFA's understanding was changed. A matching the person
+    builds by hand is imported without that reference; one that carries it must be the server's
+    own, unaltered. Nothing was written."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "IMPORT_DECISION_CHANGED",
+            "The matching is not the one NINFA settled for these answers",
+            status_code=HTTPStatus.CONFLICT,
+        )
+
+
 class InvalidImportRequestError(AppError):
     """The body of an import request is not what the page sends (not JSON of the expected shape, or
     a file that is not valid base64). Nothing was read into NINFA."""

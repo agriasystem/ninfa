@@ -56,6 +56,7 @@ from app.modules.data_sources.mapping_types import (
     FileInspection,
     MappingInput,
     ProfileStatus,
+    SmartImportDecision,
     SuggestionLevel,
 )
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal, propose
@@ -67,6 +68,7 @@ from app.modules.data_sources.smart_import import Formats, SmartImportService, p
 from app.modules.data_sources.understanding_ai import (
     apply_resolution,
     build_evidence,
+    egress_guard,
     fit_function,
     needs_help,
 )
@@ -124,9 +126,10 @@ from app.modules.document_understanding.document import (
 )
 from app.modules.document_understanding.grid import WorkbookScan, scan_workbook
 from app.modules.document_understanding.layout import GridLayout, LayoutSpec
+from app.modules.document_understanding.lexicon import SUMMARY_SHEET_WORDS
 from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.document_understanding.structure import RowKind
-from app.modules.document_understanding.text import fold
+from app.modules.document_understanding.text import fold, has_word
 from app.modules.document_understanding.values import text_of
 from app.modules.ingestion.models import DataSource, DataSourceDomain
 
@@ -140,6 +143,12 @@ _SEMANTICS: dict[DataSourceDomain, DomainSem] = {
 _LEVEL = {Level.HIGH: SuggestionLevel.RECOGNIZED, Level.MEDIUM: SuggestionLevel.TO_CHECK}
 _EXAMPLE_FIELDS_HIDDEN = {"PERSON", "CONTACT", "IDENTITY"}
 _MAX_TABLES_OFFERED = 4
+# The table the file is read as can leave real data out: another sheet (or block) that holds data,
+# has records enough to matter and looks like data of the kind the person chose. The ranking picks
+# the BEST table; it cannot prove the others are irrelevant - so the person is asked (a summary, a
+# legend, a hidden sheet, an example of two rows or a table of another kind never counts).
+_MIN_LEFT_OUT_RECORDS = 4
+_LEFT_OUT_SCORE_SHARE = 0.5
 # Any Monday: only used to read the NAMES the columns of an unpivoted grid get.
 _SIGNATURE_WEEK = date(2001, 1, 1)
 
@@ -229,7 +238,7 @@ class UnderstandingService:
         questions: list[Question] = []
         blockers: list[Blocker] = []
         questions.extend(self._domain_question(detection, domain, confirmed_domain))
-        table_question = self._table_question(candidates, domain, answers, document)
+        table_question = self._table_question(candidates, chosen, domain, answers, document)
         if table_question is not None:
             questions.append(table_question)
 
@@ -304,9 +313,16 @@ class UnderstandingService:
         # The optional assistant: asked only when the rules left something open it could help with,
         # and what it says is a SUGGESTION (MEDIUM at most) that the person still confirms.
         ai_headers: frozenset[str] = frozenset()
+        # The rules say the document is ANOTHER kind of data than the card the person came from:
+        # they ask which it is, and the model is not asked at all - what the document says wins
+        # over anything anyone suggests.
+        rules_contradict_card = any(
+            q.kind == QuestionKind.DOMAIN and q.candidate is not None for q in questions
+        )
         if (
             self._resolver is not None
             and self._resolver.enabled
+            and not rules_contradict_card
             and needs_help(proposal, adapter.groups, questions)
         ):
             # where the rules saw nothing at all, the model may say it is ANOTHER kind of data (the
@@ -338,7 +354,11 @@ class UnderstandingService:
                     ),
                 ],
             )
-            resolution = self._resolver.resolve(evidence, fit_function(_SEMANTICS, proposal))
+            resolution = self._resolver.resolve(
+                evidence,
+                fit_function(_SEMANTICS, proposal),
+                egress_guard(guard_for(samples, proposal), _SEMANTICS),
+            )
             proposal, questions, ai_headers = apply_resolution(
                 proposal, questions, resolution, domain, offered
             )
@@ -399,6 +419,10 @@ class UnderstandingService:
             labels=decision_labels,
             date_order=answers.date_order,
             decimal_style=answers.decimal_style,
+            smart_import=SmartImportDecision(
+                answers=answers.model_dump(mode="json", exclude_defaults=True),
+                confirmed_domain=confirmed_domain,
+            ),
         )
         check = self._smart.check(domain, decision)
 
@@ -644,17 +668,55 @@ class UnderstandingService:
         return []
 
     @staticmethod
+    def _left_out(
+        candidates: list[_Candidate],
+        chosen: _Candidate,
+        domain: DataSourceDomain,
+        document: DocumentUnderstanding,
+    ) -> list[_Candidate]:
+        """The other tables of the file that are real data of the kind chosen and that the chosen
+        table leaves out: every sheet they sit on holds data (not a summary, hidden or empty), they
+        have records enough to matter and the kind of data fits at least half as well as the
+        chosen table's. A file that leaves such a table out is never read without asking."""
+        roles = {sheet.name: sheet.role for sheet in document.sheets}
+        found: list[_Candidate] = []
+        for candidate in candidates:
+            if candidate is chosen:
+                continue
+            # a sheet that is hidden or empty, or that SAYS it is a summary, is not data left out.
+            # (A sheet only called "summary" for being much smaller than the best table is: size
+            # alone does not prove it is one.)
+            if any(
+                roles.get(t.sheet) not in (SheetRole.DATA, SheetRole.SUMMARY)
+                or has_word(t.sheet, SUMMARY_SHEET_WORDS)
+                for t in candidate.selection.tables
+            ):
+                continue
+            if sum(t.data_rows for t in candidate.selection.tables) < _MIN_LEFT_OUT_RECORDS:
+                continue
+            if candidate.scores[domain].score < _LEFT_OUT_SCORE_SHARE * chosen.scores[domain].score:
+                continue
+            found.append(candidate)
+        return found
+
+    @staticmethod
     def _table_question(
         candidates: list[_Candidate],
+        chosen: _Candidate,
         domain: DataSourceDomain,
         answers: UnderstandAnswers,
         document: DocumentUnderstanding,
     ) -> Question | None:
-        if answers.table_key or not document.ambiguous or len(candidates) < 2:
+        if answers.table_key or len(candidates) < 2:
             return None
         ranked = sorted(candidates, key=lambda c: -c.scores[domain].score)
         top, second = ranked[0], ranked[1]
-        if top.scores[domain].score - second.scores[domain].score >= 0.15:
+        comparable = (
+            document.ambiguous and top.scores[domain].score - second.scores[domain].score < 0.15
+        )
+        if not comparable and not UnderstandingService._left_out(
+            candidates, chosen, domain, document
+        ):
             return None
         return Question(
             id="TABLE",
@@ -662,7 +724,7 @@ class UnderstandingService:
             choices=tuple(
                 Choice(
                     c.selection.key,
-                    count=c.selection.first.data_rows,
+                    count=sum(t.data_rows for t in c.selection.tables),
                     sheets=tuple(t.sheet for t in c.selection.tables if t.sheet),
                     columns=tuple(col.label for col in c.selection.first.columns[:6]),
                     title=_short(

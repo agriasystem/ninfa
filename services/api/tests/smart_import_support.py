@@ -284,6 +284,33 @@ def validation(
     return response.json()
 
 
+def by_hand(decision: Mapping[str, Any]) -> dict[str, Any]:
+    """The decision as the PERSON's own matching: without the reference of the server's
+    understanding it was issued with. A decision that carries it is verified (read again, with
+    the answers it names, and accepted only if READY); one built by hand is judged on its merits -
+    which is what a test of the IMPORTER's own refusal of rows wants to see."""
+    return {**decision, "smart_import": None}
+
+
+def refused_as_unresolved(
+    client: TestClient,
+    env: SourcesEnv,
+    domain: str,
+    name: str,
+    content: bytes,
+    decision: Mapping[str, Any],
+) -> dict[str, Any]:
+    """The server's refusal of a decision whose understanding is not READY, by both endpoints (the
+    dry run and the import): 409 UNRESOLVED_IMPORT_QUESTIONS. Returns the details."""
+    judged = dry_run(client, env, domain, name, content, decision)
+    imported = import_mapped(client, env, domain, name, content, decision)
+    for response in (judged, imported):
+        assert response.status_code == 409, response.text
+        assert response.json()["error"]["code"] == "UNRESOLVED_IMPORT_QUESTIONS", response.text
+    details: dict[str, Any] = imported.json()["error"]["details"]
+    return details
+
+
 def profiles_of(db_session: Session, env: SourcesEnv, model: Any) -> list[Any]:
     """The saved configurations of the property (a labor or a booking mapping profile)."""
     return list(

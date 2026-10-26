@@ -26,7 +26,13 @@ from tests.hardening_support import (
     xlsx,
     xlsx_sheets,
 )
-from tests.smart_import_support import import_mapped, understand, validation
+from tests.smart_import_support import (
+    by_hand,
+    import_mapped,
+    refused_as_unresolved,
+    understand,
+    validation,
+)
 from tests.support import BookingFactory
 
 
@@ -185,8 +191,14 @@ def test_a_file_with_every_arrival_after_its_departure_is_asked_about_and_cannot
     assert [q["kind"] for q in body["understanding"]["questions"]][0] == "DATES_REVERSED"
     # nothing was swapped for the person: the decision still reads the headers as they are
     assert {c["header"]: c["field"] for c in body["proposal"]["columns"]}["Arrivo"] == "check_in"
-    tried = validation(api_client, env, "BOOKINGS", content, body["proposal"], name="pren.xlsx")
-    assert (
-        tried["can_import"] is False and tried["rows_valid"] == 0
-    )  # the importer refuses them too
+    # the server refuses the decision itself while the question is open...
+    details = refused_as_unresolved(
+        api_client, env, "BOOKINGS", "pren.xlsx", content, body["proposal"]
+    )
+    assert details["questions"][0] == "DATES_REVERSED"
+    # ...and the importer refuses the rows too, whoever asks (the person's own matching)
+    tried = validation(
+        api_client, env, "BOOKINGS", content, by_hand(body["proposal"]), name="pren.xlsx"
+    )
+    assert tried["can_import"] is False and tried["rows_valid"] == 0
     assert db_session.scalar(select(func.count()).select_from(Booking)) == 0

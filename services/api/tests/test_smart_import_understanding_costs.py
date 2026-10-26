@@ -24,9 +24,11 @@ from app.modules.suppliers.models import Supplier
 from tests import understanding_support as corpus
 from tests.data_sources_support import SourcesEnv, card, sources_env
 from tests.smart_import_support import (
+    by_hand,
     by_header,
     import_mapped,
     profiles_of,
+    refused_as_unresolved,
     understand,
     validation,
     writes,
@@ -270,10 +272,9 @@ def test_a_register_without_a_description_says_so_instead_of_inventing_one(
     (blocker,) = understanding["blockers"]
     assert blocker["code"] == "MISSING_REQUIRED" and ["line_description"] in blocker["groups"]
     assert understanding["level"] == "MANUAL"
-    assert (
-        validation(api_client, env, COSTS, content, body["proposal"], name="r.xlsx")["can_import"]
-        is False
-    )
+    refused_as_unresolved(api_client, env, COSTS, "r.xlsx", content, body["proposal"])
+    mine = by_hand(body["proposal"])  # the importer refuses it too, whoever asks
+    assert validation(api_client, env, COSTS, content, mine, name="r.xlsx")["can_import"] is False
     assert writes(db_session, env) == before
 
 
@@ -291,8 +292,11 @@ def test_a_category_word_nobody_knows_is_asked_once_and_remembered(
     question = asked["understanding"]["questions"][0]
     assert question["document"] == "category_mapping"
     assert [(item["label"], item["count"]) for item in question["labels"]] == [("Boh???", 1)]
-    # untaught, the dry run refuses that row instead of calling it "OTHER"
-    tried = validation(api_client, env, COSTS, content, asked["proposal"], name="r.xlsx")
+    # untaught, the server refuses the decision while the question is open...
+    details = refused_as_unresolved(api_client, env, COSTS, "r.xlsx", content, asked["proposal"])
+    assert details["questions"] == ["LABELS:category_mapping"]
+    # ...and the importer, asked by the person's own matching, refuses that row instead of "OTHER"
+    tried = validation(api_client, env, COSTS, content, by_hand(asked["proposal"]), name="r.xlsx")
     assert tried["can_import"] is False
     assert tried["row_problems"] == [
         {"field": "cost_category", "code": "UNKNOWN_CATEGORY", "count": 1}

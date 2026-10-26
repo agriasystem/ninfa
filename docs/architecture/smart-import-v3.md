@@ -44,6 +44,13 @@ file -> every sheet scanned (bounded) -> the table found (title, summary, totals
   is shown as a warning and never imported.
 - **Several tables on a sheet, or on several sheets**: comparable tables of the kind being imported become a `TABLE` question;
   sheets with the same columns are ONE table (one sheet per department); a summary sheet is not data.
+- **A table the chosen one leaves out is asked about, however clear the winner** (found by the AI readiness benchmark: three
+  readable department sheets and a fourth with an unreadable header were offered as READY with 27 records of 36). The ranking
+  picks the best table; it cannot prove the others irrelevant. When another table sits on a sheet that holds data (not hidden,
+  not empty, not called a summary - a sheet only *demoted* for being small counts), has at least 4 records and fits the kind of
+  data chosen at least half as well, the file is `ASK` with the `TABLE` question, whose choices show the records of each (27 and
+  9); the person's answer is the decision. A legend, an example of two rows, a dashboard, a hidden draft, a supplier directory
+  in a costs file or an empty sheet never counts. No sheets are merged and no new capability is added.
 - **`LayoutSpec`** is the small, repeatable part of the reading (department source, grid hours, sheets, table key). It travels
   with the decision and, minus the week and the table key of THIS file, is saved in `format_options.layout`. Its presence is what
   makes the next file be read the same way.

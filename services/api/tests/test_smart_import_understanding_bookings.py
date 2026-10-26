@@ -22,9 +22,11 @@ from app.modules.bookings.models import Booking, BookingMappingProfile
 from tests import understanding_support as corpus
 from tests.data_sources_support import SourcesEnv, sources_env
 from tests.smart_import_support import (
+    by_hand,
     by_header,
     import_mapped,
     profiles_of,
+    refused_as_unresolved,
     understand,
     validation,
     writes,
@@ -254,9 +256,16 @@ def test_a_missing_departure_date_is_named_and_nothing_is_imported(
     (blocker,) = understanding["blockers"]
     assert blocker["code"] == "MISSING_REQUIRED"
     assert ["check_out"] in blocker["groups"]  # said plainly: this is not in the file
-    tried = validation(api_client, env, BOOKINGS, content, body["proposal"], name="pren.xlsx")
+    details = refused_as_unresolved(
+        api_client, env, BOOKINGS, "pren.xlsx", content, body["proposal"]
+    )
+    assert details["blockers"] == ["MISSING_REQUIRED"]
+    # whoever asks - the person's own matching included - the importer cannot import a file with no
+    # departure date
+    mine = by_hand(body["proposal"])
+    tried = validation(api_client, env, BOOKINGS, content, mine, name="pren.xlsx")
     assert tried["can_import"] is False
-    done = import_mapped(api_client, env, BOOKINGS, "pren.xlsx", content, body["proposal"])
+    done = import_mapped(api_client, env, BOOKINGS, "pren.xlsx", content, mine)
     assert done.json()["succeeded"] is False
     assert writes(db_session, env) == before
 

@@ -10,6 +10,7 @@ Nothing here can make a column certain, and with no provider the whole step is s
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 
+from app.modules.ai.import_understanding.egress import EgressGuard
 from app.modules.ai.import_understanding.sanitize import clean_text
 from app.modules.ai.import_understanding.types import (
     AiResolution,
@@ -18,7 +19,7 @@ from app.modules.ai.import_understanding.types import (
     UnderstandingEvidence,
 )
 from app.modules.ai.import_understanding.validator import FitOf
-from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
+from app.modules.data_sources.proposal import ColumnProposal, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
 from app.modules.data_sources.understanding_types import (
     Choice,
@@ -27,6 +28,8 @@ from app.modules.data_sources.understanding_types import (
     QuestionKind,
 )
 from app.modules.document_understanding.lexicon import HEADER_STEMS, SECTION_WORDS
+from app.modules.document_understanding.pii import looks_like_person
+from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.document_understanding.stats import ColumnStats
 from app.modules.document_understanding.text import fold, stem
 from app.modules.document_understanding.values import CellKind
@@ -110,6 +113,20 @@ def _vocabulary(semantics: Mapping[DataSourceDomain, DomainSem]) -> frozenset[st
     return frozenset(words)
 
 
+def egress_guard(
+    personal: PersonalDataGuard, semantics: Mapping[DataSourceDomain, DomainSem]
+) -> EgressGuard:
+    """What the egress gate needs to know about THIS file: its personal values (so none can ride in
+    a header, a sheet name or an example) and what a header that is a person's name looks like (a
+    staff grid has one column per employee) - but a label made of words NINFA knows is a header,
+    whatever it resembles ("Booker Name", "Book Number")."""
+    vocabulary = _vocabulary(semantics)
+    return EgressGuard(
+        scrub=personal.clean,
+        is_name=lambda label: looks_like_person(label) and not known_words(label, vocabulary),
+    )
+
+
 def build_evidence(
     *,
     expected: DataSourceDomain,
@@ -123,8 +140,14 @@ def build_evidence(
     column, never a long free text: sheet names and the title are reduced to the words NINFA's own
     vocabulary knows."""
     vocabulary = _vocabulary(semantics)
+    position = {c.header: c.position for c in reversed(proposal.columns)}
     offered = tuple(
-        OfferedQuestion(q.id, q.kind.value, tuple(c.value for c in q.choices))
+        OfferedQuestion(
+            q.id,
+            q.kind.value,
+            tuple(c.value for c in q.choices),
+            column=position.get(q.column) if q.column is not None else None,
+        )
         for q in questions
         if q.kind in _ASKABLE and q.choices and q.candidate is None
     )
@@ -191,6 +214,9 @@ def apply_resolution(
     filled: set[str] = set()
     columns: list[ColumnProposal] = []
     taken = {c.field for c in proposal.columns if c.field is not None}
+    # a field that some OTHER column is still a candidate for (a hours/amount column that does not
+    # say which, look-alikes for one field) is not given away: there is a competing candidate
+    contended = {f for c in proposal.columns for f in c.ambiguous_fields}
     for column in proposal.columns:
         field = resolution.columns.get(column.position) if same_domain else None
         if (
@@ -198,8 +224,9 @@ def apply_resolution(
             and column.field is None
             and column.locked is None
             and column.pii is None
-            and column.ambiguous_group != CONTESTED  # a choice between look-alikes is the person's
+            and column.ambiguous_group is None  # a choice between candidates is the person's
             and field not in taken
+            and field not in contended
         ):
             taken.add(field)
             filled.add(column.header)
@@ -246,4 +273,4 @@ def apply_resolution(
     return Proposal(tuple(columns)), suggested, frozenset(filled)
 
 
-__all__ = ["apply_resolution", "build_evidence", "fit_function", "needs_help"]
+__all__ = ["apply_resolution", "build_evidence", "egress_guard", "fit_function", "needs_help"]

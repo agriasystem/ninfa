@@ -507,6 +507,23 @@ def env(factory: BookingFactory, authenticated_as: Callable[[UUID], None]) -> So
     return sources_env(factory, authenticated_as)
 
 
+def _answers_the_domain_question(domain: str) -> FakeProvider:
+    """A model that answers the kind-of-data question it is shown, whatever id it was given (what
+    goes out is opaque: the id of a question is never the file's own text)."""
+
+    class _Provider(FakeProvider):
+        def suggest(self, request: ImportUnderstandingRequest) -> object:
+            self.requests.append(request)
+            question = next(
+                q["id"]
+                for q in json.loads(request.evidence_json)["questions"]
+                if q["kind"] == "DOMAIN"
+            )
+            return guess(domain, answers=[(question, domain)])
+
+    return _Provider([])
+
+
 def _with_provider(api_client: TestClient, provider: FakeProvider | None) -> None:
     api_client.app.state.import_understanding_resolver = ImportUnderstandingResolver(provider)  # type: ignore[attr-defined]
 
@@ -702,7 +719,7 @@ def test_a_kind_of_file_nothing_points_at_is_asked_about_only_if_the_model_says_
         ["Colore", "Forma", "Peso"],
         *[["rosso", "tondo", 3 + i] for i in range(6)],
     ]
-    provider = FakeProvider([guess("COSTS", answers=[("DOMAIN", "COSTS")])])
+    provider = _answers_the_domain_question("COSTS")
     _with_provider(api_client, provider)
 
     body = understand(api_client, env, "LABOR", "altro.csv", corpus.csv_of(rows))
@@ -719,7 +736,7 @@ def test_a_model_that_agrees_with_the_card_adds_no_question(
         ["Colore", "Forma", "Peso"],
         *[["rosso", "tondo", 3 + i] for i in range(6)],
     ]
-    provider = FakeProvider([guess("LABOR", answers=[("DOMAIN", "LABOR")])])
+    provider = _answers_the_domain_question("LABOR")
     _with_provider(api_client, provider)
 
     body = understand(api_client, env, "LABOR", "altro.csv", corpus.csv_of(rows))

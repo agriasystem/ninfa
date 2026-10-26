@@ -41,6 +41,8 @@ class ResolutionReason(StrEnum):
     NOT_NEEDED = "NOT_NEEDED"  # the deterministic reading left nothing to ask
     UNAVAILABLE = "UNAVAILABLE"  # the provider failed: the deterministic reading goes on alone
     INVALID = "INVALID"  # the answer broke the rules twice: it is ignored
+    BLOCKED = "BLOCKED"  # the egress gate found personal data in what was about to be sent: no call
+    TOO_LARGE = "TOO_LARGE"  # the evidence cannot be reduced under the hard limit: no call
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +71,10 @@ class OfferedQuestion:
     id: str
     kind: str
     choices: tuple[str, ...]
+    # For a question about a column: the index of that column. (The id of a question holds the
+    # header of the column, which is free text from the file; what goes out is an opaque id and
+    # this index - see `egress.prepare`.)
+    column: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +90,8 @@ class UnderstandingEvidence:
     title: str | None = None
     columns: tuple[ColumnEvidence, ...] = ()
     questions: tuple[OfferedQuestion, ...] = ()
+    # opaque question id -> the real one. Never serialised: it stays on this side.
+    aliases: Mapping[str, str] = field(default_factory=dict)
 
     def column(self, index: int) -> ColumnEvidence | None:
         return next((c for c in self.columns if c.index == index), None)
@@ -137,6 +145,14 @@ class AiResolution:
     answers: Mapping[str, str] = field(default_factory=dict)
     # Suggestions dropped because the values of the column do not fit the field.
     rejected: int = 0
+    # What it cost and what went out (never any content): sizes of the one document sent and of
+    # the answer, rough token counts, and whether the document had to be reduced to fit the limit.
+    payload_chars: int = 0
+    input_tokens: int = 0
+    response_chars: int = 0
+    output_tokens: int = 0
+    reduced: bool = False
+    redactions: int = 0
 
     @property
     def used(self) -> bool:
