@@ -128,6 +128,10 @@ class InvoiceFormatOptions(BaseModel):
     thousands_separator: Literal[",", ".", " ", "'"] | None = None
     # Smart Import V3: how the document's structure is read (title, totals, sections, day grid).
     layout: LayoutSpec | None = None
+    # Source Learning: what a person confirmed about this source (see `source_learning.Memory`).
+    # Kept as plain JSON here so that a damaged or newer memory can never make the mapping itself
+    # unreadable: it is parsed, leniently, only by the code that uses it.
+    learning: dict[str, Any] | None = None
 
     @field_validator("date_formats")
     @classmethod

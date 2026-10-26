@@ -60,6 +60,7 @@ from app.modules.data_sources.smart_import import (
     problem_of_error,
     problem_of_error_code,
 )
+from app.modules.data_sources.source_learning import Confirmation, Via
 from app.modules.data_sources.types import (
     DOMAIN_METHOD,
     DOMAIN_SOURCE_NAME,
@@ -70,7 +71,11 @@ from app.modules.data_sources.types import (
     SourcesOverview,
     SourceState,
 )
-from app.modules.data_sources.understanding import UnderstandAnswers, UnderstandingService
+from app.modules.data_sources.understanding import (
+    UnderstandAnswers,
+    UnderstandingService,
+    confirmation_from,
+)
 from app.modules.ingestion.canonical_csv import (
     booking_format_options,
     identity_column_mapping,
@@ -125,6 +130,9 @@ class MappedImport:
     save_configuration: bool = False
     # The first day of the period THIS file is about (a grid of days written Lun/Mar/...).
     period_start: date | None = None
+    # How the decision was confirmed, as the SERVER knows it (never a claim of the client): what
+    # Source Learning may remember once the import has succeeded.
+    confirmation: Confirmation | None = None
 
 
 class DataSourcesService:
@@ -324,7 +332,19 @@ class DataSourcesService:
         content: bytes,
         mapping: MappingInput | None,
     ) -> MappingInput | None:
-        """The decision to use for a posted matching.
+        return self._settle(property_id, domain, filename, content, mapping, confirm=False)[0]
+
+    def _settle(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        filename: str,
+        content: bytes,
+        mapping: MappingInput | None,
+        *,
+        confirm: bool,
+    ) -> tuple[MappingInput | None, Confirmation | None]:
+        """The decision to use for a posted matching, and (with `confirm`) how it was confirmed.
 
         A matching the person built by hand carries no reference and is judged on its merits, as it
         always was. One that carries the reference of the understanding the server made
@@ -333,8 +353,12 @@ class DataSourcesService:
         gives exactly this mapping. The mapping that is used is then the server's own.
         """
         reference = None if mapping is None else mapping.smart_import
-        if mapping is None or reference is None:
-            return mapping
+        if mapping is None:
+            return None, None
+        if reference is None:
+            return mapping, self._manual_confirmation(
+                property_id, domain, filename, content, mapping
+            ) if confirm else None
         try:
             answers = UnderstandAnswers.model_validate(reference.answers)
         except ValidationError as error:
@@ -368,7 +392,46 @@ class DataSourcesService:
             exclude={"smart_import"}
         ):
             raise ImportDecisionChangedError()
-        return settled.model_copy(update={"smart_import": None})
+        confirmation = confirmation_from(answers, inspection.learning) if confirm else None
+        return settled.model_copy(update={"smart_import": None}), confirmation
+
+    def _manual_confirmation(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        filename: str,
+        content: bytes,
+        mapping: MappingInput,
+    ) -> Confirmation | None:
+        """A matching the person built by hand ("Abbina le colonne") is their whole decision. What
+        is remembered of the file's structure is read by the server, from the same table."""
+        layout = mapping.layout
+        answers = UnderstandAnswers(
+            sheet_name=mapping.sheet_name,
+            table_key=None if layout is None else layout.table_key,
+        )
+        hotel = PropertyRepository(self._session, self._tenant).get(property_id)
+        inspection = self._settling.understand(
+            domain,
+            filename,
+            content,
+            answers,
+            True,
+            self._source_for_domain(property_id, domain),
+            False,
+            currency=None if hotel is None else hotel.currency,
+        )
+        if inspection.learning is None or not inspection.learning.shape:
+            return None
+        kept = {
+            key: value
+            for key, value in (
+                ("date_order", mapping.date_order),
+                ("decimal_style", mapping.decimal_style),
+            )
+            if value
+        }
+        return Confirmation(Via.MANUAL, kept, frozenset(), inspection.learning.shape)
 
     def dry_run(
         self,
@@ -475,8 +538,15 @@ class DataSourcesService:
         if mapped is not None and mapped.mapping is not None:
             # a decision NINFA issued is verified BEFORE anything else - before a source is
             # created or switched on, before any job exists: an unresolved one writes nothing
-            settled = self._settled(property_id, domain, filename, content, mapped.mapping)
-            mapped = replace(mapped, mapping=settled)
+            settled, confirmation = self._settle(
+                property_id,
+                domain,
+                filename,
+                content,
+                mapped.mapping,
+                confirm=mapped.save_configuration,
+            )
+            mapped = replace(mapped, mapping=settled, confirmation=confirmation)
         if domain == DataSourceDomain.LABOR and snapshot_local_date is None:
             # The day the file is dated as of is never guessed (the labor service insists) - and a
             # request that cannot be imported must not even switch a source on.
@@ -581,7 +651,12 @@ class DataSourcesService:
         elif outcome.succeeded and mapped is not None and mapped.save_configuration and resolved:
             # Remembered only now, once the file has really been imported: a mapping that did not
             # work is never kept, and one that works is used for the next file of the same layout.
-            saved = self._smart.remember(source, self._smart.domain(domain), resolved)
+            saved = self._smart.remember(
+                source,
+                self._smart.domain(domain),
+                resolved,
+                None if mapped is None else mapped.confirmation,
+            )
             outcome = replace(outcome, configuration_saved=saved)
         return outcome
 
