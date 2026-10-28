@@ -1,7 +1,8 @@
 # Smart Import V3 — Source Learning
 
 Status: **implemented.** No model, no embedding, no external service: it works with `IMPORT_UNDERSTANDING_MODE=off`.
-Decision: ADR 0033. Measured by the Source Learning Benchmark V1 (`docs/benchmarks/source-learning-benchmark-v1.md`).
+Decisions: ADR 0033 (what a person confirmed is remembered) and ADR 0034 (a source remembers several recurring families). Measured by
+the Source Learning Benchmark V1 and its multi-source extension (`docs/benchmarks/source-learning-benchmark-v1.md`).
 
 > understands → validates → maybe asks → imports → **remembers the confirmation** → asks less next time
 
@@ -19,6 +20,7 @@ confirmation from a file the engine read alone; it overwrote the past; it reused
 unblock the *missing required field* the engine had already computed.
 
 Source Learning evolves exactly that: **a `learning` section inside `format_options`** (JSON). No table, no column, **no migration**.
+The section holds one memory **per recurring family** of the source (see *Several families in one source*).
 
 ## Source identity and fingerprint
 
@@ -83,7 +85,61 @@ evidence, 3. the trusted profile, 4. generic vocabulary. So:
   other (PB-3);
 * formats chosen before are used only where the values cannot prove them, and only if the file still reads cleanly that way.
 
+## Several families in one source
+
+A source is `property + kind of data`; a hotel brings back **more than one structure** in it - the PMS export, an OTA export, an
+internal report. Each is a **family**, and they live side by side:
+
+```
+learning = { v: 2, seq, current, families: [ Memory{id, touched, shape, mapped, person, answers, revision, history, fingerprint}, ... ] }
+```
+
+* `Memory` is the family: its structure (header keys + value classes), its confirmed mapping, the part a person decided, its closed
+  answers, its revision and its own history. `id` is a counter (never a file name, never a header); `touched` orders families by use.
+* `current` is the family whose import wrote the profile's saved column matching (the legacy "last configuration"). It is applied only to
+  a file of that family.
+* The section written by Source Learning before there were families (one flat memory) is read as a source with one family.
+
+**Family or revision.** A *revision* is the same family evolving: the file still holds everything the family remembers (the same
+columns, moved, renamed to what the engine reads the same, with new ones, or one whose meaning the person now corrects). A confirmation
+updates that family - a new revision when its meaning changed, the old one in *its* history. A *family* is another structure: as soon
+as a remembered column is no longer in the file (gone, or called something else) the file starts a family of its own. The cost of one
+family too many is a record; one too few would lose the family that was there.
+
+| The file, against the family it matches best | Confirmation |
+|---|---|
+| the same / moved / renamed to what the engine reads the same / with new columns / a meaning corrected | a revision of that family |
+| a remembered column is gone or called something else | a new family (the old one untouched) |
+| the same structure and matching already a family | that family (no duplicate) |
+| it could be two families and none clearly is | a new family (nothing is reused meanwhile) |
+
+**Which family is this file?** `choose_family` matches the file with **every** family of the source (`match_source`, as before) and
+measures each by its **residual**: new columns + remembered columns that are gone + contradicted columns + columns held only under
+another name. The best is chosen only if it explains the file completely (residual 0) **or** leaves at least `MIN_RESIDUAL_GAP = 2`
+columns fewer unexplained than the runner-up. Otherwise the result is **ambiguous: no family, nothing reused**, and the person is asked
+as for a source nobody taught. With a single family that could be the file the behaviour is the one it always had.
+
+```
+A = Data | Prev. | Eff. | Area        B = Data | Prev. | Eff. | Costo
+file A (or A + junk, A moved, A cosmetic)  ->  A            (residual 0 / 1, B 2 / 3)
+file Data | Prev. | Eff.                   ->  ambiguous    (A 1, B 1): nothing reused
+file Data | Prev. | Eff. | Altro          ->  ambiguous    (A 2, B 2)
+```
+
+A family only the engine read can win the file it is - and then nothing is reused (the engine cannot teach itself) - so a trusted
+neighbour that merely resembles it is never taken for it.
+
+**Limits.** `FAMILIES_KEPT = 32` per source and `HISTORY_KEPT = 5` per family, two different limits. Over the limit the least useful
+families go first - those only the engine read, then the longest unused - and never the one just written. A dropped family is taught
+once more. Matching a file against 32 families is a few milliseconds.
+
+**Correction is local.** A confirmation updates the one family the server found the file to be a revision of (or adds one); it never
+rewrites another. The engine alone writes nothing once a person has confirmed anything in the source.
+
 ## Isolation
+
+Family: a family belongs to its source and to nothing else; a file is read with one family or none, and the saved matching of the
+profile is applied only to the family that wrote it (`cross-family contamination = 0`, measured).
 
 Property: the profile belongs to a source of **one property** (composite foreign key); what one hotel learned never reaches another,
 even with the same headers (workspace too). Kind of data: a profile belongs to the source of one kind of data, and a memory that says it
@@ -91,7 +147,9 @@ belongs to another is ignored. Tested explicitly; the benchmark measures cross-p
 
 ## Known limits
 
-* One current structure per source: an earlier structure is kept in the history for audit, but a file that goes back to it is read again.
+* A family keeps its current structure only: an earlier revision of a family is kept in its history for audit, but a file that goes back to it is read through the current one (what is still there is reused, what is not is asked).
+* Structures nested in each other (all the columns of one inside a larger one) are not told apart by the smaller one's columns alone: taught second, the larger is a revision of the smaller (nothing remembered is lost).
+* The layout of a document (sheet, day grid, department of all the rows) is still the profile's, the last import's.
 * The match is made on the table as read; a grid of days is not matched by its synthetic columns (its hours basis is already remembered by the layout).
 * A column renamed to something the engine cannot read is "missing", not guessed.
 * There is no screen yet that says "Sorgente riconosciuta"; `FileInspection.learning` is internal and never sent to the browser.

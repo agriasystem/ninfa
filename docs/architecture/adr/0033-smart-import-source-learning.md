@@ -43,6 +43,6 @@ partly reused.
 * The first confirmation after this decision is needed again for sources saved earlier: the price of not trusting what nobody can
   vouch for.
 * Only one current structure per source is reused; keeping several structures per source would extend the same JSON (a list of
-  revisions with their documents), not the schema.
+  revisions with their documents), not the schema. **Done by ADR 0034**: a source holds N recurring families.
 * The reuse is invisible in the interface for now (`FileInspection.learning` is internal). A "Sorgente riconosciuta" notice, and a
   history view, can be built on it later without touching the engine.
