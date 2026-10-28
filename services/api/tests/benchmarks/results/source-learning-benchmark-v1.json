@@ -110,22 +110,22 @@
  },
  "performance_ms": {
   "match_source": {
-   "mean": 0.08,
-   "p50": 0.081,
-   "p95": 0.13,
-   "max": 0.15
+   "mean": 0.073,
+   "p50": 0.076,
+   "p95": 0.095,
+   "max": 0.114
   },
   "understand_with_memory": {
-   "mean": 81.263,
-   "p50": 78.194,
-   "p95": 122.399,
-   "max": 147.286
+   "mean": 71.411,
+   "p50": 67.873,
+   "p95": 109.128,
+   "max": 117.098
   },
   "understand_without_memory": {
-   "mean": 78.192,
-   "p50": 74.237,
-   "p95": 121.42,
-   "max": 167.653
+   "mean": 68.398,
+   "p50": 63.703,
+   "p95": 108.69,
+   "max": 119.815
   }
  },
  "all_versions_as_expected": {
@@ -3962,7 +3962,7 @@
    "value": 1.0
   },
   "failures": [],
-  "seconds": 42.5,
+  "seconds": 33.7,
   "per_site": [
    {
     "site": "bookings",
@@ -6541,5 +6541,1106 @@
    "V7": 6,
    "V8": 6
   }
+ },
+ "format_family": {
+  "benchmark": "source-learning-benchmark-v1/multi-format",
+  "properties": 3,
+  "formats": 9,
+  "documents": 45,
+  "timeline_steps": 56,
+  "correct_family": {
+   "num": 42,
+   "den": 42,
+   "value": 1.0
+  },
+  "correct_family_layout": {
+   "num": 42,
+   "den": 42,
+   "value": 1.0
+  },
+  "wrong_layout_reuse": 0,
+  "cross_family_layout_contamination": 0,
+  "documents_that_could_not_be_read": 0,
+  "returning_family_recognition": {
+   "num": 26,
+   "den": 26,
+   "value": 1.0
+  },
+  "repeated_mapping_questions_on_returning_unchanged": 0,
+  "recognised_after_harmless_drift": {
+   "num": 7,
+   "den": 7,
+   "value": 1.0
+  },
+  "ambiguous_layout_reuse": 0,
+  "ambiguous_family_reuse": 0,
+  "store_intact_after_import": {
+   "num": 2,
+   "den": 2,
+   "value": 1.0
+  },
+  "questions_saved": {
+   "asks_without_memory": 28,
+   "asks_with_memory": 0,
+   "saved": 28,
+   "documents_asking_nothing_with_memory": 42,
+   "documents_asking_nothing_without_memory": 25
+  },
+  "every_step_as_expected": {
+   "num": 56,
+   "den": 56,
+   "value": 1.0
+  },
+  "failures": [],
+  "seconds": 12.9,
+  "per_site": [
+   {
+    "site": "bookings",
+    "title": "PMS xlsx, another xlsx on another sheet, a csv",
+    "domain": "BOOKINGS",
+    "formats": [
+     "F-pms",
+     "F-export",
+     "F-csv"
+    ],
+    "families_in_memory": 3,
+    "layouts": [
+     [
+      "F-csv",
+      {}
+     ],
+     [
+      "F-export",
+      {
+       "sheets": [
+        "Export"
+       ]
+      }
+     ],
+     [
+      "F-pms",
+      {
+       "sheets": [
+        "Prenotazioni"
+       ]
+      }
+     ]
+    ]
+   },
+   {
+    "site": "labor",
+    "title": "a day grid, a department in the title, an xlsx table, a csv table",
+    "domain": "LABOR",
+    "formats": [
+     "F-grid",
+     "F-table",
+     "F-title",
+     "F-table-csv"
+    ],
+    "families_in_memory": 4,
+    "layouts": [
+     [
+      "F-grid",
+      {
+       "grid": {
+        "hours_field": "planned_hours"
+       }
+      }
+     ],
+     [
+      "F-table",
+      {}
+     ],
+     [
+      "F-table-csv",
+      {}
+     ],
+     [
+      "F-title",
+      {
+       "department": {
+        "kind": "TITLE"
+       }
+      }
+     ]
+    ]
+   },
+   {
+    "site": "twins",
+    "title": "two lookalike exports that need other sheets",
+    "domain": "BOOKINGS",
+    "formats": [
+     "F-twin-guests",
+     "F-twin-plan"
+    ],
+    "families_in_memory": 2,
+    "layouts": [
+     [
+      "F-twin-guests",
+      {
+       "sheets": [
+        "Prenotazioni"
+       ]
+      }
+     ],
+     [
+      "F-twin-plan",
+      {
+       "sheets": [
+        "Elenco"
+       ]
+      }
+     ]
+    ]
+   }
+  ],
+  "steps": [
+   {
+    "site": "bookings",
+    "n": 1,
+    "kind": "teach",
+    "format": "F-pms",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 2,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 3,
+    "kind": "teach",
+    "format": "F-export",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 4,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 5,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 6,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 7,
+    "kind": "teach",
+    "format": "F-csv",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 8,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 9,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 10,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 11,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 12,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 13,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 14,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 15,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 16,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 17,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 18,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 19,
+    "kind": "import",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 20,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 21,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 22,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "labor",
+    "n": 1,
+    "kind": "teach",
+    "format": "F-grid",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 2,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 3,
+    "kind": "teach",
+    "format": "F-table",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 4,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 5,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 6,
+    "kind": "teach",
+    "format": "F-title",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 7,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 8,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 9,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 10,
+    "kind": "teach",
+    "format": "F-table-csv",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 11,
+    "kind": "see",
+    "format": "F-table-csv",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "4",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 12,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 13,
+    "kind": "see",
+    "format": "F-table-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "4",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 14,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 15,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 16,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 17,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 18,
+    "kind": "see",
+    "format": "F-table-csv",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "4",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 19,
+    "kind": "import",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 20,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 21,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 22,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "twins",
+    "n": 1,
+    "kind": "teach",
+    "format": "F-twin-guests",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "twins",
+    "n": 2,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 3,
+    "kind": "teach",
+    "format": "F-twin-plan",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "twins",
+    "n": 4,
+    "kind": "see",
+    "format": "F-twin-plan",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Elenco"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 5,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 6,
+    "kind": "either",
+    "format": "Altro",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": null,
+    "ambiguous": true,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 7,
+    "kind": "see",
+    "format": "F-twin-plan",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Elenco"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 8,
+    "kind": "either",
+    "format": "Foglio1",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": null,
+    "ambiguous": true,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 9,
+    "kind": "either",
+    "format": "Riepilogo",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": null,
+    "ambiguous": true,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 10,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 11,
+    "kind": "see",
+    "format": "F-twin-plan",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Elenco"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 12,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   }
+  ]
  }
 }

@@ -63,6 +63,8 @@ def main(argv: list[str] | None = None) -> int:
 
     from app.db.session import create_db_engine
     from tests.benchmarks.source_learning.families import FAMILIES
+    from tests.benchmarks.source_learning.formats import SITES as FORMAT_SITES
+    from tests.benchmarks.source_learning.formats import run_formats
     from tests.benchmarks.source_learning.multi import SITES, run_multi_family
     from tests.benchmarks.source_learning.report import markdown
     from tests.benchmarks.source_learning.runner import run_benchmark
@@ -88,19 +90,28 @@ def main(argv: list[str] | None = None) -> int:
                 SITES,
                 progress=lambda message: print(message, file=sys.stderr, flush=True),
             )
+            data["format_family"] = run_formats(
+                session,
+                FORMAT_SITES,
+                progress=lambda message: print(message, file=sys.stderr, flush=True),
+            )
     finally:
         session.close()
         transaction.rollback()  # nothing of the benchmark stays in the database
         connection.close()
         engine.dispose()
 
-    summary = {k: v for k, v in data.items() if k not in {"versions", "per_family", "multi_family"}}
-    if "multi_family" in data:
-        summary["multi_family"] = {
-            k: v for k, v in data["multi_family"].items() if k not in {"steps", "per_site"}
-        }
+    extensions = ("multi_family", "format_family")
+    summary = {k: v for k, v in data.items() if k not in {"versions", "per_family", *extensions}}
+    for extension in extensions:
+        if extension in data:
+            summary[extension] = {
+                k: v for k, v in data[extension].items() if k not in {"steps", "per_site"}
+            }
     print(json.dumps(summary, indent=1, default=str))
-    failed = bool(data["failures"]) or bool(data.get("multi_family", {}).get("failures"))
+    failed = bool(data["failures"]) or any(
+        bool(data.get(extension, {}).get("failures")) for extension in extensions
+    )
     official = args.json == DEFAULT_JSON and args.markdown == DEFAULT_MD
     if args.no_write or (args.only and official):
         return 1 if failed else 0

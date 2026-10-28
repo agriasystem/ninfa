@@ -212,6 +212,8 @@ def markdown(data: Mapping[str, Any], today: str) -> str:
         add("")
     if data.get("multi_family"):
         add(multi_markdown(data["multi_family"]))
+    if data.get("format_family"):
+        add(formats_markdown(data["format_family"]))
     return "\n".join(out) + "\n"
 
 
@@ -363,6 +365,164 @@ def multi_markdown(multi: Mapping[str, Any]) -> str:
                 "Level",
                 "Questions",
                 "Reused",
+                "Result",
+            ],
+            rows,
+        )
+        + "\n"
+    )
+    return "\n".join(out)
+
+
+FORMAT_EVENTS = {
+    "teach": "taught",
+    "see": "a later file",
+    "either": "could be either lookalike",
+    "import": "imported from memory",
+}
+
+
+def formats_markdown(data: Mapping[str, Any]) -> str:
+    """The multi-format extension: how each family is READ, with several formats in one source."""
+    out: list[str] = []
+    add = out.append
+    saved = data["questions_saved"]
+    add("## Several formats in one source (multi-format extension)\n")
+    add(
+        f"{data['properties']} properties, {data['formats']} formats, {data['documents']} "
+        f"documents in {data['timeline_steps']} timeline steps: a property is taught one family at "
+        "a time and files of all of them keep coming, as they would over months - an xlsx whose "
+        "table sits under "
+        "a title, another xlsx on another sheet with the table lower down, a csv, a people x days "
+        "grid, a document whose department is only in its title, an ordinary table in xlsx and in "
+        "csv. A -> B -> A, A -> B -> A -> B, A -> C -> A -> C, A -> B -> C -> A -> B, SPECIAL -> "
+        "NORMAL -> SPECIAL. Two lookalike exports need different sheets, and files that could be "
+        "either of them must be read with NEITHER's. A file is read the way it was taught, "
+        "whichever family was imported in between. No model, no embedding, no external service.\n"
+    )
+    add("### Result\n")
+    add(
+        table(
+            ["Measure", "Target", "Measured"],
+            [
+                ["Correct family", "100%", pct(data["correct_family"])],
+                [
+                    "Correct layout (sheet, grid hours, origin of the department)",
+                    "100%",
+                    pct(data["correct_family_layout"]),
+                ],
+                [
+                    "Wrong layout reuse (a layout of another family, or one applied to a file "
+                    "that is not that family's)",
+                    "0",
+                    data["wrong_layout_reuse"],
+                ],
+                [
+                    "Cross-family layout contamination",
+                    "0",
+                    data["cross_family_layout_contamination"],
+                ],
+                [
+                    "Documents that could not be read because of another family's layout",
+                    "0",
+                    data["documents_that_could_not_be_read"],
+                ],
+                [
+                    "Repeated mapping questions on a returning family, unchanged",
+                    "0",
+                    data["repeated_mapping_questions_on_returning_unchanged"],
+                ],
+                ["Returning-family recognition", "100%", pct(data["returning_family_recognition"])],
+                [
+                    "Recognised and read the same after a harmless drift (a column nobody "
+                    "asked for)",
+                    "100%",
+                    pct(data["recognised_after_harmless_drift"]),
+                ],
+                [
+                    "A file that could be either of two families gets a layout of one",
+                    "0",
+                    data["ambiguous_layout_reuse"],
+                ],
+                [
+                    "A file that could be either of two families reuses one of them",
+                    "0",
+                    data["ambiguous_family_reuse"],
+                ],
+                [
+                    "Other families untouched by an import from memory",
+                    "100%",
+                    pct(data["store_intact_after_import"]),
+                ],
+                ["Every step behaves as expected", "100%", pct(data["every_step_as_expected"])],
+            ],
+        )
+        + "\n"
+    )
+    add(
+        f"**{saved['saved']} asks saved** ({saved['asks_without_memory']} without a memory, "
+        f"{saved['asks_with_memory']} with); {saved['documents_asking_nothing_with_memory']} "
+        "documents are read with nothing to ask, "
+        f"{saved['documents_asking_nothing_without_memory']} without it.\n"
+    )
+    add("### By property\n")
+    add(
+        table(
+            ["Property", "Kind of data", "Formats", "Families remembered", "Read as"],
+            [
+                [
+                    f"{info['site']}: {info['title']}",
+                    info["domain"],
+                    ", ".join(info["formats"]),
+                    info["families_in_memory"],
+                    "; ".join(
+                        f"{name}: {layout or 'its table'}" for name, layout in info["layouts"]
+                    ),
+                ]
+                for info in data["per_site"]
+            ],
+        )
+        + "\n"
+    )
+    if data["failures"]:
+        add("### Where it did not behave as expected\n")
+        for failure in data["failures"]:
+            add(
+                f"* {failure['site']} step {failure['n']} {failure['format']} "
+                f"{failure['variant']}: {failure['why']}"
+            )
+        add("")
+    add("### Every step\n")
+    rows = []
+    for step in data["steps"]:
+        rows.append(
+            [
+                step["site"],
+                step["n"],
+                FORMAT_EVENTS.get(step["kind"], step["kind"]),
+                step["format"],
+                step["variant"] or "-",
+                "-" if "family_chosen" not in step else (step["family_chosen"] or "none"),
+                "yes" if step.get("ambiguous") else "-",
+                "-" if "read_as" not in step else (step["read_as"] or "its table"),
+                step.get("level", "-"),
+                step.get("questions", "-"),
+                "ok" if step["ok"] else f"NOT OK: {step['why']}",
+            ]
+        )
+    add(
+        table(
+            [
+                "Property",
+                "#",
+                "Event",
+                "Format",
+                "Variant",
+                "Chosen",
+                "Ambiguous",
+                "Read as",
+                "Level",
+                "Questions",
                 "Result",
             ],
             rows,
