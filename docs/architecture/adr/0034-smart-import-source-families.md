@@ -63,6 +63,6 @@ A. A source that alternates between two structures would be asked every single t
   smaller one's own columns alone. If the larger is taught after the smaller, it is a revision of it (nothing remembered is lost) and
   the smaller then reads as the larger with optional columns missing: what it holds is reused, nothing is applied that the file does
   not prove. The other order keeps both.
-* Known limit: the layout of a document (sheet, day grid, department of all the rows) is still the profile's - the last import's - and
-  a day grid is not matched by its synthetic columns.
+* The layout of a document (sheet, day grid, department of all the rows) was still the profile's - the last import's - when this
+  decision was taken. **Done by ADR 0035**: how a family is read belongs to the family.
 * No screen yet says "Sorgente riconosciuta"; `FileInspection.learning` stays internal.

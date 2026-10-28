@@ -1,7 +1,8 @@
 # Smart Import V3 — Source Learning
 
 Status: **implemented.** No model, no embedding, no external service: it works with `IMPORT_UNDERSTANDING_MODE=off`.
-Decisions: ADR 0033 (what a person confirmed is remembered) and ADR 0034 (a source remembers several recurring families). Measured by
+Decisions: ADR 0033 (what a person confirmed is remembered), ADR 0034 (a source remembers several recurring families) and ADR 0035
+(how a family is read belongs to the family). Measured by
 the Source Learning Benchmark V1 and its multi-source extension (`docs/benchmarks/source-learning-benchmark-v1.md`).
 
 > understands → validates → maybe asks → imports → **remembers the confirmation** → asks less next time
@@ -136,6 +137,32 @@ once more. Matching a file against 32 families is a few milliseconds.
 **Correction is local.** A confirmation updates the one family the server found the file to be a revision of (or adds one); it never
 rewrites another. The engine alone writes nothing once a person has confirmed anything in the source.
 
+## How a family is read
+
+Which sheets are read, the hours a day grid holds and where the department comes from describe how to read **that** structure. They
+are remembered with the family (`Memory.layout`) and lent back only once a file has been recognised as it. The order that makes it
+deterministic:
+
+1. **A - the document on its own terms.** Only what the person says *now* decides how it is read; the layout of the last import is
+   nobody's but the family that wrote it.
+2. **B - which family is it?** Every candidate table is compared with the families of the source. A table that is clearly a family's
+   (nothing it remembers is lost) is preferred to the one the ranking picked; two candidates, or two families, that could both be it
+   are never settled by a guess.
+3. **C - its hints.** A family taught by a person, with nothing lost, lends its hints. If they name a sheet the document is read
+   again through it and the hints are accepted only if that reading is the same family again; otherwise they are dropped.
+4. **D - the meaning of the columns and the validation**, unchanged.
+
+| Part of a profile's `format_options` | Belongs to |
+|---|---|
+| `layout.sheets`, `layout.grid`, `layout.department` | the family |
+| `date_order`, `decimal_style`, `amount_basis`, `department_value` | the family (`Memory.answers`) |
+| the words taught (`status`, `channel`, `role`, `category` mappings) | property + kind of data (the hotel's vocabulary) |
+| `delimiter`, `encoding` | nobody: detected on every file |
+| `date_formats`, `sheet_name`, the saved column matching | the profile's last import (feeds the legacy profile status only) |
+
+What a family remembers of its *matching* is restricted to the columns the plain table has: the date and hours a grid adds, or the
+department a title gives, are the layout's. The days and totals of a grid are not part of its structure (they name the week).
+
 ## Isolation
 
 Family: a family belongs to its source and to nothing else; a file is read with one family or none, and the saved matching of the
@@ -149,7 +176,8 @@ belongs to another is ignored. Tested explicitly; the benchmark measures cross-p
 
 * A family keeps its current structure only: an earlier revision of a family is kept in its history for audit, but a file that goes back to it is read through the current one (what is still there is reused, what is not is asked).
 * Structures nested in each other (all the columns of one inside a larger one) are not told apart by the smaller one's columns alone: taught second, the larger is a revision of the smaller (nothing remembered is lost).
-* The layout of a document (sheet, day grid, department of all the rows) is still the profile's, the last import's.
+* The profile's saved column matching, its date formats and its sheet are still the last import's: they feed the legacy profile status and the `mapping: null` import, not the understanding flow (ADR 0035).
+* Two structures that differ only in a layout choice the file does not show are one family; the last confirmation wins, with history.
 * The match is made on the table as read; a grid of days is not matched by its synthetic columns (its hours basis is already remembered by the layout).
 * A column renamed to something the engine cannot read is "missing", not guessed.
 * There is no screen yet that says "Sorgente riconosciuta"; `FileInspection.learning` is internal and never sent to the browser.

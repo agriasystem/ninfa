@@ -50,9 +50,9 @@ Run 2026-10-28. 13 sources (11 the person has to teach, 2 the engine reads alone
 
 | Milliseconds | mean | p50 | p95 | max |
 |---|---|---|---|---|
-| Matching a file with the memory (`match_source`) | 0.08 | 0.081 | 0.13 | 0.15 |
-| Understanding a file, with a memory | 81.263 | 78.194 | 122.399 | 147.286 |
-| Understanding a file, without | 78.192 | 74.237 | 121.42 | 167.653 |
+| Matching a file with the memory (`match_source`) | 0.073 | 0.076 | 0.095 | 0.114 |
+| Understanding a file, with a memory | 71.411 | 67.873 | 109.128 | 117.098 |
+| Understanding a file, without | 68.398 | 63.703 | 108.69 | 119.815 |
 
 ## Every version
 
@@ -338,4 +338,96 @@ Run 2026-10-28. 13 sources (11 the person has to teach, 2 the engine reads alone
 | costs | 45 | a later file | M3-ragione | V2 | 2 | - | EXACT | NONE | READY | 0 | 5 | ok |
 | costs | 46 | a later file | M3-chi | V2 | 3 | - | EXACT | NONE | READY | 0 | 5 | ok |
 | costs | 47 | a later file | M3-forn-qta | V2 | 4 | - | EXACT | NONE | READY | 0 | 6 | ok |
+
+## Several formats in one source (multi-format extension)
+
+3 properties, 9 formats, 45 documents in 56 timeline steps: a property is taught one family at a time and files of all of them keep coming, as they would over months - an xlsx whose table sits under a title, another xlsx on another sheet with the table lower down, a csv, a people x days grid, a document whose department is only in its title, an ordinary table in xlsx and in csv. A -> B -> A, A -> B -> A -> B, A -> C -> A -> C, A -> B -> C -> A -> B, SPECIAL -> NORMAL -> SPECIAL. Two lookalike exports need different sheets, and files that could be either of them must be read with NEITHER's. A file is read the way it was taught, whichever family was imported in between. No model, no embedding, no external service.
+
+### Result
+
+| Measure | Target | Measured |
+|---|---|---|
+| Correct family | 100% | 100.0% (42/42) |
+| Correct layout (sheet, grid hours, origin of the department) | 100% | 100.0% (42/42) |
+| Wrong layout reuse (a layout of another family, or one applied to a file that is not that family's) | 0 | 0 |
+| Cross-family layout contamination | 0 | 0 |
+| Documents that could not be read because of another family's layout | 0 | 0 |
+| Repeated mapping questions on a returning family, unchanged | 0 | 0 |
+| Returning-family recognition | 100% | 100.0% (26/26) |
+| Recognised and read the same after a harmless drift (a column nobody asked for) | 100% | 100.0% (7/7) |
+| A file that could be either of two families gets a layout of one | 0 | 0 |
+| A file that could be either of two families reuses one of them | 0 | 0 |
+| Other families untouched by an import from memory | 100% | 100.0% (2/2) |
+| Every step behaves as expected | 100% | 100.0% (56/56) |
+
+**28 asks saved** (28 without a memory, 0 with); 42 documents are read with nothing to ask, 25 without it.
+
+### By property
+
+| Property | Kind of data | Formats | Families remembered | Read as |
+|---|---|---|---|---|
+| bookings: PMS xlsx, another xlsx on another sheet, a csv | BOOKINGS | F-pms, F-export, F-csv | 3 | F-csv: its table; F-export: {'sheets': ['Export']}; F-pms: {'sheets': ['Prenotazioni']} |
+| labor: a day grid, a department in the title, an xlsx table, a csv table | LABOR | F-grid, F-table, F-title, F-table-csv | 4 | F-grid: {'grid': {'hours_field': 'planned_hours'}}; F-table: its table; F-table-csv: its table; F-title: {'department': {'kind': 'TITLE'}} |
+| twins: two lookalike exports that need other sheets | BOOKINGS | F-twin-guests, F-twin-plan | 2 | F-twin-guests: {'sheets': ['Prenotazioni']}; F-twin-plan: {'sheets': ['Elenco']} |
+
+### Every step
+
+| Property | # | Event | Format | Variant | Chosen | Ambiguous | Read as | Level | Questions | Result |
+|---|---|---|---|---|---|---|---|---|---|---|
+| bookings | 1 | taught | F-pms | - | - | - | - | - | - | ok |
+| bookings | 2 | a later file | F-pms | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| bookings | 3 | taught | F-export | - | - | - | - | - | - | ok |
+| bookings | 4 | a later file | F-export | next | 2 | - | {'sheets': ['Export']} | READY | 0 | ok |
+| bookings | 5 | a later file | F-pms | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| bookings | 6 | a later file | F-export | next | 2 | - | {'sheets': ['Export']} | READY | 0 | ok |
+| bookings | 7 | taught | F-csv | - | - | - | - | - | - | ok |
+| bookings | 8 | a later file | F-csv | next | 3 | - | its table | READY | 0 | ok |
+| bookings | 9 | a later file | F-pms | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| bookings | 10 | a later file | F-export | next | 2 | - | {'sheets': ['Export']} | READY | 0 | ok |
+| bookings | 11 | a later file | F-pms | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| bookings | 12 | a later file | F-csv | next | 3 | - | its table | READY | 0 | ok |
+| bookings | 13 | a later file | F-pms | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| bookings | 14 | a later file | F-csv | next | 3 | - | its table | READY | 0 | ok |
+| bookings | 15 | a later file | F-export | next | 2 | - | {'sheets': ['Export']} | READY | 0 | ok |
+| bookings | 16 | a later file | F-pms | extra | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| bookings | 17 | a later file | F-export | extra | 2 | - | {'sheets': ['Export']} | READY | 0 | ok |
+| bookings | 18 | a later file | F-csv | extra | 3 | - | its table | READY | 0 | ok |
+| bookings | 19 | imported from memory | F-pms | next | - | - | - | - | - | ok |
+| bookings | 20 | a later file | F-export | next | 2 | - | {'sheets': ['Export']} | READY | 0 | ok |
+| bookings | 21 | a later file | F-csv | next | 3 | - | its table | READY | 0 | ok |
+| bookings | 22 | a later file | F-pms | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| labor | 1 | taught | F-grid | - | - | - | - | - | - | ok |
+| labor | 2 | a later file | F-grid | next | 1 | - | {'grid': {'hours_field': 'planned_hours'}} | READY | 0 | ok |
+| labor | 3 | taught | F-table | - | - | - | - | - | - | ok |
+| labor | 4 | a later file | F-table | next | 2 | - | its table | READY | 0 | ok |
+| labor | 5 | a later file | F-grid | next | 1 | - | {'grid': {'hours_field': 'planned_hours'}} | READY | 0 | ok |
+| labor | 6 | taught | F-title | - | - | - | - | - | - | ok |
+| labor | 7 | a later file | F-title | next | 3 | - | {'department': {'kind': 'TITLE'}} | READY | 0 | ok |
+| labor | 8 | a later file | F-table | next | 2 | - | its table | READY | 0 | ok |
+| labor | 9 | a later file | F-title | next | 3 | - | {'department': {'kind': 'TITLE'}} | READY | 0 | ok |
+| labor | 10 | taught | F-table-csv | - | - | - | - | - | - | ok |
+| labor | 11 | a later file | F-table-csv | next | 4 | - | its table | READY | 0 | ok |
+| labor | 12 | a later file | F-grid | next | 1 | - | {'grid': {'hours_field': 'planned_hours'}} | READY | 0 | ok |
+| labor | 13 | a later file | F-table-csv | next | 4 | - | its table | READY | 0 | ok |
+| labor | 14 | a later file | F-title | next | 3 | - | {'department': {'kind': 'TITLE'}} | READY | 0 | ok |
+| labor | 15 | a later file | F-table | next | 2 | - | its table | READY | 0 | ok |
+| labor | 16 | a later file | F-grid | next | 1 | - | {'grid': {'hours_field': 'planned_hours'}} | READY | 0 | ok |
+| labor | 17 | a later file | F-table | extra | 2 | - | its table | READY | 0 | ok |
+| labor | 18 | a later file | F-table-csv | extra | 4 | - | its table | READY | 0 | ok |
+| labor | 19 | imported from memory | F-grid | next | - | - | - | - | - | ok |
+| labor | 20 | a later file | F-table | next | 2 | - | its table | READY | 0 | ok |
+| labor | 21 | a later file | F-title | next | 3 | - | {'department': {'kind': 'TITLE'}} | READY | 0 | ok |
+| labor | 22 | a later file | F-grid | next | 1 | - | {'grid': {'hours_field': 'planned_hours'}} | READY | 0 | ok |
+| twins | 1 | taught | F-twin-guests | - | - | - | - | - | - | ok |
+| twins | 2 | a later file | F-twin-guests | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| twins | 3 | taught | F-twin-plan | - | - | - | - | - | - | ok |
+| twins | 4 | a later file | F-twin-plan | next | 2 | - | {'sheets': ['Elenco']} | READY | 0 | ok |
+| twins | 5 | a later file | F-twin-guests | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| twins | 6 | could be either lookalike | Altro | - | none | yes | its table | READY | 0 | ok |
+| twins | 7 | a later file | F-twin-plan | next | 2 | - | {'sheets': ['Elenco']} | READY | 0 | ok |
+| twins | 8 | could be either lookalike | Foglio1 | - | none | yes | its table | READY | 0 | ok |
+| twins | 9 | could be either lookalike | Riepilogo | - | none | yes | its table | READY | 0 | ok |
+| twins | 10 | a later file | F-twin-guests | next | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
+| twins | 11 | a later file | F-twin-plan | extra | 2 | - | {'sheets': ['Elenco']} | READY | 0 | ok |
+| twins | 12 | a later file | F-twin-guests | extra | 1 | - | {'sheets': ['Prenotazioni']} | READY | 0 | ok |
 
