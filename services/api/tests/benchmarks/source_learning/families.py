@@ -37,6 +37,7 @@ class Expect(StrEnum):
     COMPATIBLE = "COMPATIBLE"  # the same source with something added: nothing asked again
     MISSING = "MISSING"  # a known column is gone: it is NOT reused, the rest is
     CONFLICT = "CONFLICT"  # the file contradicts the memory: not reused, never automatic
+    AMBIGUOUS = "AMBIGUOUS"  # two families could be it and none clearly is: nothing is reused
 
 
 @dataclass(frozen=True, slots=True)

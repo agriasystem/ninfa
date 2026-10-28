@@ -210,4 +210,163 @@ def markdown(data: Mapping[str, Any], today: str) -> str:
         for failure in data["failures"]:
             add(f"* {failure['family']} {failure['version']}: {failure['why']}")
         add("")
+    if data.get("multi_family"):
+        add(multi_markdown(data["multi_family"]))
     return "\n".join(out) + "\n"
+
+
+EVENTS = {
+    "teach": "taught",
+    "see": "a later file",
+    "undecidable": "could be either twin",
+    "import": "imported from memory",
+    "correct": "corrected by hand",
+}
+
+
+def multi_markdown(multi: Mapping[str, Any]) -> str:
+    """The multi-source extension: several recurring families in ONE property and kind of data."""
+    out: list[str] = []
+    add = out.append
+    saved = multi["questions_saved"]
+    add("## Several sources in one property (multi-source extension)\n")
+    add(
+        f"{multi['properties']} properties (bookings, staff, costs), each with "
+        f"**{multi['families_per_property']} recurring families in the same kind of data**: "
+        f"{multi['families']} families, {multi['documents']} documents in "
+        f"{multi['timeline_steps']} timeline steps. A property is taught one family at a time and "
+        "a later file of any of them arrives, as it would over months: A -> A, A -> B, B -> A, "
+        "A -> B -> C -> A -> C -> B, a drifted A after B and C, a twin of A taught later, an "
+        "import "
+        "from memory, a correction by hand. The twin of A has the same columns plus a different "
+        "optional one (the engine reads the two as different fields), so the two can only be told "
+        "apart by what the file contains; five files per property are the twins' common part, with "
+        "and without the column of each: they could be either, and the right answer is to reuse "
+        "nothing. No model, no embedding, no external service.\n"
+    )
+    add("### Result\n")
+    add(
+        table(
+            ["Measure", "Target", "Measured"],
+            [
+                [
+                    "Returning-family recognition (a family seen again after another one, "
+                    "unchanged or harmlessly changed: recognised, nothing asked)",
+                    "100%",
+                    pct(multi["returning_family_recognition"]),
+                ],
+                [
+                    "The right family, in every file that has one (incl. a column gone or a "
+                    "contradicted one)",
+                    "100%",
+                    pct(multi["right_family_every_expected_step"]),
+                ],
+                [
+                    "Cross-family wrong reuse (a file read as another family, or a reused "
+                    "column read as something it is not)",
+                    "0",
+                    multi["cross_family_wrong_reuse"],
+                ],
+                [
+                    "Family-collision false match (a file that could be either twin: one is "
+                    "chosen, or anything is reused)",
+                    "0",
+                    pct(multi["family_collision_false_match"]),
+                ],
+                ["A twin taken for its sibling", "0", multi["twin_confusions"]],
+                [
+                    "Repeated questions after a returning source, unchanged",
+                    "0",
+                    multi["repeated_questions_after_returning_source"],
+                ],
+                [
+                    "Correct family after cosmetic / additive drift (columns moved, a junk column, "
+                    "cosmetic headers, a new column)",
+                    "100%",
+                    pct(multi["correct_family_after_cosmetic_or_additive_drift"]),
+                ],
+                [
+                    "Other families untouched by an import from memory or a correction by hand",
+                    "100%",
+                    pct(multi["store_intact_after_import_or_correction"]),
+                ],
+                ["Cross-property contamination", "0", multi["cross_property_contamination"]],
+                ["Cross-domain contamination", "0", multi["cross_domain_contamination"]],
+                ["Every step behaves as expected", "100%", pct(multi["every_step_as_expected"])],
+            ],
+        )
+        + "\n"
+    )
+    add(
+        f"**{saved['saved']} asks saved** ({saved['asks_without_memory']} without a memory, "
+        f"{saved['asks_with_memory']} with); {saved['documents_asking_nothing_with_memory']} "
+        "documents are read with nothing to ask, "
+        f"{saved['documents_asking_nothing_without_memory']} without it.\n"
+    )
+    add("### By property\n")
+    add(
+        table(
+            ["Property", "Kind of data", "Families", "Remembered", "Revisions"],
+            [
+                [
+                    f"{info['site']}: {info['title']}",
+                    info["domain"],
+                    ", ".join(info["families"]),
+                    info["families_in_memory"],
+                    ", ".join(f"{k}: {v}" for k, v in info["revisions"].items()),
+                ]
+                for info in multi["per_site"]
+            ],
+        )
+        + "\n"
+    )
+    if multi["failures"]:
+        add("### Where it did not behave as expected\n")
+        for failure in multi["failures"]:
+            add(
+                f"* {failure['site']} step {failure['n']} {failure['family']} "
+                f"{failure['version']}: {failure['why']}"
+            )
+        add("")
+    add("### Every step\n")
+    rows = []
+    for step in multi["steps"]:
+        rows.append(
+            [
+                step["site"],
+                step["n"],
+                EVENTS.get(step["kind"], step["kind"]),
+                step["family"],
+                step["version"] or "-",
+                "-" if "family_chosen" not in step else (step["family_chosen"] or "none"),
+                "yes" if step.get("ambiguous") else "-",
+                step.get("structure") or "-",
+                step.get("drift") or "-",
+                step.get("level", "-"),
+                step.get("questions", "-"),
+                step.get("reused", "-"),
+                "ok" if step["ok"] else f"NOT OK: {step['why']}",
+            ]
+        )
+    add(
+        table(
+            [
+                "Property",
+                "#",
+                "Event",
+                "Family",
+                "V",
+                "Chosen",
+                "Ambiguous",
+                "Match",
+                "Drift",
+                "Level",
+                "Questions",
+                "Reused",
+                "Result",
+            ],
+            rows,
+        )
+        + "\n"
+    )
+    return "\n".join(out)

@@ -58,6 +58,10 @@ class Reading:
     explain: str | None
     trusted: bool
     ms: float
+    # Which of the source's families the file was found to be (None: none, or it could not be told).
+    family: str | None = None
+    ambiguous: bool = False
+    known: int = 0
 
     @property
     def automatic(self) -> bool:
@@ -103,14 +107,19 @@ def _reading(inspection: FileInspection, elapsed_ms: float) -> Reading:
         explain=None if match is None else match.explain(),
         trusted=memory is not None and memory.trust.value == "PERSON",
         ms=elapsed_ms,
+        family=None if memory is None else memory.id,
+        ambiguous=learning is not None and learning.ambiguous,
+        known=0 if learning is None else learning.known,
     )
 
 
 class Bench:
-    def __init__(self, session: Session, progress: Callable[[str], None]) -> None:
+    def __init__(
+        self, session: Session, progress: Callable[[str], None], workspace: str | None = None
+    ) -> None:
         self.progress = progress
         self.factory = BookingFactory(session)
-        self.workspace = self.factory.workspace()
+        self.workspace = self.factory.workspace(workspace)
         self.service = DataSourcesService(session, TenantContext(self.workspace.id))
         self.match_ms: list[float] = []
 
@@ -124,8 +133,9 @@ class Bench:
         *,
         domain: DataSourceDomain | None = None,
         answers: dict[str, Any] | None = None,
+        month: int | None = None,
     ) -> Reading:
-        content = xlsx_of(version.columns, rows=version.rows, month=version.month)
+        content = xlsx_of(version.columns, rows=version.rows, month=month or version.month)
         started = time.perf_counter()
         inspection = self.service.understand_file(
             property_id,
@@ -138,8 +148,15 @@ class Bench:
 
     # --- the first time: the person decides, the import remembers ---
 
-    def teach(self, property_id: Any, family: Family, first: Version) -> dict[str, Any]:
-        content = xlsx_of(first.columns, rows=first.rows, month=first.month)
+    def teach(
+        self,
+        property_id: Any,
+        family: Family,
+        first: Version,
+        month: int | None = None,
+        snapshot: date | None = None,
+    ) -> dict[str, Any]:
+        content = xlsx_of(first.columns, rows=first.rows, month=month or first.month)
         name = f"{family.id}-V1.xlsx"
         if family.manual:
             decision = MappingInput(
@@ -169,7 +186,7 @@ class Bench:
             family.domain,
             filename=name,
             content=content,
-            snapshot_local_date=date(2026, 10, 30),
+            snapshot_local_date=snapshot or date(2026, 10, 30),
             mapped=MappedImport(decision, save_configuration=True),
         )
         return {
