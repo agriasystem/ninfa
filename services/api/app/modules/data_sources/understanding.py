@@ -66,8 +66,10 @@ from app.modules.data_sources.semantics_costs import COSTS
 from app.modules.data_sources.semantics_labor import LABOR, hourly_or_known_exclusion
 from app.modules.data_sources.smart_import import Formats, SmartImportService, problem_of_error
 from app.modules.data_sources.source_learning import (
+    ColumnView,
     Confirmation,
     Drift,
+    FamilyChoice,
     Learning,
     LearningInfo,
     Memory,
@@ -77,6 +79,7 @@ from app.modules.data_sources.source_learning import (
     column_views,
     header_key,
     kept_answers,
+    layout_hints,
     match_source,
     parse_learning,
     reusable,
@@ -204,6 +207,19 @@ class _Candidate:
     proposals: dict[DataSourceDomain, Proposal]
 
 
+@dataclass(slots=True)
+class _Reading:
+    """A document read under one layout: its tables, the one chosen, and which family of the source
+    that table is (if any)."""
+
+    document: DocumentUnderstanding
+    candidates: list[_Candidate]
+    detection: DomainVerdict | None
+    chosen: _Candidate | None
+    views: list[ColumnView]
+    choice: FamilyChoice
+
+
 class UnderstandingService:
     def __init__(
         self,
@@ -237,21 +253,49 @@ class UnderstandingService:
         except BookingImportError as error:
             return FileInspection(domain, problem=problem_of_error(error))
 
-        saved_config, saved_decision_layout = self._saved(adapter, source)
+        saved_config, saved_layout = self._saved(adapter, source)
         taught = {
             name: dict(document) for name, document in self._saved_labels(adapter, source).items()
         }
-        base = self._base_layout(answers, saved_decision_layout)
-        document = understand(scan, base)
-        if document.chosen is None:
+        # --- how this document is READ, in four phases (the order is what makes it deterministic) -
+        # A. The document on its own terms: only what the person says NOW decides how it is read.
+        #    The layout of the LAST import is nobody's but the family that wrote it, so it is not
+        #    applied to a file before we know whose file it is.
+        # B. Which family of this source is it? (every table the document offers is a candidate)
+        # C. Only a family recognised for sure lends its reading hints (the sheets the person chose,
+        #    the hours of a day grid, where the department comes from). If they do not reproduce
+        #    that family, they are dropped and the document stays as read in A: no guessing.
+        # D. The meaning of the columns and the validation, below, as ever.
+        store = self._learning(adapter, saved_config)
+        neutral = self._base_layout(answers, None)
+        reading = self._read(scan, content, filename, domain, sem, answers, store, neutral)
+        if reading.chosen is None:
             return redact_inspection(
-                self._without_table(domain, scan, document, already_imported),
+                self._without_table(domain, scan, reading.document, already_imported),
                 PersonalDataGuard(),
             )
-
-        candidates = self._candidates(content, filename, document, domain)
-        detection = self._detect(candidates)
-        chosen = self._pick(candidates, domain, answers)
+        base = neutral
+        hints = self._hints(reading.choice, store, saved_layout)
+        if hints is not None:
+            base = self._base_layout(answers, hints)
+            if hints.sheets and not answers.sheet_name:
+                # (the sheets the person chose for this family: the document is read through them)
+                again = self._read(scan, content, filename, domain, sem, answers, store, base)
+                same = (
+                    again.chosen is not None
+                    and again.choice.memory is not None
+                    and reading.choice.memory is not None
+                    and again.choice.memory.id == reading.choice.memory.id
+                    and again.choice.revision
+                )
+                if same:
+                    reading = again
+                else:
+                    hints, base = None, neutral
+        document, candidates, chosen = reading.document, reading.candidates, reading.chosen
+        detection = reading.detection
+        assert chosen is not None and detection is not None
+        views, choice = reading.views, reading.choice
         questions: list[Question] = []
         blockers: list[Blocker] = []
         questions.extend(self._domain_question(detection, domain, confirmed_domain))
@@ -271,9 +315,6 @@ class UnderstandingService:
         # A source can remember several recurring structures (the PMS export, an OTA export, an
         # internal report): the file is matched with ALL of them and belongs to one only if that
         # one explains it clearly better than the others; when it cannot be told, nothing is reused.
-        store = self._learning(adapter, saved_config)
-        views = column_views(sem, proposal)
-        choice = choose_family(store, views, match_source)
         memory, match = choice.memory, choice.match
         reuse = memory is not None and match is not None and reusable(memory, match)
         remembered = dict(match.proven) if reuse and match is not None else {}
@@ -285,6 +326,12 @@ class UnderstandingService:
         taught_roles = known_labels(
             dict(taught.get("role_mapping", {})), answers.labels.get("role_mapping", {})
         )
+        # (the person said the department comes from the title for THIS family: that is the answer)
+        department_from = answers.department_from or (
+            hints.department.kind
+            if hints is not None and hints.department and hints.department.kind == "TITLE"
+            else None
+        )
         if domain == DataSourceDomain.LABOR:
             plan = plan_labor(
                 scan=scan,
@@ -294,7 +341,7 @@ class UnderstandingService:
                 proposal=_with_answers(proposal, asked_fields),
                 taught=taught_roles,
                 asked_department=effective.department_value,
-                asked_department_from=answers.department_from,
+                asked_department_from=department_from,
                 asked_grid_hours=answers.grid_hours,
                 asked_period=answers.period_start is not None,
             )
@@ -612,6 +659,7 @@ class UnderstandingService:
                     memory=memory,
                     match=match,
                     family=choice.family,
+                    layout=hints,
                     known=choice.known,
                     eligible=choice.eligible,
                     ambiguous=choice.ambiguous,
@@ -622,6 +670,80 @@ class UnderstandingService:
             ),
             guard_for(samples, proposal),
         )
+
+    # --- phases A and B: the document, and whose it is ---
+
+    def _read(
+        self,
+        scan: WorkbookScan,
+        content: bytes,
+        filename: str,
+        domain: DataSourceDomain,
+        sem: DomainSem,
+        answers: UnderstandAnswers,
+        store: Learning | None,
+        base: LayoutSpec,
+    ) -> _Reading:
+        """The document read under `base`: its candidate tables, the one chosen and the family of
+        the source that table is. A table that is one family's clearly - nothing it remembers is
+        lost - is preferred to the one the ranking picked, unless the person chose one just now."""
+        document = understand(scan, base)
+        if document.chosen is None:
+            return _Reading(document, [], None, None, [], FamilyChoice())
+        candidates = self._candidates(content, filename, document, domain)
+        detection = self._detect(candidates)
+        chosen = self._pick(candidates, domain, answers)
+
+        def look(candidate: _Candidate) -> tuple[list[ColumnView], FamilyChoice]:
+            skip = self._days_of(candidate.selection)
+            views = column_views(sem, candidate.proposals[domain], skip)
+            return views, choose_family(store, views, match_source)
+
+        def clean(found: FamilyChoice) -> bool:
+            return (
+                found.memory is not None
+                and found.match is not None
+                and found.revision
+                and reusable(found.memory, found.match)
+            )
+
+        views, choice = look(chosen)
+        if store is not None and store.families and not answers.table_key and not clean(choice):
+            others = []
+            if not choice.ambiguous:
+                for candidate in candidates:
+                    if candidate is chosen:
+                        continue
+                    other_views, other = look(candidate)
+                    if clean(other):
+                        others.append((candidate, other_views, other))
+            if len(others) == 1:  # one table is a family's: that is the one the person taught
+                chosen, views, choice = others[0]
+        return _Reading(document, candidates, detection, chosen, views, choice)
+
+    @staticmethod
+    def _days_of(selection: Selection) -> frozenset[str]:
+        """The headers of a day grid's days and totals: they name the week, not the source."""
+        grid = selection.day_grid
+        if grid is None:
+            return frozenset()
+        indexes = {day.index for day in grid.columns} | set(grid.total_columns)
+        return frozenset(
+            header_key(column.label)
+            for column in selection.first.columns
+            if column.index in indexes
+        )
+
+    @staticmethod
+    def _hints(
+        choice: FamilyChoice, store: Learning | None, saved_layout: LayoutSpec | None
+    ) -> LayoutSpec | None:
+        """The reading hints of the family this file is - only when it is one a person taught and
+        the file still holds everything it remembers. Anything less reads the file on its own."""
+        memory, match = choice.memory, choice.match
+        if memory is None or match is None or not choice.revision or not reusable(memory, match):
+            return None
+        return layout_hints(memory, store, saved_layout)
 
     # --- the saved configuration ------------------------------------------------------------------
 

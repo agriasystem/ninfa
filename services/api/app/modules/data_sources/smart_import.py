@@ -77,7 +77,9 @@ from app.modules.data_sources.source_learning import (
     Via,
     header_key,
     parse_learning,
+    safe_layout,
     stored_learning,
+    within_shape,
     without_current,
 )
 from app.modules.data_sources.source_learning import remember_in as learn
@@ -859,11 +861,15 @@ class SmartImportService:
         existing_raw = self._learning_of(adapter, source)
         origin = Via.ENGINE if confirmation is None else confirmation.origin
         if confirmation is not None and confirmation.shape:
-            mapped = {
-                field: header_key(str(spec["column"]))
-                for field, spec in documents.get("column_mapping", {}).items()
-                if isinstance(spec, dict) and spec.get("column")
-            }
+            # (only the columns the file has as it is read plainly: those a layout adds are its own)
+            mapped = within_shape(
+                {
+                    field: header_key(str(spec["column"]))
+                    for field, spec in documents.get("column_mapping", {}).items()
+                    if isinstance(spec, dict) and spec.get("column")
+                },
+                confirmation.shape,
+            )
             person = (
                 dict(mapped)
                 if origin == Via.MANUAL
@@ -878,6 +884,8 @@ class SmartImportService:
                 person=person,
                 answers=confirmation.answers,
                 origin=origin,
+                # how THIS family is read travels with it: never the next family's business
+                layout=safe_layout((documents.get("format_options") or {}).get("layout")),
             )
             if families is None and origin != Via.REUSE:
                 # the engine alone never replaces what a person confirmed

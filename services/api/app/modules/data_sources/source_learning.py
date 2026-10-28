@@ -17,6 +17,11 @@ report - and each is a family of its own: the structure of the last file a perso
 (header keys in order, with the CLASS of their values), the mapping that was confirmed, the part of
 it the person decided, the formats they chose, and a short history of its earlier revisions.
 
+How a family is READ is the family's too (`Memory.layout`): which sheets, which grid of days, where
+the department comes from. They are what the person decided about THAT structure, so they are
+remembered with it and applied only once the file has been recognised as it - never inherited from
+whichever family was imported last.
+
 Family or revision. A revision is the SAME family evolving: the file still holds everything the
 family remembers (the same columns, moved, renamed to what the engine reads the same, with new ones,
 or one whose meaning the person now corrects). A family is another structure that recurs next to it:
@@ -44,7 +49,8 @@ always wins over the memory. Reuse what is still proven, ask what changed.
 import hashlib
 import json
 import math
-from collections.abc import Callable, Mapping, Sequence
+import re
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -54,6 +60,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from app.modules.bookings.mapping import normalize_header
 from app.modules.data_sources.proposal import Proposal
 from app.modules.data_sources.semantics import DomainSem
+from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.document_understanding.lexicon import HEADER_STEMS, SECTION_WORDS
 from app.modules.document_understanding.pii import looks_like_person
 from app.modules.document_understanding.pii_text import normalize
@@ -165,6 +172,10 @@ class Memory(BaseModel):
     # source's counter at which it was last confirmed or reused (least recently used goes first).
     id: str = ""
     touched: int = 0
+    # How THIS family's files are read (a `LayoutSpec`, as the profile saves it: the sheets the
+    # person chose, the hours of a day grid, where the department comes from; never a date or a
+    # row). None: not known (the family was remembered before layouts were).
+    layout: dict[str, Any] | None = None
 
     def header_keys(self) -> list[str]:
         return [key for key, _ in self.shape if key != PERSONAL]
@@ -282,12 +293,17 @@ def _names_a_person(header: str, sem: DomainSem) -> bool:
     return looks_like_person(header) and not known
 
 
-def column_views(sem: DomainSem, proposal: Proposal) -> list[ColumnView]:
+def column_views(
+    sem: DomainSem, proposal: Proposal, skip: Collection[str] = ()
+) -> list[ColumnView]:
     """The columns of a file, read by the engine ALONE (no memory), as the matcher sees them. A
     column the engine locks or flags as personal data, or whose HEADER is a person's name, is a
-    placeholder: nothing of it is kept."""
+    placeholder: nothing of it is kept. `skip` are the headers that are not part of what the file
+    IS - the days of a grid, which change every week."""
     views: list[ColumnView] = []
     for column in proposal.columns:
+        if header_key(column.header) in skip:
+            continue
 
         def fit_for(field: str, stats: ColumnStats = column.stats) -> float | None:
             spec = sem.fields.get(field)
@@ -313,6 +329,58 @@ def column_views(sem: DomainSem, proposal: Proposal) -> list[ColumnView]:
 
 def shape_of(columns: Sequence[ColumnView]) -> list[tuple[str, str]]:
     return [(PERSONAL if c.personal else c.key, c.kind) for c in columns if c.personal or c.key]
+
+
+def within_shape(mapped: Mapping[str, str], shape: Sequence[tuple[str, str]]) -> dict[str, str]:
+    """The matching restricted to the columns the file HAS as it is read plainly. A column a layout
+    adds - the date and the hours of a day grid, the department of a title - is the layout's, not
+    the structure's: it does not exist in the file, so it could never be found there."""
+    keys = {key for key, _ in shape if key != PERSONAL}
+    return {field: key for field, key in mapped.items() if key in keys}
+
+
+# --- how a family is read ---
+
+_LONG_NUMBER = re.compile(r"\d{5,}")
+
+
+def _safe_sheet(name: str) -> bool:
+    """A sheet name that says what the sheet IS, not who it is about."""
+    return not (looks_like_person(name) or "@" in name or _LONG_NUMBER.search(name))
+
+
+def safe_layout(raw: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The reading hints worth remembering for a family, as JSON, or None (no layout known).
+    Nothing of a file's rows or dates: the sheets the person chose (unless a name looks like a
+    person, an e-mail or a long number), the hours of a grid and the origin of the department."""
+    if raw is None:
+        return None
+    try:
+        spec = LayoutSpec.model_validate(dict(raw))
+    except (ValidationError, TypeError, ValueError):
+        return None
+    if not all(_safe_sheet(name) for name in spec.sheets):
+        spec = spec.model_copy(update={"sheets": []})
+    return spec.for_profile().model_dump(mode="json", exclude_none=True, exclude_defaults=True)
+
+
+def layout_hints(
+    memory: Memory | None, store: Learning | None, profile_layout: LayoutSpec | None
+) -> LayoutSpec | None:
+    """How to read a file of this family: its own hints. A family remembered before layouts were
+    (no hints at all) is read with the profile's layout only if THAT is the layout of its own last
+    import (it is the family the profile's saved matching belongs to); for any other it is nothing
+    - never the layout of whichever family was imported last. A damaged hint is no hint."""
+    if memory is None:
+        return None
+    if memory.layout is not None:
+        try:
+            return LayoutSpec.model_validate(memory.layout)
+        except (ValidationError, TypeError, ValueError):
+            return None
+    if store is not None and profile_layout is not None and memory.id == store.current:
+        return profile_layout.for_profile()
+    return None
 
 
 # --- matching ---
@@ -613,6 +681,8 @@ class LearningInfo:
     known: int = 0
     eligible: int = 0
     ambiguous: bool = False
+    # How this family's files are read (what was applied), None: nothing remembered applies.
+    layout: LayoutSpec | None = None
     # The current headers whose meaning came from the memory (the person is not asked again).
     reused: tuple[str, ...] = ()
     # The structure of this file: what a confirmed import remembers.
@@ -651,6 +721,7 @@ def remember(
     person: Mapping[str, str],
     answers: Mapping[str, str],
     origin: Via,
+    layout: Mapping[str, Any] | None = None,
 ) -> Memory | None:
     """The memory after an import that succeeded, or None when nothing is to be saved.
 
@@ -669,6 +740,16 @@ def remember(
     mapped_now = dict(mapped)
     person_now = dict(person) if trust == Trust.PERSON else {}
     answers_now = {k: v for k, v in answers.items() if k in REMEMBERED_ANSWERS and v}
+    layout_now = None if layout is None else dict(layout)
+    if (
+        layout_now is not None
+        and existing is not None
+        and existing.layout
+        and "sheets" in existing.layout
+        and "sheets" not in layout_now
+    ):
+        # (a csv has no sheets: confirming the family from one says nothing about them)
+        layout_now["sheets"] = existing.layout["sheets"]
     fingerprint = fingerprint_of(domain, shape, mapped_now)
     history: list[dict[str, Any]] = []
     revision = 1
@@ -679,6 +760,8 @@ def remember(
             and existing.mapped == mapped_now
             and existing.person == person_now
             and existing.answers == answers_now
+            # (a family remembered before layouts were learns its layout without a revision)
+            and (existing.layout is None or layout_now is None or existing.layout == layout_now)
         )
         if same:
             revision = existing.revision
@@ -691,6 +774,7 @@ def remember(
                     "origin": existing.origin.value,
                     "mapped": existing.mapped,
                     "person": existing.person,
+                    "layout": existing.layout,
                 }
             )
     return Memory(
@@ -704,6 +788,7 @@ def remember(
         answers=answers_now,
         history=history[-HISTORY_KEPT:],
         fingerprint=fingerprint,
+        layout=layout_now if layout_now is not None else (existing.layout if existing else None),
     )
 
 
@@ -717,6 +802,7 @@ def remember_in(
     person: Mapping[str, str],
     answers: Mapping[str, str],
     origin: Via,
+    layout: Mapping[str, Any] | None = None,
 ) -> Learning | None:
     """The source's families after an import that succeeded, or None when nothing is to be saved.
 
@@ -757,6 +843,7 @@ def remember_in(
         person=person,
         answers=answers,
         origin=origin,
+        layout=layout,
     )
     if updated is None:  # (only for a decision that came from the memory, handled above)
         return None
@@ -819,6 +906,7 @@ __all__ = [
     "column_views",
     "fingerprint_of",
     "header_key",
+    "layout_hints",
     "is_revision",
     "kept_answers",
     "match_source",
@@ -828,9 +916,11 @@ __all__ = [
     "remember_in",
     "residual",
     "reusable",
+    "safe_layout",
     "shape_of",
     "stored",
     "stored_learning",
     "value_class",
+    "within_shape",
     "without_current",
 ]

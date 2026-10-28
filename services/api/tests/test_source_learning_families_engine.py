@@ -749,7 +749,7 @@ def test_family_identities_are_unique_and_never_reused_after_one_is_dropped() ->
 
 ALLOWED_FAMILY_KEYS = {
     "v", "revision", "trust", "origin", "domain", "shape", "mapped", "person", "answers",
-    "history", "fingerprint", "id", "touched",
+    "history", "fingerprint", "id", "touched", "layout",
 }  # fmt: skip
 
 
