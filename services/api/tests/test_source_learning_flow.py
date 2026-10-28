@@ -22,7 +22,14 @@ from app.core.tenant import TenantContext
 from app.modules.bookings.models import BookingMappingProfile
 from app.modules.data_sources.mapping_types import FileInspection
 from app.modules.data_sources.service import DataSourcesService
-from app.modules.data_sources.source_learning import Drift, Structure, Trust, Via, parse_memory
+from app.modules.data_sources.source_learning import (
+    Drift,
+    Memory,
+    Structure,
+    Trust,
+    Via,
+    parse_learning,
+)
 from app.modules.data_sources.understanding import UnderstandAnswers
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.labor.models import LaborMappingProfile
@@ -98,8 +105,15 @@ def _inspect(
 
 
 def _memory(db_session: Session, env: SourcesEnv, model: Any = LaborMappingProfile) -> Any:
+    """The one family this source remembers (these tests teach a single structure)."""
     (profile,) = profiles_of(db_session, env, model)
-    return parse_memory(profile.format_options.get("learning"))
+    return _only_family(profile.format_options.get("learning"))
+
+
+def _only_family(raw: Any) -> Memory | None:
+    store = parse_learning(raw)
+    assert store is None or len(store.families) <= 1
+    return None if store is None or not store.families else store.families[0]
 
 
 def _teach_staff(
@@ -557,9 +571,13 @@ def test_a_memory_that_claims_another_domain_is_ignored(
 ) -> None:
     _teach_staff(api_client, env)
     (profile,) = profiles_of(db_session, env, LaborMappingProfile)
+    learning = profile.format_options["learning"]
     profile.format_options = {
         **profile.format_options,
-        "learning": {**profile.format_options["learning"], "domain": "bookings"},
+        "learning": {
+            **learning,
+            "families": [{**family, "domain": "bookings"} for family in learning["families"]],
+        },
     }
     db_session.flush()
 
@@ -692,7 +710,7 @@ def test_nothing_personal_is_remembered_about_a_source(
     assert done.json()["succeeded"] is True
 
     (profile,) = profiles_of(db_session, env, LaborMappingProfile)
-    learned = parse_memory(profile.format_options["learning"])
+    learned = _only_family(profile.format_options["learning"])
     assert learned is not None
     stored = json.dumps(
         {
@@ -728,7 +746,7 @@ def test_headers_that_are_the_names_of_people_are_never_kept_in_the_structure(
     assert done.json()["succeeded"] is True
 
     (profile,) = profiles_of(db_session, env, LaborMappingProfile)
-    learned = parse_memory(profile.format_options["learning"])
+    learned = _only_family(profile.format_options["learning"])
     assert learned is not None
     blob = json.dumps(profile.format_options, ensure_ascii=False).casefold()
     for fragment in ("mario", "rossi", "giulia", "bianchi"):

@@ -431,7 +431,9 @@ class DataSourcesService:
             )
             if value
         }
-        return Confirmation(Via.MANUAL, kept, frozenset(), inspection.learning.shape)
+        return Confirmation(
+            Via.MANUAL, kept, frozenset(), inspection.learning.shape, inspection.learning.family
+        )
 
     def dry_run(
         self,

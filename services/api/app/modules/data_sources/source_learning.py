@@ -10,10 +10,22 @@ value
 of a row, a file name or a note: a column of personal data is only a placeholder in a structure, and
 nothing personal is needed to recognise a source.
 
-What is remembered (`Memory`, a small JSON section of the profile's `format_options` - no table, no
-migration): the structure of the last file a person confirmed (header keys in order, with the CLASS
-of their values), the mapping that was confirmed, the part of it the person decided, the formats
-they chose, and a short history of earlier revisions.
+What is remembered (`Learning`, a small JSON section of the profile's `format_options` - no table,
+no migration): ONE `Memory` PER SOURCE FAMILY. A source (property + kind of data) can have several
+recurring files that are NOT the same structure - the PMS export, an OTA export, an internal
+report - and each is a family of its own: the structure of the last file a person confirmed in it
+(header keys in order, with the CLASS of their values), the mapping that was confirmed, the part of
+it the person decided, the formats they chose, and a short history of its earlier revisions.
+
+Family or revision. A revision is the SAME family evolving: the file still holds everything the
+family remembers (the same columns, moved, renamed to what the engine reads the same, with new ones,
+or one whose meaning the person now corrects). A family is another structure that recurs next to it:
+as soon as a remembered column is no longer there - gone, or called something else - the file is a
+structure of its own, because the cost of a family too many is a record, and the cost of a family
+too few is losing the one that was there. A file belongs to a family only if that family explains it
+clearly better than every other one (`choose_family`); when two could be it and none clearly is,
+NOTHING is reused (it is not guessed). A person's confirmation updates the family the file is a
+revision of, or starts a new one: it never overwrites another family.
 
 When it is trusted. Only a PERSON makes a memory trusted: an explicit answer to a Smart Import
 question, or a matching built by hand that was then imported. A file the engine read alone (READY)
@@ -56,8 +68,18 @@ MIN_FIT = 0.6
 # Fewer mapped columns than this share of the remembered ones: not enough proof it is the same
 # source.
 MIN_COVERAGE = 0.5
+# Earlier revisions kept PER FAMILY, and families kept PER SOURCE: two limits, never the same one.
+# A revision is a short audit trail (what a correction replaced). A family is a source a hotel keeps
+# bringing back - a hotel has a handful of recurring files in a kind of data, a busy one a few dozen
+# (one export per supplier, per OTA, per outlet). 32 is far above that and still small: matching a
+# file against all of them is a few milliseconds and the section stays within ~200 KB.
 HISTORY_KEPT = 5
-SCHEMA = 1
+FAMILIES_KEPT = 32
+# Between two families that could both be this file, the winner must explain it completely, or leave
+# at least this many columns fewer unexplained (new + missing + contradicted) than the runner-up.
+MIN_RESIDUAL_GAP = 2
+SCHEMA = 1  # a family
+LEARNING_SCHEMA = 2  # all the families of a source
 # The scalar answers worth remembering: closed vocabularies, nothing from a file.
 REMEMBERED_ANSWERS = ("date_order", "decimal_style", "amount_basis", "department_value")
 
@@ -139,6 +161,10 @@ class Memory(BaseModel):
     answers: dict[str, str] = {}
     history: list[dict[str, Any]] = []
     fingerprint: str = ""
+    # The family's own identity (stable across its revisions; never a file name) and the tick of the
+    # source's counter at which it was last confirmed or reused (least recently used goes first).
+    id: str = ""
+    touched: int = 0
 
     def header_keys(self) -> list[str]:
         return [key for key, _ in self.shape if key != PERSONAL]
@@ -157,6 +183,63 @@ def parse_memory(raw: Mapping[str, Any] | None) -> Memory | None:
     except (ValidationError, TypeError, ValueError):
         return None
     return memory if memory.v == SCHEMA else None
+
+
+class Learning(BaseModel):
+    """Everything a source remembers: its families, side by side. A source is a property + a kind of
+    data; a family is one recurring structure inside it."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    v: int = LEARNING_SCHEMA
+    # Counts every save: the order in which families were last used, and the next family's identity.
+    seq: int = 0
+    # The family whose import wrote the profile's saved column matching ("" when none did): that
+    # matching is only ever applied to a file of the same family.
+    current: str = ""
+    families: list[Memory] = []
+
+    def family(self, family_id: str | None) -> Memory | None:
+        return next((m for m in self.families if family_id and m.id == family_id), None)
+
+    def of_domain(self, domain: str) -> "Learning":
+        """Only the families of this kind of data (a family that says it belongs to another is
+        never applied)."""
+        kept = [m for m in self.families if m.domain == domain]
+        return self.model_copy(update={"families": kept})
+
+
+def parse_learning(raw: Mapping[str, Any] | None) -> Learning | None:
+    """The families in a stored profile, or None (none, another version, or damaged - which is never
+    an error). A damaged family is left out and the others survive; the section written before
+    there were families (one flat memory) is read as a source with one."""
+    if not raw or not isinstance(raw, Mapping):
+        return None
+    if "families" not in raw:
+        legacy = parse_memory(raw)
+        if legacy is None:
+            return None
+        return Learning(
+            seq=1, current="1", families=[legacy.model_copy(update={"id": "1", "touched": 1})]
+        )
+    entries = raw["families"]
+    if raw.get("v") != LEARNING_SCHEMA or not isinstance(entries, list):
+        return None
+    families: list[Memory] = []
+    seen: set[str] = set()
+    for entry in entries:
+        memory = parse_memory(entry) if isinstance(entry, Mapping) else None
+        if memory is None or not memory.id or memory.id in seen:
+            continue
+        seen.add(memory.id)
+        families.append(memory)
+    seq = raw.get("seq")
+    current = raw.get("current")
+    return Learning(
+        seq=max([seq if isinstance(seq, int) else 0, *(m.touched for m in families)]),
+        current=current if isinstance(current, str) and current in seen else "",
+        families=families,
+    )
 
 
 def fingerprint_of(domain: str, shape: Sequence[tuple[str, str]], mapped: Mapping[str, str]) -> str:
@@ -442,12 +525,94 @@ def kept_answers(memory: Memory, match: SourceMatch) -> dict[str, str]:
     return dict(memory.answers)
 
 
+# --- which family is this file? ---
+
+
+def residual(match: SourceMatch) -> int:
+    """How much of the file a family does NOT explain as it is: new columns, remembered columns that
+    are no longer there, columns that contradict what was confirmed, and columns it holds only under
+    another name (what the engine reads the same is weaker evidence than the header itself)."""
+    return match.new_columns + len(match.missing) + len(match.conflicts) + len(match.renamed)
+
+
+def is_revision(match: SourceMatch) -> bool:
+    """Is this file the SAME family evolving (so a confirmation updates that family), or another
+    structure that merely overlaps it (so it starts a family of its own)? A revision still holds
+    EVERYTHING the family remembers - the same columns, moved, renamed to what the engine reads the
+    same, with new ones, or one whose meaning the person now corrects. A file that lacks a
+    remembered column may be that family shrunk or a sibling that differs by it (`Area` / `Costo`):
+    there is no telling, and overwriting the family would lose it, so it is kept and the file starts
+    its own."""
+    return match.structure != Structure.DIFFERENT and not match.missing
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyChoice:
+    """Which of a source's families a file is - or that it cannot be told."""
+
+    # The family and its match. Both None when the file could be two families and is neither
+    # clearly (nothing is reused then); the closest one when no family could be this file at all.
+    memory: Memory | None = None
+    match: SourceMatch | None = None
+    known: int = 0  # families the source remembers
+    eligible: int = 0  # families this file could be (enough in common to be the same source)
+    ambiguous: bool = False
+    # The runner-up when several could be it.
+    rival: SourceMatch | None = None
+    # The file is the family evolving: a confirmation updates that family instead of starting one.
+    revision: bool = False
+
+    @property
+    def family(self) -> str | None:
+        """The family an import of this file updates; None: it starts a new one."""
+        return self.memory.id if self.memory is not None and self.revision else None
+
+
+def choose_family(
+    learning: Learning | None,
+    columns: Sequence[ColumnView],
+    matcher: Callable[[Memory, Sequence[ColumnView]], SourceMatch] = match_source,
+) -> FamilyChoice:
+    """The family of this source that the file in front of us belongs to.
+
+    Every family is matched on its own (`match_source`: column by column, the current document
+    always wins). One that could be the file is chosen only if it explains the file CLEARLY better
+    than any other that could be it: completely (nothing new, missing or contradicted), or with at
+    least `MIN_RESIDUAL_GAP` fewer columns unexplained than the runner-up. A weak coincidence - two
+    families that both share most of the columns - is never settled by a guess: no family is chosen
+    and nothing is reused, so the person is asked like for any source nobody taught."""
+    if learning is None or not learning.families:
+        return FamilyChoice()
+    scored = [(memory, matcher(memory, columns)) for memory in learning.families]
+    known = len(scored)
+    eligible = [(m, x) for m, x in scored if x.structure != Structure.DIFFERENT]
+    if not eligible:
+        closest_memory, closest = max(scored, key=lambda p: (p[1].score, p[0].touched))
+        return FamilyChoice(closest_memory, closest, known)
+    ranked = sorted(eligible, key=lambda p: (residual(p[1]), -p[1].score, -p[0].touched))
+    best_memory, best = ranked[0]
+    rival = ranked[1][1] if len(ranked) > 1 else None
+    if rival is not None:
+        gap = residual(rival) - residual(best)
+        if gap < 1 or (residual(best) > 0 and gap < MIN_RESIDUAL_GAP):
+            return FamilyChoice(known=known, eligible=len(ranked), ambiguous=True, rival=rival)
+    return FamilyChoice(
+        best_memory, best, known, len(ranked), False, rival, revision=is_revision(best)
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class LearningInfo:
     """What Source Learning did for THIS file. Internal: it is never part of the API response."""
 
     memory: Memory | None = None
     match: SourceMatch | None = None
+    # The family an import of this file updates (None: it would start a new one), how many families
+    # the source remembers, how many this file could be, and whether it could not be told.
+    family: str | None = None
+    known: int = 0
+    eligible: int = 0
+    ambiguous: bool = False
     # The current headers whose meaning came from the memory (the person is not asked again).
     reused: tuple[str, ...] = ()
     # The structure of this file: what a confirmed import remembers.
@@ -470,6 +635,8 @@ class Confirmation:
     classified: frozenset[str]
     # The structure of the file that was imported.
     shape: tuple[tuple[str, str], ...]
+    # The family the server found this file to be a revision of (None: it starts a new one).
+    family: str | None = None
 
 
 # --- remembering ---
@@ -540,36 +707,130 @@ def remember(
     )
 
 
+def remember_in(
+    learning: Learning | None,
+    *,
+    family: str | None,
+    domain: str,
+    shape: Sequence[tuple[str, str]],
+    mapped: Mapping[str, str],
+    person: Mapping[str, str],
+    answers: Mapping[str, str],
+    origin: Via,
+) -> Learning | None:
+    """The source's families after an import that succeeded, or None when nothing is to be saved.
+
+    `family` is the family the server found the file to be a revision of (`FamilyChoice.family`);
+    None means the file is a structure of its own. Only that family can change: a correction in one
+    family never touches another.
+
+    * A person's confirmation updates its family (a new revision, the old one kept in that family's
+      history) or starts a new one - unless that exact structure and matching is already a family.
+    * A decision that came from the memory itself confirms nothing new: only its family is marked
+      as the one in use.
+    * The engine alone never writes once a person has confirmed anything in this source: it cannot
+      teach itself, and what a person confirmed is not for it to replace.
+    * Over `FAMILIES_KEPT` the families least useful are dropped: those only the engine read first,
+      then the ones longest unused. The one just written is never dropped."""
+    families = list(learning.families) if learning is not None else []
+    seq = (learning.seq if learning is not None else 0) + 1
+    existing = next((m for m in families if family and m.id == family), None)
+    if origin == Via.REUSE:
+        if learning is None:
+            return None
+        if existing is None:
+            return learning.model_copy(update={"current": ""})
+        families[families.index(existing)] = existing.model_copy(update={"touched": seq})
+        return Learning(seq=seq, current=existing.id, families=families)
+    trust = Trust.PERSON if origin in (Via.ANSWERS, Via.MANUAL) else Trust.ENGINE
+    if trust == Trust.ENGINE and any(m.trust == Trust.PERSON for m in families):
+        return None
+    if existing is None:
+        # (the same structure and matching confirmed again is the same family, not a second one)
+        fingerprint = fingerprint_of(domain, shape, mapped)
+        existing = next((m for m in families if m.fingerprint == fingerprint), None)
+    updated = remember(
+        existing,
+        domain=domain,
+        shape=shape,
+        mapped=mapped,
+        person=person,
+        answers=answers,
+        origin=origin,
+    )
+    if updated is None:  # (only for a decision that came from the memory, handled above)
+        return None
+    updated = updated.model_copy(
+        update={"id": existing.id if existing is not None else f"{seq:x}", "touched": seq}
+    )
+    if existing is None:
+        families.append(updated)
+    else:
+        families[families.index(existing)] = updated
+    surplus = len(families) - FAMILIES_KEPT
+    if surplus > 0:
+        order = sorted(
+            (m for m in families if m.id != updated.id),
+            key=lambda m: (m.trust == Trust.PERSON, m.touched),
+        )
+        dropped = {m.id for m in order[:surplus]}
+        families = [m for m in families if m.id not in dropped]
+    return Learning(seq=seq, current=updated.id, families=families)
+
+
+def without_current(learning: Learning) -> Learning:
+    """The families, when the profile's saved matching was rewritten by an import that did not say
+    which family it belongs to: it is no longer any family's."""
+    return learning.model_copy(update={"current": ""})
+
+
 def stored(memory: Memory) -> dict[str, Any]:
     """The memory as the JSON kept in the profile."""
     return memory.model_dump(mode="json")
 
 
+def stored_learning(learning: Learning) -> dict[str, Any]:
+    """All of a source's families as the JSON kept in the profile."""
+    return learning.model_dump(mode="json")
+
+
 __all__ = [
+    "FAMILIES_KEPT",
     "HISTORY_KEPT",
+    "LEARNING_SCHEMA",
     "LearningInfo",
     "MIN_COVERAGE",
     "MIN_FIT",
+    "MIN_RESIDUAL_GAP",
     "PERSONAL",
     "REMEMBERED_ANSWERS",
     "ColumnView",
     "Confirmation",
     "Conflict",
     "Drift",
+    "FamilyChoice",
+    "Learning",
     "Memory",
     "Via",
     "SourceMatch",
     "Structure",
     "Trust",
+    "choose_family",
     "column_views",
     "fingerprint_of",
     "header_key",
+    "is_revision",
     "kept_answers",
     "match_source",
+    "parse_learning",
     "parse_memory",
     "remember",
+    "remember_in",
+    "residual",
     "reusable",
     "shape_of",
     "stored",
+    "stored_learning",
     "value_class",
+    "without_current",
 ]

@@ -439,7 +439,7 @@ def test_what_is_remembered_holds_only_closed_vocabulary_keys_and_numbers() -> N
     blob = stored(learned)
     assert set(blob) <= {
         "v", "revision", "trust", "origin", "domain", "shape", "mapped", "person", "answers",
-        "history", "fingerprint",
+        "history", "fingerprint", "id", "touched",
     }  # fmt: skip
 
 

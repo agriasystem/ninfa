@@ -76,10 +76,11 @@ from app.modules.data_sources.source_learning import (
     Confirmation,
     Via,
     header_key,
-    parse_memory,
-    stored,
+    parse_learning,
+    stored_learning,
+    without_current,
 )
-from app.modules.data_sources.source_learning import remember as learn
+from app.modules.data_sources.source_learning import remember_in as learn
 from app.modules.data_sources.understanding_costs import category_question
 from app.modules.data_sources.understanding_labor import label_question
 from app.modules.data_sources.understanding_redaction import (
@@ -847,10 +848,11 @@ class SmartImportService:
         keeps of it. A failure to save never undoes the import: it is only reported.
 
         What is learned depends on HOW the decision was confirmed, never on the client's say-so: a
-        person's answers or a matching they built by hand make it TRUSTED (a new revision when it
-        says something different from before); a file the engine read alone leaves ENGINE evidence
-        and never replaces what a person confirmed; a decision that came from the memory confirms
-        nothing new and leaves the memory as it is."""
+        person's answers or a matching they built by hand make it TRUSTED (a new revision of the
+        family the file is, or a new family when it is a structure of its own - never another
+        family's); a file the engine read alone leaves ENGINE evidence and never replaces what a
+        person confirmed; a decision that came from the memory confirms nothing new and leaves the
+        families as they are."""
         if resolved.documents is None:
             return False
         documents = {name: dict(document) for name, document in resolved.documents.items()}
@@ -867,8 +869,9 @@ class SmartImportService:
                 if origin == Via.MANUAL
                 else {f: k for f, k in mapped.items() if k in confirmation.classified}
             )
-            memory = learn(
-                parse_memory(existing_raw),
+            families = learn(
+                parse_learning(existing_raw),
+                family=confirmation.family,
                 domain=adapter.domain.value,
                 shape=confirmation.shape,
                 mapped=mapped,
@@ -876,12 +879,14 @@ class SmartImportService:
                 answers=confirmation.answers,
                 origin=origin,
             )
-            if memory is None and origin != Via.REUSE:
+            if families is None and origin != Via.REUSE:
                 # the engine alone never replaces what a person confirmed
                 return False
-            learning = existing_raw if memory is None else stored(memory)
+            learning = existing_raw if families is None else stored_learning(families)
         else:
-            learning = existing_raw
+            # The saved matching is rewritten without saying which family it belongs to.
+            known = parse_learning(existing_raw)
+            learning = existing_raw if known is None else stored_learning(without_current(known))
         if learning is not None:
             documents.setdefault("format_options", {})["learning"] = learning
         try:

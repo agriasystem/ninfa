@@ -68,15 +68,17 @@ from app.modules.data_sources.smart_import import Formats, SmartImportService, p
 from app.modules.data_sources.source_learning import (
     Confirmation,
     Drift,
+    Learning,
     LearningInfo,
     Memory,
     SourceMatch,
     Via,
+    choose_family,
     column_views,
     header_key,
     kept_answers,
     match_source,
-    parse_memory,
+    parse_learning,
     reusable,
     shape_of,
 )
@@ -266,9 +268,13 @@ class UnderstandingService:
         # A memory is evidence, never authority: each column the person decided is reused only if
         # the current document still proves it (see `source_learning`); the engine's own reading of
         # THIS file, and its values, always win over the memory.
-        memory = self._memory(adapter, saved_config)
+        # A source can remember several recurring structures (the PMS export, an OTA export, an
+        # internal report): the file is matched with ALL of them and belongs to one only if that
+        # one explains it clearly better than the others; when it cannot be told, nothing is reused.
+        store = self._learning(adapter, saved_config)
         views = column_views(sem, proposal)
-        match = None if memory is None else match_source(memory, views)
+        choice = choose_family(store, views, match_source)
+        memory, match = choice.memory, choice.match
         reuse = memory is not None and match is not None and reusable(memory, match)
         remembered = dict(match.proven) if reuse and match is not None else {}
         # (what the person answers NOW wins over what they answered before)
@@ -482,17 +488,26 @@ class UnderstandingService:
                 content, filename, document, chosen.selection, wanted_layout, table
             )
         profile = self._smart.profile_info(adapter, source, signature)
-        recognized_by_profile = (
-            profile.status == ProfileStatus.RECOGNIZED
-            and saved_config is not None
-            and profile.mapping is not None
-            # ...and only what a PERSON confirmed, still proven by THIS file, with no column
-            # renamed (a saved profile is evidence, not authority: the engine cannot teach itself)
-            and reuse
+        # What a PERSON confirmed about this source, still proven by THIS file, with no column
+        # renamed: the file is a source the person has taught (a memory is evidence, not authority:
+        # the engine cannot teach itself, and what the person says now is never overridden).
+        recognized_by_family = (
+            reuse
             and match is not None
             and not match.renamed
             and match.drift in (Drift.NONE, Drift.COSMETIC, Drift.ADDITIVE)
-            and not answers.column_fields  # what the person says now is never overridden
+            and not answers.column_fields
+        )
+        recognized_by_profile = (
+            recognized_by_family
+            and profile.status == ProfileStatus.RECOGNIZED
+            and saved_config is not None
+            and profile.mapping is not None
+            # ...and only for the family whose import wrote that saved matching: another family's
+            # matching is never applied to this file
+            and memory is not None
+            and store is not None
+            and memory.id == store.current
         )
         if recognized_by_profile and profile.mapping is not None:
             # A source whose files have been read before keeps reading them the same way.
@@ -554,7 +569,7 @@ class UnderstandingService:
             blockers,
             recognized_by_profile,
             origin_level,
-            hold and not recognized_by_profile,
+            hold and not recognized_by_family,
         )
         columns = tuple(
             self._column_info(sample, cp)
@@ -596,6 +611,10 @@ class UnderstandingService:
                 learning=LearningInfo(
                     memory=memory,
                     match=match,
+                    family=choice.family,
+                    known=choice.known,
+                    eligible=choice.eligible,
+                    ambiguous=choice.ambiguous,
                     reused=tuple(sorted(remembered)),
                     shape=tuple(shape_of(views)),
                     engine=tuple((v.header, v.field, v.level) for v in views),
@@ -619,13 +638,13 @@ class UnderstandingService:
         return config, adapter.format_of(config).layout
 
     @staticmethod
-    def _memory(adapter: FileDomain, config: Any | None) -> Memory | None:
-        """What Source Learning remembers of this source (None: nothing, or not readable)."""
+    def _learning(adapter: FileDomain, config: Any | None) -> Learning | None:
+        """What Source Learning remembers of this source: its families (None: nothing, or not
+        readable). A family that says it belongs to another kind of data is never applied here."""
         if config is None:
             return None
-        memory = parse_memory(adapter.format_of(config).learning)
-        # (a memory that says it belongs to another kind of data is never applied here)
-        return memory if memory is not None and memory.domain == adapter.domain.value else None
+        store = parse_learning(adapter.format_of(config).learning)
+        return None if store is None else store.of_domain(adapter.domain.value)
 
     @staticmethod
     def _with_kept_answers(
@@ -1485,7 +1504,9 @@ def confirmation_from(answers: UnderstandAnswers, learning: LearningInfo | None)
     else:
         origin = Via.ENGINE
     shape = () if learning is None else learning.shape
-    return Confirmation(origin, kept, classified, shape)
+    return Confirmation(
+        origin, kept, classified, shape, None if learning is None else learning.family
+    )
 
 
 def _conflict_questions(
