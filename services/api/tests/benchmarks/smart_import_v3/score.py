@@ -741,8 +741,8 @@ def score_case(
 
 
 def _order_of(pattern: str) -> str:
-    """DMY / MDY / YMD from a strptime pattern such as %d/%m/%Y."""
-    letters = [c for c in pattern.replace("%", "") if c in "dmY"]
+    """DMY / MDY / YMD from a strptime pattern such as %d/%m/%Y (or %d/%m/%y)."""
+    letters = [c for c in pattern.replace("%", "") if c in "dmYy"]
     return "".join(letters[:3]).upper()
 
 

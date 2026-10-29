@@ -73,10 +73,16 @@ _MONTHS = {
     **dict.fromkeys(("novembre", "nov", "november"), 11),
     **dict.fromkeys(("dicembre", "dic", "december", "dec"), 12),
 }
-# "26 ottobre 2026", "26-Oct-2026", "26.ott.2026", "26 Oct 2026 14:30": day, month name, four-digit
-# year (and, optionally, a time). Separators: spaces, "-", ".", "/" or ",".
+# "26 ottobre 2026", "26-Oct-2026", "26.ott.2026", "26 Oct 2026 14:30", "26-ott-26": day, month
+# name, year (and, optionally, a time). Separators: spaces, "-", ".", "/" or ",".
 _NAMED_DATE = re.compile(
-    r"^(\d{1,2})(?:\s*[-./,]\s*|\s+)([^\W\d_]{3,9})\.?(?:\s*[-./,]\s*|\s+)(\d{4})"
+    r"^(\d{1,2})(?:\s*[-./,]\s*|\s+)([^\W\d_]{3,9})\.?(?:\s*[-./,]\s*|\s+)(\d{4}|\d{2})"
+    r"(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$"
+)
+# "Nov 4, 2026", "November 4 2026", "Oct. 26th, 2026 14:30": month name first, as written in the
+# United States - the month is a name, so the order of day and month is not in doubt.
+_NAMED_DATE_MONTH_FIRST = re.compile(
+    r"^([^\W\d_]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?\s*,?\s+(\d{4})"
     r"(?:[T\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$"
 )
 _HOURS_UNIT = re.compile(
@@ -104,14 +110,22 @@ def month_name_date(text: str) -> datetime | None:
     at the time written after it); None when the text is not of that shape - no year, a two-digit
     year, a month nobody knows - or is not a day of the calendar."""
     match = _NAMED_DATE.match(text.strip())
-    if match is None:
-        return None
-    month = _MONTHS.get(_plain(match.group(2)))
+    if match is not None:
+        month_name, day, year = match.group(2), match.group(1), match.group(3)
+    else:
+        match = _NAMED_DATE_MONTH_FIRST.match(text.strip())
+        if match is None:
+            return None
+        month_name, day, year = match.group(1), match.group(2), match.group(3)
+    month = _MONTHS.get(_plain(month_name))
     if month is None:
         return None
     hour, minute, second = (int(part) if part else 0 for part in match.group(4, 5, 6))
+    whole_year = int(year)
+    if len(year) == 2:  # (as strptime reads %y: 00-68 are 2000-2068, 69-99 are 1969-1999)
+        whole_year += 2000 if whole_year < 69 else 1900
     try:
-        return datetime(int(match.group(3)), month, int(match.group(1)), hour, minute, second)
+        return datetime(whole_year, month, int(day), hour, minute, second)
     except ValueError:
         return None
 

@@ -46,7 +46,7 @@ _ISO_DATE = re.compile(
 )
 # Day/month first or month/day first: the two cannot be told apart without configuration.
 _SLASHED_DATE = re.compile(
-    r"^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})(?:[T ]\d{1,2}:\d{2}(?::\d{2})?)?$"
+    r"^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4}|\d{2})(?:[T ]\d{1,2}:\d{2}(?::\d{2})?)?$"
 )
 
 
