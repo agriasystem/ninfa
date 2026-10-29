@@ -24,6 +24,7 @@ from tests.benchmarks.smart_import_v3.score import (
     CaseResult,
     _claims,
     _matches,
+    _names_junk,
     _under_question,
     score_case,
 )
@@ -91,8 +92,11 @@ def committed_wrong(first: Observed, golden: Golden) -> int:
         for claim in claims:
             if claim.level != "HIGH" or _under_question(claim, first):
                 continue
-            if source is None or not _matches(source, claim, first):
-                wrong += 1
+            if source is not None:
+                wrong += 0 if _matches(source, claim, first) else 1
+            elif name in golden.ambiguous or name in golden.absent or _names_junk(claim, golden):
+                wrong += 1  # decided without asking / invented / taken from a column to leave out
+            # (a document the truth lists no fields for - a refusal - says nothing about it)
     return wrong
 
 
