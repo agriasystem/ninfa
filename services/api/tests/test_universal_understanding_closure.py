@@ -252,3 +252,38 @@ def test_once_the_person_has_taught_the_status_words_the_status_column_is_not_as
     assert [q.kind for q in first.questions] == ["VALUE_LABELS"]
     assert [r.level for r in rounds] == ["READY"]  # one answer, and nothing else is asked
     assert not rounds[0].questions
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        ["Data documento", "Data registrazione"],
+        ["Data registrazione", "Data documento"],  # (the registration date comes first)
+        ["Data reg.", "Data doc."],
+        ["Registration date", "Document date"],
+    ],
+)
+def test_the_document_date_wins_whichever_column_comes_first(headers: list[str]) -> None:
+    seen = _register(headers)
+
+    dates = [c for c in seen.claims if c.field == "invoice_date"]
+    assert len(dates) == 1 and dates[0].level == "HIGH"
+    assert dates[0].header in {"Data documento", "Data doc.", "Document date"}
+
+
+def test_a_net_that_says_taxable_is_the_net() -> None:
+    book = Workbook()
+    sheet = book.active
+    assert sheet is not None
+    sheet.append(["Supplier", "Invoice No.", "Invoice date", "Description", "Taxable Amount"])
+    for i in range(8):
+        sheet.append(
+            [f"Alfa {i % 3} Ltd", f"FT/{i}", date(2026, 10, 1 + i), f"Item {i}", 100.0 + i]
+        )
+    out = BytesIO()
+    book.save(out)
+
+    seen = run(make_service(), "costs", "ledger.xlsx", out.getvalue())
+
+    assert any(c.field == "line_total" and c.level == "HIGH" for c in seen.claims)
+    assert not any(q.kind == "AMOUNT_BASIS" for q in seen.questions)
