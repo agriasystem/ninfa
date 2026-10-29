@@ -173,10 +173,17 @@ COSTS = DomainSem(
             (
                 rule(
                     "data date dt",
-                    "fattura invoice documento doc emissione registrazione fatt inv bill issue "
-                    "issued",
+                    "fattura invoice documento doc emissione fatt inv bill issue issued",
                     none="scadenza due pagamento",
                     weight=0.93,
+                ),
+                # the date a document was REGISTERED in the books is a date of the register, not
+                # of the invoice: it stands in for it only when there is no document date
+                rule(
+                    "data date dt",
+                    "registrazione registration reg",
+                    none="scadenza due pagamento",
+                    weight=0.85,
                 ),
                 rule("data date", none="scadenza due pagamento", weight=0.75),
             ),
