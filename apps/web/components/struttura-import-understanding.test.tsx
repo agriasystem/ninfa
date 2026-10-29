@@ -222,6 +222,31 @@ describe("a file NINFA understands by itself", () => {
     expect((importMatchedFileMock.mock.calls[0]?.[0] as { saveConfiguration: boolean }).saveConfiguration).toBe(false);
   });
 
+  it("remembers by default what the person answered, even for a source it already knows", async () => {
+    const confirmQuestion = questionOf("COLUMN_MEANING", {
+      id: "CONFIRM:Ore A",
+      column: "Ore A",
+      field: "planned_hours",
+      candidate: "planned_hours",
+      choices: [{ value: "planned_hours", count: null, sheets: [], columns: [] }],
+    });
+    const known = { profile: { status: "RECOGNIZED" as const, reason: null, mapping: proposalOf(), last_used_at: "2026-10-22T08:15:00Z", missing_columns: [] } };
+    understandFileMock
+      .mockResolvedValueOnce(ok(understoodInspection({ level: "ASK", questions: [confirmQuestion] }, known)))
+      .mockResolvedValue(ok(understoodInspection({}, known)));
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({ configuration_saved: true })));
+    const user = await openStaffImport();
+    await pick(user, xlsxFile());
+
+    await within(dialog()).findByText("La colonna «Ore A» è «Ore previste»?");
+    await user.click(within(dialog()).getByRole("button", { name: "Sì" }));
+    await user.click(await within(dialog()).findByRole("button", { name: "Importa dati" }));
+
+    await waitFor(() => expect(importMatchedFileMock).toHaveBeenCalledTimes(1));
+    expect((importMatchedFileMock.mock.calls[0]?.[0] as { saveConfiguration: boolean }).saveConfiguration).toBe(true);
+  });
+
   it("offers no import when the backend says a row cannot be imported", async () => {
     understandFileMock.mockResolvedValue(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(

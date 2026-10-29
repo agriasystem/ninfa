@@ -72,6 +72,17 @@ from app.modules.data_sources.mapping_types import (
     SavedConfiguration,
     SuggestionLevel,
 )
+from app.modules.data_sources.source_learning import (
+    Confirmation,
+    Via,
+    header_key,
+    parse_learning,
+    safe_layout,
+    stored_learning,
+    within_shape,
+    without_current,
+)
+from app.modules.data_sources.source_learning import remember_in as learn
 from app.modules.data_sources.understanding_costs import category_question
 from app.modules.data_sources.understanding_labor import label_question
 from app.modules.data_sources.understanding_redaction import (
@@ -792,6 +803,15 @@ class SmartImportService:
             ),
         )
 
+    @staticmethod
+    def _learning_of(adapter: FileDomain, source: DataSource) -> dict[str, Any] | None:
+        """The raw memory in this source's saved profile (None: nothing remembered)."""
+        profile = adapter.get_profile(source.id)
+        if profile is None:
+            return None
+        learning = (profile.documents.get("format_options") or {}).get("learning")
+        return dict(learning) if isinstance(learning, dict) else None
+
     def configuration_of(self, source: DataSource) -> SavedConfiguration | None:
         adapter = domain_adapter(source.domain, self._session, self._tenant)
         profile: StoredProfile | None = None if adapter is None else adapter.get_profile(source.id)
@@ -819,15 +839,66 @@ class SmartImportService:
         adapter = self.domain(source.domain)
         return adapter.delete_profile(source.id)
 
-    def remember(self, source: DataSource, adapter: FileDomain, resolved: Resolved) -> bool:
-        """Save the configuration an import has just succeeded with. A failure to save never
-        undoes the import: it is only reported."""
+    def remember(
+        self,
+        source: DataSource,
+        adapter: FileDomain,
+        resolved: Resolved,
+        confirmation: Confirmation | None = None,
+    ) -> bool:
+        """Save the configuration an import has just succeeded with, and what Source Learning
+        keeps of it. A failure to save never undoes the import: it is only reported.
+
+        What is learned depends on HOW the decision was confirmed, never on the client's say-so: a
+        person's answers or a matching they built by hand make it TRUSTED (a new revision of the
+        family the file is, or a new family when it is a structure of its own - never another
+        family's); a file the engine read alone leaves ENGINE evidence and never replaces what a
+        person confirmed; a decision that came from the memory confirms nothing new and leaves the
+        families as they are."""
         if resolved.documents is None:
             return False
-        try:
-            adapter.save_profile(
-                source.id, source.property_id, list(resolved.headers), resolved.documents
+        documents = {name: dict(document) for name, document in resolved.documents.items()}
+        existing_raw = self._learning_of(adapter, source)
+        origin = Via.ENGINE if confirmation is None else confirmation.origin
+        if confirmation is not None and confirmation.shape:
+            # (only the columns the file has as it is read plainly: those a layout adds are its own)
+            mapped = within_shape(
+                {
+                    field: header_key(str(spec["column"]))
+                    for field, spec in documents.get("column_mapping", {}).items()
+                    if isinstance(spec, dict) and spec.get("column")
+                },
+                confirmation.shape,
             )
+            person = (
+                dict(mapped)
+                if origin == Via.MANUAL
+                else {f: k for f, k in mapped.items() if k in confirmation.classified}
+            )
+            families = learn(
+                parse_learning(existing_raw),
+                family=confirmation.family,
+                domain=adapter.domain.value,
+                shape=confirmation.shape,
+                mapped=mapped,
+                person=person,
+                answers=confirmation.answers,
+                origin=origin,
+                # how THIS family is read travels with it: never the next family's business
+                layout=safe_layout((documents.get("format_options") or {}).get("layout")),
+            )
+            if families is None and origin != Via.REUSE:
+                # the engine alone never replaces what a person confirmed
+                return False
+            learning = existing_raw if families is None else stored_learning(families)
+        else:
+            # The saved matching is rewritten without saying which family it belongs to.
+            known = parse_learning(existing_raw)
+            learning = existing_raw if known is None else stored_learning(without_current(known))
+        if learning is not None:
+            documents.setdefault("format_options", {})["learning"] = learning
+        try:
+            adapter.save_profile(source.id, source.property_id, list(resolved.headers), documents)
         except Exception as error:  # the import is done and committed: only the memory failed
             self._session.rollback()
             logger.warning(

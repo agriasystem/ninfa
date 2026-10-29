@@ -14,6 +14,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.data_sources.files import ImportProblem
+from app.modules.data_sources.source_learning import LearningInfo
 from app.modules.data_sources.understanding_types import Question, UnderstandingInfo
 from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.ingestion.models import DataSourceDomain
@@ -205,6 +206,9 @@ class FileInspection:
     understanding: UnderstandingInfo | None = None
     # ...and the decision it proposes from that (columns, layout, what the person already said).
     proposal: "MappingInput | None" = None
+    # Source Learning: what was remembered of this source and how this file relates to it. Internal:
+    # it is never part of the API response.
+    learning: "LearningInfo | None" = None
 
 
 # --- checking and trying a decision ---------------------------------------------------------------

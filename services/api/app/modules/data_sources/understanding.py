@@ -65,6 +65,26 @@ from app.modules.data_sources.semantics_bookings import BOOKINGS
 from app.modules.data_sources.semantics_costs import COSTS
 from app.modules.data_sources.semantics_labor import LABOR, hourly_or_known_exclusion
 from app.modules.data_sources.smart_import import Formats, SmartImportService, problem_of_error
+from app.modules.data_sources.source_learning import (
+    ColumnView,
+    Confirmation,
+    Drift,
+    FamilyChoice,
+    Learning,
+    LearningInfo,
+    Memory,
+    SourceMatch,
+    Via,
+    choose_family,
+    column_views,
+    header_key,
+    kept_answers,
+    layout_hints,
+    match_source,
+    parse_learning,
+    reusable,
+    shape_of,
+)
 from app.modules.data_sources.understanding_ai import (
     apply_resolution,
     build_evidence,
@@ -187,6 +207,19 @@ class _Candidate:
     proposals: dict[DataSourceDomain, Proposal]
 
 
+@dataclass(slots=True)
+class _Reading:
+    """A document read under one layout: its tables, the one chosen, and which family of the source
+    that table is (if any)."""
+
+    document: DocumentUnderstanding
+    candidates: list[_Candidate]
+    detection: DomainVerdict | None
+    chosen: _Candidate | None
+    views: list[ColumnView]
+    choice: FamilyChoice
+
+
 class UnderstandingService:
     def __init__(
         self,
@@ -220,21 +253,49 @@ class UnderstandingService:
         except BookingImportError as error:
             return FileInspection(domain, problem=problem_of_error(error))
 
-        saved_config, saved_decision_layout = self._saved(adapter, source)
+        saved_config, saved_layout = self._saved(adapter, source)
         taught = {
             name: dict(document) for name, document in self._saved_labels(adapter, source).items()
         }
-        base = self._base_layout(answers, saved_decision_layout)
-        document = understand(scan, base)
-        if document.chosen is None:
+        # --- how this document is READ, in four phases (the order is what makes it deterministic) -
+        # A. The document on its own terms: only what the person says NOW decides how it is read.
+        #    The layout of the LAST import is nobody's but the family that wrote it, so it is not
+        #    applied to a file before we know whose file it is.
+        # B. Which family of this source is it? (every table the document offers is a candidate)
+        # C. Only a family recognised for sure lends its reading hints (the sheets the person chose,
+        #    the hours of a day grid, where the department comes from). If they do not reproduce
+        #    that family, they are dropped and the document stays as read in A: no guessing.
+        # D. The meaning of the columns and the validation, below, as ever.
+        store = self._learning(adapter, saved_config)
+        neutral = self._base_layout(answers, None)
+        reading = self._read(scan, content, filename, domain, sem, answers, store, neutral)
+        if reading.chosen is None:
             return redact_inspection(
-                self._without_table(domain, scan, document, already_imported),
+                self._without_table(domain, scan, reading.document, already_imported),
                 PersonalDataGuard(),
             )
-
-        candidates = self._candidates(content, filename, document, domain)
-        detection = self._detect(candidates)
-        chosen = self._pick(candidates, domain, answers)
+        base = neutral
+        hints = self._hints(reading.choice, store, saved_layout)
+        if hints is not None:
+            base = self._base_layout(answers, hints)
+            if hints.sheets and not answers.sheet_name:
+                # (the sheets the person chose for this family: the document is read through them)
+                again = self._read(scan, content, filename, domain, sem, answers, store, base)
+                same = (
+                    again.chosen is not None
+                    and again.choice.memory is not None
+                    and reading.choice.memory is not None
+                    and again.choice.memory.id == reading.choice.memory.id
+                    and again.choice.revision
+                )
+                if same:
+                    reading = again
+                else:
+                    hints, base = None, neutral
+        document, candidates, chosen = reading.document, reading.candidates, reading.chosen
+        detection = reading.detection
+        assert chosen is not None and detection is not None
+        views, choice = reading.views, reading.choice
         questions: list[Question] = []
         blockers: list[Blocker] = []
         questions.extend(self._domain_question(detection, domain, confirmed_domain))
@@ -247,9 +308,29 @@ class UnderstandingService:
             update={"table_key": answers.table_key} if answers.table_key else {}
         )
         proposal = chosen.proposals[domain]
-        asked_fields = dict(answers.column_fields)
+        # --- Source Learning: what a PERSON confirmed about this source, where the file agrees.
+        # A memory is evidence, never authority: each column the person decided is reused only if
+        # the current document still proves it (see `source_learning`); the engine's own reading of
+        # THIS file, and its values, always win over the memory.
+        # A source can remember several recurring structures (the PMS export, an OTA export, an
+        # internal report): the file is matched with ALL of them and belongs to one only if that
+        # one explains it clearly better than the others; when it cannot be told, nothing is reused.
+        memory, match = choice.memory, choice.match
+        reuse = memory is not None and match is not None and reusable(memory, match)
+        remembered = dict(match.proven) if reuse and match is not None else {}
+        # (what the person answers NOW wins over what they answered before)
+        asked_fields = {**remembered, **dict(answers.column_fields)}
+        effective = self._with_kept_answers(
+            answers, domain, memory, match, reuse, _with_answers(proposal, asked_fields)
+        )
         taught_roles = known_labels(
             dict(taught.get("role_mapping", {})), answers.labels.get("role_mapping", {})
+        )
+        # (the person said the department comes from the title for THIS family: that is the answer)
+        department_from = answers.department_from or (
+            hints.department.kind
+            if hints is not None and hints.department and hints.department.kind == "TITLE"
+            else None
         )
         if domain == DataSourceDomain.LABOR:
             plan = plan_labor(
@@ -259,8 +340,8 @@ class UnderstandingService:
                 base=layout,
                 proposal=_with_answers(proposal, asked_fields),
                 taught=taught_roles,
-                asked_department=answers.department_value,
-                asked_department_from=answers.department_from,
+                asked_department=effective.department_value,
+                asked_department_from=department_from,
                 asked_grid_hours=answers.grid_hours,
                 asked_period=answers.period_start is not None,
             )
@@ -293,7 +374,7 @@ class UnderstandingService:
             costs_plan = plan_costs(
                 proposal=_with_answers(proposal, overrides),
                 rows=_sample_rows(table),
-                asked_basis=answers.amount_basis,
+                asked_basis=effective.amount_basis,
                 asked_columns=asked_fields,
             )
             questions.extend(costs_plan.questions)
@@ -373,11 +454,11 @@ class UnderstandingService:
         constants: dict[str, str | int] = {}
         if (
             domain == DataSourceDomain.LABOR
-            and answers.department_value
+            and effective.department_value
             and "role" not in proposal.assigned()
             and "labor_category" not in proposal.assigned()
         ):
-            constants["labor_category"] = answers.department_value
+            constants["labor_category"] = effective.department_value
         if currency and _has_cost_without_currency(domain, proposal):
             # Costs with no currency in the file: the hotel's own currency, said so on screen.
             constants["currency"] = currency
@@ -441,6 +522,8 @@ class UnderstandingService:
         questions.extend(ambiguity)
         value_questions = self._value_questions(domain, proposal, samples, taught, answers)
         questions.extend(value_questions)
+        if reuse and match is not None:
+            questions.extend(_conflict_questions(match, answers, questions))
         proposal = _with_known_departments(proposal, samples, taught_roles, value_questions)
 
         # --- the profile, the people, the explanation ---------------------------------------------
@@ -452,10 +535,26 @@ class UnderstandingService:
                 content, filename, document, chosen.selection, wanted_layout, table
             )
         profile = self._smart.profile_info(adapter, source, signature)
+        # What a PERSON confirmed about this source, still proven by THIS file, with no column
+        # renamed: the file is a source the person has taught (a memory is evidence, not authority:
+        # the engine cannot teach itself, and what the person says now is never overridden).
+        recognized_by_family = (
+            reuse
+            and match is not None
+            and not match.renamed
+            and match.drift in (Drift.NONE, Drift.COSMETIC, Drift.ADDITIVE)
+            and not answers.column_fields
+        )
         recognized_by_profile = (
-            profile.status == ProfileStatus.RECOGNIZED
+            recognized_by_family
+            and profile.status == ProfileStatus.RECOGNIZED
             and saved_config is not None
             and profile.mapping is not None
+            # ...and only for the family whose import wrote that saved matching: another family's
+            # matching is never applied to this file
+            and memory is not None
+            and store is not None
+            and memory.id == store.current
         )
         if recognized_by_profile and profile.mapping is not None:
             # A source whose files have been read before keeps reading them the same way.
@@ -469,10 +568,16 @@ class UnderstandingService:
                         }
                     ),
                     "labels": {n: dict(w) for n, w in answers.labels.items() if w},
+                    # the decision is still the server's own reading, to be verified like any other
+                    "smart_import": SmartImportDecision(
+                        answers=answers.model_dump(mode="json", exclude_defaults=True),
+                        confirmed_domain=confirmed_domain,
+                    ),
                 }
             )
             check = self._smart.check(domain, decision)
         if not recognized_by_profile and not blockers:
+            decision = self._with_kept_formats(adapter, decision, samples, memory, match, reuse)
             formats = self._smart.formats_of(adapter, decision, samples)
             if formats.problems:
                 blockers.append(Blocker(BlockerCode.MIXED_FORMATS))
@@ -500,6 +605,7 @@ class UnderstandingService:
             table,
             ai_headers,
             samples,
+            frozenset(remembered),
         )
         level = self._level(
             adapter,
@@ -510,7 +616,7 @@ class UnderstandingService:
             blockers,
             recognized_by_profile,
             origin_level,
-            hold and not recognized_by_profile,
+            hold and not recognized_by_family,
         )
         columns = tuple(
             self._column_info(sample, cp)
@@ -549,9 +655,95 @@ class UnderstandingService:
                 already_imported=already_imported,
                 understanding=understanding,
                 proposal=decision,
+                learning=LearningInfo(
+                    memory=memory,
+                    match=match,
+                    family=choice.family,
+                    layout=hints,
+                    known=choice.known,
+                    eligible=choice.eligible,
+                    ambiguous=choice.ambiguous,
+                    reused=tuple(sorted(remembered)),
+                    shape=tuple(shape_of(views)),
+                    engine=tuple((v.header, v.field, v.level) for v in views),
+                ),
             ),
             guard_for(samples, proposal),
         )
+
+    # --- phases A and B: the document, and whose it is ---
+
+    def _read(
+        self,
+        scan: WorkbookScan,
+        content: bytes,
+        filename: str,
+        domain: DataSourceDomain,
+        sem: DomainSem,
+        answers: UnderstandAnswers,
+        store: Learning | None,
+        base: LayoutSpec,
+    ) -> _Reading:
+        """The document read under `base`: its candidate tables, the one chosen and the family of
+        the source that table is. A table that is one family's clearly - nothing it remembers is
+        lost - is preferred to the one the ranking picked, unless the person chose one just now."""
+        document = understand(scan, base)
+        if document.chosen is None:
+            return _Reading(document, [], None, None, [], FamilyChoice())
+        candidates = self._candidates(content, filename, document, domain)
+        detection = self._detect(candidates)
+        chosen = self._pick(candidates, domain, answers)
+
+        def look(candidate: _Candidate) -> tuple[list[ColumnView], FamilyChoice]:
+            skip = self._days_of(candidate.selection)
+            views = column_views(sem, candidate.proposals[domain], skip)
+            return views, choose_family(store, views, match_source)
+
+        def clean(found: FamilyChoice) -> bool:
+            return (
+                found.memory is not None
+                and found.match is not None
+                and found.revision
+                and reusable(found.memory, found.match)
+            )
+
+        views, choice = look(chosen)
+        if store is not None and store.families and not answers.table_key and not clean(choice):
+            others = []
+            if not choice.ambiguous:
+                for candidate in candidates:
+                    if candidate is chosen:
+                        continue
+                    other_views, other = look(candidate)
+                    if clean(other):
+                        others.append((candidate, other_views, other))
+            if len(others) == 1:  # one table is a family's: that is the one the person taught
+                chosen, views, choice = others[0]
+        return _Reading(document, candidates, detection, chosen, views, choice)
+
+    @staticmethod
+    def _days_of(selection: Selection) -> frozenset[str]:
+        """The headers of a day grid's days and totals: they name the week, not the source."""
+        grid = selection.day_grid
+        if grid is None:
+            return frozenset()
+        indexes = {day.index for day in grid.columns} | set(grid.total_columns)
+        return frozenset(
+            header_key(column.label)
+            for column in selection.first.columns
+            if column.index in indexes
+        )
+
+    @staticmethod
+    def _hints(
+        choice: FamilyChoice, store: Learning | None, saved_layout: LayoutSpec | None
+    ) -> LayoutSpec | None:
+        """The reading hints of the family this file is - only when it is one a person taught and
+        the file still holds everything it remembers. Anything less reads the file on its own."""
+        memory, match = choice.memory, choice.match
+        if memory is None or match is None or not choice.revision or not reusable(memory, match):
+            return None
+        return layout_hints(memory, store, saved_layout)
 
     # --- the saved configuration ------------------------------------------------------------------
 
@@ -566,6 +758,69 @@ class UnderstandingService:
         except (AppError, ValueError):
             return None, None
         return config, adapter.format_of(config).layout
+
+    @staticmethod
+    def _learning(adapter: FileDomain, config: Any | None) -> Learning | None:
+        """What Source Learning remembers of this source: its families (None: nothing, or not
+        readable). A family that says it belongs to another kind of data is never applied here."""
+        if config is None:
+            return None
+        store = parse_learning(adapter.format_of(config).learning)
+        return None if store is None else store.of_domain(adapter.domain.value)
+
+    @staticmethod
+    def _with_kept_answers(
+        answers: UnderstandAnswers,
+        domain: DataSourceDomain,
+        memory: Memory | None,
+        match: Any,
+        reuse: bool,
+        proposal: Proposal,
+    ) -> UnderstandAnswers:
+        """The person's answers, plus what they said before and still holds for this file: the
+        department of ALL the rows (only if no column says it) and whether the amounts are net."""
+        if memory is None or match is None or not reuse:
+            return answers
+        kept = kept_answers(memory, match)
+        update: dict[str, Any] = {}
+        if (
+            domain == DataSourceDomain.LABOR
+            and answers.department_value is None
+            and kept.get("department_value")
+            and not {"role", "labor_category"} & set(proposal.assigned())
+        ):
+            update["department_value"] = kept["department_value"]
+        if (
+            domain == DataSourceDomain.COSTS
+            and answers.amount_basis is None
+            and kept.get("amount_basis") in ("NET", "GROSS")
+        ):
+            update["amount_basis"] = kept["amount_basis"]
+        return answers.model_copy(update=update) if update else answers
+
+    def _with_kept_formats(
+        self,
+        adapter: FileDomain,
+        decision: MappingInput,
+        samples: list[ColumnSample],
+        memory: Memory | None,
+        match: Any,
+        reuse: bool,
+    ) -> MappingInput:
+        """How the person said this source writes dates and numbers, when the values themselves
+        cannot prove it - and only if the file still reads cleanly that way."""
+        if memory is None or match is None or not reuse:
+            return decision
+        kept = kept_answers(memory, match)
+        update: dict[str, Any] = {}
+        if decision.date_order is None and kept.get("date_order") in ("DMY", "MDY"):
+            update["date_order"] = kept["date_order"]
+        if decision.decimal_style is None and kept.get("decimal_style") in ("COMMA", "POINT"):
+            update["decimal_style"] = kept["decimal_style"]
+        if not update or not self._smart.formats_of(adapter, decision, samples).unresolved:
+            return decision
+        trial = decision.model_copy(update=update)
+        return trial if not self._smart.formats_of(adapter, trial, samples).problems else decision
 
     def _saved_labels(
         self, adapter: FileDomain, source: DataSource | None
@@ -896,6 +1151,7 @@ class UnderstandingService:
         table: LayoutTable,
         ai_headers: frozenset[str] = frozenset(),
         samples: Sequence[ColumnSample] = (),
+        remembered: frozenset[str] = frozenset(),
     ) -> list[Recognized]:
         out: list[Recognized] = []
         decided = {c.header: c.field for c in decision.columns if c.field is not None}
@@ -906,6 +1162,10 @@ class UnderstandingService:
             kind = OriginKind.PROFILE if by_profile else OriginKind.COLUMN
             if column.header in answers.column_fields:
                 kind = OriginKind.USER
+            elif column.header in remembered:
+                kind = (
+                    OriginKind.PROFILE
+                )  # what the person confirmed before, and the file still proves
             elif column.header in ai_headers and not by_profile:
                 kind = OriginKind.ASSISTANT
             example = None if column.locked or column.pii else _example(samples, column)
@@ -925,7 +1185,9 @@ class UnderstandingService:
                 Recognized(
                     field,
                     Origin(kind, column.header),
-                    "HIGH" if by_profile else (column.level or Level.LOW).value,
+                    "HIGH"
+                    if by_profile or column.header in remembered
+                    else (column.level or Level.LOW).value,
                     example,
                 )
             )
@@ -1326,6 +1588,79 @@ def _synthetic_header(table: SourceTable, kind: str) -> str | None:
     if wanted is None:
         return None
     return next((h for h in table.headers if fold(h).startswith(fold(wanted))), None)
+
+
+def confirmation_from(answers: UnderstandAnswers, learning: LearningInfo | None) -> Confirmation:
+    """How a decision the server made was confirmed. Only what the PERSON answered counts: a file
+    the engine read alone is ENGINE (it cannot teach itself), and one the memory pre-answered is
+    REUSE (it confirms nothing new)."""
+    kept = {
+        key: str(value)
+        for key, value in (
+            ("date_order", answers.date_order),
+            ("decimal_style", answers.decimal_style),
+            ("amount_basis", answers.amount_basis),
+            ("department_value", answers.department_value),
+        )
+        if value
+    }
+    engine = {} if learning is None else {h: (f, lv) for h, f, lv in learning.engine}
+    # (an answer that only repeats what the engine already read clearly decides nothing)
+    classified = frozenset(
+        header_key(header)
+        for header, field in answers.column_fields.items()
+        if engine.get(header) != (field, "HIGH")
+    )
+    decided = bool(
+        classified
+        or kept
+        or answers.grid_hours
+        or answers.department_from
+        or answers.table_key
+        or answers.sheet_name
+    )
+    if decided:
+        origin = Via.ANSWERS
+    elif learning is not None and learning.reused:
+        origin = Via.REUSE
+    else:
+        origin = Via.ENGINE
+    shape = () if learning is None else learning.shape
+    return Confirmation(
+        origin, kept, classified, shape, None if learning is None else learning.family
+    )
+
+
+def _conflict_questions(
+    match: SourceMatch, answers: UnderstandAnswers, existing: Sequence[Question]
+) -> list[Question]:
+    """The file contradicts what a person confirmed about a column that is still there: ask what it
+    is now. (A column that turned into personal data is simply not used; a duplicated header is the
+    engine's own question.)"""
+    taken = {q.id for q in existing}
+    out: list[Question] = []
+    for conflict in match.conflicts:
+        question_id = f"CONFIRM:{conflict.header}"
+        if (
+            conflict.reason in {"PERSONAL_DATA", "DUPLICATE_HEADER"}
+            or conflict.header in answers.column_fields
+            or question_id in taken
+        ):
+            continue
+        taken.add(question_id)
+        out.append(
+            Question(
+                id=question_id,
+                kind=QuestionKind.COLUMN_MEANING,
+                column=conflict.header,
+                field=conflict.field,
+                # "is «Ore A» still the planned hours?" - yes, or the person looks at the columns
+                candidate=conflict.field,
+                origin=OriginKind.PROFILE,
+                choices=(Choice(conflict.field),),
+            )
+        )
+    return out
 
 
 def _with_answers(proposal: Proposal, overrides: Mapping[str, str]) -> Proposal:

@@ -1,0 +1,7646 @@
+{
+ "benchmark": "source-learning-benchmark-v1",
+ "families": 13,
+ "trusted_families": 11,
+ "control_families": 2,
+ "versions_per_family": 8,
+ "document_versions": 104,
+ "exact_reuse_rate": {
+  "num": 33,
+  "den": 33,
+  "value": 1.0
+ },
+ "compatible_reuse_rate": {
+  "num": 22,
+  "den": 22,
+  "value": 1.0
+ },
+ "questions_saved": {
+  "asks_without_memory": 97,
+  "asks_with_memory": 18,
+  "saved": 79,
+  "manual_matchings_avoided": 37,
+  "versions_asking_nothing_with_memory": 59,
+  "versions_asking_nothing_without_memory": 0
+ },
+ "repeated_mapping_questions_on_unchanged_source": 0,
+ "wrong_reuse_rate": {
+  "num": 0,
+  "den": 372,
+  "value": 0.0
+ },
+ "false_automation_with_memory": 0,
+ "cross_property_contamination": 0,
+ "cross_domain_contamination": 0,
+ "conflict_detection_recall": {
+  "num": 11,
+  "den": 11,
+  "value": 1.0
+ },
+ "missing_detection_recall": {
+  "num": 11,
+  "den": 11,
+  "value": 1.0
+ },
+ "learning_effectiveness": {
+  "first_import_effort": 15,
+  "next_import_effort": 0,
+  "effort_removed": {
+   "num": 15,
+   "den": 15,
+   "value": 1.0
+  },
+  "per_family": [
+   {
+    "family": "L1-ore-a-b",
+    "first": 2,
+    "next": 0
+   },
+   {
+    "family": "L2-ore-1-2",
+    "first": 2,
+    "next": 0
+   },
+   {
+    "family": "L3-ore-base",
+    "first": 2,
+    "next": 0
+   },
+   {
+    "family": "L4-h1-h2",
+    "first": 1,
+    "next": 0
+   },
+   {
+    "family": "L5-gruppo",
+    "first": 1,
+    "next": 0
+   },
+   {
+    "family": "B1-pratica",
+    "first": 1,
+    "next": 0
+   },
+   {
+    "family": "B2-cod",
+    "first": 1,
+    "next": 0
+   },
+   {
+    "family": "B3-id",
+    "first": 1,
+    "next": 0
+   },
+   {
+    "family": "C1-forn",
+    "first": 2,
+    "next": 0
+   },
+   {
+    "family": "C2-ragione",
+    "first": 1,
+    "next": 0
+   },
+   {
+    "family": "C3-chi",
+    "first": 1,
+    "next": 0
+   }
+  ]
+ },
+ "performance_ms": {
+  "match_source": {
+   "mean": 0.073,
+   "p50": 0.076,
+   "p95": 0.095,
+   "max": 0.114
+  },
+  "understand_with_memory": {
+   "mean": 71.411,
+   "p50": 67.873,
+   "p95": 109.128,
+   "max": 117.098
+  },
+  "understand_without_memory": {
+   "mean": 68.398,
+   "p50": 63.703,
+   "p95": 108.69,
+   "max": 119.815
+  }
+ },
+ "all_versions_as_expected": {
+  "num": 104,
+  "den": 104,
+  "value": 1.0
+ },
+ "failures": [],
+ "first_confirmation": {
+  "L1-ore-a-b": {
+   "how": "ANSWERS",
+   "asked": [
+    "MEANING:Ore A",
+    "MEANING:Ore B"
+   ],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "L2-ore-1-2": {
+   "how": "ANSWERS",
+   "asked": [
+    "MEANING:Ore 1",
+    "MEANING:Ore 2"
+   ],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "L3-ore-base": {
+   "how": "ANSWERS",
+   "asked": [
+    "MEANING:Ore base",
+    "MEANING:Ore extra"
+   ],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "L4-h1-h2": {
+   "how": "MANUAL",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "L5-gruppo": {
+   "how": "ANSWERS",
+   "asked": [
+    "DEPARTMENT_ROWS"
+   ],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "B1-pratica": {
+   "how": "MANUAL",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "B2-cod": {
+   "how": "MANUAL",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "B3-id": {
+   "how": "MANUAL",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "C1-forn": {
+   "how": "MANUAL",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "C2-ragione": {
+   "how": "MANUAL",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "C3-chi": {
+   "how": "MANUAL",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "X1-staff-clear": {
+   "how": "ANSWERS",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  },
+  "X2-costs-clear": {
+   "how": "ANSWERS",
+   "asked": [],
+   "imported": true,
+   "problem": null,
+   "remembered": true
+  }
+ },
+ "per_family": [
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "control": false,
+   "first": {
+    "how": "ANSWERS",
+    "asked": [
+     "MEANING:Ore A",
+     "MEANING:Ore B"
+    ],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 11,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "control": false,
+   "first": {
+    "how": "ANSWERS",
+    "asked": [
+     "MEANING:Ore 1",
+     "MEANING:Ore 2"
+    ],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 11,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "control": false,
+   "first": {
+    "how": "ANSWERS",
+    "asked": [
+     "MEANING:Ore base",
+     "MEANING:Ore extra"
+    ],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 11,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "control": false,
+   "first": {
+    "how": "MANUAL",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 6,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "control": false,
+   "first": {
+    "how": "ANSWERS",
+    "asked": [
+     "DEPARTMENT_ROWS"
+    ],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 5,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "control": false,
+   "first": {
+    "how": "MANUAL",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 5,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "control": false,
+   "first": {
+    "how": "MANUAL",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 5,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "control": false,
+   "first": {
+    "how": "MANUAL",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 5,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "control": false,
+   "first": {
+    "how": "MANUAL",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 10,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "control": false,
+   "first": {
+    "how": "MANUAL",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 5,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "control": false,
+   "first": {
+    "how": "MANUAL",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 5,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "control": true,
+   "first": {
+    "how": "ANSWERS",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 0,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "control": true,
+   "first": {
+    "how": "ANSWERS",
+    "asked": [],
+    "imported": true,
+    "problem": null,
+    "remembered": true
+   },
+   "versions": 8,
+   "exact": {
+    "num": 3,
+    "den": 3,
+    "value": 1.0
+   },
+   "compatible": {
+    "num": 2,
+    "den": 2,
+    "value": 1.0
+   },
+   "questions_saved": 0,
+   "wrong_reuse": 0,
+   "conflict_detected": true,
+   "all_as_expected": true
+  }
+ ],
+ "versions": [
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore A",
+     "Ore B"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore A",
+     "MEANING:Ore B"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore A",
+     "Ore B"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore A",
+     "MEANING:Ore B"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore A",
+     "Ore B"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore A",
+     "MEANING:Ore B"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore A",
+     "Ore B"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore A",
+     "MEANING:Ore B"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "ORE A:",
+     "ORE B:"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict, 1 renamed; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:ORE A:",
+     "MEANING:ORE B:"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore A",
+     "Ore B"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore A",
+     "MEANING:Ore B"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore A"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.75,
+    "explain": "COMPATIBLE (MISSING): 3/4 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.75"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore A"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L1-ore-a-b",
+   "domain": "LABOR",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "ASK",
+    "questions": [
+     "CONFIRM:Ore A"
+    ],
+    "blockers": [],
+    "reused": [
+     "Ore B"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 4/4 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore B"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore 1",
+     "Ore 2"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore 1",
+     "MEANING:Ore 2"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore 1",
+     "Ore 2"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore 1",
+     "MEANING:Ore 2"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore 1",
+     "Ore 2"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore 1",
+     "MEANING:Ore 2"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore 1",
+     "Ore 2"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore 1",
+     "MEANING:Ore 2"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "ORE 1:",
+     "ORE 2:"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict, 1 renamed; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:ORE 1:",
+     "MEANING:ORE 2:"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore 1",
+     "Ore 2"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore 1",
+     "MEANING:Ore 2"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore 1"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.75,
+    "explain": "COMPATIBLE (MISSING): 3/4 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.75"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore 1"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L2-ore-1-2",
+   "domain": "LABOR",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "ASK",
+    "questions": [
+     "CONFIRM:Ore 1"
+    ],
+    "blockers": [],
+    "reused": [
+     "Ore 2"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 4/4 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore 2"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore base",
+     "Ore extra"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore base",
+     "MEANING:Ore extra"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore base",
+     "Ore extra"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore base",
+     "MEANING:Ore extra"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore base",
+     "Ore extra"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore base",
+     "MEANING:Ore extra"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore base",
+     "Ore extra"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore base",
+     "MEANING:Ore extra"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "ORE BASE:",
+     "ORE EXTRA:"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict, 1 renamed; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:ORE BASE:",
+     "MEANING:ORE EXTRA:"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore base",
+     "Ore extra"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore base",
+     "MEANING:Ore extra"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Ore base"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.75,
+    "explain": "COMPATIBLE (MISSING): 3/4 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.75"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore base"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L3-ore-base",
+   "domain": "LABOR",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "ASK",
+    "questions": [
+     "CONFIRM:Ore base"
+    ],
+    "blockers": [],
+    "reused": [
+     "Ore extra"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 4/4 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "MEANING:Ore extra"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dt",
+     "H1",
+     "H2",
+     "Rep"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dt",
+     "H1",
+     "H2",
+     "Rep"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dt",
+     "H1",
+     "H2",
+     "Rep"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dt",
+     "H1",
+     "H2",
+     "Rep"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "DT:",
+     "H1:",
+     "H2:",
+     "Reparto"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict, 1 renamed; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dt",
+     "H1",
+     "H2",
+     "Rep"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dt",
+     "H1",
+     "Rep"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.75,
+    "explain": "COMPATIBLE (MISSING): 3/4 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.75"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L4-h1-h2",
+   "domain": "LABOR",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "ASK",
+    "questions": [
+     "CONFIRM:H1"
+    ],
+    "blockers": [],
+    "reused": [
+     "Dt",
+     "H2",
+     "Rep"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 4/4 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 3/3 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "DEPARTMENT_ROWS"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 3/3 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "DEPARTMENT_ROWS"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 3/3 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "DEPARTMENT_ROWS"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.75,
+    "explain": "COMPATIBLE (ADDITIVE): 3/4 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.75"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "DEPARTMENT_ROWS"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 3/3 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "DEPARTMENT_ROWS"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.75,
+    "explain": "COMPATIBLE (ADDITIVE): 3/4 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.75"
+   },
+   "without_memory": {
+    "level": "ASK",
+    "questions": [
+     "DEPARTMENT_ROWS"
+    ],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.667,
+    "explain": "COMPATIBLE (MISSING): 2/3 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.67"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "L5-gruppo",
+   "domain": "LABOR",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 3/3 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Al",
+     "Creata",
+     "Dal",
+     "Esito",
+     "Fonte",
+     "Pratica",
+     "Unita",
+     "Valore"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Al",
+     "Creata",
+     "Dal",
+     "Esito",
+     "Fonte",
+     "Pratica",
+     "Unita",
+     "Valore"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Al",
+     "Creata",
+     "Dal",
+     "Esito",
+     "Fonte",
+     "Pratica",
+     "Unita",
+     "Valore"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Al",
+     "Creata",
+     "Dal",
+     "Esito",
+     "Fonte",
+     "Pratica",
+     "Unita",
+     "Valore"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.889,
+    "explain": "COMPATIBLE (ADDITIVE): 8/9 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.89"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "AL:",
+     "CREATA:",
+     "DAL:",
+     "ESITO:",
+     "FONTE:",
+     "PRATICA:",
+     "UNITA:",
+     "VALORE:"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Al",
+     "Creata",
+     "Dal",
+     "Esito",
+     "Fonte",
+     "Pratica",
+     "Unita",
+     "Valore"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.889,
+    "explain": "COMPATIBLE (ADDITIVE): 8/9 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.89"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Al",
+     "Creata",
+     "Dal",
+     "Esito",
+     "Fonte",
+     "Pratica",
+     "Unita"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.875,
+    "explain": "COMPATIBLE (MISSING): 7/8 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.88"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B1-pratica",
+   "domain": "BOOKINGS",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Al",
+     "Creata",
+     "Dal",
+     "Esito",
+     "Fonte",
+     "Pratica",
+     "Unita"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 8/8 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Arrivo",
+     "Cam",
+     "Cod",
+     "Emissione",
+     "Importo",
+     "Origine",
+     "Partenza",
+     "Stato"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Arrivo",
+     "Cam",
+     "Cod",
+     "Emissione",
+     "Importo",
+     "Origine",
+     "Partenza",
+     "Stato"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Arrivo",
+     "Cam",
+     "Cod",
+     "Emissione",
+     "Importo",
+     "Origine",
+     "Partenza",
+     "Stato"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Arrivo",
+     "Cam",
+     "Cod",
+     "Emissione",
+     "Importo",
+     "Origine",
+     "Partenza",
+     "Stato"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.889,
+    "explain": "COMPATIBLE (ADDITIVE): 8/9 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.89"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "ARRIVO:",
+     "CAM:",
+     "COD:",
+     "EMISSIONE:",
+     "IMPORTO:",
+     "ORIGINE:",
+     "PARTENZA:",
+     "STATO:"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Arrivo",
+     "Cam",
+     "Cod",
+     "Emissione",
+     "Importo",
+     "Origine",
+     "Partenza",
+     "Stato"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.889,
+    "explain": "COMPATIBLE (ADDITIVE): 8/9 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.89"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Arrivo",
+     "Cam",
+     "Cod",
+     "Emissione",
+     "Origine",
+     "Partenza",
+     "Stato"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.875,
+    "explain": "COMPATIBLE (MISSING): 7/8 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.88"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B2-cod",
+   "domain": "BOOKINGS",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Arrivo",
+     "Cam",
+     "Cod",
+     "Emissione",
+     "Origine",
+     "Partenza",
+     "Stato"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 8/8 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Entrata",
+     "ID",
+     "Inserita",
+     "Prezzo",
+     "Situazione",
+     "Sorgente",
+     "Stanze",
+     "Uscita"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Entrata",
+     "ID",
+     "Inserita",
+     "Prezzo",
+     "Situazione",
+     "Sorgente",
+     "Stanze",
+     "Uscita"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Entrata",
+     "ID",
+     "Inserita",
+     "Prezzo",
+     "Situazione",
+     "Sorgente",
+     "Stanze",
+     "Uscita"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Entrata",
+     "ID",
+     "Inserita",
+     "Prezzo",
+     "Situazione",
+     "Sorgente",
+     "Stanze",
+     "Uscita"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.889,
+    "explain": "COMPATIBLE (ADDITIVE): 8/9 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.89"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "ENTRATA:",
+     "ID:",
+     "INSERITA:",
+     "PREZZO:",
+     "SITUAZIONE:",
+     "SORGENTE:",
+     "STANZE:",
+     "USCITA:"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 8/8 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Entrata",
+     "ID",
+     "Inserita",
+     "Prezzo",
+     "Situazione",
+     "Sorgente",
+     "Stanze",
+     "Uscita"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.889,
+    "explain": "COMPATIBLE (ADDITIVE): 8/9 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.89"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Entrata",
+     "ID",
+     "Inserita",
+     "Situazione",
+     "Sorgente",
+     "Stanze",
+     "Uscita"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.875,
+    "explain": "COMPATIBLE (MISSING): 7/8 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.88"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "B3-id",
+   "domain": "BOOKINGS",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Entrata",
+     "ID",
+     "Inserita",
+     "Situazione",
+     "Sorgente",
+     "Stanze",
+     "Uscita"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 8/8 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Del",
+     "Doc",
+     "Forn.",
+     "Tot",
+     "Voce"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [
+     "AMOUNT_BASIS"
+    ],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Del",
+     "Doc",
+     "Forn.",
+     "Tot",
+     "Voce"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [
+     "AMOUNT_BASIS"
+    ],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Del",
+     "Doc",
+     "Forn.",
+     "Tot",
+     "Voce"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [
+     "AMOUNT_BASIS"
+    ],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Del",
+     "Doc",
+     "Forn.",
+     "Tot",
+     "Voce"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [
+     "AMOUNT_BASIS"
+    ],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "DEL:",
+     "DOC:",
+     "FORN.:",
+     "TOT:",
+     "VOCE:"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [
+     "AMOUNT_BASIS"
+    ],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Del",
+     "Doc",
+     "Forn.",
+     "Tot",
+     "Voce"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [
+     "AMOUNT_BASIS"
+    ],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Del",
+     "Doc",
+     "Forn.",
+     "Voce"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (MISSING): 4/5 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C1-forn",
+   "domain": "COSTS",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Del",
+     "Doc",
+     "Forn.",
+     "Voce"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 5/5 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dettaglio",
+     "Emesso",
+     "Ragione",
+     "Rif",
+     "Valore"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dettaglio",
+     "Emesso",
+     "Ragione",
+     "Rif",
+     "Valore"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dettaglio",
+     "Emesso",
+     "Ragione",
+     "Rif",
+     "Valore"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dettaglio",
+     "Emesso",
+     "Ragione",
+     "Rif",
+     "Valore"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "DETTAGLIO:",
+     "EMESSO:",
+     "RAGIONE:",
+     "RIF:",
+     "VALORE:"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Dettaglio",
+     "Emesso",
+     "Ragione",
+     "Rif",
+     "Valore"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Dettaglio",
+     "Emesso",
+     "Ragione",
+     "Rif"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (MISSING): 4/5 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C2-ragione",
+   "domain": "COSTS",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Dettaglio",
+     "Emesso",
+     "Ragione",
+     "Rif"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 5/5 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Chi",
+     "Cosa",
+     "Numero",
+     "Quando",
+     "Quanto"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Chi",
+     "Cosa",
+     "Numero",
+     "Quando",
+     "Quanto"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Chi",
+     "Cosa",
+     "Numero",
+     "Quando",
+     "Quanto"
+    ],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Chi",
+     "Cosa",
+     "Numero",
+     "Quando",
+     "Quanto"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "CHI:",
+     "COSA:",
+     "NUMERO:",
+     "QUANDO:",
+     "QUANTO:"
+    ],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [
+     "Chi",
+     "Cosa",
+     "Numero",
+     "Quando",
+     "Quanto"
+    ],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Chi",
+     "Cosa",
+     "Numero",
+     "Quando"
+    ],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (MISSING): 4/5 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "C3-chi",
+   "domain": "COSTS",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [
+     "Chi",
+     "Cosa",
+     "Numero",
+     "Quando"
+    ],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 5/5 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 4/4 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (ADDITIVE): 4/5 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.75,
+    "explain": "COMPATIBLE (MISSING): 3/4 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.75"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X1-staff-clear",
+   "domain": "LABOR",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 4/4 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V1",
+   "title": "the first file",
+   "expect": "FIRST",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V2",
+   "title": "next month, other data",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V3",
+   "title": "columns moved",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "COSMETIC",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (COSMETIC): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V4",
+   "title": "a junk column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V5",
+   "title": "cosmetic headers",
+   "expect": "EXACT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "NONE",
+    "structure": "EXACT",
+    "score": 1.0,
+    "explain": "EXACT (NONE): 5/5 columns coincide, 0 new, 0 missing, 0 in conflict; types compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V6",
+   "title": "a new column",
+   "expect": "COMPATIBLE",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": [],
+    "reused": [],
+    "drift": "ADDITIVE",
+    "structure": "COMPATIBLE",
+    "score": 0.833,
+    "explain": "COMPATIBLE (ADDITIVE): 5/6 columns coincide, 1 new, 0 missing, 0 in conflict; types compatible; score 0.83"
+   },
+   "without_memory": {
+    "level": "READY",
+    "questions": [],
+    "blockers": []
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V7",
+   "title": "a known column gone",
+   "expect": "MISSING",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [],
+    "drift": "MISSING",
+    "structure": "COMPATIBLE",
+    "score": 0.8,
+    "explain": "COMPATIBLE (MISSING): 4/5 columns coincide, 0 new, 1 missing, 0 in conflict; types compatible; score 0.80"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  },
+  {
+   "family": "X2-costs-clear",
+   "domain": "COSTS",
+   "version": "V8",
+   "title": "a column changed meaning",
+   "expect": "CONFLICT",
+   "ok": true,
+   "why": "",
+   "with_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ],
+    "reused": [],
+    "drift": "SEMANTIC_CONFLICT",
+    "structure": "COMPATIBLE",
+    "score": 1.0,
+    "explain": "COMPATIBLE (SEMANTIC_CONFLICT): 5/5 columns coincide, 0 new, 0 missing, 1 in conflict; types NOT all compatible; score 1.00"
+   },
+   "without_memory": {
+    "level": "MANUAL",
+    "questions": [],
+    "blockers": [
+     "MISSING_REQUIRED"
+    ]
+   },
+   "wrong_reuse": []
+  }
+ ],
+ "multi_family": {
+  "benchmark": "source-learning-benchmark-v1/multi-source",
+  "properties": 3,
+  "families": 12,
+  "families_per_property": 4,
+  "families_in_memory": [
+   4,
+   4,
+   4
+  ],
+  "documents": 120,
+  "timeline_steps": 141,
+  "returning_family_recognition": {
+   "num": 82,
+   "den": 82,
+   "value": 1.0
+  },
+  "right_family_every_expected_step": {
+   "num": 105,
+   "den": 105,
+   "value": 1.0
+  },
+  "cross_family_wrong_reuse": 0,
+  "cross_family_wrong_family": 0,
+  "family_collision_false_match": {
+   "num": 0,
+   "den": 15,
+   "value": 0.0
+  },
+  "twin_confusions": 0,
+  "repeated_questions_after_returning_source": 0,
+  "correct_family_after_cosmetic_or_additive_drift": {
+   "num": 39,
+   "den": 39,
+   "value": 1.0
+  },
+  "store_intact_after_import_or_correction": {
+   "num": 9,
+   "den": 9,
+   "value": 1.0
+  },
+  "cross_property_contamination": 0,
+  "cross_domain_contamination": 0,
+  "questions_saved": {
+   "asks_without_memory": 154,
+   "asks_with_memory": 10,
+   "saved": 144,
+   "documents_asking_nothing_with_memory": 95,
+   "documents_asking_nothing_without_memory": 0
+  },
+  "every_step_as_expected": {
+   "num": 141,
+   "den": 141,
+   "value": 1.0
+  },
+  "failures": [],
+  "seconds": 33.7,
+  "per_site": [
+   {
+    "site": "bookings",
+    "title": "PMS, OTA, internal report and a PMS twin",
+    "domain": "BOOKINGS",
+    "families": [
+     "M1-pms",
+     "M1-ota",
+     "M1-report",
+     "M1-pms-tariffa"
+    ],
+    "families_in_memory": 4,
+    "revisions": {
+     "M1-pms": 1,
+     "M1-ota": 2,
+     "M1-report": 1,
+     "M1-pms-tariffa": 1
+    }
+   },
+   {
+    "site": "labor",
+    "title": "three staff exports and a twin of the first",
+    "domain": "LABOR",
+    "families": [
+     "M2-turni",
+     "M2-ore-1-2",
+     "M2-ore-base",
+     "M2-turni-c"
+    ],
+    "families_in_memory": 4,
+    "revisions": {
+     "M2-turni": 2,
+     "M2-ore-1-2": 1,
+     "M2-ore-base": 1,
+     "M2-turni-c": 1
+    }
+   },
+   {
+    "site": "costs",
+    "title": "supplier register, ledger, cash book and a twin of the first",
+    "domain": "COSTS",
+    "families": [
+     "M3-forn",
+     "M3-ragione",
+     "M3-chi",
+     "M3-forn-qta"
+    ],
+    "families_in_memory": 4,
+    "revisions": {
+     "M3-forn": 2,
+     "M3-ragione": 1,
+     "M3-chi": 1,
+     "M3-forn-qta": 1
+    }
+   }
+  ],
+  "steps": [
+   {
+    "site": "bookings",
+    "n": 1,
+    "kind": "teach",
+    "family": "M1-pms",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 2,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 3,
+    "kind": "teach",
+    "family": "M1-ota",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 4,
+    "kind": "see",
+    "family": "M1-ota",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 5,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 6,
+    "kind": "see",
+    "family": "M1-ota",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 7,
+    "kind": "teach",
+    "family": "M1-report",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 8,
+    "kind": "see",
+    "family": "M1-report",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 9,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 10,
+    "kind": "see",
+    "family": "M1-report",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 11,
+    "kind": "see",
+    "family": "M1-ota",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 12,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 13,
+    "kind": "see",
+    "family": "M1-ota",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 14,
+    "kind": "see",
+    "family": "M1-report",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 15,
+    "kind": "teach",
+    "family": "M1-pms-tariffa",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 16,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 17,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 18,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 19,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 20,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 21,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 22,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 23,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 24,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 25,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 26,
+    "kind": "see",
+    "family": "M1-ota",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 27,
+    "kind": "see",
+    "family": "M1-report",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 28,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V7",
+    "expect": "MISSING",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "MISSING",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 29,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V7",
+    "expect": "MISSING",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "MISSING",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 30,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V8",
+    "expect": "CONFLICT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "SEMANTIC_CONFLICT",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 31,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V8",
+    "expect": "CONFLICT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "SEMANTIC_CONFLICT",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 32,
+    "kind": "undecidable",
+    "family": "M1-pms",
+    "version": "base",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 0,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 33,
+    "kind": "undecidable",
+    "family": "M1-pms",
+    "version": "reordered",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 0,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 34,
+    "kind": "undecidable",
+    "family": "M1-pms",
+    "version": "junk",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 0,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 35,
+    "kind": "undecidable",
+    "family": "M1-pms",
+    "version": "cosmetic",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 0,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 36,
+    "kind": "undecidable",
+    "family": "M1-pms",
+    "version": "both",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 0,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 37,
+    "kind": "import",
+    "family": "M1-pms",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 38,
+    "kind": "see",
+    "family": "M1-ota",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 39,
+    "kind": "see",
+    "family": "M1-report",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 40,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 41,
+    "kind": "import",
+    "family": "M1-report",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 42,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 43,
+    "kind": "correct",
+    "family": "M1-ota",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 44,
+    "kind": "see",
+    "family": "M1-pms",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 45,
+    "kind": "see",
+    "family": "M1-ota",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 46,
+    "kind": "see",
+    "family": "M1-report",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 8,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "bookings",
+    "n": 47,
+    "kind": "see",
+    "family": "M1-pms-tariffa",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 9,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "labor",
+    "n": 1,
+    "kind": "teach",
+    "family": "M2-turni",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 2,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 3,
+    "kind": "teach",
+    "family": "M2-ore-1-2",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 4,
+    "kind": "see",
+    "family": "M2-ore-1-2",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 5,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 6,
+    "kind": "see",
+    "family": "M2-ore-1-2",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 7,
+    "kind": "teach",
+    "family": "M2-ore-base",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 8,
+    "kind": "see",
+    "family": "M2-ore-base",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 9,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 10,
+    "kind": "see",
+    "family": "M2-ore-base",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 11,
+    "kind": "see",
+    "family": "M2-ore-1-2",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 12,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 13,
+    "kind": "see",
+    "family": "M2-ore-1-2",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 14,
+    "kind": "see",
+    "family": "M2-ore-base",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 15,
+    "kind": "teach",
+    "family": "M2-turni-c",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 16,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 17,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 18,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 19,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 20,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 21,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 22,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 23,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 24,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 25,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 26,
+    "kind": "see",
+    "family": "M2-ore-1-2",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 27,
+    "kind": "see",
+    "family": "M2-ore-base",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 28,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V7",
+    "expect": "MISSING",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "MISSING",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 1,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 29,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V7",
+    "expect": "MISSING",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "MISSING",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 1,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 30,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V8",
+    "expect": "CONFLICT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "ASK",
+    "structure": "COMPATIBLE",
+    "drift": "SEMANTIC_CONFLICT",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 1,
+    "reused": 1,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 31,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V8",
+    "expect": "CONFLICT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "ASK",
+    "structure": "COMPATIBLE",
+    "drift": "SEMANTIC_CONFLICT",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 1,
+    "reused": 1,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 32,
+    "kind": "undecidable",
+    "family": "M2-turni",
+    "version": "base",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "ASK",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 33,
+    "kind": "undecidable",
+    "family": "M2-turni",
+    "version": "reordered",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "ASK",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 34,
+    "kind": "undecidable",
+    "family": "M2-turni",
+    "version": "junk",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "ASK",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 35,
+    "kind": "undecidable",
+    "family": "M2-turni",
+    "version": "cosmetic",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "ASK",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 36,
+    "kind": "undecidable",
+    "family": "M2-turni",
+    "version": "both",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "ASK",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 3,
+    "reused": 0,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 37,
+    "kind": "import",
+    "family": "M2-turni",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 38,
+    "kind": "see",
+    "family": "M2-ore-1-2",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 39,
+    "kind": "see",
+    "family": "M2-ore-base",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 40,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 41,
+    "kind": "import",
+    "family": "M2-ore-base",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 42,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 43,
+    "kind": "correct",
+    "family": "M2-turni",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 44,
+    "kind": "see",
+    "family": "M2-turni",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 4,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 45,
+    "kind": "see",
+    "family": "M2-ore-1-2",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 46,
+    "kind": "see",
+    "family": "M2-ore-base",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 47,
+    "kind": "see",
+    "family": "M2-turni-c",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 2,
+    "without_memory": "ASK"
+   },
+   {
+    "site": "costs",
+    "n": 1,
+    "kind": "teach",
+    "family": "M3-forn",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "costs",
+    "n": 2,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 3,
+    "kind": "teach",
+    "family": "M3-ragione",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "costs",
+    "n": 4,
+    "kind": "see",
+    "family": "M3-ragione",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 5,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 6,
+    "kind": "see",
+    "family": "M3-ragione",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 7,
+    "kind": "teach",
+    "family": "M3-chi",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "costs",
+    "n": 8,
+    "kind": "see",
+    "family": "M3-chi",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 9,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 10,
+    "kind": "see",
+    "family": "M3-chi",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 11,
+    "kind": "see",
+    "family": "M3-ragione",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 12,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 13,
+    "kind": "see",
+    "family": "M3-ragione",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 14,
+    "kind": "see",
+    "family": "M3-chi",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 15,
+    "kind": "teach",
+    "family": "M3-forn-qta",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "costs",
+    "n": 16,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 17,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 18,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 19,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V3",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "COSMETIC",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 20,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 21,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 22,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 23,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V5",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 24,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 25,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 26,
+    "kind": "see",
+    "family": "M3-ragione",
+    "version": "V6",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 27,
+    "kind": "see",
+    "family": "M3-chi",
+    "version": "V4",
+    "expect": "COMPATIBLE",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "COMPATIBLE",
+    "drift": "ADDITIVE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 28,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V7",
+    "expect": "MISSING",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "MISSING",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 29,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V7",
+    "expect": "MISSING",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "MISSING",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 30,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V8",
+    "expect": "CONFLICT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "SEMANTIC_CONFLICT",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 31,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V8",
+    "expect": "CONFLICT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": "COMPATIBLE",
+    "drift": "SEMANTIC_CONFLICT",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 32,
+    "kind": "undecidable",
+    "family": "M3-forn",
+    "version": "base",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 33,
+    "kind": "undecidable",
+    "family": "M3-forn",
+    "version": "reordered",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 34,
+    "kind": "undecidable",
+    "family": "M3-forn",
+    "version": "junk",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 35,
+    "kind": "undecidable",
+    "family": "M3-forn",
+    "version": "cosmetic",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 36,
+    "kind": "undecidable",
+    "family": "M3-forn",
+    "version": "both",
+    "expect": "AMBIGUOUS",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "MANUAL",
+    "structure": null,
+    "drift": null,
+    "family_chosen": null,
+    "ambiguous": true,
+    "questions": 1,
+    "reused": 0,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 37,
+    "kind": "import",
+    "family": "M3-forn",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "costs",
+    "n": 38,
+    "kind": "see",
+    "family": "M3-ragione",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 39,
+    "kind": "see",
+    "family": "M3-chi",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 40,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 41,
+    "kind": "import",
+    "family": "M3-chi",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "costs",
+    "n": 42,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 43,
+    "kind": "correct",
+    "family": "M3-forn",
+    "version": "",
+    "expect": "AMBIGUOUS",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "costs",
+    "n": 44,
+    "kind": "see",
+    "family": "M3-forn",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "1",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 45,
+    "kind": "see",
+    "family": "M3-ragione",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "2",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 46,
+    "kind": "see",
+    "family": "M3-chi",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "3",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 5,
+    "without_memory": "MANUAL"
+   },
+   {
+    "site": "costs",
+    "n": 47,
+    "kind": "see",
+    "family": "M3-forn-qta",
+    "version": "V2",
+    "expect": "EXACT",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "structure": "EXACT",
+    "drift": "NONE",
+    "family_chosen": "4",
+    "ambiguous": false,
+    "questions": 0,
+    "reused": 6,
+    "without_memory": "MANUAL"
+   }
+  ],
+  "versions_seen": {
+   "V2": 54,
+   "V4": 12,
+   "V3": 9,
+   "V5": 9,
+   "V6": 9,
+   "V7": 6,
+   "V8": 6
+  }
+ },
+ "format_family": {
+  "benchmark": "source-learning-benchmark-v1/multi-format",
+  "properties": 3,
+  "formats": 9,
+  "documents": 45,
+  "timeline_steps": 56,
+  "correct_family": {
+   "num": 42,
+   "den": 42,
+   "value": 1.0
+  },
+  "correct_family_layout": {
+   "num": 42,
+   "den": 42,
+   "value": 1.0
+  },
+  "wrong_layout_reuse": 0,
+  "cross_family_layout_contamination": 0,
+  "documents_that_could_not_be_read": 0,
+  "returning_family_recognition": {
+   "num": 26,
+   "den": 26,
+   "value": 1.0
+  },
+  "repeated_mapping_questions_on_returning_unchanged": 0,
+  "recognised_after_harmless_drift": {
+   "num": 7,
+   "den": 7,
+   "value": 1.0
+  },
+  "ambiguous_layout_reuse": 0,
+  "ambiguous_family_reuse": 0,
+  "store_intact_after_import": {
+   "num": 2,
+   "den": 2,
+   "value": 1.0
+  },
+  "questions_saved": {
+   "asks_without_memory": 28,
+   "asks_with_memory": 0,
+   "saved": 28,
+   "documents_asking_nothing_with_memory": 42,
+   "documents_asking_nothing_without_memory": 25
+  },
+  "every_step_as_expected": {
+   "num": 56,
+   "den": 56,
+   "value": 1.0
+  },
+  "failures": [],
+  "seconds": 12.9,
+  "per_site": [
+   {
+    "site": "bookings",
+    "title": "PMS xlsx, another xlsx on another sheet, a csv",
+    "domain": "BOOKINGS",
+    "formats": [
+     "F-pms",
+     "F-export",
+     "F-csv"
+    ],
+    "families_in_memory": 3,
+    "layouts": [
+     [
+      "F-csv",
+      {}
+     ],
+     [
+      "F-export",
+      {
+       "sheets": [
+        "Export"
+       ]
+      }
+     ],
+     [
+      "F-pms",
+      {
+       "sheets": [
+        "Prenotazioni"
+       ]
+      }
+     ]
+    ]
+   },
+   {
+    "site": "labor",
+    "title": "a day grid, a department in the title, an xlsx table, a csv table",
+    "domain": "LABOR",
+    "formats": [
+     "F-grid",
+     "F-table",
+     "F-title",
+     "F-table-csv"
+    ],
+    "families_in_memory": 4,
+    "layouts": [
+     [
+      "F-grid",
+      {
+       "grid": {
+        "hours_field": "planned_hours"
+       }
+      }
+     ],
+     [
+      "F-table",
+      {}
+     ],
+     [
+      "F-table-csv",
+      {}
+     ],
+     [
+      "F-title",
+      {
+       "department": {
+        "kind": "TITLE"
+       }
+      }
+     ]
+    ]
+   },
+   {
+    "site": "twins",
+    "title": "two lookalike exports that need other sheets",
+    "domain": "BOOKINGS",
+    "formats": [
+     "F-twin-guests",
+     "F-twin-plan"
+    ],
+    "families_in_memory": 2,
+    "layouts": [
+     [
+      "F-twin-guests",
+      {
+       "sheets": [
+        "Prenotazioni"
+       ]
+      }
+     ],
+     [
+      "F-twin-plan",
+      {
+       "sheets": [
+        "Elenco"
+       ]
+      }
+     ]
+    ]
+   }
+  ],
+  "steps": [
+   {
+    "site": "bookings",
+    "n": 1,
+    "kind": "teach",
+    "format": "F-pms",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 2,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 3,
+    "kind": "teach",
+    "format": "F-export",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 4,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 5,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 6,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 7,
+    "kind": "teach",
+    "format": "F-csv",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 8,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 9,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 10,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 11,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 12,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 13,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 14,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 15,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 16,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 17,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 18,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 19,
+    "kind": "import",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "bookings",
+    "n": 20,
+    "kind": "see",
+    "format": "F-export",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Export"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 21,
+    "kind": "see",
+    "format": "F-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "bookings",
+    "n": 22,
+    "kind": "see",
+    "format": "F-pms",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "labor",
+    "n": 1,
+    "kind": "teach",
+    "format": "F-grid",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 2,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 3,
+    "kind": "teach",
+    "format": "F-table",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 4,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 5,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 6,
+    "kind": "teach",
+    "format": "F-title",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 7,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 8,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 9,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 10,
+    "kind": "teach",
+    "format": "F-table-csv",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 11,
+    "kind": "see",
+    "format": "F-table-csv",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "4",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 12,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 13,
+    "kind": "see",
+    "format": "F-table-csv",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "4",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 14,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 15,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 16,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 17,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 18,
+    "kind": "see",
+    "format": "F-table-csv",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "4",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 19,
+    "kind": "import",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "labor",
+    "n": 20,
+    "kind": "see",
+    "format": "F-table",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {},
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 21,
+    "kind": "see",
+    "format": "F-title",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "3",
+    "ambiguous": false,
+    "read_as": {
+     "department": {
+      "kind": "TITLE"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "labor",
+    "n": 22,
+    "kind": "see",
+    "format": "F-grid",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "grid": {
+      "hours_field": "planned_hours"
+     }
+    },
+    "without_memory": "ASK"
+   },
+   {
+    "site": "twins",
+    "n": 1,
+    "kind": "teach",
+    "format": "F-twin-guests",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "twins",
+    "n": 2,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 3,
+    "kind": "teach",
+    "format": "F-twin-plan",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": ""
+   },
+   {
+    "site": "twins",
+    "n": 4,
+    "kind": "see",
+    "format": "F-twin-plan",
+    "variant": "next",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Elenco"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 5,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 6,
+    "kind": "either",
+    "format": "Altro",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": null,
+    "ambiguous": true,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 7,
+    "kind": "see",
+    "format": "F-twin-plan",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Elenco"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 8,
+    "kind": "either",
+    "format": "Foglio1",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": null,
+    "ambiguous": true,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 9,
+    "kind": "either",
+    "format": "Riepilogo",
+    "variant": "",
+    "returning": false,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": null,
+    "ambiguous": true,
+    "read_as": {},
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 10,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "next",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 11,
+    "kind": "see",
+    "format": "F-twin-plan",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "2",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Elenco"
+     ]
+    },
+    "without_memory": "READY"
+   },
+   {
+    "site": "twins",
+    "n": 12,
+    "kind": "see",
+    "format": "F-twin-guests",
+    "variant": "extra",
+    "returning": true,
+    "ok": true,
+    "why": "",
+    "level": "READY",
+    "questions": 0,
+    "family_chosen": "1",
+    "ambiguous": false,
+    "read_as": {
+     "sheets": [
+      "Prenotazioni"
+     ]
+    },
+    "without_memory": "READY"
+   }
+  ]
+ }
+}

@@ -122,6 +122,27 @@ export function withDecimalStyle(decision: ImportMapping, style: "COMMA" | "POIN
 }
 
 /** Same decision, same text: used to tell whether an answer still belongs to what is on screen. */
+/**
+ * Did the person decide something while NINFA was asking (a column, a department, a week's hours basis, VAT,
+ * how dates are written...)? Then the source is remembered by default, even if it was known before: it is
+ * their confirmation that makes the next file ask less. (The server decides what is actually learned.)
+ */
+export function personAnswered(answers: UnderstandAnswers): boolean {
+  return (
+    Object.keys(answers.column_fields ?? {}).length > 0 ||
+    [
+      answers.grid_hours,
+      answers.amount_basis,
+      answers.date_order,
+      answers.decimal_style,
+      answers.department_from,
+      answers.department_value,
+      answers.table_key,
+      answers.sheet_name,
+    ].some((value) => value !== undefined && value !== null && value !== "")
+  );
+}
+
 export function sameDecision(a: ImportMapping, b: ImportMapping): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }

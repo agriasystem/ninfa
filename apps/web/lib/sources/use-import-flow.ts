@@ -33,6 +33,7 @@ import type { ApiResult } from "@/lib/api/client";
 import {
   decisionFromSuggestions,
   mergeAnswers,
+  personAnswered,
   sameDecision,
   startingDecision,
   withColumnField,
@@ -326,7 +327,8 @@ export function useImportFlow({
           inspection,
           decision: proposal,
           validation: tried.data,
-          save: !known || taught,
+          // what the person answered is worth remembering even for a source NINFA already knows
+          save: !known || taught || personAnswered(answers),
           understanding,
         });
         return;

@@ -98,6 +98,8 @@ class ConfigFormat:
     decimal_separator: str | None
     thousands_separator: str | None
     layout: LayoutSpec | None = None
+    # Source Learning: the raw JSON memory of this source (None: nothing remembered).
+    learning: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,6 +271,7 @@ class BookingsDomain(FileDomain):
             options.decimal_separator,
             options.thousands_separator,
             options.layout,
+            options.learning,
         )
 
     def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
@@ -429,6 +432,7 @@ class LaborDomain(FileDomain):
             options.decimal_separator,
             options.thousands_separator,
             options.layout,
+            options.learning,
         )
 
     def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
@@ -592,6 +596,7 @@ class CostsDomain(FileDomain):
             options.decimal_separator,
             options.thousands_separator,
             options.layout,
+            options.learning,
         )
 
     def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
