@@ -120,7 +120,7 @@ def date_cell(day: date, style: str) -> Any:
     if style == "text_it":
         return f"{day.day} {_MONTHS_IT[day.month - 1]} {day.year}"
     if style == "text_it_long":
-        return f"{day.day:02d}-{_MONTHS_IT[day.month - 1]}-{day.year % 100:02d}"
+        return f"{day.day:02d}-{_MONTHS_IT[day.month - 1]}-{day.year}"
     if style == "text_en":
         return f"{_MONTHS_EN[day.month - 1]} {day.day}, {day.year}"
     if style == "slash_iso":

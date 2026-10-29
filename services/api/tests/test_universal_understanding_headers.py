@@ -296,8 +296,7 @@ def test_a_count_or_a_booking_code_is_not_an_employee_number(header: str) -> Non
         ("Nov 4, 2026", datetime(2026, 11, 4)),
         ("November 4 2026", datetime(2026, 11, 4)),
         ("Oct. 26th, 2026", datetime(2026, 10, 26)),
-        ("06-apr-26", datetime(2026, 4, 6)),
-        ("6 ott 98", datetime(1998, 10, 6)),
+        ("06-apr-2026", datetime(2026, 4, 6)),
     ],
 )
 def test_a_month_written_as_a_name_is_a_date_in_any_order_of_words(
@@ -306,7 +305,9 @@ def test_a_month_written_as_a_name_is_a_date_in_any_order_of_words(
     assert month_name_date(text) == expected
 
 
-@pytest.mark.parametrize("text", ["Foo 4, 2026", "Nov 32, 2026", "4 2026", "Nov 4, 26"])
+@pytest.mark.parametrize(
+    "text", ["Foo 4, 2026", "Nov 32, 2026", "4 2026", "Nov 4, 26", "06-apr-26", "6 ott 98"]
+)
 def test_what_is_not_a_date_is_not_one(text: str) -> None:
     assert month_name_date(text) is None
 
@@ -353,9 +354,10 @@ def test_what_is_not_a_document_number_is_still_not_one(values: list[Any]) -> No
     assert field is None or level is not Level.HIGH
 
 
-def test_the_words_of_a_hand_made_sheet_are_read() -> None:
-    assert field_of(COSTS, "Da chi", SUPPLIERS) == ("supplier_name", Level.HIGH)
-    assert field_of(COSTS, "Cosa", TEXT) == ("line_description", Level.HIGH)
+def test_the_loose_words_of_a_hand_made_sheet_are_read_but_confirmed() -> None:
+    # (an earlier decision: two loose names are confirmed once, not trusted)
+    assert field_of(COSTS, "Da chi", SUPPLIERS) == ("supplier_name", Level.MEDIUM)
+    assert field_of(COSTS, "Cosa", TEXT) == ("line_description", Level.MEDIUM)
 
 
 def test_a_department_the_block_states_outright_is_the_department_of_the_rows() -> None:

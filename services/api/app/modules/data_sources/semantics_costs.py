@@ -124,7 +124,7 @@ COSTS = DomainSem(
                 rule("billed invoiced", weight=0.88),  # "Billed By"
                 rule("ragione denominazione", "sociale fornitore societa", weight=0.9),
                 rule("intestatario titolare", weight=0.8),
-                rule("chi", weight=0.85),  # "Da chi": a hand-made sheet
+                rule("chi", weight=0.75),  # "Da chi": a hand-made sheet
             ),
             _fit_supplier,
         ),
@@ -259,7 +259,7 @@ COSTS = DomainSem(
                     none="costo spesa",
                     weight=0.8,
                 ),
-                rule("cosa", weight=0.85),  # a hand-made sheet
+                rule("cosa", weight=0.75),  # a hand-made sheet
             ),
             fit_text,
         ),
