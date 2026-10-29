@@ -1,10 +1,11 @@
 """Universal Understanding 2 does not undo Source Learning.
 
 The primary Universal Understanding Benchmark V2 reads every file as a FIRST upload: no learned
-profile helps. This is the secondary check: a V2 document that needed a question is answered once,
-imported (which remembers what the person confirmed) and then uploaded again as "the next file of
-the same source" - it is recognised and the question is not asked again. Real bytes, the real API
-and database (rolled back); no model.
+profile helps. This is the secondary check: a V2 document that needed a question is answered once
+(with the answers its truth lists, the way the benchmark's conversation gives them), imported
+(which remembers what the person confirmed) and then uploaded again as "the next file of the same
+source" - it is recognised and the question is not asked again. Real bytes, the real API and
+database (rolled back); no model.
 """
 
 from collections.abc import Callable
@@ -14,7 +15,10 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
+from app.modules.data_sources.understanding import UnderstandAnswers
+from tests.benchmarks.smart_import_v3.dialog import MAX_ROUNDS, _answer
 from tests.benchmarks.smart_import_v3.model import Doc
+from tests.benchmarks.smart_import_v3.observe import make_service, run
 from tests.benchmarks.universal_understanding_v2.corpus import build_corpus
 from tests.data_sources_support import SourcesEnv, sources_env
 from tests.smart_import_support import import_mapped, understand
@@ -22,24 +26,41 @@ from tests.support import BookingFactory
 
 DOMAIN_OF = {"bookings": "BOOKINGS", "labor": "LABOR", "costs": "COSTS"}
 HOW_MANY = 3  # documents tried per kind of data
-PLAIN = {"COLUMN_MEANING", "VALUE_LABELS", "AMOUNT_BASIS", "DATE_ORDER", "DECIMAL_STYLE"}
 
 
-def _teachable() -> list[Doc]:
-    """Documents of V2 the system answers with a plain question the truth can answer: not a choice
-    of table, not a department no file states (those are tested in the Source Learning suites)."""
-    chosen: list[Doc] = []
-    for group in DOMAIN_OF:
-        chosen.extend(
-            [
-                doc
-                for doc in build_corpus((group,))
-                if doc.golden.outcome == "ASK"
-                and doc.golden.answers
-                and set(doc.golden.questions) <= PLAIN
-                and not doc.filename.endswith(".csv")
-            ][:HOW_MANY]
+def _answers_of(doc: Doc) -> dict[str, Any] | None:
+    """The answers a careful person gives (as the benchmark's conversation does) until Smart
+    Import stops asking - or None when the truth has no answer for one of its questions."""
+    service = make_service()
+    state = run(service, doc.card, doc.filename, doc.content)
+    given: dict[str, Any] = {}
+    for _ in range(MAX_ROUNDS):
+        if state.automatic or state.error or not state.questions:
+            break
+        if not any([_answer(q, doc.golden, state, given) for q in state.questions]):
+            return None
+        state = run(
+            service, doc.card, doc.filename, doc.content, answers=UnderstandAnswers(**given)
         )
+    return given if state.automatic and given and "period_start" not in given else None
+
+
+def _teachable() -> list[tuple[Doc, dict[str, Any]]]:
+    """V2 documents that ask, and that the truth can answer completely."""
+    chosen: list[tuple[Doc, dict[str, Any]]] = []
+    for group in DOMAIN_OF:
+        found = 0
+        for doc in build_corpus((group,)):
+            if doc.golden.outcome != "ASK" or doc.filename.endswith(".csv"):
+                continue
+            if "TABLE" in doc.golden.questions:
+                continue  # (which of two tables is not a fact a family remembers: as before)
+            answers = _answers_of(doc)
+            if answers is not None:
+                chosen.append((doc, answers))
+                found += 1
+            if found == HOW_MANY:
+                break
     return chosen
 
 
@@ -52,19 +73,18 @@ def env(factory: BookingFactory, authenticated_as: Callable[[UUID], None]) -> So
 
 
 def test_every_kind_of_data_has_documents_to_teach() -> None:
-    assert {doc.card for doc in TEACHABLE} == set(DOMAIN_OF)
+    assert {doc.card for doc, _answers in TEACHABLE} == set(DOMAIN_OF)
 
 
-@pytest.mark.parametrize("doc", TEACHABLE, ids=[doc.id for doc in TEACHABLE])
+@pytest.mark.parametrize(("doc", "answers"), TEACHABLE, ids=[doc.id for doc, _answers in TEACHABLE])
 def test_what_the_person_answered_once_is_not_asked_again(
-    doc: Doc, api_client: TestClient, env: SourcesEnv
+    doc: Doc, answers: dict[str, Any], api_client: TestClient, env: SourcesEnv
 ) -> None:
     domain = DOMAIN_OF[doc.card]
 
     first = understand(api_client, env, domain, doc.filename, doc.content)
     assert first["understanding"]["questions"]
 
-    answers: dict[str, Any] = dict(doc.golden.answers)
     answered = understand(api_client, env, domain, doc.filename, doc.content, answers)
     assert answered["understanding"]["level"] == "READY"
     done = import_mapped(

@@ -437,3 +437,33 @@ def test_the_same_net_on_every_line_of_an_invoice_is_the_net_of_the_invoice() ->
     plan = _register(["FT/1", "FT/1", "FT/2", "FT/2", "FT/3", "FT/3"], [100.0, 100.0] * 3)
 
     assert not plan.assigned
+
+
+# --- explainability: why a column is read as it is (internal, never a value) -------------------
+
+
+def test_every_reading_says_what_it_rests_on_without_showing_a_value() -> None:
+    proposal = propose(
+        BOOKINGS,
+        [
+            column("CI", ARRIVALS, 0),
+            column("CO", DEPARTURES, 1),
+            column("Pratica n.", CODES, 2),
+            column("Stanze", SMALL, 3),
+        ],
+    )
+
+    by_header = {c.header: c.evidence for c in proposal.columns}
+    assert any("confirmed by the values" in why for why in by_header["CI"])
+    assert any("confirmed by the values" in why for why in by_header["CO"])
+    assert any("values fit" in why for why in by_header["Pratica n."])
+    assert any("name TOKEN" in why for why in by_header["Stanze"])
+    everything = " ".join(why for evidence in by_header.values() for why in evidence)
+    assert not any(str(code) in everything for code in CODES)  # no value of the file in it
+
+
+def test_a_reading_demoted_by_plausibility_says_so() -> None:
+    proposal = propose(LABOR, _staff([8, 48, 7, 9, 31, 8], with_person=True))
+
+    hours = next(c for c in proposal.columns if c.header == "Ore effettive")
+    assert any("per person" in why for why in hours.evidence)
