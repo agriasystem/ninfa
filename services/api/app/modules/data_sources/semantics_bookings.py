@@ -55,6 +55,7 @@ BOOKINGS = DomainSem(
                     "prenotazione prenotazioni reservation booking book conferma confirmation pren "
                     "conf pratica dossier",
                     "codice id numero riferimento rif code reference number cod",
+                    none="gruppo group",  # a group is a set of bookings, not one
                     weight=0.9,
                 ),
                 rule("res reservation", "numero id codice", weight=0.85),
@@ -65,7 +66,7 @@ BOOKINGS = DomainSem(
                 rule("ref rif riferimento reference", weight=0.85),
                 # "Codice" alone in a bookings file is very likely the reservation code, but only
                 # likely: it is proposed, to be checked.
-                rule("codice code cod", weight=0.7),
+                rule("codice code cod", none="gruppo group", weight=0.7),
             ),
             fit_unique_identifier,
         ),
@@ -216,7 +217,8 @@ BOOKINGS = DomainSem(
             (
                 rule(
                     "commissione commissioni commission provvigione comm",
-                    none="percentuale perc rate aliquota",
+                    # ("Netto dopo commissioni" is what is left AFTER the commission)
+                    none="percentuale perc rate aliquota netto net dopo after",
                     weight=0.9,
                 ),
             ),

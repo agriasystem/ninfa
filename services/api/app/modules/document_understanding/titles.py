@@ -114,11 +114,22 @@ def parse_period(lines: Iterable[str]) -> DateRange | None:
     return best
 
 
+# "Reparto: Spa", "Department - Kitchen": a label that says what the value IS
+_DEPARTMENT_LABEL = re.compile(
+    r"^\s*(?:reparto|dipartimento|department|area|settore|team)\s*[:\-–]\s*(?P<value>\S.*)$",
+    re.IGNORECASE,
+)
+
+
 def department_words(lines: Iterable[str]) -> list[str]:
     """The department words a title or a line contains, as written ("TURNI HOUSEKEEPING" ->
-    ["HOUSEKEEPING"]). Words only: the meaning of each one is the domain's business."""
+    ["HOUSEKEEPING"]). Words only: the meaning of each one is the domain's business. A line that
+    states its department outright ("Reparto: Spa") is the only one read: the other lines of the
+    block ("Responsabile: Direzione") are not departments of the rows."""
+    lines = list(lines)
+    stated = [m.group("value") for line in lines if (m := _DEPARTMENT_LABEL.match(line))]
     seen: dict[str, str] = {}
-    for line in lines:
+    for line in stated or lines:
         for raw in re.findall(r"[A-Za-zÀ-ÿ]+", line):
             if (
                 len(raw) >= 3

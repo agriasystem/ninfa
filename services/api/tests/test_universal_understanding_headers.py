@@ -317,3 +317,123 @@ def test_a_two_digit_year_needs_the_same_decision_as_a_four_digit_one() -> None:
     assert date_pattern(("04/02/26", "27/02/26"), "DMY") == "%d/%m/%y"
     assert date_pattern(("04/02/2026", "27/02/2026"), "DMY") == "%d/%m/%Y"
     assert date_pattern(("04/02/26", "27/02/2026"), "DMY") is None  # two ways in one column
+
+
+# --- fewer needless questions (Question Reduction 2) ------------------------------------------
+
+CREDIT_NOTES = [-120.0, 340.5, -50.0, 99.0, 12.0, 78.0]
+
+
+def test_a_credit_note_is_a_negative_amount_in_a_register_of_costs() -> None:
+    assert field_of(COSTS, "Imponibile", CREDIT_NOTES) == ("line_total", Level.HIGH)
+
+
+def test_negative_money_is_still_suspect_where_nothing_is_taken_back() -> None:
+    field, level = field_of(BOOKINGS, "Ricavo camere", CREDIT_NOTES)
+    assert field is None or level is not Level.HIGH
+
+
+def test_the_lines_of_one_invoice_carry_its_number() -> None:
+    repeated = ["FT/001", "FT/001", "FT/001", "FT/002", "FT/002", "FT/003"]
+
+    assert field_of(COSTS, "N. documento", repeated) == ("invoice_number", Level.HIGH)
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        ["Pagata", "Aperta", "Pagata", "Aperta", "Pagata", "Aperta"],  # words, no number
+        [1, 2, 3, 4, 5, 6],  # a row counter
+        ["FT/001"] * 6,  # one value: it identifies nothing
+    ],
+)
+def test_what_is_not_a_document_number_is_still_not_one(values: list[Any]) -> None:
+    field, level = field_of(COSTS, "N. documento", values)
+
+    assert field is None or level is not Level.HIGH
+
+
+def test_the_words_of_a_hand_made_sheet_are_read() -> None:
+    assert field_of(COSTS, "Da chi", SUPPLIERS) == ("supplier_name", Level.HIGH)
+    assert field_of(COSTS, "Cosa", TEXT) == ("line_description", Level.HIGH)
+
+
+def test_a_department_the_block_states_outright_is_the_department_of_the_rows() -> None:
+    from app.modules.document_understanding.titles import department_words
+
+    block = ["Reparto: SPA E BENESSERE", "Periodo: 19-25 ottobre 2026", "Responsabile: Direzione"]
+
+    assert department_words(block) == ["SPA"]
+    # the same words without the label are as many departments as there are words
+    assert department_words(["SPA", "Direzione"]) == ["SPA", "Direzione"]
+    assert department_words(["Reparto: Sala e Bar"]) == ["Sala", "Bar"]
+
+
+# --- not the thing it sounds like -------------------------------------------------------------
+
+
+def test_what_is_left_after_a_commission_is_not_the_commission() -> None:
+    field, _level = field_of(BOOKINGS, "Netto dopo commissioni", MONEY)
+
+    assert field != "commission_amount"
+    assert field_of(BOOKINGS, "Commissione OTA", MONEY)[0] == "commission_amount"
+
+
+@pytest.mark.parametrize("header", ["Cod. gruppo", "Group code", "Codice gruppo"])
+def test_a_code_of_a_group_is_not_a_booking_code(header: str) -> None:
+    field, _level = field_of(BOOKINGS, header, ["G1", "G2", "G3", "G4", "G5", "G6"])
+
+    assert field != "source_record_id"
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        ("Issuer", "supplier_name"),
+        ("Natura costo", "cost_category"),
+        ("Pagabile entro", "due_date"),
+        ("Pay By", "due_date"),
+    ],
+)
+def test_more_words_for_the_costs_of_a_register(header: str, expected: str) -> None:
+    by_field: dict[str, list[Any]] = {
+        "supplier_name": SUPPLIERS,
+        "cost_category": ["FOOD", "UTILITIES", "CLEANING", "FOOD", "SOFTWARE", "OTHER"],
+        "due_date": ARRIVALS,
+    }
+    values = by_field[expected]
+
+    assert field_of(COSTS, header, values)[0] == expected
+
+
+# --- the net of an invoice, in a register ------------------------------------------------------
+
+
+def _register(numbers: list[str], nets: list[float]) -> Any:
+    from app.modules.data_sources.understanding_costs import plan_costs
+
+    rows = [(number, net, "Descrizione") for number, net in zip(numbers, nets, strict=True)]
+    columns = [
+        ColumnSample(0, "Numero fattura", (), tuple(r[0] for r in rows), tuple(r[0] for r in rows)),
+        ColumnSample(1, "Netto fattura", (), tuple(r[1] for r in rows), tuple(r[1] for r in rows)),
+    ]
+    proposal = propose(COSTS, columns)
+    return plan_costs(proposal=proposal, rows=rows, asked_basis=None, asked_columns={})
+
+
+def test_the_net_of_the_invoice_is_the_net_of_the_line_when_every_row_is_an_invoice() -> None:
+    plan = _register(INVOICES, MONEY)
+
+    assert plan.assigned == {"Netto fattura": "line_total"}
+
+
+def test_the_lines_of_an_invoice_with_a_net_each_are_lines() -> None:
+    plan = _register(["FT/1", "FT/1", "FT/2", "FT/2", "FT/3", "FT/3"], MONEY)
+
+    assert plan.assigned == {"Netto fattura": "line_total"}
+
+
+def test_the_same_net_on_every_line_of_an_invoice_is_the_net_of_the_invoice() -> None:
+    plan = _register(["FT/1", "FT/1", "FT/2", "FT/2", "FT/3", "FT/3"], [100.0, 100.0] * 3)
+
+    assert not plan.assigned

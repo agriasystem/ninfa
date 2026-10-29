@@ -346,7 +346,7 @@ SPECS: dict[str, Spec] = {
         ("Training",),
     ),
     "TRANSPORT": Spec(
-        "OTHER",
+        "TRANSPORT",
         (80, 900),
         (22,),
         (
@@ -405,7 +405,7 @@ KNOWN = (
     "PROFESSIONAL_SERVICES",
     "OTHER",
 )
-UNKNOWN = ("TELECOM", "TRAINING", "TRANSPORT", "GIFTS", "UNIFORMS", "SUBSCRIPTIONS")
+UNKNOWN = ("TELECOM", "TRAINING", "GIFTS", "UNIFORMS", "SUBSCRIPTIONS")
 
 _VENDOR_ROWS: tuple[tuple[str, str], ...] = (
     ("Energia Verde Adriatica S.p.A.", "UTILITIES"),

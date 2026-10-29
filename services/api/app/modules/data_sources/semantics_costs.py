@@ -60,9 +60,21 @@ def _is_category_name(text: str) -> bool:
     return text.strip().upper() in _CATEGORY_NAMES
 
 
+def _has_digit(text: str) -> bool:
+    return any(ch.isdigit() for ch in text)
+
+
 def _fit_document_number(stats: ColumnStats) -> float:
-    """A document number: different from row to row, and not a row counter (1, 2, 3...)."""
+    """A document number: not a row counter (1, 2, 3...) and, unlike a booking code, allowed to
+    come back: the lines of one invoice all carry its number. What a number is: short, with
+    digits in it, several different ones."""
     base = fit_identifier(stats)
+    if stats.n and stats.distinct >= 3 and stats.text_fraction + stats.numeric / stats.n >= 0.95:
+        shown = stats.strings or stats.texts
+        short = stats.avg_len <= 25 or not stats.texts
+        numbered = not shown or sum(1 for text in shown if _has_digit(text)) / len(shown) >= 0.8
+        if short and numbered and stats.date_fraction == 0:
+            base = max(base, 0.9)
     if (
         stats.n
         and stats.numeric == stats.n
@@ -74,6 +86,11 @@ def _fit_document_number(stats: ColumnStats) -> float:
     ):
         return 0.1  # the values contradict the name: it is not a document number
     return base
+
+
+def _fit_amount(stats: ColumnStats) -> float:
+    """An amount of a register: a credit note is NEGATIVE (the amount it takes back)."""
+    return fit_money(stats, allow_negative=True)
 
 
 def _fit_supplier(stats: ColumnStats) -> float:
@@ -101,13 +118,13 @@ COSTS = DomainSem(
             (
                 rule(
                     "fornitore supplier vendor emittente cedente ditta creditore creditor payee "
-                    "venditore seller prestatore",
+                    "venditore seller prestatore issuer",
                     weight=0.93,
                 ),
                 rule("billed invoiced", weight=0.88),  # "Billed By"
                 rule("ragione denominazione", "sociale fornitore societa", weight=0.9),
                 rule("intestatario titolare", weight=0.8),
-                rule("chi", weight=0.75),  # "Da chi": a hand-made sheet
+                rule("chi", weight=0.85),  # "Da chi": a hand-made sheet
             ),
             _fit_supplier,
         ),
@@ -169,7 +186,10 @@ COSTS = DomainSem(
         F.DUE_DATE.value: FieldSem(
             F.DUE_DATE.value,
             _exact(F.DUE_DATE),
-            (rule("scadenza due", weight=0.93),),
+            (
+                rule("scadenza due", weight=0.93),
+                rule("pagabile payable pay", "entro by", weight=0.9),
+            ),
             fit_date,
         ),
         F.DOCUMENT_TYPE.value: FieldSem(
@@ -188,7 +208,7 @@ COSTS = DomainSem(
             F.INVOICE_NET_AMOUNT.value,
             _exact(F.INVOICE_NET_AMOUNT),
             (rule("imponibile netto net", "documento fattura invoice", weight=0.9),),
-            fit_money,
+            _fit_amount,
             veto=_PAYROLL,
         ),
         F.INVOICE_TAX_AMOUNT.value: FieldSem(
@@ -221,7 +241,7 @@ COSTS = DomainSem(
                 # "Totale" alone: very likely the total WITH VAT, but only likely.
                 rule("totale total", weight=0.72, none="imponibile netto net riga iva"),
             ),
-            fit_money,
+            _fit_amount,
             veto=_PAYROLL,
         ),
         F.LINE_DESCRIPTION.value: FieldSem(
@@ -239,7 +259,7 @@ COSTS = DomainSem(
                     none="costo spesa",
                     weight=0.8,
                 ),
-                rule("cosa", weight=0.75),  # a hand-made sheet
+                rule("cosa", weight=0.85),  # a hand-made sheet
             ),
             fit_text,
         ),
@@ -279,7 +299,7 @@ COSTS = DomainSem(
                     weight=0.7,
                 ),
             ),
-            fit_money,
+            _fit_amount,
             veto=_PAYROLL,
         ),
         F.VAT_RATE.value: FieldSem(
@@ -293,7 +313,11 @@ COSTS = DomainSem(
             _exact(F.COST_CATEGORY),
             (
                 rule("categoria category", none="documento fiscale", weight=0.93),
-                rule("tipo tipologia classe type class", "costo spesa cost expense", weight=0.9),
+                rule(
+                    "tipo tipologia classe type class natura nature",
+                    "costo spesa cost expense",
+                    weight=0.9,
+                ),
                 rule("conto voce", "costo spesa", weight=0.85),
             ),
             fit_vocabulary(_is_category_name),

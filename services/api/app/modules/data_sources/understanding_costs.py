@@ -200,8 +200,9 @@ def amounts_check(
 
 def _register_net(proposal: Proposal, rows: Sequence[Sequence[object]]) -> ColumnProposal | None:
     """ "Netto fattura" in a register where EVERY row is a different invoice: the net of the invoice
-    is the net of its only line. (When an invoice number comes back on several rows, the same net
-    repeated on each of them is the invoice's and not the line's: nothing is decided then.)"""
+    is the net of its only line. When an invoice number comes back on several rows the net is the
+    line's if it is different on each of them; the same net repeated on the lines of one invoice
+    is the invoice's, and nothing is decided then."""
     assigned = proposal.assigned()
     invoice_net, number = assigned.get("invoice_net_amount"), assigned.get("invoice_number")
     if "line_total" in assigned or invoice_net is None or number is None:
@@ -211,10 +212,20 @@ def _register_net(proposal: Proposal, rows: Sequence[Sequence[object]]) -> Colum
         for row in rows
         if number.position < len(row)
     ]
-    numbers = [n for n in numbers if n]
-    if len(numbers) < 3 or len(set(numbers)) / len(numbers) < 0.98:
+    if len([n for n in numbers if n]) < 3:
         return None
-    return invoice_net
+    if len(set(numbers)) == len([n for n in numbers if n]):
+        return invoice_net  # one invoice per row
+    nets: dict[str, list[str]] = {}
+    for row in rows:
+        if number.position < len(row) and invoice_net.position < len(row):
+            key = fold(text_of(row[number.position]))  # type: ignore[arg-type]
+            if key:
+                nets.setdefault(key, []).append(text_of(row[invoice_net.position]))  # type: ignore[arg-type]
+    repeated = [values for values in nets.values() if len(values) > 1]
+    if repeated and all(len(set(values)) == len(values) for values in repeated):
+        return invoice_net  # the lines of an invoice, each with its own net
+    return None
 
 
 def plan_costs(
