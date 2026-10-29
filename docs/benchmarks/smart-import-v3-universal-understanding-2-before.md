@@ -9,7 +9,7 @@ Unseen documents, generated from recipes (none is in the official 240-document c
 - **402** documents: 360 positives (Prenotazioni 120, Personale 120, Costi 120), 27 negatives, 15 unsupported files.
 - Difficulty of the positives: EASY 90, MEDIUM 120, HARD 90, ADVERSARIAL 60.
 - 323 xlsx / 79 csv, 34 with several sheets, 126 with personal data, 42 distinct structures.
-- sha256 `4497059eced08b9b8e73ab55f87d6fb1ae44279053b87f54c3b9efeebb683bc2`
+- sha256 `2a06f243f009c7ce066a6ff5b9fafaee54cc437ad32691d74a3a4b89a19e11bc`
 
 ## Targets
 
@@ -26,7 +26,7 @@ Unseen documents, generated from recipes (none is in the official 240-document c
 | table accuracy (strict) | >= 0.99 | 0.9972 | yes |
 | required precision | >= 0.995 | 0.9891 | **NO** |
 | required precision, committed claims | >= 0.995 | 0.9961 | yes |
-| required recall | >= 0.99 | 0.8242 | **NO** |
+| required recall | >= 0.99 | 0.8254 | **NO** |
 
 ## Results by group (positive documents)
 
@@ -34,12 +34,12 @@ Domain / header / table are STRICT: a document the engine could not read counts 
 
 | Group | Docs | Domain | Header | Table | Req. prec. | Req. recall | Opt. prec. | FA | Crit. wrong (committed) | Zero-question | Necessary Q | Unneeded Q | PII | P0 | P1 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| All positives | 360 | 96.9% | 99.7% | 99.7% | 98.91% | 82.4% | 98.7% | 4 | 3 | 22.6% | 73.5% | 139 | 13 | 10 | 311 |
+| All positives | 360 | 96.9% | 99.7% | 99.7% | 98.91% | 82.5% | 98.7% | 4 | 3 | 22.6% | 73.5% | 139 | 13 | 10 | 309 |
 | Prenotazioni | 120 | 95.8% | 99.2% | 99.2% | 98.50% | 77.8% | 100.0% | 0 | 3 | 8.8% | 62.5% | 13 | 1 | 2 | 210 |
 | Personale | 120 | 94.9% | 100.0% | 100.0% | 99.73% | 84.9% | n/a | 4 | 0 | 40.9% | 81.2% | 76 | 12 | 8 | 21 |
-| Costi | 120 | 100.0% | 100.0% | 100.0% | 98.75% | 86.2% | 96.8% | 0 | 0 | 19.6% | 70.0% | 50 | 0 | 0 | 80 |
+| Costi | 120 | 100.0% | 100.0% | 100.0% | 98.75% | 86.5% | 96.8% | 0 | 0 | 19.6% | 70.0% | 50 | 0 | 0 | 78 |
 | EASY | 90 | 95.6% | 100.0% | 100.0% | 100.00% | 81.1% | 100.0% | 1 | 0 | 24.4% | n/a | 32 | 0 | 1 | 80 |
-| MEDIUM | 120 | 97.5% | 100.0% | 100.0% | 99.40% | 83.5% | 100.0% | 2 | 0 | 23.3% | n/a | 59 | 13 | 7 | 118 |
+| MEDIUM | 120 | 97.5% | 100.0% | 100.0% | 99.41% | 83.8% | 100.0% | 2 | 0 | 23.3% | n/a | 59 | 13 | 7 | 116 |
 | HARD | 90 | 97.8% | 98.9% | 98.9% | 98.08% | 81.5% | 100.0% | 0 | 3 | 20.0% | 86.4% | 32 | 0 | 1 | 92 |
 | ADVERSARIAL | 60 | 96.4% | 100.0% | 100.0% | 96.69% | 84.4% | 88.9% | 1 | 0 | 16.7% | 50.0% | 16 | 0 | 1 | 21 |
 
@@ -55,7 +55,7 @@ Wrong readings of a critical fact at ANY level (a LOW guess the person is asked 
 | Severity | Findings | Documents (worst) |
 |---|---|---|
 | P0 | 10 | 10 |
-| P1 | 311 | 146 |
+| P1 | 309 | 146 |
 | P2 | 231 | 115 |
 | P3 | 2 | 0 |
 
@@ -65,7 +65,7 @@ Wrong readings of a critical fact at ANY level (a LOW guess the person is asked 
 | HEADER_WRONG | 1 | 1 |
 | TABLE_BOUNDARY_WRONG | 1 | 1 |
 | FIELD_WRONG | 14 | 12 |
-| FIELD_MISSED | 364 | 204 |
+| FIELD_MISSED | 362 | 204 |
 | PII_LEAK | 5 | 5 |
 | QUESTION_MISSING | 8 | 8 |
 | QUESTION_UNNECESSARY | 141 | 105 |
@@ -180,10 +180,10 @@ Wrong readings of a critical fact at ANY level (a LOW guess the person is asked 
 
 | Stage | mean | p50 | p95 | max |
 |---|---|---|---|---|
-| scan | 4.0 | 4.4 | 7.3 | 10.5 |
-| understanding | 25.6 | 24.6 | 47.5 | 122.2 |
-| mapping | 92.2 | 91.7 | 161.6 | 216.4 |
-| total | 121.8 | 121.3 | 205.3 | 344.4 |
+| scan | 4.6 | 4.8 | 8.8 | 14.1 |
+| understanding | 28.6 | 28.2 | 50.4 | 126.3 |
+| mapping | 101.3 | 99.8 | 182.3 | 292.3 |
+| total | 134.5 | 132.3 | 232.9 | 360.9 |
 
 ## Reading levels (first answer)
 

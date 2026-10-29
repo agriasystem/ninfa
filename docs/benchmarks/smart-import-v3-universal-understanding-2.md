@@ -9,7 +9,7 @@ Unseen documents, generated from recipes (none is in the official 240-document c
 - **402** documents: 360 positives (Prenotazioni 120, Personale 120, Costi 120), 27 negatives, 15 unsupported files.
 - Difficulty of the positives: EASY 90, MEDIUM 120, HARD 90, ADVERSARIAL 60.
 - 323 xlsx / 79 csv, 34 with several sheets, 126 with personal data, 42 distinct structures.
-- sha256 `4497059eced08b9b8e73ab55f87d6fb1ae44279053b87f54c3b9efeebb683bc2`
+- sha256 `2a06f243f009c7ce066a6ff5b9fafaee54cc437ad32691d74a3a4b89a19e11bc`
 
 ## Targets
 
@@ -172,10 +172,10 @@ Wrong readings of a critical fact at ANY level (a LOW guess the person is asked 
 
 | Stage | mean | p50 | p95 | max |
 |---|---|---|---|---|
-| scan | 4.0 | 4.4 | 7.3 | 11.9 |
-| understanding | 26.0 | 25.2 | 46.1 | 90.7 |
-| mapping | 93.8 | 93.0 | 169.1 | 248.3 |
-| total | 123.8 | 121.6 | 219.2 | 299.4 |
+| scan | 4.4 | 4.7 | 7.9 | 12.3 |
+| understanding | 28.0 | 27.4 | 51.0 | 86.4 |
+| mapping | 100.1 | 97.3 | 189.4 | 266.6 |
+| total | 132.5 | 129.7 | 241.8 | 329.9 |
 
 ## Reading levels (first answer)
 

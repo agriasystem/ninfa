@@ -25,9 +25,9 @@ The failures were not random. They had four causes, in this order of weight:
    department; supplier, document number, description, net/gross) and their abbreviations ("Descr.", "CI", "Rms", "U.O.").
 2. **Evidence the engine did not use** - a column of dates called "CI" next to a column of dates called "CO" that is later than it on
    every row *is* an arrival and a departure; 48 hours on a row that names the person cannot be hours worked.
-3. **Formats** - a month written as a name over a two-digit year ("06-apr-26"), a month name first ("Nov 4, 2026"), and a date over a
-   two-digit year ("04/02/26": a date for the structure but invisible to the order check; a latent defect, exposed as soon as the headers
-   around it were read: such a document was offered as ready without the day/month question).
+3. **Formats** - a month name first ("Nov 4, 2026") was not a date, and a numeric date over a two-digit year ("04/02/26") was a date for
+   the structure but invisible to the order check (a latent defect, exposed as soon as the headers around it were read: such a document was
+   offered as ready without the day/month question).
 4. **Personal data nobody was looking for** - free text about a guest ("Special Requests"), an address, an employee badge.
 
 ## Decision
@@ -48,8 +48,9 @@ interprets, the person confirms only what the document does not prove. Determini
 5. **Identifiers.** A booking code must be different on every row (`fit_unique_identifier`; a code that repeats stays a candidate to be
    asked about, never a sure one). A document number may repeat (the lines of one invoice) but must be short, with digits, and not a
    row counter. In a register where every row is a different invoice the invoice-level net is the net of the line.
-6. **Formats.** A month name is a date in either order of words ("Nov 4, 2026", "06-apr-26"); a numeric date over a two-digit year
-   needs the same day/month decision as one over four digits and reads with `%y`. A credit note is a negative amount (costs only).
+6. **Formats.** A month name is a date in either order of words ("26 ottobre 2026", "Nov 4, 2026"); a numeric date over a two-digit year
+   needs the same day/month decision as one over four digits and reads with `%y` once the person has decided. A credit note is a negative
+   amount (costs only).
 7. **Personal data.** Free text about a person (`NOTE`), an address (`ADDRESS`) and the number that identifies an employee
    (`EMPLOYEE_ID`: badge, matricola) are never shown, sampled or sent. A person's tax code and a supplier's IBAN are left out of a
    register of costs; a payslip ("Netto in busta") is never an amount of one.
@@ -63,6 +64,9 @@ interprets, the person confirms only what the document does not prove. Determini
 * **Names under a supplier header are still supplier names after a confirmation.** The official benchmark (C45, "Intestatario") reads a
   sole trader's name as a supplier; locking person-shaped columns in a cost register would have made it MANUAL. The V2 truth was aligned
   to the product decision, not the other way round.
+* **A month name over a short year stays refused** ("26-ott-26"): a year is never invented (four hardening tests). The loose words of a
+  hand-made sheet ("Da chi", "Cosa") stay MEDIUM: two loose names are confirmed once, not trusted (an earlier hardening test). Both were tried
+  in this gate, failed the suite and were taken back.
 * **No department codes in the lexicon** ("HK", "FO", "REC") - the hotel's own, asked once and remembered (ADR of Question Reduction 1).
 * **No change to Source Learning** (families, per-family layout, revision, trust). Fixtures that used "Note"/"Annotazioni" as an
   incidental junk column now use a neutral header, because those words are personal notes since this decision and personal columns are

@@ -37,7 +37,7 @@ scan_workbook (cells, merged areas, hidden sheets)
 | Credit notes | `semantics_costs._fit_amount` | negative amounts fit in a register of costs | negative money in bookings is still suspect |
 | Personal data | `pii.py` | `NOTE` (guest requests, remarks, allergies), `ADDRESS`, `EMPLOYEE_ID` (badge, matricola); tax code and IBAN left out of a cost register | `Nota di credito`, a note column of numbers, `Numero ospiti` |
 | Payslip | `semantics_costs._PAYROLL` | `Netto in busta` is never an amount of a cost register | |
-| Dates | `ingestion.value_text`, `bookings.normalization`, `column_profile`, `invoices.mapping` | a month name in either word order and a two-digit year (`Nov 4, 2026`, `06-apr-26`); `04/02/26` needs the same decision as `04/02/2026` and reads with `%y` | `Foo 4, 2026`, `Nov 32, 2026`, `Nov 4, 26` |
+| Dates | `ingestion.value_text`, `bookings.normalization`, `column_profile`, `invoices.mapping` | a month name first (`Nov 4, 2026`); `04/02/26` needs the same decision as `04/02/2026` and reads with `%y` once decided | `Foo 4, 2026`, `Nov 32, 2026`, `Nov 4, 26`, `06-apr-26` (a short year is never invented) |
 | Stated department | `titles.department_words` | `Reparto: Spa` is the department of the rows; `Responsabile: Direzione` in the same block is not | the same words without the label are as many departments as words |
 | Internal evidence | `ColumnProposal.evidence` | why a column is read as it is: name kind and score, share of fitting values, abbreviation, relation, plausibility. Never a value of the file; never sent to the browser | |
 
@@ -50,7 +50,7 @@ scan_workbook (cells, merged areas, hidden sheets)
 | CSV encoding | UTF-8 (with or without BOM), Windows-1252 | UTF-16 and anything else: refused, no guessing |
 | CSV details | quoted fields, a newline inside quotes, an empty column, a trailing delimiter | |
 | XLSX | several sheets, merged title cells, blank rows, formulas with cached values, totals, one sheet per month (one table) | macros; **a hidden sheet is never read** (a workbook whose data is only on a hidden sheet is refused) |
-| Dates | ISO, `dd/mm/yyyy`, `dd/mm/yy`, `mm/dd/yyyy`, dotted, with weekday, month names (`26 ottobre 2026`, `26-Oct-26`, `Nov 4, 2026`); the order is decided only when the values prove it, else DATE_ORDER is asked | a date in a language other than Italian or English |
+| Dates | ISO, `dd/mm/yyyy`, `dd/mm/yy` (after the day/month decision), `mm/dd/yyyy`, dotted, with weekday, month names with a four-digit year (`26 ottobre 2026`, `26-Oct-2026`, `Nov 4, 2026`); the order is decided only when the values prove it, else DATE_ORDER is asked | a date in a language other than Italian or English |
 | Amounts | `1.234,56`, `1,234.56`, `1234,56`, `€ 1.234`, `EUR 1234.50`, `1 234,50`; the style is decided when the values prove it, else DECIMAL_STYLE is asked | |
 
 ## What this does not do
