@@ -12,17 +12,18 @@ python -m tests.benchmarks.universal_understanding_v2.compare BEFORE.json AFTER.
 
 Nothing is read from or written to a database, nothing leaves the process, no model is called (`IMPORT_UNDERSTANDING_PROVIDER=unconfigured`).
 
-## The corpus (402 documents)
+## The corpus (432 documents)
 
 | Group | Documents | What it is |
 |---|---|---|
 | bookings | 120 | PMS / channel-manager / front-desk exports (`gen_bookings.py`) |
 | labor | 120 | staff rosters, timesheets, day grids (`gen_labor.py`) |
 | costs | 120 | purchase registers, ledgers, multi-line invoices (`gen_costs.py`) |
+| closure | 30 | probes of the capabilities of Gate 2.1 (`gen_closure.py`): a department stated by a label and the same word after a note / customer / person / supplier, a register with a document date and a registration date (and two dates that both say invoice), a booking status in the hotel's own letters |
 | negative | 27 | real office spreadsheets that are none of the three: inventory, trial balance, restaurant takings, marketing, web analytics, contacts, to-do list, rules, menu - each uploaded on the three cards |
 | unsupported | 15 | PDF, text, old .xls, .xlsm, UTF-16 text, empty file, broken archive, a workbook named .csv, HTML as .xls, binary, **pipe-delimited files** |
 
-Each positive group has 30 EASY, 40 MEDIUM, 30 HARD and 20 ADVERSARIAL documents. Documents are **generated from recipes**, deterministically
+Each of the three main groups has 30 EASY, 40 MEDIUM, 30 HARD and 20 ADVERSARIAL documents (the 30 closure probes are added to the group of their kind of data). Documents are **generated from recipes**, deterministically
 (a document depends on its id alone), and no two are byte-identical. None is a document of the official corpus.
 
 ## The truth is written next to the file

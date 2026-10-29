@@ -38,7 +38,7 @@ scan_workbook (cells, merged areas, hidden sheets)
 | Personal data | `pii.py` | `NOTE` (guest requests, remarks, allergies), `ADDRESS`, `EMPLOYEE_ID` (badge, matricola); tax code and IBAN left out of a cost register | `Nota di credito`, a note column of numbers, `Numero ospiti` |
 | Payslip | `semantics_costs._PAYROLL` | `Netto in busta` is never an amount of a cost register | |
 | Dates | `ingestion.value_text`, `bookings.normalization`, `column_profile`, `invoices.mapping` | a month name first (`Nov 4, 2026`); `04/02/26` needs the same decision as `04/02/2026` and reads with `%y` once decided | `Foo 4, 2026`, `Nov 32, 2026`, `Nov 4, 26`, `06-apr-26` (a short year is never invented) |
-| Stated department | `titles.department_words` | `Reparto: Spa` is the department of the rows; `Responsabile: Direzione` in the same block is not | the same words without the label are as many departments as words |
+| Label/value context (Gate 2.1) | `context.py`, `titles.department_words`, `structure._is_label_block` | a line above a table is read by its LABEL (department, period, hotel, person, customer, note); only a department label gives the department of the rows, and a block of such lines is not where the table above it ends | `Nota: Spa chiusa`, `Cliente: Spa S.r.l.`, `Responsabile: Direzione` give no department (see ADR 0037) |
 | Internal evidence | `ColumnProposal.evidence` | why a column is read as it is: name kind and score, share of fitting values, abbreviation, relation, plausibility. Never a value of the file; never sent to the browser | |
 
 ## Supported files (what is *truly* supported)

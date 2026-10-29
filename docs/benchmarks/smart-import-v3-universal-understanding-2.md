@@ -1,4 +1,4 @@
-# NINFA Smart Import — Universal Understanding Benchmark V2 (AFTER)
+# NINFA Smart Import — Universal Understanding Benchmark V2 (after Gate 2.1)
 
 Generated 2026-10-29. IMPORT_UNDERSTANDING_PROVIDER=unconfigured; no model was called.
 
@@ -6,10 +6,10 @@ Unseen documents, generated from recipes (none is in the official 240-document c
 
 ## Corpus
 
-- **402** documents: 360 positives (Prenotazioni 120, Personale 120, Costi 120), 27 negatives, 15 unsupported files.
-- Difficulty of the positives: EASY 90, MEDIUM 120, HARD 90, ADVERSARIAL 60.
-- 323 xlsx / 79 csv, 34 with several sheets, 126 with personal data, 42 distinct structures.
-- sha256 `2a06f243f009c7ce066a6ff5b9fafaee54cc437ad32691d74a3a4b89a19e11bc`
+- **432** documents: 390 positives (Prenotazioni 128, Personale 132, Costi 130), 27 negatives, 15 unsupported files.
+- Difficulty of the positives: EASY 90, MEDIUM 144, HARD 90, ADVERSARIAL 66.
+- 353 xlsx / 79 csv, 34 with several sheets, 138 with personal data, 43 distinct structures.
+- sha256 `8b0b711e82fe75c48f586acc820feb7cf165ce1d2bdeaf65b655e132e5a9e221`
 
 ## Targets
 
@@ -21,11 +21,11 @@ Unseen documents, generated from recipes (none is in the official 240-document c
 | necessary-question recall | >= 1.0 | 1 | yes |
 | safe fallback (negatives + unsupported) | >= 1.0 | 1 | yes |
 | personal data leaked / not excluded | == 0 | 0 | yes |
-| domain accuracy (strict) | >= 0.99 | 0.9944 | yes |
+| domain accuracy (strict) | >= 0.99 | 0.9948 | yes |
 | header accuracy (strict) | >= 0.99 | 1 | yes |
 | table accuracy (strict) | >= 0.99 | 1 | yes |
-| required precision | >= 0.995 | 0.994 | **NO** |
-| required precision, committed claims | >= 0.995 | 0.9982 | yes |
+| required precision | >= 0.995 | 0.9961 | yes |
+| required precision, committed claims | >= 0.995 | 1 | yes |
 | required recall | >= 0.99 | 1 | yes |
 
 ## Results by group (positive documents)
@@ -34,14 +34,14 @@ Domain / header / table are STRICT: a document the engine could not read counts 
 
 | Group | Docs | Domain | Header | Table | Req. prec. | Req. recall | Opt. prec. | FA | Crit. wrong (committed) | Zero-question | Necessary Q | Unneeded Q | PII | P0 | P1 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| All positives | 360 | 99.4% | 100.0% | 100.0% | 99.40% | 100.0% | 99.7% | 0 | 0 | 94.8% | 100.0% | 23 | 0 | 0 | 1 |
-| Prenotazioni | 120 | 100.0% | 100.0% | 100.0% | 99.27% | 100.0% | 100.0% | 0 | 0 | 100.0% | 100.0% | 1 | 0 | 0 | 1 |
-| Personale | 120 | 99.2% | 100.0% | 100.0% | 100.00% | 100.0% | n/a | 0 | 0 | 94.6% | 100.0% | 6 | 0 | 0 | 0 |
-| Costi | 120 | 99.2% | 100.0% | 100.0% | 99.10% | 100.0% | 99.3% | 0 | 0 | 89.1% | 100.0% | 16 | 0 | 0 | 0 |
+| All positives | 390 | 99.5% | 100.0% | 100.0% | 99.61% | 100.0% | 99.8% | 0 | 0 | 95.0% | 100.0% | 23 | 0 | 0 | 1 |
+| Prenotazioni | 128 | 100.0% | 100.0% | 100.0% | 99.31% | 100.0% | 100.0% | 0 | 0 | 100.0% | 100.0% | 1 | 0 | 0 | 1 |
+| Personale | 132 | 99.2% | 100.0% | 100.0% | 100.00% | 100.0% | n/a | 0 | 0 | 95.0% | 100.0% | 6 | 0 | 0 | 0 |
+| Costi | 130 | 99.2% | 100.0% | 100.0% | 99.67% | 100.0% | 99.3% | 0 | 0 | 90.0% | 100.0% | 16 | 0 | 0 | 0 |
 | EASY | 90 | 100.0% | 100.0% | 100.0% | 100.00% | 100.0% | 100.0% | 0 | 0 | 94.4% | n/a | 5 | 0 | 0 | 0 |
-| MEDIUM | 120 | 100.0% | 100.0% | 100.0% | 100.00% | 100.0% | 100.0% | 0 | 0 | 95.8% | n/a | 5 | 0 | 0 | 0 |
-| HARD | 90 | 100.0% | 100.0% | 100.0% | 99.32% | 100.0% | 100.0% | 0 | 0 | 92.3% | 100.0% | 3 | 0 | 0 | 0 |
-| ADVERSARIAL | 60 | 96.4% | 100.0% | 100.0% | 96.13% | 100.0% | 97.7% | 0 | 0 | 100.0% | 100.0% | 10 | 0 | 0 | 1 |
+| MEDIUM | 144 | 100.0% | 100.0% | 100.0% | 100.00% | 100.0% | 100.0% | 0 | 0 | 96.3% | 100.0% | 5 | 0 | 0 | 0 |
+| HARD | 90 | 100.0% | 100.0% | 100.0% | 100.00% | 100.0% | 100.0% | 0 | 0 | 92.3% | 100.0% | 3 | 0 | 0 | 0 |
+| ADVERSARIAL | 66 | 96.7% | 100.0% | 100.0% | 96.52% | 100.0% | 97.7% | 0 | 0 | 100.0% | 100.0% | 10 | 0 | 0 | 1 |
 
 ## Negatives and unsupported files
 
@@ -49,6 +49,15 @@ Domain / header / table are STRICT: a document the engine could not read counts 
 - Unsupported files (15): clean refusal 15/15.
 
 Wrong readings of a critical fact at ANY level (a LOW guess the person is asked about counts too): 1; committed (certain and not asked): 0.
+
+## Claims on required facts: all, certain, tentative
+
+| Precision | All claims | Certain claims | Tentative claims |
+|---|---|---|---|
+| after the person's answers (official counters) | 99.61% (1802/1809) | 100.00% (1802/1802) | 0.00% (0/7) |
+| in the first answer (what is shown before anything is asked) | 99.61% (1781/1788) | 100.00% (1767/1767) | 66.67% (14/21) |
+
+Certain = shown as sure (HIGH) with no question on its column. Tentative = a proposal the person is asked to confirm or choose. The product risk is the certain row of the first answer; a tentative claim that is wrong is a wrong proposal inside a question.
 
 ## Findings
 
@@ -102,6 +111,7 @@ Wrong readings of a critical fact at ANY level (a LOW guess the person is asked 
 | adv_vat_percent_column | 2 | 0 | 0 | 0 | 0 |
 | contact_list | 3 | 0 | 0 | 0 | 0 |
 | costs_like_menu | 3 | 0 | 0 | 0 | 0 |
+| document_and_registration | 8 | 0 | 0 | 0 | 0 |
 | easy_csv_english | 5 | 0 | 0 | 0 | 0 |
 | easy_csv_semicolon | 21 | 0 | 0 | 0 | 0 |
 | easy_daily_by_department | 6 | 0 | 0 | 0 | 0 |
@@ -162,8 +172,12 @@ Wrong readings of a critical fact at ANY level (a LOW guess the person is asked 
 | medium_reorder_junk | 12 | 0 | 0 | 0 | 0 |
 | medium_reorder_noise | 5 | 0 | 0 | 0 | 0 |
 | medium_text_formats | 17 | 1 | 0 | 0 | 1 |
+| other_label | 4 | 0 | 0 | 0 | 0 |
 | restaurant_sales | 3 | 0 | 0 | 0 | 0 |
+| rival_dates | 2 | 0 | 0 | 0 | 0 |
 | rules_workbook | 3 | 0 | 0 | 0 | 0 |
+| stated_department | 8 | 0 | 0 | 0 | 0 |
+| status_codes | 8 | 0 | 0 | 0 | 0 |
 | todo_sheet | 3 | 0 | 0 | 0 | 0 |
 | trial_balance | 3 | 0 | 0 | 0 | 0 |
 | web_analytics | 3 | 0 | 0 | 0 | 0 |
@@ -172,11 +186,11 @@ Wrong readings of a critical fact at ANY level (a LOW guess the person is asked 
 
 | Stage | mean | p50 | p95 | max |
 |---|---|---|---|---|
-| scan | 4.4 | 4.7 | 7.9 | 12.3 |
-| understanding | 28.0 | 27.4 | 51.0 | 86.4 |
-| mapping | 100.1 | 97.3 | 189.4 | 266.6 |
-| total | 132.5 | 129.7 | 241.8 | 329.9 |
+| scan | 4.3 | 4.6 | 7.6 | 11.2 |
+| understanding | 27.9 | 27.6 | 50.5 | 103.6 |
+| mapping | 97.5 | 95.8 | 169.6 | 216.7 |
+| total | 129.7 | 127.5 | 214.3 | 272.1 |
 
 ## Reading levels (first answer)
 
-ASK 53, BLOCKED 14, MANUAL 44, READY 276
+ASK 67, BLOCKED 14, MANUAL 44, READY 292
