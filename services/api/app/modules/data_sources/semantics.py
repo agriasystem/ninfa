@@ -16,14 +16,16 @@ Nothing here writes anything or decides a mapping: it proposes, deterministicall
 """
 
 import difflib
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
 from app.modules.bookings.mapping import normalize_header
+from app.modules.data_sources.relations import Relation
 from app.modules.document_understanding.pii import PiiKind
 from app.modules.document_understanding.stats import MIN_EVIDENCE, ColumnStats
-from app.modules.document_understanding.text import stems, tokens
+from app.modules.document_understanding.text import fold, stems, tokens
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.ingestion.suggestions import LOW_THRESHOLD, MEDIUM_THRESHOLD
 
@@ -57,20 +59,28 @@ def rule(*all_of: str, none: str = "", weight: float = 0.9) -> TokenRule:
     return TokenRule(tuple(stems(group) for group in all_of), stems(none), weight)
 
 
-def rule_score(header_words: frozenset[str], rules: Sequence[TokenRule]) -> float:
+def rule_score(
+    header_words: frozenset[str], rules: Sequence[TokenRule], context: frozenset[str] = frozenset()
+) -> float:
     """The best weight among the rules the header satisfies, a little less for each word of the
-    header the rule does not explain (a long header with an incidental match is not as good)."""
-    return _best_rule(header_words, rules)[0]
+    header the rule does not explain (a long header with an incidental match is not as good).
+    `context` words name the kind of document ("Prenotazione - Registrata il" in a bookings
+    file): they are not an incidental extra."""
+    return _best_rule(header_words, rules, context)[0]
 
 
-def rule_index(header_words: frozenset[str], rules: Sequence[TokenRule]) -> int | None:
+def rule_index(
+    header_words: frozenset[str], rules: Sequence[TokenRule], context: frozenset[str] = frozenset()
+) -> int | None:
     """WHICH rule scored best (None when the header satisfies none). Two headers that satisfy the
     same rule say the same thing in different words: "Ore previste", "Ore previste (rev.)"."""
-    return _best_rule(header_words, rules)[1]
+    return _best_rule(header_words, rules, context)[1]
 
 
 def _best_rule(
-    header_words: frozenset[str], rules: Sequence[TokenRule]
+    header_words: frozenset[str],
+    rules: Sequence[TokenRule],
+    context: frozenset[str] = frozenset(),
 ) -> tuple[float, int | None]:
     best, which = 0.0, None
     for position, candidate in enumerate(rules):
@@ -78,7 +88,7 @@ def _best_rule(
             continue
         if all(group & header_words for group in candidate.all_of):
             explained = frozenset().union(*candidate.all_of)
-            extra = len(header_words - explained)
+            extra = len(header_words - explained - context)
             score = candidate.weight - min(0.06, 0.02 * extra)
             if score > best:
                 best, which = score, position
@@ -129,6 +139,16 @@ class DomainSem:
     # Fields that are MONEY: a choice between two columns for one of them is never made by NINFA
     # and never asked as a yes/no - the person matches the columns by hand.
     financial: frozenset[str] = frozenset()
+    # What the VALUES of two columns say about each other (a departure after its arrival): a
+    # reading that already stands on a name and on fitting values is promoted by it.
+    relations: tuple[Relation, ...] = ()
+    # Words that only name the kind of document a header belongs to ("Prenotazione" over a column
+    # in a bookings file): they do not count against a rule that explains the rest.
+    context: frozenset[str] = frozenset()
+    # The most a column can hold PER PERSON per row ("hours worked in a day": 24). When the file
+    # lists people (their column is left out of the import) a value above it cannot be what the
+    # column says, so the reading is demoted to a question instead of being taken on its name.
+    person_limits: Mapping[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,10 +160,54 @@ class Candidate:
     rule: int | None = None
 
 
+_VOCABULARY: dict[int, dict[str, frozenset[str]]] = {}
+_ABBREVIATION = re.compile(r"([^\W\d_]{3,})\.")
+MAX_EXPANSIONS = 3
+
+
+def vocabulary(sem: DomainSem) -> dict[str, frozenset[str]]:
+    """Every word (stem) the rules and names of a kind of data use, and the fields it speaks of."""
+    known = _VOCABULARY.get(id(sem))
+    if known is None:
+        fields: dict[str, set[str]] = {}
+        for spec in sem.fields.values():
+            for candidate in spec.rules:
+                for group in candidate.all_of:
+                    for word in group:
+                        fields.setdefault(word, set()).add(spec.key)
+                for word in candidate.none_of:
+                    fields.setdefault(word, set())
+            for name in spec.exact:
+                for word in tokens(name):
+                    fields.setdefault(word, set()).add(spec.key)
+        known = _VOCABULARY[id(sem)] = {w: frozenset(f) for w, f in fields.items()}
+    return known
+
+
+def expand_abbreviations(sem: DomainSem, header: str) -> frozenset[str]:
+    """The words a header abbreviates WITH A POINT: "Descr." is "descrizione", "Aliq." is
+    "aliquota". Only a written abbreviation counts (a bare "Pre" is a word of its own), only of a
+    word the kind of data knows, and only when the beginning leaves no doubt about WHAT it means:
+    every word it could stand for (in either language, at most `MAX_EXPANSIONS`) speaks of the
+    same single field. "Imp." could be "imponibile", "imposta" or "importo": three different
+    things, so it is not expanded."""
+    known = vocabulary(sem)
+    out: set[str] = set()
+    for match in _ABBREVIATION.finditer(header.casefold()):
+        start = fold(match.group(1))
+        if not start or start in known or stems(start) <= known.keys():
+            continue  # already a word of the vocabulary
+        expansions = [word for word in known if word.startswith(start) and len(word) > len(start)]
+        fields = {field for word in expansions for field in known[word]}
+        if 1 <= len(expansions) <= MAX_EXPANSIONS and len(fields) == 1:
+            out.update(expansions)
+    return frozenset(out)
+
+
 def name_candidates(sem: DomainSem, header: str) -> list[Candidate]:
     """Every field the NAME of this header could mean, best first."""
     key = normalize_header(header)
-    words = tokens(header)
+    words = tokens(header) | expand_abbreviations(sem, header)
     found: list[Candidate] = []
     percentage = "perc" in words  # "Commissione %": a rate, whatever the amount is called
     for spec in sem.fields.values():
@@ -152,11 +216,19 @@ def name_candidates(sem: DomainSem, header: str) -> list[Candidate]:
         # (a header with a standing "%" is not the name of an amount, whatever else it says)
         names_a_rate = not percentage or any("perc" in tokens(name) for name in spec.exact)
         if names_a_rate and key in {normalize_header(name) for name in spec.exact}:
-            found.append(Candidate(spec.key, NameMatch.EXACT, 1.0, rule_index(words, spec.rules)))
+            found.append(
+                Candidate(
+                    spec.key, NameMatch.EXACT, 1.0, rule_index(words, spec.rules, sem.context)
+                )
+            )
             continue
-        score = rule_score(words, spec.rules)
+        score = rule_score(words, spec.rules, sem.context)
         if score:
-            found.append(Candidate(spec.key, NameMatch.TOKEN, score, rule_index(words, spec.rules)))
+            found.append(
+                Candidate(
+                    spec.key, NameMatch.TOKEN, score, rule_index(words, spec.rules, sem.context)
+                )
+            )
             continue
         names = [normalize_header(name) for name in spec.exact]
         best = max(
@@ -252,6 +324,17 @@ def fit_identifier(stats: ColumnStats) -> float:
     return min(1.0, stats.distinct_ratio + 0.05)
 
 
+def fit_unique_identifier(stats: ColumnStats) -> float:
+    """An identifier that must be DIFFERENT on every row: a booking code. A reference that repeats
+    (a group, a company, a convention) names a set of bookings, not one booking, so it is not the
+    code however it is called. (An invoice number, by contrast, legitimately repeats over the
+    lines of one invoice: that is `fit_identifier`.)"""
+    base = fit_identifier(stats)
+    if not stats.n or stats.distinct_ratio >= 0.9:
+        return base
+    return min(base, 0.25)  # (still a candidate - to be asked about - but never a sure one)
+
+
 def fit_vocabulary(check: Callable[[str], bool]) -> FitFunction:
     """Text whose distinct values are, for the most part, words the domain knows."""
 
@@ -293,6 +376,7 @@ __all__ = [
     "fit_percentage",
     "fit_small_integer",
     "fit_text",
+    "fit_unique_identifier",
     "fit_vocabulary",
     "level_of",
     "name_candidates",

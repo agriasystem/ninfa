@@ -232,6 +232,37 @@ def propose(
                 key, name, fit, _ = chosen[index]
                 chosen[index] = (key, name, fit, Level.HIGH)
 
+    # 5b. columns whose VALUES confirm each other (a departure later than its arrival)
+    for relation in sem.relations:
+        a = next((i for i, c in chosen.items() if c[0] == relation.first), None)
+        b = next((i for i, c in chosen.items() if c[0] == relation.second), None)
+        if a is None or b is None:
+            continue
+        if not (
+            all(
+                chosen[i][1] in (NameMatch.EXACT, NameMatch.TOKEN)
+                and chosen[i][3] != Level.LOW
+                and stats[i].enough()
+                and (chosen[i][2] or 0) >= 0.9
+                for i in (a, b)
+            )
+            and samples[a].rows
+            and samples[b].rows
+            and relation.holds(samples[a].rows, samples[b].rows)
+        ):
+            continue
+        for index in (a, b):
+            key, name, fit, _ = chosen[index]
+            chosen[index] = (key, name, fit, Level.HIGH)
+
+    # 5c. a value no person could have ("48 hours" in a day, on a row that names the person)
+    if sem.person_limits and any(reason == "PERSON" for reason, _pii in locked.values()):
+        for index, (key, name, fit, level) in list(chosen.items()):
+            limit = sem.person_limits.get(key)
+            top = stats[index].maximum
+            if limit is not None and top is not None and top > limit and level != Level.LOW:
+                chosen[index] = (key, name, fit, Level.LOW)
+
     # 6. "hours" / "an amount" that does not say which
     out: list[ColumnProposal] = []
     for index, sample in enumerate(samples):
