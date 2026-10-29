@@ -21,6 +21,7 @@ from tests.benchmarks.smart_import_v3.model import CRITICAL_FIELDS, Golden, gold
 from tests.benchmarks.smart_import_v3.observe import Observed
 from tests.benchmarks.smart_import_v3.runner import Run
 from tests.benchmarks.smart_import_v3.score import (
+    REQUIRED_SCORED,
     CaseResult,
     _claims,
     _matches,
@@ -100,8 +101,70 @@ def committed_wrong(first: Observed, golden: Golden) -> int:
     return wrong
 
 
+def first_answer_claims(first: Observed, golden: Golden) -> dict[str, int]:
+    """The claims on REQUIRED facts in the first answer, as the scorer's own counting sees them
+    (a claim counts when the truth lists the fact, or says it is ambiguous, absent or to be left
+    out), split into CERTAIN (shown as sure, nobody asked) and TENTATIVE (a proposal: MEDIUM / LOW,
+    or a column the person is asked about), and into right and wrong."""
+    required = REQUIRED_SCORED.get(golden.domain, frozenset())
+    out = {"certain_right": 0, "certain_wrong": 0, "tentative_right": 0, "tentative_wrong": 0}
+    for name, claims in _claims(first).items():
+        if name not in required:
+            continue
+        source = golden.fields.get(name)
+        for claim in claims:
+            relevant = (
+                source is not None
+                or name in golden.ambiguous
+                or name in golden.absent
+                or _names_junk(claim, golden)
+            )
+            if not relevant:
+                continue
+            certain = claim.level == "HIGH" and not _under_question(claim, first)
+            right = source is not None and _matches(source, claim, first)
+            out[("certain" if certain else "tentative") + ("_right" if right else "_wrong")] += 1
+    return out
+
+
+def claim_precision(results: list[CaseResult], split: dict[str, dict[str, int]]) -> dict[str, Any]:
+    """Precision of the claims on required facts: all, certain, tentative - in the state after the
+    person's answers (the official counters) and in the first answer (what is shown before
+    anything is asked)."""
+    final = {
+        "all": ratio(
+            sum(r.required.claims_correct for r in results), sum(r.required.claims for r in results)
+        ),
+        "certain": ratio(
+            sum(r.required.committed_correct for r in results),
+            sum(r.required.committed for r in results),
+        ),
+        "tentative": ratio(
+            sum(r.required.claims_correct - r.required.committed_correct for r in results),
+            sum(r.required.claims - r.required.committed for r in results),
+        ),
+    }
+    totals = {
+        key: sum(split[r.id][key] for r in results if r.id in split)
+        for key in ("certain_right", "certain_wrong", "tentative_right", "tentative_wrong")
+    }
+    first = {
+        "all": ratio(totals["certain_right"] + totals["tentative_right"], sum(totals.values())),
+        "certain": ratio(
+            totals["certain_right"], totals["certain_right"] + totals["certain_wrong"]
+        ),
+        "tentative": ratio(
+            totals["tentative_right"], totals["tentative_right"] + totals["tentative_wrong"]
+        ),
+    }
+    return {"final_state": final, "first_answer": first, "first_answer_counts": totals}
+
+
 def extras(
-    results: list[CaseResult], truth: dict[str, Golden], first_wrong: dict[str, int]
+    results: list[CaseResult],
+    truth: dict[str, Golden],
+    first_wrong: dict[str, int],
+    split: dict[str, dict[str, int]],
 ) -> dict[str, Any]:
     """The figures V2 adds to the official aggregate, for one group of POSITIVE documents."""
     n = len(results)
@@ -119,6 +182,7 @@ def extras(
     golden_required = sum(r.required.golden for r in results)
     return {
         "documents": n,
+        "claims": claim_precision(results, split),
         # an unreadable document counts as a miss here (the official figure skips it)
         "domain_accuracy_strict": ratio(
             sum(1 for r in with_domain if r.domain_ok), len(with_domain)
@@ -199,8 +263,11 @@ def evaluate(run: Run, stages: dict[str, StageTimes] | None = None) -> dict[str,
         r.id: committed_wrong(run.first[r.id], truth[r.id]) for r in results if r.error is None
     }
     committed.update({r.id: 0 for r in results if r.error is not None})
+    split = {
+        r.id: first_answer_claims(run.first[r.id], truth[r.id]) for r in results if r.error is None
+    }
     detail = {
-        name: extras(selected, truth, committed)
+        name: extras(selected, truth, committed, split)
         for name, selected in selections.items()
         if name not in {"negatives", "total"}
     }

@@ -177,6 +177,33 @@ def markdown_report(data: dict[str, Any], today: str, title: str | None = None) 
         "committed (certain and not asked): "
         f"{data['v2']['positives']['required_committed_wrong']}.",
     ]
+    claims = data["v2"]["positives"]["claims"]
+    lines += ["", "## Claims on required facts: all, certain, tentative", ""]
+    lines += _table(
+        ["Precision", "All claims", "Certain claims", "Tentative claims"],
+        [
+            [
+                "after the person's answers (official counters)",
+                *(
+                    f"{pct(claims['final_state'][k], 2)} ({frac(claims['final_state'][k])})"
+                    for k in ("all", "certain", "tentative")
+                ),
+            ],
+            [
+                "in the first answer (what is shown before anything is asked)",
+                *(
+                    f"{pct(claims['first_answer'][k], 2)} ({frac(claims['first_answer'][k])})"
+                    for k in ("all", "certain", "tentative")
+                ),
+            ],
+        ],
+    )
+    lines += [
+        "",
+        "Certain = shown as sure (HIGH) with no question on its column. Tentative = a proposal "
+        "the person is asked to confirm or choose. The product risk is the certain row of the "
+        "first answer; a tentative claim that is wrong is a wrong proposal inside a question.",
+    ]
     lines += ["", "## Findings", ""]
     total = metrics["total"]
     lines += _table(

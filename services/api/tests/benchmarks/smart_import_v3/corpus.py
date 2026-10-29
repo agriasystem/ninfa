@@ -25,6 +25,7 @@ from tests.benchmarks.smart_import_v3.corpus_office import (
 from tests.benchmarks.smart_import_v3.formats_truth import BY_CARD, FORMATS
 from tests.benchmarks.smart_import_v3.match import norm
 from tests.benchmarks.smart_import_v3.model import Doc, golden_to_json
+from tests.benchmarks.smart_import_v3.oracle_review import apply_review
 
 DOMAIN_NAMES = {"labor": "Personale", "bookings": "Prenotazioni", "costs": "Costi"}
 
@@ -43,6 +44,7 @@ def build_corpus() -> list[Doc]:
     if duplicated:
         raise ValueError(f"duplicate document ids: {duplicated}")
     apply_formats(docs)
+    apply_review(docs)
     return docs
 
 
