@@ -25,7 +25,7 @@ from app.modules.data_sources.semantics import (
 )
 from app.modules.document_understanding.pii import PiiKind, looks_like_names
 from app.modules.document_understanding.stats import ColumnStats
-from app.modules.document_understanding.text import stems
+from app.modules.document_understanding.text import stems, tokens
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.mapping import InvoiceField
@@ -35,10 +35,12 @@ F = InvoiceField
 
 # Words that say the amount is NET (before VAT) / GROSS (with VAT).
 # ("Amount excl. VAT", "Importo IVA esclusa": the amount says it leaves the VAT out)
-NET_WORDS = stems("imponibile netto net excl excluding esclusa escluso senza before")
+NET_WORDS = stems("imponibile netto net excl excluding esclusa escluso senza before taxable")
 GROSS_WORDS = stems("lordo gross inclusa compresa incl including with")
 _NOT_A_NUMBER_OF_THE_DOCUMENT = "iva imposta vat tax lordo gross inclusa compresa aliquota"
 # A payslip is not a purchase: "Netto in busta" is what an employee takes home.
+# the date a document was REGISTERED in the books (see the invoice date below)
+_REGISTERED = stems("registrazione registration reg")
 _PAYROLL = stems("busta cedolino stipendio stipendi payroll salary retribuzione")
 _VAT_NUMBER = re.compile(r"^[A-Za-z]{0,2}\s?\d{8,12}$")
 _CATEGORY_NAMES = frozenset(category.value for category in CostCategory)
@@ -168,8 +170,15 @@ COSTS = DomainSem(
         F.INVOICE_DATE.value: FieldSem(
             F.INVOICE_DATE.value,
             # ("Fattura del", "Invoice dated": the preposition is the word "date", and a
-            # preposition is not a word of a header)
-            (*_exact(F.INVOICE_DATE), "fattura del", "documento del", "invoice dated"),
+            # preposition is not a word of a header). The importer's own alias "Data registrazione"
+            # is left to its rule below: as an exact name it would tie with the document date, and
+            # the first of the two columns would win.
+            (
+                *(a for a in _exact(F.INVOICE_DATE) if not tokens(a) & _REGISTERED),
+                "fattura del",
+                "documento del",
+                "invoice dated",
+            ),
             (
                 rule(
                     "data date dt",
@@ -295,7 +304,7 @@ COSTS = DomainSem(
                 ),
                 # Says it is NET: sure.
                 rule(
-                    "imponibile netto net",
+                    "imponibile netto net taxable",
                     none=f"documento fattura invoice {_NOT_A_NUMBER_OF_THE_DOCUMENT}",
                     weight=0.93,
                 ),
