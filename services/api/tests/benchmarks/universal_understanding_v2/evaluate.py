@@ -20,7 +20,13 @@ from tests.benchmarks.smart_import_v3.metrics import aggregate, ratio
 from tests.benchmarks.smart_import_v3.model import CRITICAL_FIELDS, Golden, golden_from_json
 from tests.benchmarks.smart_import_v3.observe import Observed
 from tests.benchmarks.smart_import_v3.runner import Run
-from tests.benchmarks.smart_import_v3.score import CaseResult, score_case
+from tests.benchmarks.smart_import_v3.score import (
+    CaseResult,
+    _claims,
+    _matches,
+    _under_question,
+    score_case,
+)
 from tests.benchmarks.universal_understanding_v2.corpus import (
     DOMAIN_NAMES,
     DOMAINS,
@@ -71,7 +77,28 @@ def _critical_wrong(results: list[CaseResult]) -> int:
     )
 
 
-def extras(results: list[CaseResult], truth: dict[str, Golden]) -> dict[str, Any]:
+def committed_wrong(first: Observed, golden: Golden) -> int:
+    """Certain readings (HIGH, no question on their column) of a fact a business decision rests
+    on that the truth does not confirm, in the FIRST answer - what a person is shown before
+    answering anything. (The official counters also look at the state AFTER the person's answers,
+    where a column the person has just been asked about is certain by then.)"""
+    critical = set(CRITICAL_FIELDS.get(golden.domain, ()))
+    wrong = 0
+    for name, claims in _claims(first).items():
+        if name not in critical:
+            continue
+        source = golden.fields.get(name)
+        for claim in claims:
+            if claim.level != "HIGH" or _under_question(claim, first):
+                continue
+            if source is None or not _matches(source, claim, first):
+                wrong += 1
+    return wrong
+
+
+def extras(
+    results: list[CaseResult], truth: dict[str, Golden], first_wrong: dict[str, int]
+) -> dict[str, Any]:
     """The figures V2 adds to the official aggregate, for one group of POSITIVE documents."""
     n = len(results)
     # (a document whose records are deliberately not read has no kind of data to find)
@@ -105,7 +132,8 @@ def extras(results: list[CaseResult], truth: dict[str, Golden]) -> dict[str, Any
             golden_all - golden_required,
         ),
         "critical_wrong_mapping": _critical_wrong(results),
-        "required_committed_wrong": committed - committed_ok,
+        "required_committed_wrong": sum(first_wrong[r.id] for r in results),
+        "required_committed_wrong_final_state": committed - committed_ok,
         "ready_documents": sum(1 for r in results if r.outcome == "READY"),
         "ready_automatic": sum(1 for r in results if r.outcome == "READY" and r.automatic),
         "cases_with_p0": sum(1 for r in results if any(f.severity == "P0" for f in r.findings)),
@@ -163,8 +191,12 @@ def evaluate(run: Run, stages: dict[str, StageTimes] | None = None) -> dict[str,
         selections[difficulty] = [r for r in positives if _difficulty(tags[r.id]) == difficulty]
 
     metrics = {name: group(selected) for name, selected in selections.items()}
+    committed = {
+        r.id: committed_wrong(run.first[r.id], truth[r.id]) for r in results if r.error is None
+    }
+    committed.update({r.id: 0 for r in results if r.error is not None})
     detail = {
-        name: extras(selected, truth)
+        name: extras(selected, truth, committed)
         for name, selected in selections.items()
         if name not in {"negatives", "total"}
     }
