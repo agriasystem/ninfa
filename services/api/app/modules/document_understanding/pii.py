@@ -27,6 +27,7 @@ class PiiKind(StrEnum):
     TAX_CODE = "TAX_CODE"
     IBAN = "IBAN"
     ADDRESS = "ADDRESS"
+    EMPLOYEE_ID = "EMPLOYEE_ID"  # the number that identifies one person at work: badge, matricola
     NOTE = "NOTE"  # free text written about a person: a guest's request, an employee's remark
 
 
@@ -50,7 +51,7 @@ _NOT_A_NAME = stems(
 )
 _EMAIL_WORDS = stems("email mail pec")
 _PHONE_WORDS = stems("telefono cellulare tel phone mobile cell")
-_TAX_WORDS = stems("fiscale cf codfisc")
+_TAX_WORDS = stems("fiscale cf codfisc fisc")
 # "Tax" alone is the VAT of an invoice; "Tax Code" / "Tax ID" is a person's fiscal code.
 _TAX_QUALIFIERS = stems("code id codice")
 _IBAN_WORDS = stems("iban")
@@ -64,6 +65,10 @@ _NOTE_WORDS = stems(
     "allergies esigenze osservazioni osservazione memo"
 )
 _NOT_A_NOTE = stems("credito credit accredito addebito debit")
+# A badge or a payroll number points at ONE employee as surely as a name does.
+_BADGE_WORDS = stems("badge matricola cartellino payroll tessera")
+# ("Numero ospiti" is a count of guests: "number" alone does not make an identifier)
+_ID_WORDS = stems("id codice code matricola badge")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 # A telephone number is written in a few recognisable ways: with the country code ("+39 333
@@ -195,6 +200,8 @@ def _classify(words: frozenset[str], stats: ColumnStats) -> PiiFinding | None:
         return PiiFinding(PiiKind.TAX_CODE, "HEADER" if _says_tax_code(words) else "VALUES", True)
     if words & _PHONE_WORDS or _phone_numbers(stats):
         return PiiFinding(PiiKind.PHONE, "HEADER" if words & _PHONE_WORDS else "VALUES", True)
+    if words & _BADGE_WORDS or (words & _PERSON_WORDS and words & _ID_WORDS):
+        return PiiFinding(PiiKind.EMPLOYEE_ID, "HEADER", True)
     if words & _PERSON_WORDS and not words & _NOT_A_NAME:
         # "Ospiti: 2, 3, 2" is a count, not a guest.
         if stats.n == 0 or stats.text_fraction >= 0.6:

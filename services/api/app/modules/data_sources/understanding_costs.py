@@ -34,7 +34,8 @@ from app.modules.data_sources.understanding_types import (
     QuestionKind,
 )
 from app.modules.document_understanding.structure import as_decimal
-from app.modules.document_understanding.text import tokens
+from app.modules.document_understanding.text import fold, tokens
+from app.modules.document_understanding.values import text_of
 from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.mapping import resolve_category
 
@@ -197,6 +198,25 @@ def amounts_check(
     return "MATCH" if ok / compared >= _COHERENT else "MISMATCH"
 
 
+def _register_net(proposal: Proposal, rows: Sequence[Sequence[object]]) -> ColumnProposal | None:
+    """ "Netto fattura" in a register where EVERY row is a different invoice: the net of the invoice
+    is the net of its only line. (When an invoice number comes back on several rows, the same net
+    repeated on each of them is the invoice's and not the line's: nothing is decided then.)"""
+    assigned = proposal.assigned()
+    invoice_net, number = assigned.get("invoice_net_amount"), assigned.get("invoice_number")
+    if "line_total" in assigned or invoice_net is None or number is None:
+        return None
+    numbers = [
+        fold(text_of(row[number.position]))  # type: ignore[arg-type]
+        for row in rows
+        if number.position < len(row)
+    ]
+    numbers = [n for n in numbers if n]
+    if len(numbers) < 3 or len(set(numbers)) / len(numbers) < 0.98:
+        return None
+    return invoice_net
+
+
 def plan_costs(
     *,
     proposal: Proposal,
@@ -205,8 +225,28 @@ def plan_costs(
     asked_columns: Mapping[str, str],
 ) -> CostsPlan:
     """Which column is the NET amount, and what is left to ask about it."""
+    register = _register_net(proposal, rows)
+    plan = _plan_costs(
+        proposal=proposal,
+        rows=rows,
+        asked_basis=asked_basis,
+        asked_columns=asked_columns,
+        net=register or proposal.assigned().get("line_total"),
+    )
+    if register is None:
+        return plan
+    return replace(plan, assigned={**(plan.assigned or {}), register.header: "line_total"})
+
+
+def _plan_costs(
+    *,
+    proposal: Proposal,
+    rows: Sequence[Sequence[object]],
+    asked_basis: str | None,
+    asked_columns: Mapping[str, str],
+    net: ColumnProposal | None,
+) -> CostsPlan:
     assigned = proposal.assigned()
-    net = assigned.get("line_total")
     gross = assigned.get("invoice_gross_amount")
     tax = assigned.get("invoice_tax_amount")
 

@@ -23,7 +23,7 @@ from app.modules.data_sources.semantics import (
     fit_vocabulary,
     rule,
 )
-from app.modules.document_understanding.pii import looks_like_names
+from app.modules.document_understanding.pii import PiiKind, looks_like_names
 from app.modules.document_understanding.stats import ColumnStats
 from app.modules.document_understanding.text import stems
 from app.modules.ingestion.models import DataSourceDomain
@@ -35,9 +35,11 @@ F = InvoiceField
 
 # Words that say the amount is NET (before VAT) / GROSS (with VAT).
 # ("Amount excl. VAT", "Importo IVA esclusa": the amount says it leaves the VAT out)
-NET_WORDS = stems("imponibile netto net excl excluding esclusa escluso")
-GROSS_WORDS = stems("lordo gross inclusa compresa")
+NET_WORDS = stems("imponibile netto net excl excluding esclusa escluso senza before")
+GROSS_WORDS = stems("lordo gross inclusa compresa incl including with")
 _NOT_A_NUMBER_OF_THE_DOCUMENT = "iva imposta vat tax lordo gross inclusa compresa aliquota"
+# A payslip is not a purchase: "Netto in busta" is what an employee takes home.
+_PAYROLL = stems("busta cedolino stipendio stipendi payroll salary retribuzione")
 _VAT_NUMBER = re.compile(r"^[A-Za-z]{0,2}\s?\d{8,12}$")
 _CATEGORY_NAMES = frozenset(category.value for category in CostCategory)
 
@@ -97,7 +99,12 @@ COSTS = DomainSem(
             F.SUPPLIER_NAME.value,
             _exact(F.SUPPLIER_NAME),
             (
-                rule("fornitore supplier vendor emittente cedente", weight=0.93),
+                rule(
+                    "fornitore supplier vendor emittente cedente ditta creditore creditor payee "
+                    "venditore seller prestatore",
+                    weight=0.93,
+                ),
+                rule("billed invoiced", weight=0.88),  # "Billed By"
                 rule("ragione denominazione", "sociale fornitore societa", weight=0.9),
                 rule("intestatario titolare", weight=0.8),
                 rule("chi", weight=0.75),  # "Da chi": a hand-made sheet
@@ -124,8 +131,16 @@ COSTS = DomainSem(
             F.INVOICE_NUMBER.value,
             _exact(F.INVOICE_NUMBER),
             (
-                rule("fattura invoice documento doc fatt", "numero n num nr no id", weight=0.93),
-                rule("numero n num nr", "fattura invoice documento doc fatt", weight=0.93),
+                rule(
+                    "fattura invoice documento doc fatt inv bill",
+                    "numero n num nr no id ref rif riferimento reference",
+                    weight=0.93,
+                ),
+                rule(
+                    "numero n num nr ref rif riferimento reference",
+                    "fattura invoice documento doc fatt inv bill",
+                    weight=0.93,
+                ),
                 rule("protocollo", weight=0.8),
                 # "Numero", "Num.", "N.", "Doc." alone, in a register of invoices
                 rule("numero", none="riga linea line prot protocollo", weight=0.8),
@@ -135,11 +150,14 @@ COSTS = DomainSem(
         ),
         F.INVOICE_DATE.value: FieldSem(
             F.INVOICE_DATE.value,
-            _exact(F.INVOICE_DATE),
+            # ("Fattura del", "Invoice dated": the preposition is the word "date", and a
+            # preposition is not a word of a header)
+            (*_exact(F.INVOICE_DATE), "fattura del", "documento del", "invoice dated"),
             (
                 rule(
-                    "data date",
-                    "fattura invoice documento doc emissione registrazione",
+                    "data date dt",
+                    "fattura invoice documento doc emissione registrazione fatt inv bill issue "
+                    "issued",
                     none="scadenza due pagamento",
                     weight=0.93,
                 ),
@@ -157,7 +175,7 @@ COSTS = DomainSem(
         F.DOCUMENT_TYPE.value: FieldSem(
             F.DOCUMENT_TYPE.value,
             _exact(F.DOCUMENT_TYPE),
-            (rule("tipo tipologia", "documento doc fattura", weight=0.93),),
+            (rule("tipo tipologia causale", "documento doc fattura", weight=0.93),),
             fit_label,
         ),
         F.CURRENCY.value: FieldSem(
@@ -171,6 +189,7 @@ COSTS = DomainSem(
             _exact(F.INVOICE_NET_AMOUNT),
             (rule("imponibile netto net", "documento fattura invoice", weight=0.9),),
             fit_money,
+            veto=_PAYROLL,
         ),
         F.INVOICE_TAX_AMOUNT.value: FieldSem(
             F.INVOICE_TAX_AMOUNT.value,
@@ -183,6 +202,7 @@ COSTS = DomainSem(
                 ),
             ),
             _fit_tax_amount,
+            veto=_PAYROLL,
         ),
         F.INVOICE_GROSS_AMOUNT.value: FieldSem(
             F.INVOICE_GROSS_AMOUNT.value,
@@ -195,18 +215,30 @@ COSTS = DomainSem(
                     none="imponibile netto net",
                     weight=0.88,
                 ),
-                rule("iva vat", "inclusa compresa included", weight=0.93),
+                rule(
+                    "iva vat tax", "inclusa compresa included incl including with con", weight=0.93
+                ),
                 # "Totale" alone: very likely the total WITH VAT, but only likely.
                 rule("totale total", weight=0.72, none="imponibile netto net riga iva"),
             ),
             fit_money,
+            veto=_PAYROLL,
         ),
         F.LINE_DESCRIPTION.value: FieldSem(
             F.LINE_DESCRIPTION.value,
             _exact(F.LINE_DESCRIPTION),
             (
-                rule("descrizione description oggetto causale dettaglio", weight=0.93),
-                rule("voce articolo prodotto servizio item", none="costo spesa", weight=0.8),
+                rule(
+                    "descrizione description oggetto causale dettaglio dettagli details detail "
+                    "prestazione memo narrative",
+                    weight=0.93,
+                ),
+                rule("text testo", "fattura invoice line riga", weight=0.88),
+                rule(
+                    "voce articolo prodotto servizio item merce goods services service",
+                    none="costo spesa",
+                    weight=0.8,
+                ),
                 rule("cosa", weight=0.75),  # a hand-made sheet
             ),
             fit_text,
@@ -229,9 +261,9 @@ COSTS = DomainSem(
             (
                 # "Amount excl. VAT": says it is net, in words that also name the VAT.
                 rule(
-                    "excl excluding esclusa escluso",
+                    "excl excluding esclusa escluso before senza ex",
                     "vat iva tax",
-                    none="incl including inclusa compresa lordo gross",
+                    none="incl including inclusa compresa lordo gross with con",
                     weight=0.93,
                 ),
                 # Says it is NET: sure.
@@ -248,6 +280,7 @@ COSTS = DomainSem(
                 ),
             ),
             fit_money,
+            veto=_PAYROLL,
         ),
         F.VAT_RATE.value: FieldSem(
             F.VAT_RATE.value,
@@ -260,7 +293,7 @@ COSTS = DomainSem(
             _exact(F.COST_CATEGORY),
             (
                 rule("categoria category", none="documento fiscale", weight=0.93),
-                rule("tipo tipologia", "costo spesa", weight=0.9),
+                rule("tipo tipologia classe type class", "costo spesa cost expense", weight=0.9),
                 rule("conto voce", "costo spesa", weight=0.85),
             ),
             fit_vocabulary(_is_category_name),
@@ -275,7 +308,7 @@ COSTS = DomainSem(
     ),
     # A supplier is a business: its name, VAT number and IBAN are what an invoice IS. Nothing is
     # locked here (NINFA keeps suppliers); a column that is not mapped is dropped at import anyway.
-    locked={},
+    locked={PiiKind.TAX_CODE: "IDENTITY", PiiKind.IBAN: "IDENTITY"},
     # Every amount of a register: which one is the net, the tax, the total is never guessed.
     financial=frozenset(
         {

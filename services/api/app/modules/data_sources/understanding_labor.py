@@ -94,15 +94,20 @@ _LEXICON: Final[dict[LaborCategory, tuple[str, ...]]] = {
         "maitre",
         "banqueting",
         "colazioni",
+        "f and b",  # ("F&B")
+        "food and beverage",
+        "restaurant",
     ),
     LaborCategory.KITCHEN: ("sous chef", "commis", "pizzaiolo", "lavapiatti"),
-    LaborCategory.MAINTENANCE: ("manutentore", "manutentori"),
+    LaborCategory.MAINTENANCE: ("manutentore", "manutentori", "engineering"),
     LaborCategory.MANAGEMENT: (
         "amministrazione",
         "direttore",
         "direttrice",
         "general manager",
         "ufficio amministrativo",
+        "admin",
+        "administration",
     ),
     LaborCategory.SPA_WELLNESS: ("centro benessere", "benessere", "estetista", "massaggiatrice"),
 }
