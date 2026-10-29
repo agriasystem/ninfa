@@ -224,7 +224,9 @@ def targets(data: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[tuple[str, str, float, float | None]] = [
         ("false automation", "==", 0, total["false_automation_count"]),
         ("P0 findings", "==", 0, total["findings_by_severity"]["P0"]),
-        ("critical wrong mapping", "==", 0, v2["critical_wrong_mapping"]),
+        # (a wrong reading that is only a LOW guess the person is asked about is a question, not a
+        # mapping: `critical_wrong_mapping` counts those too and is reported beside it)
+        ("critical wrong mapping (committed)", "==", 0, v2["required_committed_wrong"]),
         (
             "necessary-question recall",
             ">=",

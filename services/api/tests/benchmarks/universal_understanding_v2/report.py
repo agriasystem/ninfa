@@ -30,7 +30,7 @@ def _row(name: str, data: dict[str, Any], extra: dict[str, Any]) -> list[str]:
         pct(data["required_recall"]),
         pct(extra["optional_precision"]),
         str(data["false_automation_count"]),
-        str(extra["critical_wrong_mapping"]),
+        str(extra["required_committed_wrong"]),
         pct(data["zero_question_rate_valid"]),
         pct(data["necessary_question_recall"]),
         str(data["questions_unnecessary"]),
@@ -50,7 +50,7 @@ HEADER = [
     "Req. recall",
     "Opt. prec.",
     "FA",
-    "Crit. wrong",
+    "Crit. wrong (committed)",
     "Zero-question",
     "Necessary Q",
     "Unneeded Q",
@@ -150,8 +150,9 @@ def markdown_report(data: dict[str, Any], today: str, title: str | None = None) 
         "## Results by group (positive documents)",
         "",
         "Domain / header / table are STRICT: a document the engine could not read counts as a "
-        "miss. FA = false automation. Crit. wrong = wrong reading of a fact a business decision "
-        "rests on. Necessary Q = recall of the questions a person must be asked.",
+        "miss. FA = false automation. Crit. wrong = a CERTAIN wrong reading of a fact a "
+        "business decision rests on. Necessary Q = recall of the questions a person must be "
+        "asked.",
         "",
         *_table(HEADER, rows(data)),
         "",
@@ -169,6 +170,13 @@ def markdown_report(data: dict[str, Any], today: str, title: str | None = None) 
             f"  - not clean: `{u['id']}` level {u['level']}, problem {u['problem']}, "
             f"error {u['error']}"
         )
+    lines += [
+        "",
+        "Wrong readings of a critical fact at ANY level (a LOW guess the person is asked about "
+        f"counts too): {data['v2']['positives']['critical_wrong_mapping']}; "
+        "committed (certain and not asked): "
+        f"{data['v2']['positives']['required_committed_wrong']}.",
+    ]
     lines += ["", "## Findings", ""]
     total = metrics["total"]
     lines += _table(
