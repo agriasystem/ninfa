@@ -10,6 +10,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+from app.modules.document_understanding.context import stated_department_values, title_lines
 from app.modules.document_understanding.lexicon import MONTHS, SECTION_WORDS
 from app.modules.document_understanding.text import fold, stem
 
@@ -114,22 +115,9 @@ def parse_period(lines: Iterable[str]) -> DateRange | None:
     return best
 
 
-# "Reparto: Spa", "Department - Kitchen": a label that says what the value IS
-_DEPARTMENT_LABEL = re.compile(
-    r"^\s*(?:reparto|dipartimento|department|area|settore|team)\s*[:\-–]\s*(?P<value>\S.*)$",
-    re.IGNORECASE,
-)
-
-
-def department_words(lines: Iterable[str]) -> list[str]:
-    """The department words a title or a line contains, as written ("TURNI HOUSEKEEPING" ->
-    ["HOUSEKEEPING"]). Words only: the meaning of each one is the domain's business. A line that
-    states its department outright ("Reparto: Spa") is the only one read: the other lines of the
-    block ("Responsabile: Direzione") are not departments of the rows."""
-    lines = list(lines)
-    stated = [m.group("value") for line in lines if (m := _DEPARTMENT_LABEL.match(line))]
+def _department_words_of(lines: Iterable[str]) -> list[str]:
     seen: dict[str, str] = {}
-    for line in stated or lines:
+    for line in lines:
         for raw in re.findall(r"[A-Za-zÀ-ÿ]+", line):
             if (
                 len(raw) >= 3
@@ -140,4 +128,20 @@ def department_words(lines: Iterable[str]) -> list[str]:
     return list(seen.values())
 
 
-__all__ = ["DateRange", "department_words", "parse_period"]
+def stated_department_words(lines: Iterable[str]) -> list[str]:
+    """The department words a line STATES with a label that says "department" ("Reparto: Spa").
+    Nothing else does: "Nota: Spa chiusa", "Cliente: Spa S.r.l." and "Responsabile: Direzione" are
+    a note, a customer and a person (see `context`)."""
+    return _department_words_of(stated_department_values(list(lines)))
+
+
+def department_words(lines: Iterable[str]) -> list[str]:
+    """The department words a title or a line contains, as written ("TURNI HOUSEKEEPING" ->
+    ["HOUSEKEEPING"]). Words only: the meaning of each one is the domain's business. A line that
+    states its department with a label is the only one read; a line that is about something else
+    (a note, a customer, a person, a period, a hotel) is not a title and is not read."""
+    lines = list(lines)
+    return _department_words_of(stated_department_values(lines) or title_lines(lines))
+
+
+__all__ = ["DateRange", "department_words", "parse_period", "stated_department_words"]

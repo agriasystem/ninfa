@@ -616,7 +616,8 @@ def analyze_sheet(scan: SheetScan) -> list[TableCandidate]:
             break
         tables.append(found)
         claimed.append((found.header_rows[0], max(found.last_row, found.header_rows[-1])))
-    # The lines above each table, up to the end of the table before it.
+    # The lines above each table, up to the end of the table before it. (A block of "Label: value"
+    # lines is read as a tiny two-column table: it is the lines ABOVE the real table, not its end.)
     floor = 0
     for table in sorted(tables, key=lambda t: t.header_rows[0]):
         table.preamble = tuple(
@@ -624,9 +625,16 @@ def analyze_sheet(scan: SheetScan) -> list[TableCandidate]:
             for n in ordered
             if floor < n < table.header_rows[0] and rows[n].n
         )
-        floor = max(table.last_row, table.header_rows[-1])
+        if not _is_label_block(table):
+            floor = max(table.last_row, table.header_rows[-1])
     tables.sort(key=lambda t: (-t.value, t.header_rows[0]))
     return tables
+
+
+def _is_label_block(table: TableCandidate) -> bool:
+    """ "Reparto: Spa / Periodo: ottobre / Responsabile: Direzione": two columns, the first one a
+    label that ends with a colon. Not a table of records."""
+    return len(table.columns) == 2 and table.columns[0].label.rstrip().endswith(":")
 
 
 def _best_table(
