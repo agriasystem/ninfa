@@ -250,4 +250,5 @@ def test_once_the_person_has_taught_the_status_words_the_status_column_is_not_as
     rounds = converse(service, document, first)
 
     assert [q.kind for q in first.questions] == ["VALUE_LABELS"]
-    assert rounds and rounds[-1].level == "READY" and not rounds[-1].questions
+    assert [r.level for r in rounds] == ["READY"]  # one answer, and nothing else is asked
+    assert not rounds[0].questions
