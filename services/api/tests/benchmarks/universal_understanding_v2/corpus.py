@@ -29,6 +29,7 @@ GROUPS: dict[str, tuple[str, str]] = {
     "bookings": ("gen_bookings", "build"),
     "labor": ("gen_labor", "build"),
     "costs": ("gen_costs", "build"),
+    "closure": ("gen_closure", "build"),
     "negative": ("gen_negative", "build_negative"),
     "unsupported": ("gen_negative", "build_unsupported"),
 }
