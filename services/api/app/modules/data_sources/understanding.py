@@ -525,6 +525,8 @@ class UnderstandingService:
         if reuse and match is not None:
             questions.extend(_conflict_questions(match, answers, questions))
         proposal = _with_known_departments(proposal, samples, taught_roles, value_questions)
+        # (a booking status, once its words are known; the category of a cost keeps its level)
+        proposal = _with_known_words(proposal, "status", value_questions)
 
         # --- the profile, the people, the explanation ---------------------------------------------
         # A grid whose week is not known yet is judged by the columns it WILL have (its names do
@@ -585,8 +587,11 @@ class UnderstandingService:
                 questions.extend(_format_questions(formats, decision))
                 # (the labels of a department column are asked about as labels, not twice)
                 skip: set[str] = set()
-                if any(q.kind == QuestionKind.VALUE_LABELS for q in questions):
-                    skip.add("role")
+                for q in questions:
+                    if q.kind == QuestionKind.VALUE_LABELS:
+                        skip.add("role")
+                        if q.field:  # the status / category words are asked as words, not twice
+                            skip.add(q.field)
                 if any(q.kind == QuestionKind.AMOUNT_BASIS for q in questions):
                     skip.add("line_total")  # the amount is asked about as an amount, not twice
                 if any(q.kind == QuestionKind.DATES_REVERSED for q in questions):
@@ -1452,6 +1457,26 @@ def _with_known_departments(
         or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
         or any(q.kind == QuestionKind.VALUE_LABELS for q in asked)
         or label_question(column_labels(samples[column.position]), known, lexicon=True) is not None
+    ):
+        return proposal
+    return Proposal(
+        tuple(
+            replace(c, level=Level.HIGH) if c.header == column.header else c
+            for c in proposal.columns
+        )
+    )
+
+
+def _with_known_words(proposal: Proposal, field: str, asked: Sequence[Question]) -> Proposal:
+    """A column of words (a booking status) whose NAME is clear is as sure as its words: when no
+    word of it is left to ask about (the person has just taught them, or NINFA knew them), nothing
+    is left to doubt - and the column is not asked about on top of its words."""
+    column = proposal.assigned().get(field)
+    if (
+        column is None
+        or column.level == Level.HIGH
+        or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
+        or any(q.kind == QuestionKind.VALUE_LABELS and q.field == field for q in asked)
     ):
         return proposal
     return Proposal(

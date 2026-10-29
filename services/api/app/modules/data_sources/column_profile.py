@@ -64,13 +64,20 @@ class ColumnSample:
     examples: tuple[str, ...]
     # Every non-empty value among the scanned rows (kept for the evidence below).
     values: tuple[Cell, ...]
+    # The same cells row by row, an empty one kept as None: what lets two columns be compared
+    # (a departure later than its arrival). Empty when the caller built the sample by hand.
+    rows: tuple[Cell, ...] = ()
 
 
 def sample_columns(table: SourceTable) -> list[ColumnSample]:
     """The first rows, column by column. Stops reading after `SCAN_ROWS` rows."""
     columns: list[list[Cell]] = [[] for _ in table.headers]
+    aligned: list[list[Cell]] = [[] for _ in table.headers]
     for row in islice(table.rows(), SCAN_ROWS):
-        for position, cell in enumerate(row.cells[: len(columns)]):
+        cells = row.cells[: len(columns)]
+        for position in range(len(columns)):
+            cell = cells[position] if position < len(cells) else None
+            aligned[position].append(cell)
             if cell is not None:
                 columns[position].append(cell)
     return [
@@ -79,6 +86,7 @@ def sample_columns(table: SourceTable) -> list[ColumnSample]:
             header=header,
             examples=tuple(display_cell(value) for value in values[:EXAMPLES_PER_COLUMN]),
             values=tuple(values),
+            rows=tuple(aligned[position]),
         )
         for position, (header, values) in enumerate(zip(table.headers, columns, strict=True))
     ]
@@ -88,7 +96,7 @@ def sample_columns(table: SourceTable) -> list[ColumnSample]:
 
 _ISO_DATE = re.compile(r"^\d{4}[-/]\d{2}[-/]\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?)?$")
 _SLASHED_DATE = re.compile(
-    r"^(\d{1,2})([/.\-])(\d{1,2})\2(\d{4})(?:([T ])(\d{1,2}):(\d{2})(?::(\d{2}))?)?$"
+    r"^(\d{1,2})([/.\-])(\d{1,2})\2(\d{4}|\d{2})(?:([T ])(\d{1,2}):(\d{2})(?::(\d{2}))?)?$"
 )
 
 
@@ -127,7 +135,7 @@ def date_order_of(values: Sequence[Cell]) -> DateOrder:
 def date_pattern(values: Sequence[Cell], order: DateChoice) -> str | None:
     """The pattern that reads every day/month-first date of the column, or None when the column
     has no such date or writes them in more than one way (the import then reports the rows)."""
-    shapes: set[tuple[str, str, str]] = set()
+    shapes: set[tuple[str, str, str, int]] = set()
     for text in _texts(values):
         match = _SLASHED_DATE.match(text)
         if match is None:
@@ -135,12 +143,12 @@ def date_pattern(values: Sequence[Cell], order: DateChoice) -> str | None:
                 return None  # year-first and day/month-first dates in one column: not one way
             continue
         time_shape = "" if match.group(6) is None else ("HMS" if match.group(8) else "HM")
-        shapes.add((match.group(2), match.group(5) or "", time_shape))
+        shapes.add((match.group(2), match.group(5) or "", time_shape, len(match.group(4))))
     if len(shapes) != 1:
         return None
-    separator, time_separator, time_shape = next(iter(shapes))
+    separator, time_separator, time_shape, year_digits = next(iter(shapes))
     first, second = ("%d", "%m") if order == "DMY" else ("%m", "%d")
-    pattern = f"{first}{separator}{second}{separator}%Y"
+    pattern = f"{first}{separator}{second}{separator}{'%Y' if year_digits == 4 else '%y'}"
     if time_shape:
         pattern += f"{time_separator}%H:%M" + (":%S" if time_shape == "HMS" else "")
     return pattern

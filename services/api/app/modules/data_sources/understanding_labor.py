@@ -44,7 +44,7 @@ from app.modules.document_understanding.layout import (
     GridLayout,
     LayoutSpec,
 )
-from app.modules.document_understanding.titles import department_words
+from app.modules.document_understanding.titles import department_words, stated_department_words
 from app.modules.document_understanding.values import CellKind, kind_of, text_of
 from app.modules.labor.classification import classify_role, matching_categories
 from app.modules.labor.roles import LaborCategory, LaborClassificationMethod
@@ -94,15 +94,20 @@ _LEXICON: Final[dict[LaborCategory, tuple[str, ...]]] = {
         "maitre",
         "banqueting",
         "colazioni",
+        "f and b",  # ("F&B")
+        "food and beverage",
+        "restaurant",
     ),
     LaborCategory.KITCHEN: ("sous chef", "commis", "pizzaiolo", "lavapiatti"),
-    LaborCategory.MAINTENANCE: ("manutentore", "manutentori"),
+    LaborCategory.MAINTENANCE: ("manutentore", "manutentori", "engineering"),
     LaborCategory.MANAGEMENT: (
         "amministrazione",
         "direttore",
         "direttrice",
         "general manager",
         "ufficio amministrativo",
+        "admin",
+        "administration",
     ),
     LaborCategory.SPA_WELLNESS: ("centro benessere", "benessere", "estetista", "massaggiatrice"),
 }
@@ -314,8 +319,10 @@ def plan_labor(
         origin, level = Origin(OriginKind.SHEET, sheets[0]), Level.HIGH
     else:
         words = department_words(selection.preamble)
+        stated = stated_department_words(selection.preamble)
         if len(words) == 1 and classifies(words[0], taught, lexicon=True):
-            if asked_department_from == "TITLE":
+            if asked_department_from == "TITLE" or stated == words:
+                # (said by the person, or written outright: "Reparto: Spa" is not a guess)
                 kind, labels = "TITLE", [(words[0], 1)]
                 origin, level = Origin(OriginKind.TITLE, words[0]), Level.HIGH
             else:

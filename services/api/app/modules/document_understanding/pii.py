@@ -26,6 +26,9 @@ class PiiKind(StrEnum):
     PHONE = "PHONE"
     TAX_CODE = "TAX_CODE"
     IBAN = "IBAN"
+    ADDRESS = "ADDRESS"
+    EMPLOYEE_ID = "EMPLOYEE_ID"  # the number that identifies one person at work: badge, matricola
+    NOTE = "NOTE"  # free text written about a person: a guest's request, an employee's remark
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,10 +51,24 @@ _NOT_A_NAME = stems(
 )
 _EMAIL_WORDS = stems("email mail pec")
 _PHONE_WORDS = stems("telefono cellulare tel phone mobile cell")
-_TAX_WORDS = stems("fiscale cf codfisc")
+_TAX_WORDS = stems("fiscale cf codfisc fisc")
 # "Tax" alone is the VAT of an invoice; "Tax Code" / "Tax ID" is a person's fiscal code.
 _TAX_QUALIFIERS = stems("code id codice")
 _IBAN_WORDS = stems("iban")
+_ADDRESS_WORDS = stems("indirizzo address residenza domicilio")
+# Free text a person wrote ABOUT somebody: what a guest asked for, what was noted of an employee.
+# Its content is personal (an allergy, an anniversary, a health remark) even when no name is in it,
+# so the column is never shown, sampled or sent anywhere. "Nota di credito" is a document, not this.
+_NOTE_WORDS = stems(
+    "note notes nota annotazioni annotazione commenti commento comments comment remarks remark "
+    "richieste richiesta requests request preferenze preferenza preferences allergie allergia "
+    "allergies esigenze osservazioni osservazione memo"
+)
+_NOT_A_NOTE = stems("credito credit accredito addebito debit")
+# A badge or a payroll number points at ONE employee as surely as a name does.
+_BADGE_WORDS = stems("badge matricola cartellino payroll tessera")
+# ("Numero ospiti" is a count of guests: "number" alone does not make an identifier)
+_ID_WORDS = stems("id codice code matricola badge")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 # A telephone number is written in a few recognisable ways: with the country code ("+39 333
@@ -183,11 +200,17 @@ def _classify(words: frozenset[str], stats: ColumnStats) -> PiiFinding | None:
         return PiiFinding(PiiKind.TAX_CODE, "HEADER" if _says_tax_code(words) else "VALUES", True)
     if words & _PHONE_WORDS or _phone_numbers(stats):
         return PiiFinding(PiiKind.PHONE, "HEADER" if words & _PHONE_WORDS else "VALUES", True)
+    if words & _BADGE_WORDS or (words & _PERSON_WORDS and words & _ID_WORDS):
+        return PiiFinding(PiiKind.EMPLOYEE_ID, "HEADER", True)
     if words & _PERSON_WORDS and not words & _NOT_A_NAME:
         # "Ospiti: 2, 3, 2" is a count, not a guest.
         if stats.n == 0 or stats.text_fraction >= 0.6:
             return PiiFinding(PiiKind.PERSON_NAME, "HEADER", True)
         return None
+    if words & _ADDRESS_WORDS and stats.text_fraction >= 0.6:
+        return PiiFinding(PiiKind.ADDRESS, "HEADER", True)
+    if words & _NOTE_WORDS and not words & _NOT_A_NOTE and stats.text_fraction >= 0.6:
+        return PiiFinding(PiiKind.NOTE, "HEADER", True)
     if looks_like_names(stats):
         return PiiFinding(PiiKind.PERSON_NAME, "VALUES", False)
     return None

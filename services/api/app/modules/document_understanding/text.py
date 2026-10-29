@@ -79,13 +79,28 @@ def token_list(text: str) -> tuple[str, ...]:
     A "#" is the word "number" ("Res #") and a "%" on its own the word "percentage" ("Commissione
     %"); the "22%" of "Imponibile 22%" is a rate that names the amount, not a column of
     percentages."""
-    words = tuple(stem(word) for word in fold(text).split() if word not in STOP_WORDS)
+    words = tuple(stem(word) for word in _words(text) if word not in STOP_WORDS)
     extra = [
         word
         for sign, word in (("#", "numer"), ("%", "perc"))
         if word not in words and _standing_sign(text, sign)
     ]
     return (*words, *extra)
+
+
+def _words(text: str) -> list[str]:
+    """The folded words of a header, with an abbreviation that punctuation cut in two put back:
+    "Q.tà" folds to "q ta" and means "qta" (quantity), "U.O." means "uo" (operating unit)."""
+    words = fold(text).split()
+    merged: list[str] = []
+    for word in words:
+        if word == "ta" and merged and merged[-1] == "q":
+            merged[-1] = "qta"
+        elif word == "o" and merged and merged[-1] == "u":
+            merged[-1] = "uo"  # "U.O." (unita operativa): the "o" is not the word "or"
+        else:
+            merged.append(word)
+    return merged
 
 
 def _standing_sign(text: str, sign: str) -> bool:

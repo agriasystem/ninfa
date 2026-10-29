@@ -19,6 +19,7 @@ from app.modules.data_sources.semantics import (
     DomainSem,
     Level,
     NameMatch,
+    expand_abbreviations,
     level_of,
     name_candidates,
     rule_score,
@@ -54,6 +55,10 @@ class ColumnProposal:
     # original and an adjusted amount, two VAT rates: NINFA does not pick one.
     ambiguous_group: str | None = None
     ambiguous_fields: tuple[str, ...] = ()
+    # WHY the column is read as it is, in words and numbers, never with a value of the file
+    # ("name TOKEN 0.93", "96% of the values fit", "confirmed: departure after arrival"). Internal:
+    # nothing here is sent to the browser.
+    evidence: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -214,6 +219,17 @@ def propose(
         taken_fields.discard(chosen[index][0])
         del chosen[index]
 
+    # (what each chosen reading rests on, for whoever has to explain it)
+    notes: dict[int, list[str]] = {}
+    for index, (key, name, fit, _level) in chosen.items():
+        mine = scored.get((index, key))
+        why = [f"name {name.value}" + (f" {mine[0].score:.2f}" if mine else "")]
+        if expand_abbreviations(sem, samples[index].header):
+            why.append("an abbreviation read as the word it cuts")
+        if fit is not None:
+            why.append(f"{fit:.0%} of the values fit")
+        notes[index] = why
+
     # 5. columns that confirm each other
     for (field_a, header_a), (field_b, header_b) in sem.pairs:
         a = next((i for i, c in chosen.items() if c[0] == field_a), None)
@@ -231,6 +247,42 @@ def propose(
             for index in (a, b):
                 key, name, fit, _ = chosen[index]
                 chosen[index] = (key, name, fit, Level.HIGH)
+                notes[index].append("confirmed by its partner column")
+
+    # 5b. columns whose VALUES confirm each other (a departure later than its arrival)
+    for relation in sem.relations:
+        a = next((i for i, c in chosen.items() if c[0] == relation.first), None)
+        b = next((i for i, c in chosen.items() if c[0] == relation.second), None)
+        if a is None or b is None:
+            continue
+        if not (
+            all(
+                chosen[i][1] in (NameMatch.EXACT, NameMatch.TOKEN)
+                and chosen[i][3] != Level.LOW
+                and stats[i].enough()
+                and (chosen[i][2] or 0) >= 0.9
+                for i in (a, b)
+            )
+            and samples[a].rows
+            and samples[b].rows
+            and relation.holds(samples[a].rows, samples[b].rows)
+        ):
+            continue
+        for index in (a, b):
+            key, name, fit, _ = chosen[index]
+            chosen[index] = (key, name, fit, Level.HIGH)
+            notes[index].append(
+                f"confirmed by the values: {relation.first} before {relation.second}"
+            )
+
+    # 5c. a value no person could have ("48 hours" in a day, on a row that names the person)
+    if sem.person_limits and any(reason == "PERSON" for reason, _pii in locked.values()):
+        for index, (key, name, fit, level) in list(chosen.items()):
+            limit = sem.person_limits.get(key)
+            top = stats[index].maximum
+            if limit is not None and top is not None and top > limit and level != Level.LOW:
+                chosen[index] = (key, name, fit, Level.LOW)
+                notes[index].append(f"more than {limit} per person: asked, not trusted")
 
     # 6. "hours" / "an amount" that does not say which
     out: list[ColumnProposal] = []
@@ -251,6 +303,7 @@ def propose(
                     name,
                     fit,
                     pii=personal.get(index),
+                    evidence=tuple(notes.get(index, ())),
                 )
             )
             continue

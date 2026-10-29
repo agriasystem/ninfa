@@ -244,8 +244,8 @@ def test_what_the_person_said_once_about_the_whole_file_is_kept_and_verified_by_
     [
         ({"move": ("Settore", 0)}, Drift.COSMETIC),  # another order
         ({"move": ("Ore B", 1)}, Drift.COSMETIC),
-        ({"add": {"Note": "note"}}, Drift.ADDITIVE),  # a junk column
-        ({"add": {"Codice": "junk", "Note": "note"}}, Drift.ADDITIVE),
+        ({"add": {"Colonna extra": "note"}}, Drift.ADDITIVE),  # a junk column
+        ({"add": {"Codice": "junk", "Colonna extra": "note"}}, Drift.ADDITIVE),
     ],
     ids=["settore first", "ore b second", "junk", "two junk"],
 )

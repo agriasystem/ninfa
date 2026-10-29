@@ -253,7 +253,7 @@ def test_two_families_one_column_apart_are_told_apart(
     assert night.memory.mapped["actual_hours"] == "ore c"
     _nothing_asked(api_client, env, RECEPTION)
     _nothing_asked(api_client, env, NIGHT)
-    _nothing_asked(api_client, env, same_columns_with(RECEPTION, add={"Note": "note"}))
+    _nothing_asked(api_client, env, same_columns_with(RECEPTION, add={"Colonna extra": "note"}))
     _nothing_asked(api_client, env, same_columns_with(NIGHT, move=("Settore", 0)))
 
 

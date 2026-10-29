@@ -43,6 +43,7 @@ def parts(cols: Sequence[Col], items: Sequence[Any]) -> dict[str, Any]:
     """The meaning part of a golden: where fields are, what stays unmapped, what is personal."""
     fields: dict[str, Source] = {}
     ambiguous: list[str] = []
+    ambiguous_sources: dict[str, Source] = {}  # (what each would be if the person confirmed it)
     unmapped: list[tuple[str, ...]] = []
     pii_columns: list[tuple[str, ...]] = []
     pii_values: set[str] = set()
@@ -55,6 +56,7 @@ def parts(cols: Sequence[Col], items: Sequence[Any]) -> dict[str, Any]:
             pii_values.update(str(col.cell(item)) for item in items)
         elif col.field is not None and col.ambiguous:
             ambiguous.append(col.field)
+            ambiguous_sources[col.field] = source
         elif col.field is not None:
             fields[col.field] = source
         elif col.junk:
@@ -62,6 +64,7 @@ def parts(cols: Sequence[Col], items: Sequence[Any]) -> dict[str, Any]:
     return {
         "fields": fields,
         "ambiguous": tuple(ambiguous),
+        "ambiguous_sources": ambiguous_sources,
         "unmapped": tuple(unmapped),
         "pii_columns": tuple(pii_columns),
         "pii_values": tuple(sorted(v for v in pii_values if len(v) >= 5)),
@@ -124,6 +127,11 @@ def flat_document(
         after(sheet)
     meaning = parts(cols, items)
     absent = list(absent)
+    answers = dict(answers or {})
+    amount = meaning["ambiguous_sources"].get("net_amount")
+    if answers.get("amount_basis") == "NET" and amount is not None:
+        # the column the person's answer turns into the net (the scorer reads it back)
+        answers["amount_column"] = {"header": list(amount.header), "occurrence": amount.occurrence}
     if domain == "bookings" and outcome == "READY":
         # The importer needs a status and a number of rooms for every booking: from a column, or
         # from a value the person chooses. Without either, V3.0 cannot be automatic (and has no
@@ -149,7 +157,7 @@ def flat_document(
         pii_values=meaning["pii_values"],
         questions=tuple(questions),
         tolerated=tuple(tolerated),
-        answers=answers or {},
+        answers=answers,
         labels=labels or {},
         blockers=tuple(blockers),
         absent=tuple(absent),

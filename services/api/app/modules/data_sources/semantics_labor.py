@@ -29,16 +29,16 @@ from app.modules.labor.suggestions import FIELD_ALIASES, excluded_reason
 
 F = LaborField
 
-_HOURS = "ore ora hours hour"
+_HOURS = "ore ora hours hour hrs hr"
 # ("H previste": the letter is a word for hours only next to the plan or the time worked)
 _HOURS_WORDS = f"{_HOURS} h"
 _PLANNED = (
     "previste previsto pianificate programmate prog pian prev programmed planned scheduled "
-    "budget preventivo"
+    "budget preventivo plan rostered"
 )
 _ACTUAL = (
     "effettive effettivo eff lavorate lav svolte svolto reali reale consuntivo timbrate actual "
-    "worked effettuate"
+    "worked effettuate rilevate rilevato clocked punched"
 )
 _COST = "costo costi cost"
 _NOT_A_LABEL = "ore costo data totale"
@@ -73,7 +73,7 @@ LABOR = DomainSem(
             _exact(F.WORK_DATE),
             (
                 rule(
-                    "data giorno gg date day",
+                    "data giorno giornata gg date day dt",
                     none="nascita assunzione scadenza cessazione fattura prenotazione",
                     weight=0.9,
                 ),
@@ -87,7 +87,8 @@ LABOR = DomainSem(
             _exact(F.ROLE),
             (
                 rule(
-                    "reparto dipartimento department dept rep area settore squadra team",
+                    "reparto dipartimento department dept rep area settore squadra team division "
+                    "divisione section sezione uo servizio",
                     none=_NOT_A_LABEL,
                     weight=0.95,
                 ),
@@ -97,7 +98,13 @@ LABOR = DomainSem(
                     weight=0.88,
                 ),
                 # "Centro operativo": where the work is done - the department, if its values say so
-                rule("centro unita struttura", "operativo operativa", weight=0.85),
+                rule(
+                    "centro unita unit struttura",
+                    "operativo operativa operating lavoro work",
+                    weight=0.85,
+                ),
+                rule("operating", "unit", weight=0.85),
+                rule("centro", "lavoro work", weight=0.85),
             ),
             fit_vocabulary(_is_department),
         ),
@@ -158,13 +165,14 @@ LABOR = DomainSem(
         PiiKind.IBAN: "IDENTITY",
     },
     financial=frozenset({F.PLANNED_COST.value, F.ACTUAL_COST.value}),
+    person_limits={F.PLANNED_HOURS.value: 24, F.ACTUAL_HOURS.value: 24},
     # "Prev." and "Eff." together, both columns of hours: the plan and the time worked. Alone, each
     # is a maybe (one confirmation): they have no word for hours of their own.
     pairs=(((F.PLANNED_HOURS.value, "prev"), (F.ACTUAL_HOURS.value, "eff")),),
     ambiguous=(
         AmbiguousColumn(
             "HOURS",
-            stems(_HOURS),
+            stems(_HOURS_WORDS),
             stems(f"{_PLANNED} {_ACTUAL} {_COST} orario tariffa {_OTHER_HOURS}"),
             (F.PLANNED_HOURS.value, F.ACTUAL_HOURS.value),
             fit_hours,

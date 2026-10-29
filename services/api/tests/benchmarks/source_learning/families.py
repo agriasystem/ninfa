@@ -28,7 +28,7 @@ from typing import Any
 from app.modules.ingestion.models import DataSourceDomain
 
 JUNK = "Colonna extra"
-NEW = "Annotazioni"
+NEW = "Colonna extra"
 
 
 class Expect(StrEnum):

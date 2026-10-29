@@ -12,17 +12,18 @@ from app.modules.bookings.statuses import BUILTIN_STATUS_KEYS
 from app.modules.bookings.suggestions import FIELD_ALIASES
 from app.modules.bookings.text import normalize_key
 from app.modules.data_sources.channel_words import fit_channel
+from app.modules.data_sources.relations import Relation, stay_dates
 from app.modules.data_sources.semantics import (
     AmbiguousColumn,
     DomainSem,
     FieldSem,
     fit_date,
-    fit_identifier,
     fit_label,
     fit_money,
     fit_percentage,
     fit_small_integer,
     fit_text,
+    fit_unique_identifier,
     fit_vocabulary,
     rule,
 )
@@ -51,18 +52,23 @@ BOOKINGS = DomainSem(
             _exact(F.SOURCE_RECORD_ID),
             (
                 rule(
-                    "prenotazione prenotazioni reservation booking book conferma confirmation pren",
-                    "codice id numero riferimento rif code reference number",
+                    "prenotazione prenotazioni reservation booking book conferma confirmation pren "
+                    "conf pratica dossier",
+                    "codice id numero riferimento rif code reference number cod",
+                    none="gruppo group",  # a group is a set of bookings, not one
                     weight=0.9,
                 ),
                 rule("res reservation", "numero id codice", weight=0.85),
+                # the number a file is known by at the desk or the agency
+                rule("pratica pratiche dossier", weight=0.85),
+                rule("localizzatore locator", weight=0.88),
                 # "Ref." alone: the reference of the reservation.
                 rule("ref rif riferimento reference", weight=0.85),
                 # "Codice" alone in a bookings file is very likely the reservation code, but only
                 # likely: it is proposed, to be checked.
-                rule("codice code cod", weight=0.7),
+                rule("codice code cod", none="gruppo group", weight=0.7),
             ),
-            fit_identifier,
+            fit_unique_identifier,
         ),
         F.BOOKED_AT.value: FieldSem(
             F.BOOKED_AT.value,
@@ -70,14 +76,23 @@ BOOKINGS = DomainSem(
             (
                 rule(
                     "data date",
-                    "prenotazione prenotazioni booking reservation creazione inserimento pren",
+                    "prenotazione prenotazioni booking reservation creazione inserimento pren "
+                    "registrazione registration entry",
                     none=_OTHER_DATES,
                     weight=0.9,
                 ),
                 rule(
-                    "creata creato created prenotato booked inserita bkd bkg",
+                    "creata creato created prenotato booked inserita bkd bkg registrata "
+                    "registrato inserito entered recorded",
                     none="cancellata",
                     weight=0.8,
+                ),
+                # "Prenotata in data", "Booked on date": the verb says it, the date is the noun
+                rule(
+                    "creata creato created prenotato booked registrata registrato",
+                    "data date il on",
+                    none="cancellata arrivo arrival partenza departure",
+                    weight=0.86,
                 ),
             ),
             fit_date,
@@ -87,11 +102,17 @@ BOOKINGS = DomainSem(
             _exact(F.CHECK_IN),
             (
                 rule(
-                    "arrivo arrival checkin arrivi arr", none="partenza departure out", weight=0.93
+                    "arrivo arrival checkin arrivi arr ingresso entrata",
+                    none="partenza departure out uscita",
+                    weight=0.93,
                 ),
                 rule("check", "in", none="out", weight=0.93),
+                # "CI": only a maybe by itself (an identity card is "C.I." too); its values and
+                # its partner "CO" settle it
+                rule("ci", none="co", weight=0.75),
                 rule("inizio start", "soggiorno stay", weight=0.85),
                 rule("start begin", "date data", weight=0.8),
+                rule("stay soggiorno", "from dal", weight=0.85),
                 # "Dal" alone: only a likely arrival when its partner "Al" is there (`pairs`).
                 rule("dal from", weight=0.7),
             ),
@@ -103,13 +124,15 @@ BOOKINGS = DomainSem(
             _exact(F.CHECK_OUT),
             (
                 rule(
-                    "partenza departure checkout partenze part dep",
-                    none="arrivo arrival in",
+                    "partenza departure checkout partenze part dep uscita",
+                    none="arrivo arrival in ingresso entrata",
                     weight=0.93,
                 ),
                 rule("check", "out", weight=0.93),
+                rule("co", none="ci", weight=0.75),
                 rule("fine end", "soggiorno stay", weight=0.85),
                 rule("end", "date data", weight=0.8),
+                rule("stay soggiorno", "to al fino", weight=0.85),
                 rule("al to", weight=0.7),
             ),
             fit_date,
@@ -117,13 +140,23 @@ BOOKINGS = DomainSem(
         F.STATUS.value: FieldSem(
             F.STATUS.value,
             _exact(F.STATUS),
-            (rule("stato status", none="pagamento civile", weight=0.9),),
+            (rule("stato status situazione", none="pagamento civile", weight=0.9),),
             fit_vocabulary(_is_status),
         ),
         F.ROOMS.value: FieldSem(
             F.ROOMS.value,
             _exact(F.ROOMS),
-            (rule("camere camera rooms room cam", "numero num qta quantita n", weight=0.9),),
+            (
+                rule(
+                    "camere camera rooms room cam stanze stanza rms",
+                    "numero num qta quantita n prenotate prenotata booked count totale",
+                    none="tipo tipologia categoria type",
+                    weight=0.9,
+                ),
+                # the plural / the abbreviation on its own is a count of rooms ("Camera" is not:
+                # it is as often the room itself)
+                rule("stanze rms rooms camere", none="tipo tipologia categoria type", weight=0.9),
+            ),
             fit_small_integer(100),
         ),
         F.ROOM_REVENUE.value: FieldSem(
@@ -131,8 +164,10 @@ BOOKINGS = DomainSem(
             _exact(F.ROOM_REVENUE),
             (
                 rule(
-                    "ricavo importo totale revenue prezzo amount tot imp earnings",
-                    "camera camere room rooms cam soggiorno pernottamento",
+                    "ricavo importo totale revenue prezzo amount tot imp earnings corrispettivo "
+                    "fatturato incasso incassi charges charge valore value rev",
+                    "camera camere room rooms cam soggiorno pernottamento lodging accommodation "
+                    "alloggio",
                     none="commissione commission",
                     weight=0.9,
                 ),
@@ -147,6 +182,12 @@ BOOKINGS = DomainSem(
                     "canale channel provenienza source portale origine fonte ota agenzia src can",
                     none="data codice id numero",
                     weight=0.9,
+                ),
+                # "Prenotato tramite", "Booked via": the channel the booking came through
+                rule(
+                    "tramite via through attraverso",
+                    "prenotato booked venduto sold prenotazione booking",
+                    weight=0.88,
                 ),
             ),
             fit_channel,
@@ -175,8 +216,9 @@ BOOKINGS = DomainSem(
             _exact(F.COMMISSION_AMOUNT),
             (
                 rule(
-                    "commissione commissioni commission provvigione",
-                    none="percentuale perc rate aliquota",
+                    "commissione commissioni commission provvigione comm",
+                    # ("Netto dopo commissioni" is what is left AFTER the commission)
+                    none="percentuale perc rate aliquota netto net dopo after",
                     weight=0.9,
                 ),
             ),
@@ -215,7 +257,13 @@ BOOKINGS = DomainSem(
         F.RATE_PLAN.value: FieldSem(
             F.RATE_PLAN.value,
             _exact(F.RATE_PLAN),
-            (rule("tariffa rate piano", none="commissione commission", weight=0.85),),
+            (
+                rule(
+                    "tariffa rate piano trattamento pensione board meal",
+                    none="commissione commission",
+                    weight=0.85,
+                ),
+            ),
             fit_text,
         ),
     },
@@ -232,6 +280,8 @@ BOOKINGS = DomainSem(
         PiiKind.IBAN: "IDENTITY",
     },
     pairs=(((F.CHECK_IN.value, "dal"), (F.CHECK_OUT.value, "al")),),
+    relations=(Relation(F.CHECK_IN.value, F.CHECK_OUT.value, stay_dates),),
+    context=stems("prenotazione prenotazioni booking bookings reservation reservations"),
     financial=frozenset(
         {
             F.ROOM_REVENUE.value,

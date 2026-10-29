@@ -371,6 +371,12 @@ def _extended(golden: Golden) -> dict[str, Source]:
         expected[golden.answers["grid_hours"]] = Source("GRID")
     if "period_start" in golden.answers:
         expected["work_date"] = Source("GRID")
+    column_of_amount = golden.answers.get("amount_column")
+    if golden.answers.get("amount_basis") == "NET" and column_of_amount is not None:
+        # "this amount is the NET": the bare amount column IS the net amount from now on
+        expected["net_amount"] = Source(
+            "COLUMN", tuple(column_of_amount["header"]), int(column_of_amount.get("occurrence", 1))
+        )
     return expected
 
 
@@ -741,8 +747,8 @@ def score_case(
 
 
 def _order_of(pattern: str) -> str:
-    """DMY / MDY / YMD from a strptime pattern such as %d/%m/%Y."""
-    letters = [c for c in pattern.replace("%", "") if c in "dmY"]
+    """DMY / MDY / YMD from a strptime pattern such as %d/%m/%Y (or %d/%m/%y)."""
+    letters = [c for c in pattern.replace("%", "") if c in "dmYy"]
     return "".join(letters[:3]).upper()
 
 
