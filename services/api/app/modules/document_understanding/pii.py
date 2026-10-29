@@ -26,6 +26,8 @@ class PiiKind(StrEnum):
     PHONE = "PHONE"
     TAX_CODE = "TAX_CODE"
     IBAN = "IBAN"
+    ADDRESS = "ADDRESS"
+    NOTE = "NOTE"  # free text written about a person: a guest's request, an employee's remark
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +54,16 @@ _TAX_WORDS = stems("fiscale cf codfisc")
 # "Tax" alone is the VAT of an invoice; "Tax Code" / "Tax ID" is a person's fiscal code.
 _TAX_QUALIFIERS = stems("code id codice")
 _IBAN_WORDS = stems("iban")
+_ADDRESS_WORDS = stems("indirizzo address residenza domicilio")
+# Free text a person wrote ABOUT somebody: what a guest asked for, what was noted of an employee.
+# Its content is personal (an allergy, an anniversary, a health remark) even when no name is in it,
+# so the column is never shown, sampled or sent anywhere. "Nota di credito" is a document, not this.
+_NOTE_WORDS = stems(
+    "note notes nota annotazioni annotazione commenti commento comments comment remarks remark "
+    "richieste richiesta requests request preferenze preferenza preferences allergie allergia "
+    "allergies esigenze osservazioni osservazione memo"
+)
+_NOT_A_NOTE = stems("credito credit accredito addebito debit")
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$")
 # A telephone number is written in a few recognisable ways: with the country code ("+39 333
@@ -188,6 +200,10 @@ def _classify(words: frozenset[str], stats: ColumnStats) -> PiiFinding | None:
         if stats.n == 0 or stats.text_fraction >= 0.6:
             return PiiFinding(PiiKind.PERSON_NAME, "HEADER", True)
         return None
+    if words & _ADDRESS_WORDS and stats.text_fraction >= 0.6:
+        return PiiFinding(PiiKind.ADDRESS, "HEADER", True)
+    if words & _NOTE_WORDS and not words & _NOT_A_NOTE and stats.text_fraction >= 0.6:
+        return PiiFinding(PiiKind.NOTE, "HEADER", True)
     if looks_like_names(stats):
         return PiiFinding(PiiKind.PERSON_NAME, "VALUES", False)
     return None
