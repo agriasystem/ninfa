@@ -525,8 +525,8 @@ class UnderstandingService:
         if reuse and match is not None:
             questions.extend(_conflict_questions(match, answers, questions))
         proposal = _with_known_departments(proposal, samples, taught_roles, value_questions)
-        for words_field in ("status", "cost_category"):
-            proposal = _with_known_words(proposal, words_field, value_questions)
+        # (a booking status, once its words are known; the category of a cost keeps its level)
+        proposal = _with_known_words(proposal, "status", value_questions)
 
         # --- the profile, the people, the explanation ---------------------------------------------
         # A grid whose week is not known yet is judged by the columns it WILL have (its names do
@@ -1468,9 +1468,9 @@ def _with_known_departments(
 
 
 def _with_known_words(proposal: Proposal, field: str, asked: Sequence[Question]) -> Proposal:
-    """A status / category column whose NAME is clear is as sure as its values: when no word of it
-    is left to ask about (the person has just taught them, or NINFA knew them), nothing is left to
-    doubt - and the column is not asked about on top of its words."""
+    """A column of words (a booking status) whose NAME is clear is as sure as its words: when no
+    word of it is left to ask about (the person has just taught them, or NINFA knew them), nothing
+    is left to doubt - and the column is not asked about on top of its words."""
     column = proposal.assigned().get(field)
     if (
         column is None

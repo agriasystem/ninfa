@@ -24,6 +24,7 @@ from tests.benchmarks.smart_import_v3.score import (
     REQUIRED_SCORED,
     CaseResult,
     _claims,
+    _extended,
     _matches,
     _names_junk,
     _under_question,
@@ -108,10 +109,13 @@ def first_answer_claims(first: Observed, golden: Golden) -> dict[str, int]:
     or a column the person is asked about), and into right and wrong."""
     required = REQUIRED_SCORED.get(golden.domain, frozenset())
     out = {"certain_right": 0, "certain_wrong": 0, "tentative_right": 0, "tentative_wrong": 0}
+    # (right = the document says so, or the answer the truth lists makes it so: an amount the
+    # person will confirm as NET is a right proposal)
+    truth = _extended(golden)
     for name, claims in _claims(first).items():
         if name not in required:
             continue
-        source = golden.fields.get(name)
+        source = truth.get(name)
         for claim in claims:
             relevant = (
                 source is not None
