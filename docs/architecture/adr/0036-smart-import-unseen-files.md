@@ -16,7 +16,7 @@ On the engine of ADR 0035 it gave, over the 360 documents that can be imported:
 | zero-question rate of the documents that are clear | 22.6 % |
 | false automation | 4 documents (all staff) |
 | P0 findings | 10 |
-| personal values shown to the browser | 13 documents |
+| personal values shown to the browser | 13 values in 5 documents |
 | unnecessary questions | 139 |
 
 The failures were not random. They had four causes, in this order of weight:
@@ -25,8 +25,9 @@ The failures were not random. They had four causes, in this order of weight:
    department; supplier, document number, description, net/gross) and their abbreviations ("Descr.", "CI", "Rms", "U.O.").
 2. **Evidence the engine did not use** - a column of dates called "CI" next to a column of dates called "CO" that is later than it on
    every row *is* an arrival and a departure; 48 hours on a row that names the person cannot be hours worked.
-3. **Formats** - a month written as a name over a two-digit year ("06-apr-26"), a date over a two-digit year ("04/02/26": a date for
-   the structure but invisible to the order check, so a document whose order could not be proven was offered as ready).
+3. **Formats** - a month written as a name over a two-digit year ("06-apr-26"), a month name first ("Nov 4, 2026"), and a date over a
+   two-digit year ("04/02/26": a date for the structure but invisible to the order check; a latent defect, exposed as soon as the headers
+   around it were read: such a document was offered as ready without the day/month question).
 4. **Personal data nobody was looking for** - free text about a guest ("Special Requests"), an address, an employee badge.
 
 ## Decision
