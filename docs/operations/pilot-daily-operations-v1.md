@@ -136,6 +136,9 @@ with a snapshot conflict. That is the product working as designed, not a fault:
 - re-running with identical data is a safe replay (no new run);
 - **do not delete snapshots, edit the database or try to force a re-run.**
 
+An import made through the web page handles this by itself: its refresh is queued for just after the
+next local midnight, and the page says so (see `docs/architecture/post-import-analysis-v1.md`).
+
 To avoid it: finish the import before the dispatch, and do not run a manual analysis before today's
 import.
 

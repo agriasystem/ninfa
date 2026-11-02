@@ -106,14 +106,35 @@ The browser keeps no history of its own.
 
 ## After the import
 
-The page takes a file to the data; the Decision Engine stays on the server. An import starts no analysis, today as before, and
-the page starts none: the automatic analysis runs on its own schedule. "Importazione completata" therefore says "I nuovi dati
-entreranno nella prossima analisi di NINFA" and offers "Vai a Oggi", without going there on its own.
+The page takes a file to the data; the Decision Engine stays on the server. A successful import asks the worker for a refresh of
+the analysis by itself ([post-import-analysis-v1.md](post-import-analysis-v1.md)), and the page starts nothing: "Importazione
+completata" says where the analysis stands, live ("Aggiornamento analisi…", then "Analisi aggiornata."), and offers "Vai a Oggi",
+without going there on its own.
+
+## A bookings file need not count rooms
+
+`Booking.rooms` is the rooms OF THE BOOKING, not of the hotel: the hotel's are the room inventory (`RoomInventoryDaily`), which no
+file has to provide and none is read for, not even a "Camere struttura: 32" written above the table. An export that writes one room
+per line simply has no such column, and the engine used to stop there (`MISSING_REQUIRED`).
+
+A field may now declare what its absence means (`ConstantSpec.when_absent`). With no column for it, `rooms` is 1 on every row, as a
+constant in the decision, verified and saved like any other. It is said on the summary (`understanding.assumed`), and it is not
+among the things NINFA read from the file. A column that might be the field keeps it open: it is never overruled. The canonical
+model does not change: every booking still has a positive `rooms`.
+
+What depends on capacity is limited on its own, as before: with no inventory, occupancy is not available. Measured in
+[booking-without-rooms-v1.md](../benchmarks/booking-without-rooms-v1.md).
+
+## The limits of a file
+
+`GET .../data-sources/import-limits` says them: 10 MB (the route's own `MAX_FILE_BYTES`), 100.000 rows and 200 columns (the readers'),
+`.csv` and `.xlsx`. The page repeats none of them: with no answer it checks nothing by itself, and the backend still decides. The
+readers alone would take 25 MB, but no file that large can reach them through this API.
 
 ## Errors
 
-Refused in the browser, with nothing sent: a format that is not CSV or Excel, an empty file, a file over the 10 MB of the backend's
-own limit (the backend still decides: this only spares the browser from reading it into memory), several files at once. Everything
+Refused in the browser, with nothing sent: a format that is not CSV or Excel, an empty file, a file over the backend's own limit
+(the backend still decides: this only spares the browser from reading it into memory), several files at once. Everything
 else is the backend's answer in a plain sentence: a file it cannot read, an import that fails, another import running, several sources
 of a kind (`SEVERAL_SOURCES`), a file the browser can no longer read. A session that has ended, or a property no longer the person's,
 goes back through the session check and from there to the login. A file dropped beside the zone does not make the browser leave the page.

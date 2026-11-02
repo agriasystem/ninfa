@@ -69,7 +69,7 @@ Gates 1 and 2: `... downgrade 0002_procrastinate_schema`.
 | What     | Command              | Default address / notes                       |
 | -------- | -------------------- | --------------------------------------------- |
 | API      | `npm run dev:api`    | `http://127.0.0.1:8000/api/v1/health`         |
-| Worker   | `npm run dev:worker` | Ctrl+C to stop                                |
+| Worker   | `npm run dev:worker` | Ctrl+C to stop. Needed for an import to reach the Home |
 | Web      | `npm run dev:web`    | `http://127.0.0.1:3100`                       |
 
 Ports and hosts are configurable through `API_HOST`, `API_PORT`, `WEB_HOST`, `WEB_PORT` (the web

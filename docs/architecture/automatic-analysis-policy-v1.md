@@ -1,8 +1,11 @@
 # Automatic Analysis Policy V1 (Gate 26B)
 
 Gate 25 made the analysis runnable by a worker. Gate 26B adds the **policy** that says what may run
-automatically, plus the commands an external scheduler uses. **Nothing inside NINFA schedules
-anything**, and automation is **not hands-off** while booking intake is a manual file import.
+automatically, plus the commands an external scheduler uses. **This policy schedules nothing inside
+NINFA**, and automation is **not hands-off** while booking intake is a manual file import.
+
+An import made through the web page asks for its own refresh of the analysis: see
+[post-import-analysis-v1.md](post-import-analysis-v1.md). A run it makes counts as today's run here too.
 
 ## The frozen V1 policy
 

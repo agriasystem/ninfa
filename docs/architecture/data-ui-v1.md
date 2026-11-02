@@ -44,7 +44,8 @@ Built from the repository as it is - no metric was assumed. "Now" = shown by Dat
 | Day-level OTA share | none: the OTA metric is a 30-night window | **no** | - | - | **Omitted** (no OTA column in the table) |
 | Per-night "Regolare" | per-night evaluation outcomes are **not persisted** (a run stores counts only) | derived from the run, see below | - | - | **Now, conservatively** |
 | Cost of the month in progress | invoices arrive after the fact; Cost CPOR V1 evaluates concluded months only | not safely | - | - | **Not shown** |
-| Labor cost / incidence / FTE / productivity | not defined | **no** | - | - | **Not shown** |
+| Labor incidence on revenue, revenue per labor hour | plain divisions of stored figures, on the SAME days | yes | `LaborEconomics` | on-books room revenue of the plan's own days | **Now** (Personale) |
+| FTE, productivity of a person or of a department | not defined: the hotel's revenue is not produced by one department | **no** | - | - | **Not shown** |
 | Fatturato, incassi, margine, RevPAR, cancellations, no-show, OTA commission amounts, forecast, competitor / market benchmark, revenue by channel | not defined / not modelled (see the Mia V2 capability matrix) | **no** | - | - | **Not shown**, extension points left clean |
 
 ## Architecture
@@ -123,8 +124,14 @@ exact; it is deferred, and the table says "Lo stato riflette solo le decisioni d
 - **Costi:** the last concluded month's net cost (by invoice date), change vs the month before, the share
   of cost in a recognised category, the category table with the cost per occupied room or the reason it is
   missing, the cost decision with its own figures. Costs in another currency are flagged, never converted.
-- **Personale:** planned hours (and planned cost when every shift has one) by role for the next 7 days,
-  days with data / incomplete, the overstaffing decision's facts. No incidence, productivity, FTE or ratio.
+- **Personale:** five figures for the next 7 days, each computed once in the backend on exact values:
+  planned hours; planned cost; average hourly cost (`cost / hours`); incidence on revenue
+  (`cost / reference revenue * 100`); revenue per labor hour (`reference revenue / hours`). The reference
+  revenue is the on-books room revenue of EXACTLY the days with hours, so labor of one week never meets the
+  revenue of another; what cannot be compared is absent with a reason (`LaborRevenueGap`), never a zero. By
+  role: hours, cost, hourly cost, share of the labor cost, incidence on revenue, days with data. A role never
+  has revenue of its own, and no FTE is defined. How many people are planned is not known: the labor model
+  holds no person, on purpose.
 
 ## Provenance and the rules that keep numbers honest
 
