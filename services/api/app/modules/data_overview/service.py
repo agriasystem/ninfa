@@ -20,6 +20,7 @@ Scope and provenance, like every other NINFA read:
 import logging
 from collections.abc import Sequence
 from datetime import date, timedelta
+from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -211,6 +212,7 @@ class DataOverviewService:
             source_id=labor_source.source_id,
             source_reason=_unavailable_reason_of(labor_source.reason),
             labor_decision=_first_of_type(feed.items, PriorityDecisionType.LABOR_OVERSTAFFING),
+            revenue_by_day=self._revenue_by_day(booking_source_id, as_of),
         )
         freshness = OverviewFreshness(
             bookings=booking_freshness_of(run),
@@ -235,6 +237,21 @@ class DataOverviewService:
         )
 
     # --- bookings / occupancy ----------------------------------------------------------------
+
+    def _revenue_by_day(self, source_id: UUID | None, as_of: date) -> dict[date, Decimal] | None:
+        """The on-books room revenue of the labor window's nights, as the analysis day observed
+        them: the only revenue NINFA holds for days to come. None with no observation at all."""
+        if source_id is None:
+            return None
+        days = LaborOverviewReader.window_days(as_of)
+        rows = self._snapshots.list_for_snapshot_date(
+            source_id,
+            as_of,
+            stay_date_from=days[0],
+            stay_date_to=days[-1],
+            origin=SnapshotOrigin.OBSERVED,
+        )
+        return {row.stay_date: row.allocated_room_revenue_on_books for row in rows} or None
 
     def _occupancy(
         self,

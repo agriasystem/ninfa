@@ -143,6 +143,22 @@ class LaborCategoryResponse(BaseModel):
     days_complete: int
     days_incomplete: int
     planned_cost: str | None
+    average_hourly_cost: str | None
+    cost_share_pct: str | None
+    revenue_incidence_pct: str | None
+
+
+class LaborEconomicsResponse(BaseModel):
+    planned_hours: str | None
+    planned_cost: str | None
+    average_hourly_cost: str | None
+    period_start: date | None
+    period_end: date | None
+    period_days: int
+    reference_revenue: str | None
+    revenue_gap: str | None
+    cost_to_revenue_pct: str | None
+    revenue_per_hour: str | None
 
 
 class LaborDecisionResponse(BaseModel):
@@ -163,6 +179,7 @@ class LaborResponse(BaseModel):
     days_with_data: int
     categories: list[LaborCategoryResponse]
     decision: LaborDecisionResponse | None
+    economics: LaborEconomicsResponse
 
 
 # --- freshness / analysis ----------------------------------------------------------------------

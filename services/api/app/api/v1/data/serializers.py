@@ -17,6 +17,7 @@ from app.api.v1.data.schemas import (
     FreshnessResponse,
     LaborCategoryResponse,
     LaborDecisionResponse,
+    LaborEconomicsResponse,
     LaborResponse,
     NightRowResponse,
     OccupancyResponse,
@@ -176,6 +177,7 @@ def _costs(costs: CostOverview) -> CostsResponse:
 
 def _labor(labor: LaborOverview) -> LaborResponse:
     decision = labor.decision
+    economics = labor.economics
     return LaborResponse(
         state=labor.state.value,
         reason=None if labor.reason is None else labor.reason.value,
@@ -190,9 +192,24 @@ def _labor(labor: LaborOverview) -> LaborResponse:
                 days_complete=row.days_complete,
                 days_incomplete=row.days_incomplete,
                 planned_cost=_text(row.planned_cost),
+                average_hourly_cost=_text(row.average_hourly_cost),
+                cost_share_pct=_text(row.cost_share_pct),
+                revenue_incidence_pct=_text(row.revenue_incidence_pct),
             )
             for row in labor.categories
         ],
+        economics=LaborEconomicsResponse(
+            planned_hours=_text(economics.planned_hours),
+            planned_cost=_text(economics.planned_cost),
+            average_hourly_cost=_text(economics.average_hourly_cost),
+            period_start=economics.period_start,
+            period_end=economics.period_end,
+            period_days=economics.period_days,
+            reference_revenue=_text(economics.reference_revenue),
+            revenue_gap=None if economics.revenue_gap is None else economics.revenue_gap.value,
+            cost_to_revenue_pct=_text(economics.cost_to_revenue_pct),
+            revenue_per_hour=_text(economics.revenue_per_hour),
+        ),
         decision=(
             None
             if decision is None

@@ -279,6 +279,45 @@ class LaborCategoryRow:
     days_complete: int
     days_incomplete: int
     planned_cost: Decimal | None
+    # `planned_cost / planned_hours`; None when either is unknown or there are no hours.
+    average_hourly_cost: Decimal | None = None
+    # The share of the property's planned labor cost: None when that total is not known.
+    cost_share_pct: Decimal | None = None
+    # `planned_cost / the property's reference revenue * 100`. Deliberately no "revenue per hour" of
+    # a role: the hotel's revenue is not produced by one department.
+    revenue_incidence_pct: Decimal | None = None
+
+
+class LaborRevenueGap(StrEnum):
+    """Why the labor figures have no revenue beside them. A figure that cannot be compared on the
+    SAME days is absent, never computed against another period."""
+
+    NO_LABOR = "NO_LABOR"  # no day with planned hours to compare
+    NO_ANALYSIS = "NO_ANALYSIS"  # no observation of the bookings for this day yet
+    PERIOD_NOT_COVERED = "PERIOD_NOT_COVERED"  # a day with hours has no revenue stored
+    LABOR_INCOMPLETE = "LABOR_INCOMPLETE"  # part of the plan has no hours: the ratio would flatter
+    NO_REVENUE = "NO_REVENUE"  # nothing on the books for those days (a real zero: no ratio)
+
+
+@dataclass(frozen=True, slots=True)
+class LaborEconomics:
+    """The planned labor of the window as a whole, and how it compares with the revenue of the same
+    days. Every division is made here, on exact values, once: the page only formats.
+
+    `reference_revenue` is the ON-BOOKS room revenue of exactly `period_days` (the stored OBSERVED
+    snapshots of the analysis day): what is booked so far, never a forecast. `revenue_gap` says why
+    it is `None`. The two ratios need it AND, for the incidence, a known cost."""
+
+    planned_hours: Decimal | None
+    planned_cost: Decimal | None
+    average_hourly_cost: Decimal | None
+    period_start: date | None
+    period_end: date | None
+    period_days: int
+    reference_revenue: Decimal | None
+    revenue_gap: LaborRevenueGap | None
+    cost_to_revenue_pct: Decimal | None
+    revenue_per_hour: Decimal | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,6 +343,7 @@ class LaborOverview:
     days_with_data: int
     categories: tuple[LaborCategoryRow, ...]
     decision: LaborDecisionFacts | None
+    economics: LaborEconomics
 
 
 # --- freshness / coverage -------------------------------------------------------------------------
@@ -367,7 +407,9 @@ __all__ = [
     "FreshnessReason",
     "LaborCategoryRow",
     "LaborDecisionFacts",
+    "LaborEconomics",
     "LaborOverview",
+    "LaborRevenueGap",
     "NightRow",
     "NightStatus",
     "OccupancyOverview",
