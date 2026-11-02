@@ -462,6 +462,8 @@ class UnderstandingService:
         if currency and _has_cost_without_currency(domain, proposal):
             # Costs with no currency in the file: the hotel's own currency, said so on screen.
             constants["currency"] = currency
+        absent_means = _meaning_of_absent_columns(adapter, proposal)
+        constants.update(absent_means)
 
         decision_labels = {name: dict(words) for name, words in answers.labels.items() if words}
         if domain == DataSourceDomain.COSTS and "cost_category" in proposal.assigned():
@@ -599,6 +601,10 @@ class UnderstandingService:
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
+        # (the same reading on every file of a source: the file still does not say)
+        assumed = frozenset(
+            key for key, value in absent_means.items() if decision.constants.get(key) == value
+        )
         recognized = self._recognized(
             proposal,
             decision,
@@ -611,6 +617,7 @@ class UnderstandingService:
             ai_headers,
             samples,
             frozenset(remembered),
+            assumed,
         )
         level = self._level(
             adapter,
@@ -638,6 +645,7 @@ class UnderstandingService:
             people=people,
             questions=tuple(_dedupe(questions)),
             blockers=tuple(blockers),
+            assumed=tuple(sorted(assumed)),
         )
         complete = check.valid
         canonical = complete and all(
@@ -1157,6 +1165,7 @@ class UnderstandingService:
         ai_headers: frozenset[str] = frozenset(),
         samples: Sequence[ColumnSample] = (),
         remembered: frozenset[str] = frozenset(),
+        assumed: frozenset[str] = frozenset(),
     ) -> list[Recognized]:
         out: list[Recognized] = []
         decided = {c.header: c.field for c in decision.columns if c.field is not None}
@@ -1197,6 +1206,8 @@ class UnderstandingService:
                 )
             )
         for key, value in decision.constants.items():
+            if key in assumed:
+                continue  # nothing read from the file: `UnderstandingInfo.assumed` says it
             if by_profile:
                 kind = OriginKind.PROFILE
             else:
@@ -1370,6 +1381,24 @@ _MAX_CONFIRMATIONS = 2
 # ...and so is a column that may be one of two things, or one of two look-alikes.
 _MAX_AMBIGUITY_QUESTIONS = 3
 _AMOUNT_CHECK_ROWS = 400
+
+
+def _meaning_of_absent_columns(adapter: FileDomain, proposal: Proposal) -> dict[str, str | int]:
+    """The fields a file may simply not state (`ConstantSpec.when_absent`) and that this one does
+    not. A column that might be the field keeps it open: it is asked about, never overruled."""
+    assigned = proposal.assigned()
+    out: dict[str, str | int] = {}
+    for spec in adapter.fields:
+        constant = spec.constant
+        if constant is None or not constant.when_absent or constant.default is None:
+            continue
+        if spec.key in assigned or any(
+            column.ambiguous_group and spec.key in column.ambiguous_fields
+            for column in proposal.columns
+        ):
+            continue
+        out[spec.key] = constant.default
+    return out
 
 
 def _ambiguity_questions(

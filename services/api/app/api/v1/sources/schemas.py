@@ -70,6 +70,13 @@ class RecentImportsResponse(BaseModel):
     imports: list[RecentImportResponse]
 
 
+class ImportLimitsResponse(BaseModel):
+    max_file_bytes: int
+    max_rows: int
+    max_columns: int
+    file_extensions: list[str]
+
+
 class ImportResultResponse(BaseModel):
     succeeded: bool
     problem: str | None
@@ -214,6 +221,7 @@ class UnderstandingResponse(BaseModel):
     people: int | None
     questions: list[QuestionResponse]
     blockers: list[BlockerResponse]
+    assumed: list[str]
 
 
 class DryRunSummaryResponse(BaseModel):

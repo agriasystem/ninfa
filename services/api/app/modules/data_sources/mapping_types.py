@@ -121,11 +121,17 @@ class ConstantKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ConstantSpec:
-    """A field that may be given ONE value for every row of the file."""
+    """A field that may be given ONE value for every row of the file.
+
+    `when_absent`: a file with no column for this field still says what it means, and `default` is
+    what it says - a line of a bookings export is one room unless the file counts them. NINFA then
+    reads that value by itself and states it on the summary. It is never used while a column of the
+    file might be the field: that is a question, not an absence."""
 
     kind: ConstantKind
     choices: tuple[str, ...] = ()
     default: str | int | None = None
+    when_absent: bool = False
 
 
 @dataclass(frozen=True, slots=True)

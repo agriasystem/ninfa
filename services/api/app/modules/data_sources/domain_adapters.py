@@ -212,7 +212,9 @@ class BookingsDomain(FileDomain):
         FieldSpec(
             CanonicalField.ROOMS.value,
             FieldKind.INTEGER,
-            ConstantSpec(ConstantKind.INTEGER, default=1),
+            # The rooms OF THE BOOKING, not the rooms of the hotel (that is the room inventory,
+            # which no booking file has to provide): one row is one room unless the file counts.
+            ConstantSpec(ConstantKind.INTEGER, default=1, when_absent=True),
         ),
         FieldSpec(CanonicalField.ROOM_REVENUE.value, FieldKind.DECIMAL),
         FieldSpec(CanonicalField.CHANNEL.value, FieldKind.TEXT, ConstantSpec(ConstantKind.TEXT)),

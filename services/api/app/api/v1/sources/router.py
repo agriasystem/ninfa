@@ -6,6 +6,7 @@ up, how a file gets in, how a source is switched off.
     POST   .../data-sources/import-preview?domain=  look at a file, writes NOTHING
     POST   .../data-sources/imports?domain=         import it (the pilot's own services)
     GET    .../data-sources/imports                 the latest import attempts of the property
+    GET    .../data-sources/import-limits           what a file may be (size, rows, columns, kinds)
     GET    .../data-sources/templates/{domain}      the column row of the canonical CSV
 
 Smart Import - the hotel's own CSV / Excel file, with the person's matching of its columns:
@@ -48,6 +49,7 @@ from app.api.v1.sources.schemas import (
     FieldSpecResponse,
     FileInspectionResponse,
     FormatHintResponse,
+    ImportLimitsResponse,
     ImportPreviewResponse,
     ImportResultResponse,
     InvalidRowResponse,
@@ -72,6 +74,8 @@ from app.api.v1.sources.schemas import (
     UnderstandRequest,
 )
 from app.db.session import get_session
+from app.modules.bookings.parsers import MAX_COLUMNS as PARSER_MAX_COLUMNS
+from app.modules.bookings.parsers import MAX_ROWS as PARSER_MAX_ROWS
 from app.modules.data_sources.errors import (
     DataSourceNotFoundError,
     FileTooLargeError,
@@ -79,7 +83,7 @@ from app.modules.data_sources.errors import (
     InvalidSnapshotDateError,
     UnsupportedDomainError,
 )
-from app.modules.data_sources.files import MAX_FILE_BYTES, template_csv
+from app.modules.data_sources.files import IMPORTABLE_EXTENSIONS, MAX_FILE_BYTES, template_csv
 from app.modules.data_sources.mapping_types import (
     DryRun,
     FileInspection,
@@ -323,6 +327,24 @@ async def preview_import(
         sample_rows=[list(row) for row in preview.sample_rows],
         documents_with_issues=preview.documents_with_issues,
         already_imported=preview.already_imported,
+    )
+
+
+@router.get(
+    "/import-limits",
+    response_model=ImportLimitsResponse,
+    summary="What a file may be: the backend's own limits, so that no page repeats them",
+)
+def get_import_limits(
+    response: Response,
+    _scope: PropertyScope = Depends(resolve_property_scope),
+) -> ImportLimitsResponse:
+    response.headers["Cache-Control"] = "no-store"
+    return ImportLimitsResponse(
+        max_file_bytes=MAX_FILE_BYTES,
+        max_rows=PARSER_MAX_ROWS,
+        max_columns=PARSER_MAX_COLUMNS,
+        file_extensions=list(IMPORTABLE_EXTENSIONS),
     )
 
 

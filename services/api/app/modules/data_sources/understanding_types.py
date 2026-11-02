@@ -204,6 +204,9 @@ class UnderstandingInfo:
     people: int | None = None
     questions: tuple[Question, ...] = ()
     blockers: tuple[Blocker, ...] = ()
+    # The fields the file does not state and whose absence has a meaning of its own (one row, one
+    # room): nothing NINFA read, so never among `recognized`, and said on the summary.
+    assumed: tuple[str, ...] = ()
 
 
 __all__ = [

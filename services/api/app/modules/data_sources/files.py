@@ -32,6 +32,8 @@ from app.modules.labor.mapping import (
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
+# What the import-file page accepts: what the readers read (`bookings.parsers.detect_file_type`).
+IMPORTABLE_EXTENSIONS = (".csv", ".xlsx")
 SAMPLE_ROWS = 3
 SAMPLE_COLUMNS = 6
 
