@@ -486,6 +486,7 @@ export function understoodInspection(
   understanding: Partial<Understanding> = {},
   overrides: Partial<FileInspectionResponse> = {},
 ): FileInspectionResponse {
+  const domain = overrides.domain ?? "LABOR";
   return laborInspection({
     file_type: "XLSX",
     columns: [
@@ -496,7 +497,11 @@ export function understoodInspection(
       column(4, "Ore effettive", ["8,5", "6"], { field: "actual_hours", level: "RECOGNIZED" }),
       column(5, "Costo previsto", ["120", "84"], { field: "planned_cost", level: "RECOGNIZED" }),
     ],
-    understanding: understandingOf(understanding),
+    // (the backend's verdict on the document agrees with the kind it was read as, unless a test says otherwise)
+    understanding: understandingOf({
+      detection: { domain, level: "HIGH", scores: [{ domain, score: 0.93 }], expected: domain },
+      ...understanding,
+    }),
     proposal: proposalOf(),
     ...overrides,
   });

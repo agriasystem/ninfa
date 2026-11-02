@@ -4,8 +4,8 @@
 its profile, its room inventory, the few operating parameters the analysis uses, and which systems feed it.
 It is **not** a PMS, a CMS or a hotel page. Blocks 1-3 (profile, inventory, parameters) are **frontend-only**: no
 endpoint, no migration, no new dependency, no model, no Mia. **Block 4 (Fonti dati) is real**: it has its own backend
-API and working dialogs - see [data-sources-v1.md](data-sources-v1.md). The visual source of truth is the approved
-mockup of the screen.
+API and working dialogs - see [data-sources-v1.md](data-sources-v1.md); a CSV or Excel file comes in through the "Importa file"
+page, see [importa-file-v1.md](importa-file-v1.md). The visual source of truth is the approved mockup of the screen.
 
 ## Composition
 

@@ -4,7 +4,7 @@ import { useMemo, useState, type ComponentType, type SVGProps } from "react";
 
 import type { SourceCardKey } from "@ninfa/contracts";
 
-import { datiRoute } from "@/lib/routes";
+import { datiRoute, importaFileRoute } from "@/lib/routes";
 import { sourcesCopy } from "@/lib/sources/copy";
 import { strutturaCopy } from "@/lib/structure/copy";
 import { useDataSources } from "@/lib/sources/use-data-sources";
@@ -42,10 +42,12 @@ const CATEGORY_ICONS: Record<SourceCardKey, ComponentType<SVGProps<SVGSVGElement
 };
 
 /** The page an action that is a LINK (not a dialog) goes to: the Dati section already shows the real
- * bookings and channels, so nothing is duplicated here. */
+ * bookings and channels, and a file comes in through "Importa file", so nothing is duplicated here. (Invoices
+ * are the one kind of file that page does not read: their "Carica nuovo file" opens the card's own dialog.) */
 function hrefOfAction(propertyId: string, view: SourceCardView, item: CardButton): string | undefined {
   if (item.action === "view-channels") return datiRoute(propertyId, { tab: "distribution" });
   if (item.action === "view") return datiRoute(propertyId, { tab: "bookings" });
+  if (item.action === "upload" && view.card.domain !== "COSTS") return importaFileRoute(propertyId);
   return undefined;
 }
 
@@ -147,9 +149,10 @@ export interface StrutturaSourcesProps {
  * Block 4 - where NINFA's data come from, and what the user can do about it. Every card says what the
  * BACKEND says (configured, received through another source, never imported...): while the answer is on its
  * way the block says so, and if it fails the block says that - it never shows "Non configurato" it has not
- * verified. Each card works: "Collega fonte", "Carica file", "Gestisci" and the "..." menu open real
- * dialogs that put a file into NINFA through the existing import services. Nothing here simulates an
- * integration: what does not exist yet is "Prossimamente".
+ * verified. This block says where the data come from; bringing a file in is the "Importa file" page, and
+ * each card leads there ("Collega fonte", "Carica nuovo file", "Gestisci", the "..." menu). The one file taken in
+ * here is an electronic invoice (XML), which that page does not read. Nothing here simulates an integration:
+ * what does not exist yet is "Prossimamente".
  */
 export function StrutturaSources({ propertyId, timeZone, onPropertyInvalid }: StrutturaSourcesProps) {
   const sources = useDataSources(propertyId, onPropertyInvalid);
@@ -175,9 +178,8 @@ export function StrutturaSources({ propertyId, timeZone, onPropertyInvalid }: St
         setDialog({ kind: "manage", card: view.key, confirmRemove: true });
         break;
       case "upload":
-        if (view.card.domain !== null && !view.card.several_sources) {
-          setDialog({ kind: "import", domain: view.card.domain });
-        }
+        // (only the invoices of Contabilità get here: every other "Carica nuovo file" is a link)
+        if (!view.card.several_sources) setDialog({ kind: "connect", card: view.key });
         break;
       default:
         break; // "view" / "view-channels" are links: the browser follows them
@@ -191,14 +193,19 @@ export function StrutturaSources({ propertyId, timeZone, onPropertyInvalid }: St
       title={SECTION.title}
       description={SECTION.description}
       action={
-        <StrutturaButton
-          variant="primary"
-          Icon={PlusIcon}
-          disabled={sources.data === null}
-          onClick={() => setDialog({ kind: "wizard" })}
-        >
-          {COPY.actions.connectNew}
-        </StrutturaButton>
+        <div className="struttura-card__actions">
+          <StrutturaLinkButton variant="outline" href={importaFileRoute(propertyId)}>
+            {COPY.actions.importFile}
+          </StrutturaLinkButton>
+          <StrutturaButton
+            variant="primary"
+            Icon={PlusIcon}
+            disabled={sources.data === null}
+            onClick={() => setDialog({ kind: "wizard" })}
+          >
+            {COPY.actions.connectNew}
+          </StrutturaButton>
+        </div>
       }
     >
       {sources.status === "loading" ? <SourcesSkeleton /> : null}

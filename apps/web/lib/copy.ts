@@ -86,6 +86,7 @@ export const copy = {
     today: "Oggi",
     decisions: "Decisioni",
     data: "Dati",
+    importFile: "Importa file",
     structure: "Struttura",
     settings: "Impostazioni",
     profile: "Profilo e account",

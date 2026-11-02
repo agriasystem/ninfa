@@ -3,8 +3,8 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
@@ -122,6 +122,23 @@ class ImportJobRepository:
         if status is not None:
             query = query.where(ImportJob.status == status)
         return self._session.scalars(query.order_by(ImportJob.created_at)).all()
+
+    def list_recent_for_property(self, property_id: UUID, *, limit: int) -> Sequence[ImportJob]:
+        """The latest import attempts of ONE property, newest first, with their source and file
+        (`id` as a deterministic tie-break, like `latest_succeeded_for_data_source`)."""
+        return self._session.scalars(
+            select(ImportJob)
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.property_id == property_id,
+            )
+            .options(selectinload(ImportJob.data_source), selectinload(ImportJob.files))
+            .order_by(
+                func.coalesce(ImportJob.finished_at, ImportJob.created_at).desc(),
+                ImportJob.id.desc(),
+            )
+            .limit(limit)
+        ).all()
 
     def latest_succeeded_for_data_source(self, data_source_id: UUID) -> ImportJob | None:
         """The latest SUCCEEDED import of this EXACT data source (Gate 23B), ordered by

@@ -693,6 +693,20 @@ export interface ImportResultResponse {
   already_imported: boolean;
 }
 
+/** One import attempt of a property, for "Importazioni recenti". A failed one says only that it failed. */
+export interface RecentImport {
+  /** The name the file had, with any personal value masked. `null`: no file was recorded. */
+  file_name: string | null;
+  domain: DataSourceDomain;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  /** When it ended, or (an attempt still running) when it began. */
+  at: string;
+}
+
+export interface RecentImportsResponse {
+  imports: RecentImport[];
+}
+
 // --- Smart Import: the hotel's own CSV / Excel file, its columns matched by the person -------------------
 
 /** What a column of a spreadsheet-like file can mean. The backend owns the list (`fields` of an inspection). */

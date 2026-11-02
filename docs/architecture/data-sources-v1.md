@@ -5,6 +5,10 @@ data come from and to put a file in: the cards show what the backend says, "Coll
 the "..." menu open working dialogs, and a file goes through the SAME import services the pilot CLI already used.
 **No migration, no new dependency, no integration simulated.**
 
+> **Importa file V1** moved the way a CSV / Excel file comes in out of this block, to its own page: see
+> [importa-file-v1.md](importa-file-v1.md). What follows about the backend, the rules and the states still holds; the
+> dialogs described here now lead to that page, and only an electronic invoice (XML) is still taken in here.
+
 ## Rule: the UI and the state tell the truth
 
 NINFA has exactly **one kind of data source: a file** (`DataSource.source_type = FILE_UPLOAD`) of one of three domains.

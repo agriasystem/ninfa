@@ -8,6 +8,9 @@ the person ended up answering "Reparto di tutte le righe" about a file that has 
 **Smart Import V3** reads the whole DOCUMENT first (every sheet, titles, totals, sections, grids), says what it understood
 and asks ONLY what is really ambiguous. Almost always the person sees a summary and one button.
 
+> The screens described here now live on the "Importa file" page, which reads the kind of data from the document instead of a
+> card: see [importa-file-v1.md](importa-file-v1.md).
+
 **No migration. No new dependency. No employee identity. Nothing of Decision Engine, Mia, scoring, Home, auth or connectors
 is touched.** The AI part exists as a boundary and is OFF by default; everything works without it.
 

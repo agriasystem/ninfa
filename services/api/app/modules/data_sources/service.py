@@ -65,6 +65,7 @@ from app.modules.data_sources.types import (
     DOMAIN_METHOD,
     DOMAIN_SOURCE_NAME,
     DerivedFrom,
+    RecentImport,
     SourceCapability,
     SourceCard,
     SourceCardState,
@@ -76,6 +77,7 @@ from app.modules.data_sources.understanding import (
     UnderstandingService,
     confirmation_from,
 )
+from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.ingestion.canonical_csv import (
     booking_format_options,
     identity_column_mapping,
@@ -97,6 +99,7 @@ from app.modules.properties.repository import PropertyRepository
 logger = logging.getLogger(__name__)
 
 _MAX_CHANNELS_SHOWN = 8
+_RECENT_IMPORTS_SHOWN = 10
 
 # How long an import waits for another import of the same kind and property to finish. An import is
 # seconds of work (10 MB at most); past this wait the caller is told to retry instead of hanging.
@@ -244,6 +247,21 @@ class DataSourcesService:
             if channel.channel_type == ChannelType.OTA
         )
         return tuple(names[:_MAX_CHANNELS_SHOWN])
+
+    def recent_imports(self, property_id: UUID) -> tuple[RecentImport, ...]:
+        """The latest import attempts of this property, newest first. Read-only. The name of a
+        file was chosen by a person and may name one: it passes the same gate as every other
+        answer about a file (an e-mail, a telephone number, a tax code or an IBAN never travels)."""
+        guard = PersonalDataGuard()
+        return tuple(
+            RecentImport(
+                file_name=guard.clean(job.files[0].original_filename) if job.files else None,
+                domain=job.data_source.domain,
+                status=job.status,
+                at=job.finished_at or job.created_at,
+            )
+            for job in self._jobs.list_recent_for_property(property_id, limit=_RECENT_IMPORTS_SHOWN)
+        )
 
     # --- removing -------------------------------------------------------------------------------
 

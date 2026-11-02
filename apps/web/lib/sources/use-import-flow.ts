@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   DataSourceDomain,
@@ -8,26 +8,16 @@ import type {
   ImportFieldKey,
   ImportFormatHint,
   ImportMapping,
-  ImportPreviewResponse,
   ImportProblem,
-  ImportResultResponse,
   ImportValidationResponse,
   MappedImportResultResponse,
   MappingCheckResponse,
-  SourceMethod,
   UnderstandAnswers,
   Understanding,
   UnderstandingQuestion,
 } from "@ninfa/contracts";
 
-import {
-  checkMapping,
-  importFile,
-  importMatchedFile,
-  previewImport,
-  understandFile,
-  validateImport,
-} from "@/lib/api/data-sources";
+import { checkMapping, importMatchedFile, understandFile, validateImport } from "@/lib/api/data-sources";
 import type { ApiResult } from "@/lib/api/client";
 
 import {
@@ -42,41 +32,32 @@ import {
   withDecimalStyle,
 } from "./mapping-decision";
 
-/** The way a domain's file arrives: the ONLY formats NINFA reads today. */
-export const METHOD_OF_DOMAIN: Record<DataSourceDomain, SourceMethod> = {
-  BOOKINGS: "CSV",
-  COSTS: "XML",
-  LABOR: "CSV",
-};
+/** The files Smart Import reads. An electronic invoice (XML) has its own path: see `use-invoice-import.ts`. */
+const FILE_EXTENSIONS = [".csv", ".xlsx"];
 
-/** What the hotel can choose: a spreadsheet-like file for bookings and staff; for costs the invoices' XML or a
- * register in the same kind of file. */
-const EXTENSIONS_OF_DOMAIN: Record<DataSourceDomain, string[]> = {
-  BOOKINGS: [".csv", ".xlsx"],
-  COSTS: [".xml", ".csv", ".xlsx"],
-  LABOR: [".csv", ".xlsx"],
-};
+export const FILE_ACCEPT = ".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-export const ACCEPT_OF_DOMAIN: Record<DataSourceDomain, string> = {
-  BOOKINGS: ".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  COSTS:
-    ".xml,.csv,.xlsx,text/xml,application/xml,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  LABOR: ".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-};
+/** The backend's own limit (`MAX_FILE_BYTES`), and it stays the one that decides: this only spares the browser
+ * from reading into memory a file that would be refused anyway. */
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-/** An invoice XML keeps its own short path; every other file NINFA reads is a spreadsheet-like one. */
-function isInvoiceXml(file: File): boolean {
-  return file.name.toLowerCase().endsWith(".xml");
-}
-
-/** The way THIS file arrives (a costs register is a spreadsheet-like file, an invoice is XML). */
-export function methodOfFile(domain: DataSourceDomain, file: File | null): SourceMethod {
-  if (file === null) return METHOD_OF_DOMAIN[domain];
-  return isInvoiceXml(file) ? "XML" : "CSV";
-}
+/**
+ * The first reading of a file nobody has said anything about. The API reads a file "as" a kind of data, but the
+ * verdict on what the document IS (`understanding.detection`) is the same whichever kind is named: this stands
+ * for no choice of the person's, and what the backend answers about THIS kind is used only if the verdict agrees.
+ */
+const FIRST_READING: DataSourceDomain = "BOOKINGS";
 
 /** A problem that is not about the file itself. */
-export type FlowProblem = ImportProblem | "SOURCE_GONE" | "IMPORT_IN_PROGRESS";
+export type FlowProblem =
+  | ImportProblem
+  | "SOURCE_GONE"
+  | "IMPORT_IN_PROGRESS"
+  | "SEVERAL_SOURCES"
+  | "SESSION_EXPIRED";
+
+/** Why a file never left the browser. */
+export type RejectedFile = "WRONG_TYPE" | "EMPTY" | "TOO_LARGE" | "SEVERAL";
 
 export interface MappingStep {
   step: "mapping";
@@ -109,6 +90,26 @@ export interface ReadyStep {
   understanding: Understanding | null;
 }
 
+/** NINFA read the file but is not sure enough to go on alone: it says so, and the person decides. */
+export interface ManualStep {
+  step: "manual";
+  file: File;
+  inspection: FileInspectionResponse;
+  understanding: Understanding;
+  /** Questions about how the file writes dates / numbers, for when the person takes over. */
+  hints: ImportFormatHint[];
+  /** Why trying the whole file did not work, in one stable word. */
+  notice: FlowProblem | null;
+}
+
+/** Nothing in the document says what kind of data it holds, and nobody has said it yet. */
+export interface KindStep {
+  step: "kind";
+  file: File;
+  /** The kinds of data NINFA can read, as the backend lists them. */
+  kinds: DataSourceDomain[];
+}
+
 /** NINFA understood almost everything and needs ONE more piece of information. */
 export interface AskStep {
   step: "ask";
@@ -131,43 +132,52 @@ export interface BlockedStep {
 }
 
 export type ImportFlowState =
-  | { step: "choose"; wrongType: boolean }
-  | { step: "checking"; file: File }
-  | { step: "sheet"; file: File; sheets: string[] }
+  | { step: "choose"; rejected: RejectedFile | null }
+  /** Only what the page really knows: the file is being read, or the whole of it is being tried. */
+  | { step: "checking"; file: File; phase: "reading" | "verifying" }
+  | { step: "sheet"; file: File; sheets: string[]; domain: DataSourceDomain }
+  | KindStep
   | MappingStep
+  | ManualStep
   | ReadyStep
   | AskStep
   | BlockedStep
-  | { step: "other-kind"; file: File; kind: DataSourceDomain }
-  | { step: "preview"; file: File; preview: ImportPreviewResponse }
   | { step: "importing"; file: File }
-  | { step: "done"; file: File; result: ImportResultResponse | MappedImportResultResponse }
+  | {
+      step: "done";
+      file: File;
+      domain: DataSourceDomain;
+      result: MappedImportResultResponse;
+      /** What the whole file was found to hold, just before it was imported. */
+      validation: ImportValidationResponse;
+    }
   | { step: "failed"; file: File; problem: FlowProblem };
 
 export interface ImportFlowOptions {
   propertyId: string;
-  domain: DataSourceDomain;
   /** The property-local day the file is dated as of; labor only. */
   snapshotLocalDate: string;
-  /** "edit": the person wants to look at the columns again, so the saved configuration is not applied
-   * on its own. */
-  mode?: "import" | "edit";
-  /** Called once an import SUCCEEDED, so the cards can be re-read from the backend. */
+  /** The person asked to look at the columns again for this kind of source: nothing is left to the document,
+   * and the saved configuration is not applied on its own. */
+  review?: DataSourceDomain | null;
+  /** Called once an import SUCCEEDED, so the page can re-read the list of imports from the backend. */
   onImported: () => void;
+  /** The session is over, or the property is no longer the person's: the caller re-resolves them. */
+  onAccessLost: () => void;
 }
 
 export interface ImportFlow {
   state: ImportFlowState;
-  method: SourceMethod;
-  /** Reads the file (writes nothing). A file of the wrong type never leaves the browser. */
-  chooseFile: (file: File) => Promise<void>;
+  /** What the person handed over. Reads a file (writes nothing); one that cannot be read never leaves the
+   * browser. */
+  chooseFiles: (files: readonly File[]) => Promise<void>;
   /** An Excel file with several sheets: the one to read. */
   chooseSheet: (name: string) => Promise<void>;
   /** The answer to the question on screen (what the person has said is never asked again). */
   answer: (patch: Partial<UnderstandAnswers>, confirmedDomain?: boolean) => Promise<void>;
   /** A VALUE_LABELS question: what the current word means (the last answer sends them all). */
   teach: (meaning: string) => Promise<void>;
-  /** The file is another kind of data than the one being imported: say where it belongs. */
+  /** What kind of data the file holds, when the document does not say. */
   chooseKind: (kind: DataSourceDomain) => Promise<void>;
   /** Leave the questions and match the columns by hand. */
   matchByHand: () => void;
@@ -189,8 +199,12 @@ export interface ImportFlow {
 }
 
 /** The reason an API call failed, in the page's own terms. Technical text never leaves this function. */
-function problemOfFailure(result: Extract<ApiResult<unknown>, { ok: false }>): FlowProblem {
+export function problemOfFailure(result: Extract<ApiResult<unknown>, { ok: false }>): FlowProblem {
+  if (result.status === 401) return "SESSION_EXPIRED";
   if (result.code === "FILE_TOO_LARGE") return "FILE_TOO_LARGE";
+  if (result.code === "FILE_NOT_READABLE") return "UNREADABLE_FILE";
+  // More than one source of this kind, created outside this page: NINFA does not pick one.
+  if (result.code === "SEVERAL_SOURCES") return "SEVERAL_SOURCES";
   // Another import of the same data is still running: nothing was changed, the user can try again.
   if (result.code === "IMPORT_IN_PROGRESS") return "IMPORT_IN_PROGRESS";
   if (result.code === "DATA_SOURCE_NOT_FOUND" || result.code === "PROPERTY_NOT_FOUND") {
@@ -199,42 +213,66 @@ function problemOfFailure(result: Extract<ApiResult<unknown>, { ok: false }>): F
   return "GENERIC";
 }
 
+/** Why a file is not even sent: its name says NINFA cannot read it, or it plainly holds nothing. */
+function rejectionOf(files: readonly File[]): RejectedFile | null {
+  if (files.length > 1) return "SEVERAL";
+  const [file] = files;
+  if (file === undefined) return null;
+  const name = file.name.toLowerCase();
+  if (!FILE_EXTENSIONS.some((extension) => name.endsWith(extension))) return "WRONG_TYPE";
+  if (file.size === 0) return "EMPTY";
+  if (file.size > MAX_FILE_BYTES) return "TOO_LARGE";
+  return null;
+}
+
 /**
- * The steps of putting a file into NINFA.
+ * The steps of putting a file into NINFA. The person hands over the file; what it is, is read from the document:
  *
- * Bookings and staff, a file the hotel already has (CSV or Excel):
- *   choose -> NINFA reads it -> [recognised format | file already in NINFA's own form] -> preview -> import
- *                            \-> match the columns -> preview -> import
+ *   choose -> NINFA reads the whole DOCUMENT -> tries every row -> a summary and one button -> import
+ *                                            \-> ONE question at a time ("ask")
+ *                                            \-> "I cannot go on alone": the person may match the columns ("manual")
+ *                                            \-> why it cannot be imported ("blocked")
+ *                                            \-> nothing says what kind of data it is: the person says ("kind")
  *
- * Smart Import V3 reads the whole DOCUMENT first (every sheet, titles, totals, department lines, a grid of
- * days). Almost always the result is READY - a summary ("File riconosciuto") and one button; otherwise ONE
- * question at a time ("ask"), or the file says plainly why it cannot be imported ("blocked"), or the person
- * matches the columns by hand as before ("mapping").
- * Costs, an invoice XML:  choose -> NINFA looks at it -> confirm -> import.
+ * The kind of data is the engine's own verdict (`understanding.detection`). A verdict that points at a kind is
+ * followed - HIGH and MEDIUM alike, because the engine then answers about THAT kind, nothing is imported before
+ * the person presses the button, and the summary above that button names the kind. A verdict that points nowhere
+ * is never followed: only a person can say what the file is (`confirmedDomain`).
  *
  * The backend does every check - what a column probably means, what is still missing, how dates and numbers
  * are written, every row of the file - and the import itself; this hook only walks the steps and keeps the
  * person informed. Nothing is parsed, validated or counted here, and no rule about what is required lives
  * here: the backend answers it for each change the person makes.
  *
- * Nothing before `confirm` writes anything: opening the dialog, choosing a file, matching its columns and
- * looking at the preview leave the property exactly as it was. The source behind the card, and the
- * remembered configuration, come to exist only when the confirmed import succeeds.
+ * Nothing before `confirm` writes anything: choosing a file, matching its columns and looking at the summary
+ * leave the property exactly as it was. The source behind a card of Fonti dati, and the remembered configuration,
+ * come to exist only when the confirmed import succeeds (the backend reuses the source of that kind of data).
  */
 export function useImportFlow({
   propertyId,
-  domain,
   snapshotLocalDate,
-  mode = "import",
+  review = null,
   onImported,
+  onAccessLost,
 }: ImportFlowOptions): ImportFlow {
-  const [state, setState] = useState<ImportFlowState>({ step: "choose", wrongType: false });
-  const method = methodOfFile(domain, "file" in state ? state.file : null);
+  const [state, setState] = useState<ImportFlowState>({ step: "choose", rejected: null });
   // An answer about a decision that is no longer on screen is dropped.
   const checkToken = useRef(0);
 
+  // The caller builds a new callback on every render: read it through a ref.
+  const accessLostRef = useRef(onAccessLost);
+  useEffect(() => {
+    accessLostRef.current = onAccessLost;
+  });
+
+  /** A request that failed ends the flow, with its reason in the page's own terms. */
+  const fail = useCallback((file: File, result: Extract<ApiResult<unknown>, { ok: false }>) => {
+    if (result.status === 401 || result.code === "PROPERTY_NOT_FOUND") accessLostRef.current();
+    setState({ step: "failed", file, problem: problemOfFailure(result) });
+  }, []);
+
   const runCheck = useCallback(
-    async (decision: ImportMapping) => {
+    async (domain: DataSourceDomain, decision: ImportMapping) => {
       checkToken.current += 1;
       const token = checkToken.current;
       setState((current) => (current.step === "mapping" ? { ...current, checking: true } : current));
@@ -246,7 +284,7 @@ export function useImportFlow({
           : current,
       );
     },
-    [propertyId, domain],
+    [propertyId],
   );
 
   const openMapping = useCallback(
@@ -272,7 +310,7 @@ export function useImportFlow({
         notice: extra.notice ?? null,
         understanding: extra.understanding ?? null,
       });
-      void runCheck(decision);
+      void runCheck(inspection.domain, decision);
     },
     [runCheck],
   );
@@ -288,7 +326,7 @@ export function useImportFlow({
       answers: UnderstandAnswers,
       confirmedDomain: boolean,
     ) => {
-      if (mode === "edit") {
+      if (review !== null) {
         // "Modifica associazioni": the person wants the columns in front of them.
         openMapping(file, inspection, proposal, { understanding });
         return;
@@ -312,13 +350,18 @@ export function useImportFlow({
         return;
       }
       if (understanding.level === "MANUAL") {
-        openMapping(file, inspection, proposal, { understanding });
+        setState({ step: "manual", file, inspection, understanding, hints: [], notice: null });
         return;
       }
       // READY: the whole file is tried with the proposal and, if every row is fine, the person sees a
       // summary and one button.
-      const tried = await validateImport({ propertyId, domain, file, mapping: proposal });
-      if (tried.ok && tried.data.status === "READY") {
+      setState({ step: "checking", file, phase: "verifying" });
+      const tried = await validateImport({ propertyId, domain: inspection.domain, file, mapping: proposal });
+      if (!tried.ok) {
+        fail(file, tried);
+        return;
+      }
+      if (tried.data.status === "READY") {
         const known = inspection.profile.status === "RECOGNIZED";
         const taught = Object.keys(answers.labels ?? {}).length > 0;
         setState({
@@ -333,33 +376,37 @@ export function useImportFlow({
         });
         return;
       }
-      openMapping(file, inspection, proposal, {
-        hints: tried.ok && tried.data.status === "NEEDS_CHOICE" ? tried.data.format_hints : [],
-        notice: tried.ok && tried.data.status === "BLOCKED" ? (tried.data.problem ?? "GENERIC") : null,
+      setState({
+        step: "manual",
+        file,
+        inspection,
         understanding,
+        hints: tried.data.status === "NEEDS_CHOICE" ? tried.data.format_hints : [],
+        notice: tried.data.status === "BLOCKED" ? (tried.data.problem ?? "GENERIC") : null,
       });
     },
-    [propertyId, domain, mode, openMapping],
+    [propertyId, review, openMapping, fail],
   );
 
-  const readFile = useCallback(
+  /** What the backend answered about a file, as a step of the flow. */
+  const settle = useCallback(
     async (
       file: File,
-      answers: UnderstandAnswers = {},
-      confirmedDomain = false,
+      inspection: FileInspectionResponse,
+      answers: UnderstandAnswers,
+      confirmedDomain: boolean,
     ) => {
-      setState({ step: "checking", file });
-      const result = await understandFile({ propertyId, domain, file, answers, confirmedDomain });
-      if (!result.ok) {
-        setState({ step: "failed", file, problem: problemOfFailure(result) });
-        return;
-      }
-      const inspection = result.data;
+      const { domain } = inspection;
       if (inspection.problem === "SHEET_REQUIRED") {
-        setState({ step: "sheet", file, sheets: inspection.sheet_names });
+        setState({ step: "sheet", file, sheets: inspection.sheet_names, domain });
         return;
       }
       if (inspection.problem !== null) {
+        // (a document with no table at all says so as a blocker, in better words than the problem's)
+        if (inspection.understanding && inspection.understanding.blockers.length > 0) {
+          setState({ step: "blocked", file, inspection, understanding: inspection.understanding });
+          return;
+        }
         setState({ step: "failed", file, problem: inspection.problem });
         return;
       }
@@ -375,7 +422,7 @@ export function useImportFlow({
         return;
       }
 
-      if (mode === "import" && inspection.profile.status === "RECOGNIZED") {
+      if (review === null && inspection.profile.status === "RECOGNIZED") {
         // A layout NINFA already knows: the whole file is tried with the saved configuration and, if every
         // row is fine, the person goes straight to the preview.
         const tried = await validateImport({ propertyId, domain, file, mapping: null });
@@ -391,7 +438,7 @@ export function useImportFlow({
           });
           return;
         }
-      } else if (mode === "import" && inspection.already_canonical) {
+      } else if (review === null && inspection.already_canonical) {
         // A file already written in NINFA's own columns needs no matching either.
         const proposal = decisionFromSuggestions(inspection);
         const tried = await validateImport({ propertyId, domain, file, mapping: proposal });
@@ -414,35 +461,81 @@ export function useImportFlow({
       }
       openMapping(file, inspection, startingDecision(inspection));
     },
-    [propertyId, domain, mode, openMapping, routeUnderstood],
+    [propertyId, review, openMapping, routeUnderstood],
   );
 
-  const chooseFile = useCallback(
-    async (file: File) => {
-      const name = file.name.toLowerCase();
-      if (!EXTENSIONS_OF_DOMAIN[domain].some((extension) => name.endsWith(extension))) {
-        setState({ step: "choose", wrongType: true });
-        return;
-      }
-      if (!isInvoiceXml(file)) {
-        await readFile(file);
-        return;
-      }
-      setState({ step: "checking", file });
-      const result = await previewImport(propertyId, domain, file);
+  /** Reads the file as a kind of data that is already known: what the person said, or the document's verdict. */
+  const readFile = useCallback(
+    async (
+      file: File,
+      domain: DataSourceDomain,
+      answers: UnderstandAnswers = {},
+      confirmedDomain = false,
+    ) => {
+      setState({ step: "checking", file, phase: "reading" });
+      const result = await understandFile({ propertyId, domain, file, answers, confirmedDomain });
       if (!result.ok) {
-        setState({ step: "failed", file, problem: problemOfFailure(result) });
+        fail(file, result);
         return;
       }
-      setState({ step: "preview", file, preview: result.data });
+      await settle(file, result.data, answers, confirmedDomain);
     },
-    [propertyId, domain, readFile],
+    [propertyId, settle, fail],
+  );
+
+  /** Reads a file nobody has said anything about, and follows what the document says it is. */
+  const readUnknownFile = useCallback(
+    async (file: File) => {
+      setState({ step: "checking", file, phase: "reading" });
+      const result = await understandFile({
+        propertyId,
+        domain: FIRST_READING,
+        file,
+        answers: {},
+        confirmedDomain: false,
+      });
+      if (!result.ok) {
+        fail(file, result);
+        return;
+      }
+      const inspection = result.data;
+      const understanding = inspection.understanding;
+      if (understanding && inspection.problem === null) {
+        const { domain, scores } = understanding.detection;
+        if (domain !== null && domain !== inspection.domain) {
+          await readFile(file, domain);
+          return;
+        }
+        // (the optional assistant may have a suggestion: that is a question of the backend's, not this)
+        const suggested = understanding.questions.some((question) => question.kind === "DOMAIN");
+        if (domain === null && !suggested) {
+          setState({ step: "kind", file, kinds: scores.map((score) => score.domain) });
+          return;
+        }
+      }
+      await settle(file, inspection, {}, false);
+    },
+    [propertyId, readFile, settle, fail],
+  );
+
+  const chooseFiles = useCallback(
+    async (files: readonly File[]) => {
+      const rejected = rejectionOf(files);
+      if (rejected !== null) {
+        setState({ step: "choose", rejected });
+        return;
+      }
+      const [file] = files;
+      if (file === undefined) return;
+      await (review !== null ? readFile(file, review) : readUnknownFile(file));
+    },
+    [review, readFile, readUnknownFile],
   );
 
   const chooseSheet = useCallback(
     async (name: string) => {
       if (state.step !== "sheet") return;
-      await readFile(state.file, { sheet_name: name });
+      await readFile(state.file, state.domain, { sheet_name: name });
     },
     [state, readFile],
   );
@@ -452,6 +545,7 @@ export function useImportFlow({
       if (state.step !== "ask") return;
       await readFile(
         state.file,
+        state.inspection.domain,
         mergeAnswers(state.answers, patch),
         confirmedDomain ?? state.confirmedDomain,
       );
@@ -474,6 +568,7 @@ export function useImportFlow({
       if (document === null) return;
       await readFile(
         state.file,
+        state.inspection.domain,
         mergeAnswers(state.answers, { labels: { [document]: taught } }),
         state.confirmedDomain,
       );
@@ -483,20 +578,19 @@ export function useImportFlow({
 
   const chooseKind = useCallback(
     async (kind: DataSourceDomain) => {
-      if (state.step !== "ask") return;
-      if (kind === domain) {
-        await readFile(state.file, state.answers, true);
-        return;
-      }
-      setState({ step: "other-kind", file: state.file, kind });
+      if (state.step !== "ask" && state.step !== "kind") return;
+      await readFile(state.file, kind, state.step === "ask" ? state.answers : {}, true);
     },
-    [state, domain, readFile],
+    [state, readFile],
   );
 
   const matchByHand = useCallback(() => {
-    if (state.step !== "ask" && state.step !== "blocked") return;
+    if (state.step !== "ask" && state.step !== "blocked" && state.step !== "manual") return;
     const proposal = state.inspection.proposal ?? startingDecision(state.inspection);
-    openMapping(state.file, state.inspection, proposal, { understanding: state.understanding });
+    openMapping(state.file, state.inspection, proposal, {
+      understanding: state.understanding,
+      ...(state.step === "manual" ? { hints: state.hints, notice: state.notice } : {}),
+    });
   }, [state, openMapping]);
 
   const edit = useCallback(
@@ -511,7 +605,7 @@ export function useImportFlow({
         hints: recheck ? [] : state.hints,
         notice: null,
       });
-      if (recheck) void runCheck(decision);
+      if (recheck) void runCheck(state.inspection.domain, decision);
     },
     [state, runCheck],
   );
@@ -539,7 +633,7 @@ export function useImportFlow({
     if (state.step !== "mapping" || state.busy || state.check?.valid !== true) return;
     const { file, inspection, decision } = state;
     setState({ ...state, busy: true, notice: null });
-    const result = await validateImport({ propertyId, domain, file, mapping: decision });
+    const result = await validateImport({ propertyId, domain: inspection.domain, file, mapping: decision });
     const stay = (extra: Partial<MappingStep>) =>
       setState((current) =>
         current.step === "mapping" && sameDecision(current.decision, decision)
@@ -547,6 +641,7 @@ export function useImportFlow({
           : current,
       );
     if (!result.ok) {
+      if (result.status === 401 || result.code === "PROPERTY_NOT_FOUND") accessLostRef.current();
       stay({ notice: problemOfFailure(result) });
       return;
     }
@@ -572,7 +667,7 @@ export function useImportFlow({
       hints: tried.format_hints,
       check: tried.check ?? state.check,
     });
-  }, [state, propertyId, domain]);
+  }, [state, propertyId]);
 
   const reviewColumns = useCallback(() => {
     if (state.step !== "ready") return;
@@ -585,25 +680,9 @@ export function useImportFlow({
   );
 
   const confirm = useCallback(async () => {
-    if (state.step === "preview") {
-      if (!state.preview.can_import) return;
-      const { file } = state;
-      setState({ step: "importing", file });
-      const result = await importFile({ propertyId, domain, file });
-      if (!result.ok) {
-        setState({ step: "failed", file, problem: problemOfFailure(result) });
-        return;
-      }
-      if (!result.data.succeeded) {
-        setState({ step: "failed", file, problem: result.data.problem ?? "GENERIC" });
-        return;
-      }
-      setState({ step: "done", file, result: result.data });
-      onImported();
-      return;
-    }
     if (state.step !== "ready" || !state.validation.can_import) return;
-    const { file, decision, save } = state;
+    const { file, decision, save, validation } = state;
+    const { domain } = state.inspection;
     setState({ step: "importing", file });
     const result = await importMatchedFile({
       propertyId,
@@ -614,26 +693,25 @@ export function useImportFlow({
       snapshotLocalDate: domain === "LABOR" ? snapshotLocalDate : undefined,
     });
     if (!result.ok) {
-      setState({ step: "failed", file, problem: problemOfFailure(result) });
+      fail(file, result);
       return;
     }
     if (!result.data.succeeded) {
       setState({ step: "failed", file, problem: result.data.problem ?? "GENERIC" });
       return;
     }
-    setState({ step: "done", file, result: result.data });
+    setState({ step: "done", file, domain, result: result.data, validation });
     onImported();
-  }, [state, propertyId, domain, snapshotLocalDate, onImported]);
+  }, [state, propertyId, snapshotLocalDate, onImported, fail]);
 
   const reset = useCallback(() => {
     checkToken.current += 1;
-    setState({ step: "choose", wrongType: false });
+    setState({ step: "choose", rejected: null });
   }, []);
 
   return {
     state,
-    method,
-    chooseFile,
+    chooseFiles,
     chooseSheet,
     answer,
     teach,

@@ -7,6 +7,8 @@ import type { FlowProblem } from "./use-import-flow";
 export function problemText(problem: FlowProblem, method: SourceMethod): string {
   if (problem === "SOURCE_GONE") return sourcesCopy.errors.sourceGone;
   if (problem === "IMPORT_IN_PROGRESS") return sourcesCopy.errors.importInProgress;
+  if (problem === "SEVERAL_SOURCES") return sourcesCopy.errors.severalSources;
+  if (problem === "SESSION_EXPIRED") return sourcesCopy.errors.sessionExpired;
   const base = sourcesCopy.problems[problem];
   const hints: Partial<Record<ImportProblem, Record<SourceMethod, string>>> = sourcesCopy.problemHints;
   const hint = hints[problem]?.[method];

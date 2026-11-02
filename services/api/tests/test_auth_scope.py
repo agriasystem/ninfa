@@ -8,6 +8,8 @@ Fonti dati V1 (docs/architecture/data-sources-v1.md) adds the `.../data-sources`
 `/properties/{property_id}`, whose exact methods are pinned below and in `test_data_sources_api.py`.
 Smart Import V2 (docs/architecture/smart-import-v2.md) adds to that family, all POST except the
 saved configuration (GET / DELETE): read a file, check a matching, dry-run it, import with it.
+Importa file V1 (docs/architecture/importa-file-v1.md) adds a GET to `.../imports`: the latest
+import attempts of the property.
 """
 
 from fastapi.testclient import TestClient
@@ -21,7 +23,7 @@ _SOURCES_METHODS = {
     _SOURCES: {"get"},  # NO POST: a source is never created on its own, only by a successful import
     f"{_SOURCES}/{{data_source_id}}": {"delete"},
     f"{_SOURCES}/import-preview": {"post"},
-    f"{_SOURCES}/imports": {"post"},
+    f"{_SOURCES}/imports": {"get", "post"},
     f"{_SOURCES}/imports/mapped": {"post"},
     f"{_SOURCES}/import-inspection": {"post"},
     f"{_SOURCES}/import-understanding": {"post"},

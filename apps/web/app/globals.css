@@ -4587,6 +4587,7 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
    Green appears ONLY for "connected" and "active"; nothing here is orange (no decision lives on this page).
    LIGHT ONLY. Desktop is the source of truth; everything below is responsive CSS, never coordinates. */
 
+.importa-screen,
 .struttura-screen,
 .struttura-modal {
   --struttura-gap: 14px;
@@ -4675,6 +4676,13 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 .struttura-card__heading {
   flex: 1;
   min-width: 0;
+}
+
+.struttura-card__actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .struttura-card__title {
@@ -5459,6 +5467,12 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   color: var(--home-greeting);
 }
 
+.struttura-option__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .struttura-option--soon {
   border-style: dashed;
   background: transparent;
@@ -5736,8 +5750,14 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
     flex-basis: calc(100% - 64px);
   }
 
-  .struttura-card__header > .struttura-button {
+  .struttura-card__header > .struttura-button,
+  .struttura-card__header > .struttura-card__actions {
     margin-left: 52px;
+  }
+
+  .struttura-card__header > .struttura-card__actions {
+    flex: 1 1 calc(100% - 64px);
+    min-width: 0;
   }
 
   .struttura-profile {
@@ -6161,5 +6181,336 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   .struttura-match__fixed-row label {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/* --- Importa file V1: where a file comes into NINFA -------------------------------------------------------
+   One thing on the page is loud, the zone the file is dropped on; everything around it stays quiet. Same language
+   as Struttura (its tokens and buttons, its question and summary screens): green only for "it worked", nothing
+   orange (no decision lives on this page). LIGHT ONLY. */
+
+.importa-screen {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.importa-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.importa-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: clamp(320px, 48vh, 440px);
+  padding: 32px 20px;
+  border: 1.5px dashed #bfd0ee;
+  border-radius: var(--struttura-radius);
+  background: #fff;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.importa-drop:hover {
+  border-color: var(--home-link);
+  background: var(--struttura-soft);
+}
+
+.importa-drop[data-dragging="true"] {
+  border-style: solid;
+  border-color: var(--home-link);
+  background: var(--struttura-tint);
+}
+
+.importa-drop:has(input:focus-visible) {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+.importa-drop__icon {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin-bottom: 8px;
+  border-radius: 20px;
+  background: var(--struttura-tint);
+  color: var(--home-link);
+  transition: transform 0.2s ease, background 0.15s ease;
+}
+
+.importa-drop__icon svg {
+  width: 32px;
+  height: 32px;
+}
+
+.importa-drop[data-dragging="true"] .importa-drop__icon {
+  background: #fff;
+  transform: translateY(-4px);
+}
+
+.importa-drop__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--home-ink);
+}
+
+.importa-drop__or {
+  font-size: 0.8125rem;
+  color: var(--home-greeting);
+}
+
+.importa-drop__pick {
+  white-space: normal;
+}
+
+.importa-drop__formats {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--home-muted);
+}
+
+.importa-flow__rejected {
+  margin: 0;
+}
+
+.importa-panel {
+  min-width: 0;
+  padding: 22px 24px;
+  background: #fff;
+  border: 1px solid var(--struttura-border);
+  border-radius: var(--struttura-radius);
+  box-shadow: var(--struttura-shadow);
+  overflow-wrap: anywhere;
+}
+
+.importa-panel:focus {
+  outline: none;
+}
+
+.importa-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78125rem;
+}
+
+.importa-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--home-muted);
+}
+
+.importa-steps li::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+.importa-steps li[data-state="current"] {
+  color: var(--home-ink);
+  font-weight: 500;
+}
+
+.importa-steps li[data-state="current"]::before {
+  border-color: var(--home-link);
+  background: var(--home-link);
+}
+
+.importa-steps li[data-state="done"]::before {
+  border-color: #17713d;
+  background: #17713d;
+}
+
+.importa-done {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.importa-done__icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #e4f4ea;
+  color: #17713d;
+}
+
+.importa-done__icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.importa-done__title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: var(--home-ink);
+}
+
+.importa-done__facts {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.importa-done__facts > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 140px) minmax(0, 1fr);
+  gap: 2px 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--struttura-line);
+}
+
+.importa-done__facts dt {
+  font-size: 0.78125rem;
+  color: var(--home-greeting);
+}
+
+.importa-done__facts dd {
+  margin: 0;
+  font-weight: 500;
+  color: var(--home-ink);
+}
+
+.importa-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 32px;
+  min-width: 0;
+}
+
+.importa-recent__title {
+  font-size: 0.96875rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--home-ink);
+}
+
+.importa-recent__note {
+  font-size: 0.78125rem;
+  color: var(--home-greeting);
+}
+
+.importa-recent__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.importa-recent__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78125rem;
+  color: var(--home-ink);
+}
+
+.importa-recent__table th,
+.importa-recent__table td {
+  padding: 9px 12px 9px 0;
+  border-bottom: 1px solid var(--struttura-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.importa-recent__table th {
+  font-size: 0.71875rem;
+  font-weight: 500;
+  color: var(--home-greeting);
+}
+
+.importa-recent__file {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.importa-recent__status {
+  white-space: nowrap;
+}
+
+.importa-recent__status[data-status="SUCCEEDED"] {
+  color: #17713d;
+}
+
+.importa-recent__status[data-status="FAILED"] {
+  color: var(--color-danger);
+}
+
+@media (max-width: 559px) {
+  /* a phone: each import reads as two lines, so a long name of a file never widens the page */
+  .importa-recent__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .importa-recent__table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 2px 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--struttura-line);
+  }
+
+  .importa-recent__table td {
+    padding: 0;
+    border: 0;
+  }
+
+  .importa-recent__file {
+    grid-column: 1 / -1;
+  }
+
+  .importa-panel {
+    padding: 18px 16px;
+  }
+
+  .importa-done__facts > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 399px) {
+  /* five sections, the logo and two icons in one row: a narrow phone must not scroll sideways */
+  .app-sidebar {
+    padding: 8px;
+  }
+
+  .nav-item {
+    width: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .importa-drop,
+  .importa-drop__icon {
+    transition: none;
+  }
+
+  .importa-drop[data-dragging="true"] .importa-drop__icon {
+    transform: none;
   }
 }

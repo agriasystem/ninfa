@@ -1,6 +1,7 @@
 """Wire shapes of the data-source API V1. Enums travel as plain strings (the page never needs the
-Python enum); nothing here carries a file name, a file content (beyond the few preview cells the
-caller just sent) or a technical error message."""
+Python enum); nothing here carries a file content (beyond the few preview cells the caller just
+sent) or a technical error message, and a file name only in the property's own list of recent
+imports, after the personal-data gate."""
 
 import base64
 import binascii
@@ -56,6 +57,17 @@ class ImportPreviewResponse(BaseModel):
     sample_rows: list[list[str]]
     documents_with_issues: int
     already_imported: bool
+
+
+class RecentImportResponse(BaseModel):
+    file_name: str | None
+    domain: str
+    status: str
+    at: datetime
+
+
+class RecentImportsResponse(BaseModel):
+    imports: list[RecentImportResponse]
 
 
 class ImportResultResponse(BaseModel):
@@ -398,6 +410,8 @@ __all__ = [
     "MappingCheckResponse",
     "MappingProblemResponse",
     "ProfileInfoResponse",
+    "RecentImportResponse",
+    "RecentImportsResponse",
     "RowIssueResponse",
     "RowProblemResponse",
     "SavedColumnResponse",

@@ -5,6 +5,7 @@ up, how a file gets in, how a source is switched off.
     DELETE .../data-sources/{source_id}             switch a source off (data are kept)
     POST   .../data-sources/import-preview?domain=  look at a file, writes NOTHING
     POST   .../data-sources/imports?domain=         import it (the pilot's own services)
+    GET    .../data-sources/imports                 the latest import attempts of the property
     GET    .../data-sources/templates/{domain}      the column row of the canonical CSV
 
 Smart Import - the hotel's own CSV / Excel file, with the person's matching of its columns:
@@ -58,6 +59,8 @@ from app.api.v1.sources.schemas import (
     MappingProblemResponse,
     ProfileInfoResponse,
     QuestionResponse,
+    RecentImportResponse,
+    RecentImportsResponse,
     RowIssueResponse,
     RowProblemResponse,
     SavedColumnResponse,
@@ -320,6 +323,31 @@ async def preview_import(
         sample_rows=[list(row) for row in preview.sample_rows],
         documents_with_issues=preview.documents_with_issues,
         already_imported=preview.already_imported,
+    )
+
+
+@router.get(
+    "/imports",
+    response_model=RecentImportsResponse,
+    summary="The latest import attempts of a property (the name of the file and how it ended)",
+)
+def get_recent_imports(
+    response: Response,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    session: Session = Depends(get_session),
+) -> RecentImportsResponse:
+    response.headers["Cache-Control"] = "no-store"
+    recent = DataSourcesService(session, scope.tenant).recent_imports(scope.property_id)
+    return RecentImportsResponse(
+        imports=[
+            RecentImportResponse(
+                file_name=item.file_name,
+                domain=item.domain.value,
+                status=item.status.value,
+                at=item.at,
+            )
+            for item in recent
+        ]
     )
 
 

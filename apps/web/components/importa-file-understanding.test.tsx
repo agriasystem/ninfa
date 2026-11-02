@@ -3,15 +3,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DataSourcesResponse } from "@ninfa/contracts";
-
 import {
   checkOf,
   csvFile,
   DEPARTMENT_CHOICES,
   laborInspection,
   matchedResultOf,
-  nothingConfigured,
   ok,
   PROPERTY_ID,
   proposalOf,
@@ -20,41 +17,28 @@ import {
   understoodInspection,
   validationOf,
   xlsxFile,
-  xmlFile,
-  previewOf,
-  costsViaXml,
 } from "@/test/sources-support";
 
-import { StrutturaSources } from "./struttura-sources";
+import { ImportaFileFlow } from "./importa-file-flow";
 
 /**
- * Smart Import V3 - "NINFA ha riconosciuto il tuo file": the person picks a file and, almost always, sees what
+ * Smart Import V3 on the "Importa file" page: the person hands over a file and, almost always, sees what
  * NINFA found and ONE button. When something is really ambiguous there is ONE question, never a form. When the
  * file cannot be imported, it says why. Every decision - what the file is, what is missing, which question -
  * is the mocked backend's: the page only shows it and carries the answer back.
  */
 
-const getDataSourcesMock = vi.fn();
 const understandFileMock = vi.fn();
 const checkMappingMock = vi.fn();
 const validateImportMock = vi.fn();
 const importMatchedFileMock = vi.fn();
-const previewImportMock = vi.fn();
-const importFileMock = vi.fn();
+const onImportedMock = vi.fn();
 
 vi.mock("@/lib/api/data-sources", () => ({
-  getDataSources: (...args: unknown[]) => getDataSourcesMock(...args),
-  removeDataSource: vi.fn(),
-  previewImport: (...args: unknown[]) => previewImportMock(...args),
-  importFile: (...args: unknown[]) => importFileMock(...args),
-  inspectFile: vi.fn(),
   understandFile: (...args: unknown[]) => understandFileMock(...args),
   checkMapping: (...args: unknown[]) => checkMappingMock(...args),
   validateImport: (...args: unknown[]) => validateImportMock(...args),
   importMatchedFile: (...args: unknown[]) => importMatchedFileMock(...args),
-  getImportConfiguration: vi.fn(),
-  forgetImportConfiguration: vi.fn(),
-  downloadTemplate: vi.fn(),
 }));
 
 function textOf(node: Node): string {
@@ -62,43 +46,21 @@ function textOf(node: Node): string {
   return Array.from(node.childNodes).map(textOf).join(" ");
 }
 const flat = (node: Node): string => textOf(node).replace(/\s+/gu, " ").trim();
-const dialog = () => screen.getByRole("dialog");
-const cardOf = (name: string) =>
-  screen
-    .getAllByRole("listitem")
-    .find((item) => within(item).queryByRole("heading", { level: 3, name }) !== null) as HTMLElement;
+const panel = () => screen.getByRole("region", { name: "Importazione del file" });
 
-async function renderBlock(response: DataSourcesResponse = nothingConfigured()) {
-  getDataSourcesMock.mockResolvedValue(ok(response));
-  render(<StrutturaSources propertyId={PROPERTY_ID} timeZone="Europe/Rome" onPropertyInvalid={vi.fn()} />);
-  await screen.findByRole("list", { name: "Fonti dati collegate e collegabili" });
+function renderFlow() {
+  render(
+    <ImportaFileFlow propertyId={PROPERTY_ID} timeZone="Europe/Rome" onImported={onImportedMock} onAccessLost={vi.fn()} />,
+  );
+  return userEvent.setup({ applyAccept: false });
 }
-
-async function openImport(card: string, heading: string) {
-  const user = userEvent.setup({ applyAccept: false });
-  await renderBlock();
-  await user.click(within(cardOf(card)).getByRole("button", { name: `Collega fonte ${card}` }));
-  await user.click(within(dialog()).getByRole("button", { name: "Importa file" }));
-  await screen.findByRole("heading", { level: 2, name: heading });
-  return user;
-}
-
-const openStaffImport = () => openImport("Personale", "Importa i dati del personale");
 
 async function pick(user: ReturnType<typeof userEvent.setup>, file: File) {
-  await user.upload(within(dialog()).getByLabelText("Seleziona file"), file);
+  await user.upload(within(panel()).getByLabelText("Seleziona un file CSV o Excel"), file);
 }
 
 beforeEach(() => {
-  for (const mock of [
-    getDataSourcesMock,
-    understandFileMock,
-    checkMappingMock,
-    validateImportMock,
-    importMatchedFileMock,
-    previewImportMock,
-    importFileMock,
-  ]) {
+  for (const mock of [understandFileMock, checkMappingMock, validateImportMock, importMatchedFileMock, onImportedMock]) {
     mock.mockReset();
   }
   checkMappingMock.mockResolvedValue(ok(checkOf()));
@@ -110,11 +72,11 @@ describe("a file NINFA understands by itself", () => {
   it("shows what it found and ONE button - no question, no matching table", async () => {
     understandFileMock.mockResolvedValue(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
 
     await pick(user, xlsxFile("turni-ottobre.xlsx"));
 
-    const box = dialog();
+    const box = panel();
     expect(await within(box).findByRole("heading", { level: 3, name: "File riconosciuto" })).not.toBeNull();
     const text = flat(box);
     expect(text).toContain("NINFA ha riconosciuto un file del personale");
@@ -134,7 +96,6 @@ describe("a file NINFA understands by itself", () => {
     expect(understandFileMock).toHaveBeenCalledTimes(1);
     expect(understandFileMock.mock.calls[0]?.[0]).toMatchObject({
       propertyId: PROPERTY_ID,
-      domain: "LABOR",
       answers: {},
       confirmedDomain: false,
     });
@@ -144,12 +105,12 @@ describe("a file NINFA understands by itself", () => {
     understandFileMock.mockResolvedValue(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
     importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({ rows_total: 52, created: 52 })));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await user.click(await within(dialog()).findByRole("button", { name: "Importa dati" }));
+    await user.click(await within(panel()).findByRole("button", { name: "Importa dati" }));
 
-    expect(await within(dialog()).findByRole("heading", { level: 3, name: "Importazione completata" })).not.toBeNull();
+    expect(await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" })).not.toBeNull();
     const args = importMatchedFileMock.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(args.mapping).toEqual(proposalOf()); // the layout travels with it
     // ...and so does the reference of the understanding it comes from: the server verifies it
@@ -173,11 +134,11 @@ describe("a file NINFA understands by itself", () => {
       ),
     );
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
-    await user.click(await within(dialog()).findByRole("button", { name: "Controlla cosa ho riconosciuto" }));
+    await user.click(await within(panel()).findByRole("button", { name: "Controlla cosa ho riconosciuto" }));
 
-    const table = within(dialog()).getByRole("region", { name: "Cosa ha riconosciuto NINFA" });
+    const table = within(panel()).getByRole("region", { name: "Cosa ha riconosciuto NINFA" });
     const text = flat(table);
     for (const header of ["Campo", "Valore", "Origine"]) expect(text).toContain(header);
     expect(text).toContain("Reparto o mansione Reception colonna «Reparto o mansione»");
@@ -185,7 +146,7 @@ describe("a file NINFA understands by itself", () => {
     expect(text).toContain("suggerito da NINFA, da controllare (colonna «Impegno»)");
     expect(text).toContain("impostazioni della struttura");
     expect(within(table).getAllByText("Da controllare")).toHaveLength(1); // only the suggested one
-    expect(flat(dialog())).toContain("Alcuni abbinamenti sono suggerimenti di NINFA");
+    expect(flat(panel())).toContain("Alcuni abbinamenti sono suggerimenti di NINFA");
     // a column that is only "da controllare" (not a suggestion of the assistant) does not say so
   });
 
@@ -200,11 +161,11 @@ describe("a file NINFA understands by itself", () => {
       ),
     );
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
-    expect(flat(dialog())).not.toContain("suggerimenti di NINFA");
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(flat(panel())).not.toContain("suggerimenti di NINFA");
   });
 
   it("says when a file is read as last time and then saves nothing new", async () => {
@@ -213,11 +174,11 @@ describe("a file NINFA understands by itself", () => {
     );
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
     importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({ configuration_saved: false })));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    expect(await within(dialog()).findByText(/come l'ultima volta/u)).not.toBeNull();
-    await user.click(within(dialog()).getByRole("button", { name: "Importa dati" }));
+    expect(await within(panel()).findByText(/come l'ultima volta/u)).not.toBeNull();
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
     await waitFor(() => expect(importMatchedFileMock).toHaveBeenCalledTimes(1));
     expect((importMatchedFileMock.mock.calls[0]?.[0] as { saveConfiguration: boolean }).saveConfiguration).toBe(false);
   });
@@ -236,12 +197,12 @@ describe("a file NINFA understands by itself", () => {
       .mockResolvedValue(ok(understoodInspection({}, known)));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
     importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({ configuration_saved: true })));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("La colonna «Ore A» è «Ore previste»?");
-    await user.click(within(dialog()).getByRole("button", { name: "Sì" }));
-    await user.click(await within(dialog()).findByRole("button", { name: "Importa dati" }));
+    await within(panel()).findByText("La colonna «Ore A» è «Ore previste»?");
+    await user.click(within(panel()).getByRole("button", { name: "Sì" }));
+    await user.click(await within(panel()).findByRole("button", { name: "Importa dati" }));
 
     await waitFor(() => expect(importMatchedFileMock).toHaveBeenCalledTimes(1));
     expect((importMatchedFileMock.mock.calls[0]?.[0] as { saveConfiguration: boolean }).saveConfiguration).toBe(true);
@@ -252,11 +213,11 @@ describe("a file NINFA understands by itself", () => {
     validateImportMock.mockResolvedValue(
       ok(realisticValidation({ can_import: false, rows_invalid: 2, rows_valid: 50, row_problems: [{ field: "work_date", code: "INVALID_DATE", count: 2 }] })),
     );
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
-    expect(within(dialog()).queryByRole("button", { name: "Importa dati" })).toBeNull();
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(within(panel()).queryByRole("button", { name: "Importa dati" })).toBeNull();
   });
 });
 
@@ -270,18 +231,18 @@ describe("a file NINFA cannot import as it is", () => {
         }),
       ),
     );
-    const user = await openStaffImport();
+    const user = renderFlow();
 
     await pick(user, xlsxFile("riepilogo.xlsx"));
 
-    const alert = await within(dialog()).findByRole("alert");
+    const alert = await within(panel()).findByRole("alert");
     expect(flat(alert)).toContain(
       "Questo file contiene un riepilogo settimanale. Per le analisi del personale NINFA ha bisogno del dettaglio giorno per giorno.",
     );
     expect(flat(alert)).toContain("Non è stato importato nulla.");
     expect(validateImportMock).not.toHaveBeenCalled();
     expect(importMatchedFileMock).not.toHaveBeenCalled();
-    expect(within(dialog()).queryByRole("button", { name: "Importa dati" })).toBeNull();
+    expect(within(panel()).queryByRole("button", { name: "Importa dati" })).toBeNull();
   });
 
   it("names what a file lacks, in the hotelier's words", async () => {
@@ -293,11 +254,11 @@ describe("a file NINFA cannot import as it is", () => {
         }),
       ),
     );
-    const user = await openStaffImport();
+    const user = renderFlow();
 
     await pick(user, xlsxFile());
 
-    const alert = await within(dialog()).findByRole("alert");
+    const alert = await within(panel()).findByRole("alert");
     expect(flat(alert)).toContain("Nel file non ho trovato:");
     expect(flat(alert)).toContain("Data di partenza");
     expect(flat(alert)).toContain("Ore previste oppure Ore lavorate");
@@ -323,14 +284,14 @@ describe("ONE question at a time", () => {
     );
     understandFileMock.mockResolvedValueOnce(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile("turni-hk.xlsx"));
 
-    const question = await within(dialog()).findByRole("region", { name: /Il titolo del file parla di «Piani \(housekeeping\)»/u });
-    expect(within(dialog()).queryAllByRole("combobox")).toHaveLength(0); // never a form of dropdowns
+    const question = await within(panel()).findByRole("region", { name: /Il titolo del file parla di «Piani \(housekeeping\)»/u });
+    expect(within(panel()).queryAllByRole("combobox")).toHaveLength(0); // never a form of dropdowns
     await user.click(within(question).getByRole("button", { name: "Sì, sono righe di Piani (housekeeping)" }));
 
-    expect(await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" })).not.toBeNull();
+    expect(await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" })).not.toBeNull();
     expect(understandFileMock).toHaveBeenCalledTimes(2);
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { department_from: "TITLE" } });
   });
@@ -341,13 +302,13 @@ describe("ONE question at a time", () => {
     );
     understandFileMock.mockResolvedValueOnce(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("A quale reparto appartengono le righe di questo file?");
-    await user.click(within(dialog()).getByRole("button", { name: "Reception" }));
+    await within(panel()).findByText("A quale reparto appartengono le righe di questo file?");
+    await user.click(within(panel()).getByRole("button", { name: "Reception" }));
 
-    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { department_value: "FRONT_OFFICE" } });
   });
 
@@ -373,18 +334,18 @@ describe("ONE question at a time", () => {
     );
     understandFileMock.mockResolvedValueOnce(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("Che reparto è «HK»? (3 righe)");
-    expect(within(dialog()).queryByText(/Turno A/u)).toBeNull(); // one word on screen at a time
-    expect(flat(dialog())).toContain("Ne resta 1");
-    await user.click(within(dialog()).getByRole("button", { name: "Piani (housekeeping)" }));
-    await within(dialog()).findByText("Che reparto è «Turno A»? (2 righe)");
+    await within(panel()).findByText("Che reparto è «HK»? (3 righe)");
+    expect(within(panel()).queryByText(/Turno A/u)).toBeNull(); // one word on screen at a time
+    expect(flat(panel())).toContain("Ne resta 1");
+    await user.click(within(panel()).getByRole("button", { name: "Piani (housekeeping)" }));
+    await within(panel()).findByText("Che reparto è «Turno A»? (2 righe)");
     expect(understandFileMock).toHaveBeenCalledTimes(1); // not asked again between words
-    await user.click(within(dialog()).getByRole("button", { name: "Reception" }));
+    await user.click(within(panel()).getByRole("button", { name: "Reception" }));
 
-    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({
       answers: { labels: { role_mapping: { HK: "HOUSEKEEPING", "Turno A": "FRONT_OFFICE" } } },
     });
@@ -396,61 +357,18 @@ describe("ONE question at a time", () => {
     );
     understandFileMock.mockResolvedValueOnce(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("A quale settimana si riferisce il file?");
-    const confirm = within(dialog()).getByRole("button", { name: "Conferma la settimana" });
+    await within(panel()).findByText("A quale settimana si riferisce il file?");
+    const confirm = within(panel()).getByRole("button", { name: "Conferma la settimana" });
     expect((confirm as HTMLButtonElement).disabled).toBe(true);
-    const date = within(dialog()).getByLabelText("Un giorno qualsiasi della settimana");
+    const date = within(panel()).getByLabelText("Un giorno qualsiasi della settimana");
     await user.type(date, "2026-10-28");
     await user.click(confirm);
 
-    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { period_start: "2026-10-28" } });
-  });
-
-  it("asks what kind of data a file is when it is not what was chosen, and never imports it here", async () => {
-    understandFileMock.mockResolvedValueOnce(
-      ok(
-        understoodInspection({
-          level: "ASK",
-          questions: [questionOf("DOMAIN", { candidate: "COSTS", choices: ["BOOKINGS", "LABOR", "COSTS"].map((value) => ({ value, count: null, sheets: [], columns: [] })) })],
-        }),
-      ),
-    );
-    const user = await openStaffImport();
-    await pick(user, xlsxFile("registro.xlsx"));
-
-    await within(dialog()).findByText("Questo sembra un file dei costi. Corretto?");
-    await user.click(within(dialog()).getByRole("button", { name: "Sì, è un file dei costi" }));
-
-    const alert = await within(dialog()).findByRole("alert");
-    expect(flat(alert)).toContain("Per importare questo tipo di dati usa la scheda «Costi» di Fonti dati.");
-    expect(flat(alert)).toContain("Qui non è stato importato nulla.");
-    expect(understandFileMock).toHaveBeenCalledTimes(1);
-    expect(importMatchedFileMock).not.toHaveBeenCalled();
-  });
-
-  it("goes on as chosen when the person says the file is what they meant, and does not ask twice", async () => {
-    understandFileMock.mockResolvedValueOnce(
-      ok(
-        understoodInspection({
-          level: "ASK",
-          questions: [questionOf("DOMAIN", { candidate: "COSTS", choices: ["BOOKINGS", "LABOR", "COSTS"].map((value) => ({ value, count: null, sheets: [], columns: [] })) })],
-        }),
-      ),
-    );
-    understandFileMock.mockResolvedValueOnce(ok(understoodInspection()));
-    validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
-    await pick(user, xlsxFile());
-
-    await within(dialog()).findByText("Questo sembra un file dei costi. Corretto?");
-    await user.click(within(dialog()).getByRole("button", { name: "No, è un file del personale" }));
-
-    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
-    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ confirmedDomain: true });
   });
 
   it("tells two tables with the same columns apart by the line above each", async () => {
@@ -471,15 +389,15 @@ describe("ONE question at a time", () => {
     );
     understandFileMock.mockResolvedValueOnce(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("Ho trovato più di una tabella nel file. Quale devo leggere?");
-    const evening = within(dialog()).getByRole("button", { name: /«Turni sera»/u });
+    await within(panel()).findByText("Ho trovato più di una tabella nel file. Quale devo leggere?");
+    const evening = within(panel()).getByRole("button", { name: /«Turni sera»/u });
     expect(evening.textContent).toContain("dalla riga 11");
     await user.click(evening);
 
-    await within(dialog()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { table_key: "Foglio1#11" } });
   });
 
@@ -492,14 +410,14 @@ describe("ONE question at a time", () => {
       choices: [{ value: "source_record_id", count: null, sheets: [], columns: [] }],
     });
     understandFileMock.mockResolvedValue(ok(understoodInspection({ level: "ASK", questions: [confirmQuestion] })));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("La colonna «Codice» è «Numero della prenotazione»?");
-    await user.click(within(dialog()).getByRole("button", { name: "No, controllo le colonne" }));
+    await within(panel()).findByText("La colonna «Codice» è «Numero della prenotazione»?");
+    await user.click(within(panel()).getByRole("button", { name: "No, controllo le colonne" }));
 
     // the classic matching, starting from NINFA's proposal (the layout is kept)
-    expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
+    expect(await within(panel()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
     expect(checkMappingMock.mock.calls[0]?.[2]).toMatchObject({ layout: { version: 1 } });
   });
 
@@ -512,15 +430,15 @@ describe("ONE question at a time", () => {
       choices: [{ value: "source_record_id", count: null, sheets: [], columns: [] }],
     });
     understandFileMock.mockResolvedValue(ok(understoodInspection({ level: "ASK", questions: [confirmQuestion] })));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("La colonna «Codice» è «Numero della prenotazione»?");
-    await user.click(within(dialog()).getByRole("button", { name: "No, controllo le colonne" }));
+    await within(panel()).findByText("La colonna «Codice» è «Numero della prenotazione»?");
+    await user.click(within(panel()).getByRole("button", { name: "No, controllo le colonne" }));
 
     // the classic matching works on a copy of the proposal that the person now owns: a matching built by
     // hand is judged on its merits, and the reference the server put on ITS decision is not part of it
-    expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
+    expect(await within(panel()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
     expect(checkMappingMock.mock.calls[0]?.[2]).toMatchObject({ smart_import: null });
     expect(importMatchedFileMock).not.toHaveBeenCalled();
   });
@@ -532,14 +450,14 @@ describe("ONE question at a time", () => {
       choices: [{ value: "Partenza", count: null, sheets: [], columns: [] }],
     });
     understandFileMock.mockResolvedValue(ok(understoodInspection({ level: "ASK", questions: [swapped] })));
-    const user = await openStaffImport();
+    const user = renderFlow();
     await pick(user, xlsxFile());
 
-    await within(dialog()).findByText("Le colonne «Arrivo» e «Partenza» sembrano invertite. Vuoi controllarle?");
-    expect(flat(dialog())).toContain("NINFA non le scambia da sola");
-    await user.click(within(dialog()).getByRole("button", { name: "Controlla le colonne" }));
+    await within(panel()).findByText("Le colonne «Arrivo» e «Partenza» sembrano invertite. Vuoi controllarle?");
+    expect(flat(panel())).toContain("NINFA non le scambia da sola");
+    await user.click(within(panel()).getByRole("button", { name: "Controlla le colonne" }));
 
-    expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
+    expect(await within(panel()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
     expect(understandFileMock).toHaveBeenCalledTimes(1); // nothing was swapped or answered for the person
   });
 
@@ -555,32 +473,50 @@ describe("ONE question at a time", () => {
     understandFileMock.mockResolvedValueOnce(
       ok(understoodInspection({ level: "BLOCKED", blockers: [{ code: "AMOUNT_NOT_NET", groups: [] }] }, { domain: "COSTS" })),
     );
-    const user = userEvent.setup({ applyAccept: false });
-    await renderBlock(costsViaXml());
-    await user.click(within(cardOf("Contabilità")).getByRole("button", { name: "Carica nuovo file Contabilità" }));
-    await screen.findByRole("heading", { level: 2, name: "Importa le fatture" });
+    const user = renderFlow();
 
     await pick(user, xlsxFile("registro.xlsx"));
-    await within(dialog()).findByText("L'importo della colonna «Importo» è al netto di IVA?");
-    await user.click(within(dialog()).getByRole("button", { name: "No, comprende l'IVA" }));
+    await within(panel()).findByText("L'importo della colonna «Importo» è al netto di IVA?");
+    await user.click(within(panel()).getByRole("button", { name: "No, comprende l'IVA" }));
 
-    const alert = await within(dialog()).findByRole("alert");
+    const alert = await within(panel()).findByRole("alert");
     expect(flat(alert)).toContain("L'importo comprende l'IVA.");
-    expect(understandFileMock.mock.calls[0]?.[0]).toMatchObject({ domain: "COSTS" });
-    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { amount_basis: "GROSS" } });
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ domain: "COSTS", answers: { amount_basis: "GROSS" } });
   });
 });
 
 describe("when NINFA is not sure enough", () => {
-  it("opens the classic matching with its proposal and says so", async () => {
+  it("says so first, shows no column, and opens the matching only if the person asks", async () => {
     understandFileMock.mockResolvedValue(ok(understoodInspection({ level: "MANUAL" })));
-    const user = await openStaffImport();
+    const user = renderFlow();
 
     await pick(user, xlsxFile());
 
-    expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
-    expect(flat(dialog())).toContain("NINFA ha letto il file ma non è sicura di tutto.");
+    const alert = await within(panel()).findByRole("alert");
+    expect(flat(alert)).toContain("Non posso importare questo file da sola");
+    expect(flat(alert)).toContain("Non è stato importato nulla.");
+    expect(within(panel()).queryByRole("combobox")).toBeNull();
+    expect(within(panel()).queryByText("Abbina le colonne del tuo file")).toBeNull();
     expect(validateImportMock).not.toHaveBeenCalled();
+
+    await user.click(within(panel()).getByRole("button", { name: "Abbina le colonne" }));
+
+    expect(await within(panel()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
+    expect(flat(panel())).toContain("NINFA ha letto il file ma non è sicura di tutto.");
+    expect(validateImportMock).not.toHaveBeenCalled();
+  });
+
+  it("names what the file lacks in the same plain words, and lets the person choose another file", async () => {
+    understandFileMock.mockResolvedValue(
+      ok(understoodInspection({ level: "MANUAL", blockers: [{ code: "MISSING_REQUIRED", groups: [["check_in"]] }] })),
+    );
+    const user = renderFlow();
+
+    await pick(user, xlsxFile());
+
+    expect(flat(await within(panel()).findByRole("alert"))).toContain("Nel file non ho trovato: Data di arrivo");
+    await user.click(within(panel()).getByRole("button", { name: "Scegli un altro file" }));
+    expect(within(panel()).getByLabelText("Seleziona un file CSV o Excel")).not.toBeNull();
   });
 
   it("falls back to the matching when dates must still be chosen", async () => {
@@ -594,40 +530,20 @@ describe("when NINFA is not sure enough", () => {
         }),
       ),
     );
-    const user = await openStaffImport();
+    const user = renderFlow();
 
     await pick(user, xlsxFile());
 
-    expect(await within(dialog()).findByText("Come sono scritte le date?")).not.toBeNull();
+    await user.click(await within(panel()).findByRole("button", { name: "Abbina le colonne" }));
+    expect(await within(panel()).findByText("Come sono scritte le date?")).not.toBeNull();
   });
 
   it("falls back to the classic flow when the backend sends no understanding at all", async () => {
     understandFileMock.mockResolvedValue(ok(laborInspection()));
-    const user = await openStaffImport();
+    const user = renderFlow();
 
     await pick(user, csvFile("turni.csv"));
 
-    expect(await within(dialog()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
-  });
-});
-
-describe("costs: an invoice XML keeps its own path, a register is understood like any other file", () => {
-  it("sends a register to the understanding and an XML to the preview", async () => {
-    understandFileMock.mockResolvedValue(ok(understoodInspection({}, { domain: "COSTS" })));
-    validateImportMock.mockResolvedValue(ok(realisticValidation()));
-    previewImportMock.mockResolvedValue(ok(previewOf({ method: "XML", rows_total: 1, sample_columns: [], sample_rows: [] })));
-    const user = userEvent.setup({ applyAccept: false });
-    await renderBlock(costsViaXml());
-    await user.click(within(cardOf("Contabilità")).getByRole("button", { name: "Carica nuovo file Contabilità" }));
-    await screen.findByRole("heading", { level: 2, name: "Importa le fatture" });
-
-    await pick(user, xmlFile());
-    expect(await within(dialog()).findByText("1 fattura trovata")).not.toBeNull();
-    expect(understandFileMock).not.toHaveBeenCalled();
-
-    await user.click(within(dialog()).getByRole("button", { name: "Scegli un altro file" }));
-    await pick(user, xlsxFile("registro.xlsx"));
-    await waitFor(() => expect(understandFileMock).toHaveBeenCalledTimes(1));
-    expect(understandFileMock.mock.calls[0]?.[0]).toMatchObject({ domain: "COSTS" });
+    expect(await within(panel()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
   });
 });

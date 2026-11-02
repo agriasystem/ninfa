@@ -14,7 +14,7 @@ import { sourcesCopy } from "@/lib/sources/copy";
 import type { SourceCardView } from "@/lib/sources/view-model";
 
 import { StrutturaModal } from "./struttura-modal";
-import { StrutturaButton } from "./struttura-parts";
+import { StrutturaButton, StrutturaLinkButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.manage;
 const CONFIG = sourcesCopy.manage.configuration;
@@ -40,10 +40,12 @@ export interface StrutturaManageDialogProps {
   view: SourceCardView;
   /** Opens straight on "Rimuovere questa fonte?" (the "..." menu's "Rimuovi fonte"). */
   initialConfirm?: boolean;
-  /** "Carica nuovo file": goes to the import of the source's own kind of data. */
+  /** "Carica nuovo file", when it is a link: a file comes in through the "Importa file" page. */
+  uploadHref: string | null;
+  /** "Carica nuovo file", when it is not: invoices have their own way in (see `struttura-source-dialogs`). */
   onUpload: () => void;
-  /** "Modifica associazioni": the same import, started from the columns. */
-  onEditColumns: () => void;
+  /** "Modifica associazioni": the "Importa file" page, started from the columns. */
+  reviewHref: string;
   /** The source was switched off (or is already gone): the cards are re-read from the backend. */
   onRemoved: () => void;
   onClose: () => void;
@@ -63,8 +65,9 @@ export function StrutturaManageDialog({
   timeZone,
   view,
   initialConfirm = false,
+  uploadHref,
   onUpload,
-  onEditColumns,
+  reviewHref,
   onRemoved,
   onClose,
 }: StrutturaManageDialogProps) {
@@ -229,9 +232,9 @@ export function StrutturaManageDialog({
                   <p className="struttura-flow__note">{CONFIG.outdated}</p>
                 ) : null}
                 <div className="struttura-flow__actions">
-                  <StrutturaButton variant="outline" onClick={onEditColumns}>
+                  <StrutturaLinkButton variant="outline" href={reviewHref}>
                     {CONFIG.edit}
-                  </StrutturaButton>
+                  </StrutturaLinkButton>
                   <StrutturaButton variant="outline" onClick={() => setForgetting("confirm")}>
                     {CONFIG.forget}
                   </StrutturaButton>
@@ -242,7 +245,12 @@ export function StrutturaManageDialog({
         ) : null}
 
         <div className="struttura-flow__actions">
-          {canUpload ? (
+          {canUpload && uploadHref !== null ? (
+            <StrutturaLinkButton variant="primary" href={uploadHref}>
+              {sourcesCopy.actions.uploadNew}
+            </StrutturaLinkButton>
+          ) : null}
+          {canUpload && uploadHref === null ? (
             <StrutturaButton variant="primary" onClick={onUpload}>
               {sourcesCopy.actions.uploadNew}
             </StrutturaButton>

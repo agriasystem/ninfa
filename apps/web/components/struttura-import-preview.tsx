@@ -1,5 +1,7 @@
 "use client";
 
+import type { ImportValidationResponse } from "@ninfa/contracts";
+
 import { formatPropertyLocalDateLongItalian } from "@/lib/date/property-date";
 import { sourcesCopy } from "@/lib/sources/copy";
 import { formatSampleCell } from "@/lib/sources/sample-format";
@@ -19,9 +21,49 @@ function fieldName(field: string): string {
   return (sourcesCopy.fields as Record<string, string>)[field] ?? "";
 }
 
+/** Rows that cannot be imported, counted and explained: a file with even one of them imports nothing. Row numbers
+ * and stable codes only, never a value of the file. */
+export function StrutturaRowProblems({ validation }: { validation: ImportValidationResponse }) {
+  return (
+    <div className="struttura-flow__problem" role="alert">
+      <h4 className="struttura-flow__subtitle">{COPY.blockedTitle}</h4>
+      <ul>
+        {validation.row_problems.map((problem) => (
+          <li key={`${problem.field}|${problem.code}`}>
+            {COPY.problemLine(rowProblem(problem.code), fieldName(problem.field), problem.count)}
+          </li>
+        ))}
+      </ul>
+      {validation.invalid_rows.length > 0 ? (
+        <>
+          <p>{COPY.firstRows}</p>
+          <ul>
+            {validation.invalid_rows.map((row) => (
+              <li key={row.row}>
+                {COPY.rowLine(
+                  row.row,
+                  row.issues
+                    .map((issue) => {
+                      const name = fieldName(issue.field);
+                      return `${name.length > 0 ? `${name}: ` : ""}${rowProblem(issue.code)}`;
+                    })
+                    .join("; "),
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <p>{COPY.blockedBody}</p>
+    </div>
+  );
+}
+
 export interface StrutturaImportPreviewProps {
   step: ReadyStep;
   timeZone: string;
+  /** What the person should know about how this kind of file is dated (staff files only). */
+  dateNote: string | null;
   onSave: (save: boolean) => void;
   onImport: () => void;
   onReview: () => void;
@@ -37,6 +79,7 @@ export interface StrutturaImportPreviewProps {
 export function StrutturaImportPreview({
   step,
   timeZone,
+  dateNote,
   onSave,
   onImport,
   onReview,
@@ -79,6 +122,7 @@ export function StrutturaImportPreview({
       {validation.already_imported ? (
         <p className="struttura-flow__note">{COPY.alreadyImported}</p>
       ) : null}
+      {dateNote !== null ? <p className="struttura-flow__note">{dateNote}</p> : null}
       {dateOrder !== null ? <p className="struttura-flow__note">{COPY.datesRead[dateOrder]}</p> : null}
       {decimalStyle !== null ? (
         <p className="struttura-flow__note">{COPY.numbersRead[decimalStyle]}</p>
@@ -92,37 +136,7 @@ export function StrutturaImportPreview({
       ) : null}
 
       {validation.rows_invalid > 0 ? (
-        <div className="struttura-flow__problem" role="alert">
-          <h4 className="struttura-flow__subtitle">{COPY.blockedTitle}</h4>
-          <ul>
-            {validation.row_problems.map((problem) => (
-              <li key={`${problem.field}|${problem.code}`}>
-                {COPY.problemLine(rowProblem(problem.code), fieldName(problem.field), problem.count)}
-              </li>
-            ))}
-          </ul>
-          {validation.invalid_rows.length > 0 ? (
-            <>
-              <p>{COPY.firstRows}</p>
-              <ul>
-                {validation.invalid_rows.map((row) => (
-                  <li key={row.row}>
-                    {COPY.rowLine(
-                      row.row,
-                      row.issues
-                        .map((issue) => {
-                          const name = fieldName(issue.field);
-                          return `${name.length > 0 ? `${name}: ` : ""}${rowProblem(issue.code)}`;
-                        })
-                        .join("; "),
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-          <p>{COPY.blockedBody}</p>
-        </div>
+        <StrutturaRowProblems validation={validation} />
       ) : validation.sample_rows.length > 0 ? (
         <div className="struttura-flow__summary">
           <p className="struttura-flow__note">{COPY.sampleNote}</p>

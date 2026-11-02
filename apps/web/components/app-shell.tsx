@@ -29,7 +29,7 @@ export interface AppShellProps {
 
 /**
  * The whole authenticated shell (Home UI V1, replacing Gate 14's topbar): a sidebar with the logo
- * slot, Oggi / Decisioni / Dati / Struttura and profile | settings; and, on the content side, the
+ * slot, Oggi / Decisioni / Dati / Importa file / Struttura and profile | settings; and, on the content side, the
  * property header (name + local date) above the page. Impostazioni does not exist yet and is never a
  * link (see `AppSidebar`). Logout is the profile menu's "Esci" - the same
  * `logout()` Gate 14 wired, unchanged.

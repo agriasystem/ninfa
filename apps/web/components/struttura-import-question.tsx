@@ -58,7 +58,6 @@ function Choices({
 
 export interface StrutturaImportQuestionProps {
   step: AskStep;
-  domain: DataSourceDomain;
   flow: Pick<ImportFlow, "answer" | "teach" | "chooseKind" | "matchByHand" | "reset">;
 }
 
@@ -68,7 +67,7 @@ export interface StrutturaImportQuestionProps {
  * after which NINFA reads the file again with that answer and goes on. What the person has said is never asked
  * twice.
  */
-export function StrutturaImportQuestion({ step, domain, flow }: StrutturaImportQuestionProps) {
+export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionProps) {
   const { question } = step;
   const [week, setWeek] = useState("");
   const words = wordsOfDocument(question.document);
@@ -83,6 +82,7 @@ export function StrutturaImportQuestion({ step, domain, flow }: StrutturaImportQ
   switch (question.kind) {
     case "DOMAIN": {
       const detected = candidate as DataSourceDomain | null;
+      const others = question.choices.filter((choice) => choice.value !== detected);
       body = (
         <>
           {heading(
@@ -91,28 +91,21 @@ export function StrutturaImportQuestion({ step, domain, flow }: StrutturaImportQ
           {question.origin === "ASSISTANT" ? (
             <p className="struttura-flow__note">{COPY.DOMAIN.suggested}</p>
           ) : null}
-          {detected !== null ? (
-            <div className="struttura-question__choices">
+          <div className="struttura-question__choices">
+            {detected !== null ? (
               <StrutturaButton variant="primary" onClick={() => void flow.chooseKind(detected)}>
                 {COPY.DOMAIN.asIs(NAMES.kindPhrase[detected])}
               </StrutturaButton>
-              <StrutturaButton variant="outline" onClick={() => void flow.chooseKind(domain)}>
-                {COPY.DOMAIN.notIt(NAMES.kindPhrase[domain])}
-              </StrutturaButton>
-            </div>
-          ) : (
-            <div className="struttura-question__choices">
-              {question.choices.map((choice) => (
-                <StrutturaButton
-                  key={choice.value}
-                  variant="outline"
-                  onClick={() => void flow.chooseKind(choice.value as DataSourceDomain)}
-                >
-                  {NAMES.kindName[choice.value as DataSourceDomain]}
+            ) : null}
+            {others.map((choice) => {
+              const kind = choice.value as DataSourceDomain;
+              return (
+                <StrutturaButton key={kind} variant="outline" onClick={() => void flow.chooseKind(kind)}>
+                  {detected !== null ? COPY.DOMAIN.notIt(NAMES.kindPhrase[kind]) : NAMES.kindName[kind]}
                 </StrutturaButton>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </>
       );
       break;
@@ -370,7 +363,7 @@ export function StrutturaImportQuestion({ step, domain, flow }: StrutturaImportQ
     <>
       <p className="struttura-flow__file">{FLOW.chosen(step.file.name)}</p>
       <section className="struttura-question" aria-labelledby="struttura-question-title">
-        <p className="struttura-question__progress">{COPY.progress}</p>
+        <p className="struttura-question__progress">{COPY.progress(step.understanding.questions.length)}</p>
         {body}
       </section>
       <div className="struttura-flow__actions">

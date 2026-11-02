@@ -25,8 +25,9 @@ function sourceFiles(): { file: string; text: string }[] {
     ...readdirSync(path.join(WEB, "components"))
       .filter(
         (name) =>
-          /^struttura-(sources|source-.*|import-.*|manage-dialog|modal)\.tsx$/u.test(name) &&
-          !name.includes(".test."),
+          /^(importa-file-.*|struttura-(sources|source-.*|import-.*|invoice-dialog|template-button|manage-dialog|modal))\.tsx$/u.test(
+            name,
+          ) && !name.includes(".test."),
       )
       .map((name) => `components/${name}`),
     "lib/api/data-sources.ts",
@@ -204,8 +205,14 @@ describe("Smart Import: the page decides nothing about the data", () => {
     "components/struttura-import-question.tsx",
     "components/struttura-import-understood.tsx",
     "lib/sources/understanding-format.ts",
-    "components/struttura-import-dialog.tsx",
+    "components/struttura-invoice-dialog.tsx",
     "components/struttura-manage-dialog.tsx",
+    "components/importa-file-flow.tsx",
+    "components/importa-file-dropzone.tsx",
+    "components/importa-file-recent.tsx",
+    "components/importa-file-screen.tsx",
+    "lib/sources/use-invoice-import.ts",
+    "lib/sources/use-recent-imports.ts",
   ];
 
   it("names no field of any kind of data in its logic: what is required, and what a field is, come from the backend", () => {
@@ -230,6 +237,58 @@ describe("Smart Import: the page decides nothing about the data", () => {
     const client = withoutComments(read("lib/api/data-sources.ts"));
     expect(client).toMatch(/readAsDataURL/u); // a file travels as text inside the request, never to a third party
     for (const file of logic) expect(read(file), file).not.toMatch(/\bfetch\(|XMLHttpRequest|sendBeacon/u);
+  });
+});
+
+describe("Importa file: one way in, and the same Smart Import", () => {
+  it("is the only place a spreadsheet comes in: the one file input left in Struttura takes invoices, nothing else", () => {
+    const struttura = readdirSync(path.join(WEB, "components")).filter(
+      (name) => /^struttura-.*\.tsx$/u.test(name) && !name.includes(".test."),
+    );
+    const withInput = struttura.filter((name) => /type="file"/u.test(read(`components/${name}`)));
+    expect(withInput).toEqual(["struttura-invoice-dialog.tsx"]);
+    expect(read("components/struttura-invoice-dialog.tsx")).toMatch(/accept=\{INVOICE_ACCEPT\}/u);
+    expect(read("lib/sources/use-invoice-import.ts")).toMatch(/INVOICE_ACCEPT = "\.xml,text\/xml,application\/xml"/u);
+    for (const name of struttura) {
+      expect(read(`components/${name}`), name).not.toMatch(/useImportFlow|understandFile|importMatchedFile|validateImport/u);
+    }
+  });
+
+  it("the browser reads no file: it only turns one into text for the request, in the API client", () => {
+    for (const { file, text } of sourceFiles()) {
+      if (file !== "lib/api/data-sources.ts") {
+        expect(withoutComments(text), file).not.toMatch(/FileReader|readAsText|\.arrayBuffer\(|\.text\(\)|\.slice\(/u);
+      }
+      expect(withoutComments(text), file).not.toMatch(/xlsx\b.*from|papaparse|read-excel|exceljs|sheetjs/iu);
+    }
+    const client = withoutComments(read("lib/api/data-sources.ts"));
+    expect(client).not.toMatch(/readAsText|\.arrayBuffer\(/u);
+  });
+
+  it("guesses no kind of data and asks no question of its own: the kind is the engine's verdict or the person's word", () => {
+    const flow = withoutComments(read("lib/sources/use-import-flow.ts"));
+    expect(flow).toMatch(/understanding\.detection/u);
+    // nothing about the name of a file or its columns decides the kind
+    expect(flow).not.toMatch(/\.name\.[a-zA-Z]*\(\)\.(includes|match|startsWith)|\/prenot|\/turni|\/fattur/iu);
+    expect(flow).not.toMatch(/kind: "(DOMAIN|TABLE|COLUMN_MEANING|VALUE_LABELS)"/u);
+    const page = withoutComments(read("components/importa-file-flow.tsx"));
+    expect(page).toMatch(/understanding\.blockers/u);
+    expect(page).not.toMatch(/\.confidence|\.score\b|\.level\b/u);
+  });
+
+  it("keeps no history of its own: the browser's storage is not a source of truth", () => {
+    for (const file of ["components/importa-file-recent.tsx", "components/importa-file-flow.tsx", "lib/sources/use-recent-imports.ts", "lib/sources/use-import-flow.ts"]) {
+      expect(withoutComments(read(file)), file).not.toMatch(/localStorage|sessionStorage|indexedDB/u);
+    }
+  });
+
+  it("starts no analysis: the page takes a file to the data, the engine stays on the server", () => {
+    for (const file of ["components/importa-file-flow.tsx", "components/importa-file-screen.tsx", "lib/sources/use-import-flow.ts"]) {
+      const imports = read(file)
+        .split("\n")
+        .filter((line) => /\bfrom\b/u.test(line));
+      for (const line of imports) expect(line, `${file}: ${line}`).not.toMatch(/decisions|feed|recommendations|ask-ninfa/iu);
+    }
   });
 });
 
@@ -281,5 +340,23 @@ describe("responsive-critical CSS of the dialogs and the cards", () => {
 
   it("stays light and orange-free", () => {
     expect(block).not.toMatch(/prefers-color-scheme|--home-attention/u);
+  });
+
+  it("gives the page of a file the same tokens as Struttura, a visible focus, and no motion for who asked for none", () => {
+    expect(block).toMatch(/\.importa-screen,\s*\.struttura-screen,\s*\.struttura-modal \{\s*--struttura-gap:/u);
+    expect(block).toMatch(/\.importa-drop:has\(input:focus-visible\) \{\s*outline: 2px solid var\(--home-focus\)/u);
+    expect(block).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{\s*\.importa-drop,\s*\.importa-drop__icon \{\s*transition: none;/u,
+    );
+  });
+
+  it("keeps a long name of a file, and the list of imports, from widening a phone", () => {
+    expect(block).toMatch(/\.importa-panel \{[^}]*overflow-wrap: anywhere;/u);
+    expect(block).toMatch(/\.importa-recent__file \{[^}]*overflow-wrap: anywhere;/u);
+    expect(block).toMatch(/@media \(max-width: 559px\) \{[\s\S]*?\.importa-recent__table tr \{\s*display: grid;/u);
+  });
+
+  it("keeps the five sections of the sidebar in one row on a narrow phone", () => {
+    expect(block).toMatch(/@media \(max-width: 399px\) \{[\s\S]*?\.nav-item \{\s*width: 36px;/u);
   });
 });

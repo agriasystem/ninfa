@@ -8,6 +8,7 @@ import { sourcesCopy } from "@/lib/sources/copy";
 import { factsOf, originText, periodText } from "@/lib/sources/understanding-format";
 import type { ReadyStep } from "@/lib/sources/use-import-flow";
 
+import { StrutturaRowProblems } from "./struttura-import-preview";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.understanding;
@@ -29,6 +30,8 @@ function valueText(item: UnderstandingRecognized): string {
 
 export interface StrutturaImportUnderstoodProps {
   step: ReadyStep;
+  /** What the person should know about how this kind of file is dated (staff files only). */
+  dateNote: string | null;
   onSave: (save: boolean) => void;
   onImport: () => void;
   onReview: () => void;
@@ -43,6 +46,7 @@ export interface StrutturaImportUnderstoodProps {
  */
 export function StrutturaImportUnderstood({
   step,
+  dateNote,
   onSave,
   onImport,
   onReview,
@@ -52,7 +56,11 @@ export function StrutturaImportUnderstood({
   const { understanding, validation, inspection } = step;
   if (understanding === null) return null;
   const domain = inspection.domain;
-  const facts = factsOf(domain, understanding, validation);
+  const recognizedFields = understanding.recognized.length;
+  const facts = [
+    ...factsOf(domain, understanding, validation),
+    ...(recognizedFields > 0 ? [COPY.facts.fields(recognizedFields)] : []),
+  ];
   const period = periodText(validation);
   const document = understanding.document;
   const known = inspection.profile.status === "RECOGNIZED";
@@ -71,6 +79,7 @@ export function StrutturaImportUnderstood({
         </ul>
         {period !== null ? <p className="struttura-flow__note">{period}</p> : null}
         {known ? <p className="struttura-flow__note">{COPY.sameAsLastTime}</p> : null}
+        {dateNote !== null ? <p className="struttura-flow__note">{dateNote}</p> : null}
       </div>
 
       {understanding.people !== null ? (
@@ -108,6 +117,7 @@ export function StrutturaImportUnderstood({
           <p>{COPY.unclassified(validation.rows_unclassified)}</p>
         </div>
       ) : null}
+      {validation.rows_invalid > 0 ? <StrutturaRowProblems validation={validation} /> : null}
       {suggested ? <p className="struttura-flow__note">{COPY.assistantNote}</p> : null}
       {validation.already_imported ? (
         <p className="struttura-flow__note">{sourcesCopy.preview.alreadyImported}</p>

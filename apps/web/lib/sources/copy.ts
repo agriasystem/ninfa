@@ -2,9 +2,15 @@ import type {
   ImportFieldKey,
   ImportProblem,
   ImportProfileInfo,
+  RecentImport,
   SourceCardKey,
   SourceMethod,
 } from "@ninfa/contracts";
+
+/** "1.284": Italian leaves a four-digit number ungrouped by default. */
+function countText(count: number): string {
+  return new Intl.NumberFormat("it-IT", { useGrouping: "always" }).format(count);
+}
 
 /**
  * Italian copy of "Fonti dati" (Struttura). One source per string, like `lib/copy.ts`.
@@ -67,6 +73,7 @@ export const sourcesCopy = {
     configure: "Configura fonte",
     upload: "Carica file",
     uploadNew: "Carica nuovo file",
+    importFile: "Importa un file",
     manage: "Gestisci",
     remove: "Rimuovi fonte",
     viewChannels: "Visualizza canali",
@@ -114,23 +121,28 @@ export const sourcesCopy = {
   methods: {
     bookingsCsv: {
       title: "Importa da file",
-      body: "Carica il file delle prenotazioni che hai già, in formato CSV o Excel (.xlsx): NINFA ti aiuta ad abbinare le colonne.",
-      cta: "Importa file",
+      body: "Usa il file delle prenotazioni che hai già, in formato CSV o Excel (.xlsx): NINFA lo riconosce da sola.",
+      cta: "Importa un file",
     },
     channelCsv: {
       title: "Importa da file",
-      body: "Carica il file delle prenotazioni, in formato CSV o Excel (.xlsx): i canali (Booking.com, Expedia e altri) sono già al suo interno.",
-      cta: "Importa file",
+      body: "Usa il file delle prenotazioni, in formato CSV o Excel (.xlsx): i canali (Booking.com, Expedia e altri) sono già al suo interno.",
+      cta: "Importa un file",
     },
     invoicesXml: {
-      title: "Importa fatture",
-      body: "Carica le fatture elettroniche in formato XML, oppure il registro dei costi in CSV o Excel (.xlsx).",
-      cta: "Importa file",
+      title: "Fatture elettroniche",
+      body: "Carica le fatture elettroniche in formato XML.",
+      cta: "Importa fatture XML",
+    },
+    costsRegister: {
+      title: "Registro dei costi",
+      body: "Usa il registro dei costi che hai già, in formato CSV o Excel (.xlsx): NINFA lo riconosce da sola.",
+      cta: "Importa un file",
     },
     laborCsv: {
       title: "Importa da file",
       body: "Ore, reparti e costi del personale: usa il file che hai già, in formato CSV o Excel (.xlsx).",
-      cta: "Importa file",
+      cta: "Importa un file",
     },
   },
   // --- the "Collega una nuova fonte" wizard ----------------------------------------------------------
@@ -151,26 +163,17 @@ export const sourcesCopy = {
   },
   // --- importing a file ---------------------------------------------------------------------------
   importFlow: {
-    titles: {
-      BOOKINGS: "Importa le prenotazioni",
-      COSTS: "Importa le fatture",
-      LABOR: "Importa i dati del personale",
-    },
+    invoiceTitle: "Importa le fatture",
     chooseFile: "Seleziona file",
     chooseOther: "Scegli un altro file",
     chosen: (name: string) => `File selezionato: ${name}`,
-    hints: {
-      CSV: "Usa il file che hai già, in formato CSV o Excel (.xlsx): non devi rinominare le colonne, ti aiutiamo noi ad abbinarle.",
-      XML: "Carica le fatture elettroniche (XML) oppure il registro dei costi che hai già, in formato CSV o Excel (.xlsx).",
-    },
+    invoiceHint:
+      "Carica una fattura elettronica in formato XML. Per un registro dei costi in CSV o Excel usa «Importa file».",
     template: "Scarica modello CSV",
     templateFailed: "Il modello non è disponibile al momento.",
     laborDate: (date: string) =>
       `I dati vengono registrati con la data di oggi (${date}), secondo il fuso orario della struttura.`,
-    wrongType: {
-      CSV: "Scegli un file CSV o Excel (con estensione .csv o .xlsx).",
-      XML: "Scegli un file XML, CSV o Excel (con estensione .xml, .csv o .xlsx).",
-    },
+    invoiceWrongType: "Scegli un file XML di fattura elettronica (con estensione .xml).",
     checking: "Controllo del file in corso…",
     importing: "Importazione in corso…",
     previewTitle: "Cosa NINFA ha trovato nel file",
@@ -240,6 +243,8 @@ export const sourcesCopy = {
     sourceGone: "Questa fonte non è più disponibile. Aggiorna la pagina.",
     importInProgress: "È già in corso un altro import di questi dati. Attendi qualche istante e riprova.",
     alreadyConfigured: "Hai già una fonte per questi dati.",
+    severalSources: "Per questi dati risultano più fonti attive e NINFA non ne sceglie una da sola.",
+    sessionExpired: "La sessione è scaduta. Accedi di nuovo per continuare.",
     tryAgain: "Riprova",
   },
   // --- "Abbina le colonne": the file the hotel already has -------------------------------------------
@@ -525,8 +530,9 @@ export const sourcesCopy = {
       actualHours: (hours: string) => `${hours} ore effettive`,
       plannedCost: (amount: string) => `${amount} di costo previsto`,
       actualCost: (amount: string) => `${amount} di costo effettivo`,
-      rows: (count: number) => (count === 1 ? "1 riga" : `${count} righe`),
-      bookings: (count: number) => (count === 1 ? "1 prenotazione" : `${count} prenotazioni`),
+      rows: (count: number) => (count === 1 ? "1 riga" : `${countText(count)} righe`),
+      bookings: (count: number) => (count === 1 ? "1 prenotazione" : `${countText(count)} prenotazioni`),
+      fields: (count: number) => (count === 1 ? "1 campo riconosciuto" : `${count} campi riconosciuti`),
       channels: (count: number) => (count === 1 ? "1 canale" : `${count} canali`),
       revenue: (amount: string) => `${amount} di ricavo delle camere`,
       documents: (count: number) => (count === 1 ? "1 fattura" : `${count} fatture`),
@@ -578,7 +584,8 @@ export const sourcesCopy = {
     },
     // --- the one question at a time ---
     question: {
-      progress: "Ho bisogno di una sola informazione",
+      // How many questions the backend still has for this file, this one included.
+      progress: (count: number) => (count > 1 ? `Mi servono ${count} conferme` : "Mi serve solo una conferma"),
       thinking: "Un attimo…",
       back: "Scegli un altro file",
       yes: "Sì",
@@ -590,8 +597,6 @@ export const sourcesCopy = {
         nothing: "Che tipo di dati contiene questo file?",
         suggested: "Suggerimento di NINFA, da controllare.",
       },
-      otherKind: (name: string) =>
-        `Per importare questo tipo di dati usa la scheda «${name}» di Fonti dati. Qui non è stato importato nulla.`,
       TABLE: {
         title: "Ho trovato più di una tabella nel file. Quale devo leggere?",
         choice: (title: string, sheet: string, firstRow: number, rows: number, columns: string) =>
@@ -667,6 +672,67 @@ export const sourcesCopy = {
     assistantNote: "Alcuni abbinamenti sono suggerimenti di NINFA: controllali prima di continuare.",
     // The week: the day picked is moved back to its Monday.
     weekStarts: (date: string) => `Settimana dal ${date}`,
+  },
+  // --- the "Importa file" page: the person hands over the file, NINFA works out what it is -------------------
+  importPage: {
+    heading: "Importa file",
+    subtitle: "NINFA riconosce automaticamente il contenuto del file e prepara i dati per l'analisi.",
+    reviewSubtitle: "Carica un file di questa fonte per rivedere come NINFA ne legge le colonne.",
+    backToSources: "Torna a Fonti dati",
+    panelLabel: "Importazione del file",
+    drop: {
+      title: "Trascina qui il tuo file",
+      or: "oppure",
+      pick: "Selezionalo dal computer",
+      formats: "CSV o Excel (.xlsx), fino a 10 MB",
+      inputLabel: "Seleziona un file CSV o Excel",
+    },
+    rejected: {
+      WRONG_TYPE:
+        "Questo formato non è supportato: scegli un file CSV o Excel (.xlsx). Le fatture elettroniche XML si importano da Struttura, in Fonti dati.",
+      EMPTY: "Il file è vuoto: non c'è nulla da importare.",
+      TOO_LARGE: "Il file supera i 10 MB: è troppo grande per essere importato.",
+      SEVERAL: "Trascina un file alla volta.",
+    },
+    checking: {
+      reading: "Sto leggendo il file…",
+      verifying: "Sto controllando tutte le righe…",
+      stepReading: "Lettura e riconoscimento del file",
+      stepVerifying: "Verifica di tutte le righe",
+    },
+    kind: {
+      title: "Non riesco a capire che tipo di dati contiene questo file",
+      body: "NINFA importa prenotazioni, personale e costi. Se il file contiene uno di questi dati, indicalo:",
+    },
+    manual: {
+      title: "Non posso importare questo file da sola",
+      body: "NINFA ha letto il file, ma non è abbastanza sicura di come interpretarlo.",
+      offer: "Puoi indicare tu cosa contiene ogni colonna, oppure scegliere un altro file.",
+      action: "Abbina le colonne",
+    },
+    done: {
+      file: "File",
+      kind: "Tipo di dati",
+      rows: "Contenuto",
+      period: "Periodo",
+      analysis: "I nuovi dati entreranno nella prossima analisi di NINFA.",
+      goToday: "Vai a Oggi",
+      another: "Importa un altro file",
+    },
+    recent: {
+      title: "Importazioni recenti",
+      columns: { file: "File", kind: "Tipo", date: "Data", status: "Stato" },
+      loading: "Caricamento delle importazioni recenti…",
+      loadError: "Non siamo riusciti a caricare le importazioni recenti.",
+      empty: "Qui troverai i file che hai importato.",
+      unnamed: "File senza nome",
+      status: {
+        SUCCEEDED: "Completata",
+        FAILED: "Non riuscita",
+        RUNNING: "In corso",
+        PENDING: "In corso",
+      } satisfies Record<RecentImport["status"], string>,
+    },
   },
   // --- manage / remove -----------------------------------------------------------------------------
   manage: {

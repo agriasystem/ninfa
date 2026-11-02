@@ -8,6 +8,7 @@ import type {
   ImportValidationResponse,
   MappedImportResultResponse,
   MappingCheckResponse,
+  RecentImportsResponse,
   SavedImportConfiguration,
   UnderstandAnswers,
 } from "@ninfa/contracts";
@@ -30,6 +31,14 @@ export function getDataSources(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ApiResult<DataSourcesResponse>> {
   return apiRequest<DataSourcesResponse>(dataSourcesPath(propertyId), { method: "GET" }, fetchImpl);
+}
+
+/** GET - the latest import attempts of the property, newest first: "Importazioni recenti". */
+export function getRecentImports(
+  propertyId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ApiResult<RecentImportsResponse>> {
+  return apiRequest<RecentImportsResponse>(`${dataSourcesPath(propertyId)}/imports`, { method: "GET" }, fetchImpl);
 }
 
 /** DELETE - switch a source off. The data it already delivered are kept. */
@@ -123,6 +132,23 @@ export function fileToBase64(file: Blob): Promise<string> {
 }
 
 /**
+ * A file the browser can no longer read (moved or deleted after it was chosen, a folder dropped by mistake)
+ * ends like any other failed call: `apiRequest` never throws, and neither does what is built on it.
+ */
+async function withFileBase64<T>(
+  file: Blob,
+  send: (fileBase64: string) => Promise<ApiResult<T>>,
+): Promise<ApiResult<T>> {
+  let fileBase64: string;
+  try {
+    fileBase64 = await fileToBase64(file);
+  } catch {
+    return { ok: false, status: 0, code: "FILE_NOT_READABLE", message: "The file could not be read" };
+  }
+  return send(fileBase64);
+}
+
+/**
  * POST - read a CSV / Excel file and get NINFA's proposal for what each column means. Writes NOTHING: no
  * source, no job, no saved configuration.
  */
@@ -156,23 +182,25 @@ export interface UnderstandFileArgs {
  * POST - NINFA reads the whole DOCUMENT (every sheet, titles, totals, department lines, a grid of days)
  * and says what it understood, what it still needs to ask and the decision it proposes. Writes NOTHING.
  */
-export async function understandFile(
+export function understandFile(
   { propertyId, domain, file, answers, confirmedDomain }: UnderstandFileArgs,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ApiResult<FileInspectionResponse>> {
-  return apiRequest<FileInspectionResponse>(
-    `${dataSourcesPath(propertyId)}/import-understanding`,
-    {
-      method: "POST",
-      body: {
-        domain,
-        filename: file.name,
-        file_base64: await fileToBase64(file),
-        confirmed_domain: confirmedDomain,
-        answers,
+  return withFileBase64(file, (fileBase64) =>
+    apiRequest<FileInspectionResponse>(
+      `${dataSourcesPath(propertyId)}/import-understanding`,
+      {
+        method: "POST",
+        body: {
+          domain,
+          filename: file.name,
+          file_base64: fileBase64,
+          confirmed_domain: confirmedDomain,
+          answers,
+        },
       },
-    },
-    fetchImpl,
+      fetchImpl,
+    ),
   );
 }
 
@@ -199,17 +227,19 @@ export interface MatchedFileArgs {
 }
 
 /** POST - judge every row of the file with this matching, exactly as the import will. Writes NOTHING. */
-export async function validateImport(
+export function validateImport(
   { propertyId, domain, file, mapping }: MatchedFileArgs,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ApiResult<ImportValidationResponse>> {
-  return apiRequest<ImportValidationResponse>(
-    `${dataSourcesPath(propertyId)}/import-validation`,
-    {
-      method: "POST",
-      body: { domain, filename: file.name, file_base64: await fileToBase64(file), mapping },
-    },
-    fetchImpl,
+  return withFileBase64(file, (fileBase64) =>
+    apiRequest<ImportValidationResponse>(
+      `${dataSourcesPath(propertyId)}/import-validation`,
+      {
+        method: "POST",
+        body: { domain, filename: file.name, file_base64: fileBase64, mapping },
+      },
+      fetchImpl,
+    ),
   );
 }
 
@@ -221,24 +251,26 @@ export interface MatchedImportArgs extends MatchedFileArgs {
 }
 
 /** POST - import with the person's matching of columns. The source exists only if this succeeds. */
-export async function importMatchedFile(
+export function importMatchedFile(
   { propertyId, domain, file, mapping, saveConfiguration, snapshotLocalDate }: MatchedImportArgs,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ApiResult<MappedImportResultResponse>> {
-  return apiRequest<MappedImportResultResponse>(
-    `${dataSourcesPath(propertyId)}/imports/mapped`,
-    {
-      method: "POST",
-      body: {
-        domain,
-        filename: file.name,
-        file_base64: await fileToBase64(file),
-        mapping,
-        save_configuration: saveConfiguration,
-        snapshot_local_date: snapshotLocalDate ?? null,
+  return withFileBase64(file, (fileBase64) =>
+    apiRequest<MappedImportResultResponse>(
+      `${dataSourcesPath(propertyId)}/imports/mapped`,
+      {
+        method: "POST",
+        body: {
+          domain,
+          filename: file.name,
+          file_base64: fileBase64,
+          mapping,
+          save_configuration: saveConfiguration,
+          snapshot_local_date: snapshotLocalDate ?? null,
+        },
       },
-    },
-    fetchImpl,
+      fetchImpl,
+    ),
   );
 }
 

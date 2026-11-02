@@ -33,7 +33,7 @@ destinations at `/dati` and `/struttura`: see [data-ui-v1.md](data-ui-v1.md) and
 `components/app-shell.tsx` is now a sidebar (~240 px) + content frame (it replaced Gate 14's topbar;
 the Decision Detail uses the same shell, with "Decisioni" active):
 
-- **Sidebar:** logo slot, Oggi / Decisioni / Dati / Struttura, then profile | divider | settings.
+- **Sidebar:** logo slot, Oggi / Decisioni / Dati / Importa file / Struttura, then profile | divider | settings.
 - **Profile** is a real disclosure: display name (when present), e-mail, and "Esci" - the same
   `logout()` Gate 14 wired. Escape and a click outside close it; Esc returns focus to the avatar.
 - **Property header** (top-right of the content): the real property name and today's date in the
