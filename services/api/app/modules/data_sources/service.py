@@ -18,12 +18,14 @@ from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
 from app.db.locks import LockWaitTimeoutError, hold_source_import_lock
 from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
+from app.modules.analysis.queue import enqueue_refresh
 from app.modules.bookings.errors import BookingImportError
 from app.modules.bookings.mapping import CanonicalField, header_index, normalize_header
 from app.modules.bookings.models import ChannelType
@@ -586,7 +588,7 @@ class DataSourcesService:
                 domain.value,
                 wait_ms=IMPORT_LOCK_WAIT_MS,
             ):
-                return self._import_into_source(
+                outcome = self._import_into_source(
                     property_id, domain, filename, content, snapshot_local_date, mapped
                 )
         except LockWaitTimeoutError as error:
@@ -598,6 +600,25 @@ class DataSourcesService:
                 domain.value,
             )
             raise ImportInProgressError() from error
+        if outcome.succeeded:
+            self._request_analysis_refresh(property_id)
+        return outcome
+
+    def _request_analysis_refresh(self, property_id: UUID) -> None:
+        """Ask the worker to bring the analysis up to date. The import has already been committed
+        and stands whatever happens here: a request that cannot be queued is logged, the data stay
+        imported, and the analysis status says "new data" and offers to ask again."""
+        try:
+            enqueue_refresh(self._session, self._tenant, property_id)
+            self._session.commit()
+        except SQLAlchemyError as error:
+            self._session.rollback()
+            logger.error(
+                "analysis refresh not queued workspace_id=%s property_id=%s error_type=%s",
+                self._tenant.workspace_id,
+                property_id,
+                type(error).__name__,
+            )
 
     def _refusal_before_import(
         self,

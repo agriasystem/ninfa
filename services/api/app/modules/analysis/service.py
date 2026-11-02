@@ -73,7 +73,11 @@ class AnalysisInputError(AppError):
 class AnalysisRunRequest:
     """Every execution choice, explicit and already resolved. `cost_year`/`cost_month` come
     together or not at all (checked here, the one place, so enqueueing a job and running one
-    reject the same inconsistent request); `currency` falls back to the property's own currency."""
+    reject the same inconsistent request); `currency` falls back to the property's own currency.
+
+    `cost_periods` is the same choice for several months at once ((year, month), oldest first), for
+    a file that spans them; never together with `cost_year`/`cost_month`. `labor_work_dates` narrows
+    labor to the dates a source really has entries for (None: every target of the window)."""
 
     workspace_id: UUID
     property_id: UUID
@@ -84,10 +88,24 @@ class AnalysisRunRequest:
     cost_year: int | None = None
     cost_month: int | None = None
     currency: str | None = None
+    cost_periods: tuple[tuple[int, int], ...] = ()
+    labor_work_dates: frozenset[date] | None = None
 
     def __post_init__(self) -> None:
         if (self.cost_year is None) != (self.cost_month is None):
             raise AnalysisInputError("cost_year and cost_month must be given together")
+        if self.cost_periods and self.cost_year is not None:
+            raise AnalysisInputError("cost_periods replaces cost_year and cost_month")
+        if self.labor_work_dates is not None and self.labor_data_source_id is None:
+            raise AnalysisInputError("labor_work_dates needs a labor data source")
+
+    @property
+    def cost_months(self) -> tuple[tuple[int, int], ...]:
+        if self.cost_periods:
+            return self.cost_periods
+        if self.cost_year is not None and self.cost_month is not None:
+            return ((self.cost_year, self.cost_month),)
+        return ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,8 +159,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
     stay_date_start = request.stay_date_start
     stay_date_end = request.stay_date_end
     labor_data_source_id = request.labor_data_source_id
-    cost_year = request.cost_year
-    cost_month = request.cost_month
+    cost_months = request.cost_months
 
     # 1. Materialize today's OBSERVED booking snapshots - the ONLY step below that writes
     # anything before the final sync(). The snapshot day is the real clock's "today" in the
@@ -186,20 +203,23 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
     )
     evaluations.append(ota_evaluation)
 
-    # 5. Cost: only when the caller gave an explicit target month - never a hidden default.
+    # 5. Cost: only when the caller gave explicit target months - never a hidden default.
     cost_currency: str | None = None
     cost_category_count: int | None = None
-    if cost_year is not None and cost_month is not None:
+    if cost_months:
         cost_currency = request.currency or prop.currency
-        cost_evaluations = CostDecisionService(session, tenant).evaluate_month(
-            property_id=prop.id,
-            booking_data_source_id=booking_data_source_id,
-            year=cost_year,
-            month=cost_month,
-            currency=cost_currency,
-        )
-        evaluations.extend(cost_evaluations)
-        cost_category_count = len(cost_evaluations)
+        cost_service = CostDecisionService(session, tenant)
+        cost_category_count = 0
+        for cost_year, cost_month in cost_months:
+            cost_evaluations = cost_service.evaluate_month(
+                property_id=prop.id,
+                booking_data_source_id=booking_data_source_id,
+                year=cost_year,
+                month=cost_month,
+                currency=cost_currency,
+            )
+            evaluations.extend(cost_evaluations)
+            cost_category_count += len(cost_evaluations)
 
     # 6. Labor: only when the caller gave an explicit labor data source - one evaluation per
     # OBSERVED target snapshot and labor category, reusing the same targets as step 3.
@@ -213,6 +233,12 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
             stay_date_to=stay_date_end,
             origin=SnapshotOrigin.OBSERVED,
         )
+        if request.labor_work_dates is not None:
+            target_snapshots = [
+                target
+                for target in target_snapshots
+                if target.stay_date in request.labor_work_dates
+            ]
         labor_service = LaborDecisionService(session, tenant)
         labor_evaluations = [
             labor_service.evaluate_overstaffing(
@@ -235,7 +261,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
             DomainCoverage(AnalysisDomain.REVENUE, DomainCoverageStatus.EVALUATED),
             DomainCoverage(AnalysisDomain.DISTRIBUTION, DomainCoverageStatus.EVALUATED),
             DomainCoverage(AnalysisDomain.COSTS, DomainCoverageStatus.EVALUATED)
-            if cost_year is not None and cost_month is not None
+            if cost_months
             else DomainCoverage(
                 AnalysisDomain.COSTS, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
             ),

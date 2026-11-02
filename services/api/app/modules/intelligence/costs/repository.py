@@ -28,6 +28,32 @@ class CostLineRepository:
         self._session = session
         self._tenant = tenant
 
+    def months_with_lines(self, property_id: UUID, *, before: date, limit: int) -> list[date]:
+        """The first day of each calendar month that has an invoice line dated before `before`, the
+        newest `limit` of them, newest first: the months the invoices really touch."""
+        month = cast(func.date_trunc("month", Invoice.invoice_date), Date)
+        return list(
+            self._session.scalars(
+                select(month)
+                .select_from(InvoiceLine)
+                .join(
+                    Invoice,
+                    and_(
+                        Invoice.workspace_id == InvoiceLine.workspace_id,
+                        Invoice.id == InvoiceLine.invoice_id,
+                    ),
+                )
+                .where(
+                    Invoice.workspace_id == self._tenant.workspace_id,
+                    Invoice.property_id == property_id,
+                    Invoice.invoice_date < before,
+                )
+                .group_by(month)
+                .order_by(month.desc())
+                .limit(limit)
+            ).all()
+        )
+
     def monthly_aggregates(
         self, property_id: UUID, first: date, last: date
     ) -> list[MonthlyCostAggregate]:

@@ -24,6 +24,7 @@ _SOURCES_METHODS = {
     f"{_SOURCES}/{{data_source_id}}": {"delete"},
     f"{_SOURCES}/import-preview": {"post"},
     f"{_SOURCES}/imports": {"get", "post"},
+    f"{_SOURCES}/import-limits": {"get"},
     f"{_SOURCES}/imports/mapped": {"post"},
     f"{_SOURCES}/import-inspection": {"post"},
     f"{_SOURCES}/import-understanding": {"post"},
@@ -31,6 +32,11 @@ _SOURCES_METHODS = {
     f"{_SOURCES}/import-validation": {"post"},
     f"{_SOURCES}/{{data_source_id}}/import-configuration": {"get", "delete"},
     f"{_SOURCES}/templates/{{domain}}": {"get"},
+}
+# Where the analysis stands against the data, and the recovery when a refresh did not happen.
+_ANALYSIS_METHODS = {
+    "/api/v1/properties/{property_id}/analysis/status": {"get"},
+    "/api/v1/properties/{property_id}/analysis/refresh": {"post"},
 }
 
 _EXPECTED_PATHS = {
@@ -46,6 +52,7 @@ _EXPECTED_PATHS = {
     _HOME_ASK_PATH,
     _DATA_OVERVIEW_PATH,
     *_SOURCES_METHODS,
+    *_ANALYSIS_METHODS,
 }
 
 
@@ -76,6 +83,8 @@ def test_decision_routes_remain_get_only_except_the_two_ask_posts(client: TestCl
             continue
         if path in _SOURCES_METHODS:
             assert set(methods) == _SOURCES_METHODS[path], path
+        elif path in _ANALYSIS_METHODS:
+            assert set(methods) == _ANALYSIS_METHODS[path], path
         elif path in (_ASK_PATH, _HOME_ASK_PATH):
             assert set(methods) == {"post"}, path
         else:

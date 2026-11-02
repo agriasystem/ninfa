@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1 import health
+from app.api.v1.analysis.router import router as analysis_router
 from app.api.v1.auth.router import router as auth_router
 from app.api.v1.data.router import router as data_router
 from app.api.v1.decisions.router import router as decisions_router
@@ -12,3 +13,4 @@ api_v1_router.include_router(auth_router)
 api_v1_router.include_router(decisions_router)
 api_v1_router.include_router(data_router)
 api_v1_router.include_router(sources_router)
+api_v1_router.include_router(analysis_router)

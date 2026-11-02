@@ -37,13 +37,16 @@ _DECISION_PATHS = _GET_ONLY_DECISION_PATHS | {_ASK_PATH, _HOME_ASK_PATH}
 
 
 def _decision_namespace(paths: Iterable[str]) -> set[str]:
-    """The property-scoped paths of the DECISION API. Dati UI V1's `/data/overview` (ADR 0031) lives
-    under the same prefix but is not a decision route: it has its own exact-surface and read-only
-    guards in `test_auth_scope.py` and `test_data_overview_scope.py`."""
+    """The property-scoped paths of the DECISION API. Dati UI V1's `/data/overview` (ADR 0031) and
+    the analysis status live under the same prefix but are not decision routes: they have their own
+    exact-surface guards in `test_auth_scope.py`."""
     return {
         p
         for p in paths
-        if p.startswith("/api/v1/properties/") and "/data/" not in p and "/data-sources" not in p
+        if p.startswith("/api/v1/properties/")
+        and "/data/" not in p
+        and "/data-sources" not in p
+        and "/analysis/" not in p
     }
 
 
@@ -73,8 +76,13 @@ def test_every_decision_route_is_get_only_except_the_one_ask_post(client: TestCl
     GET-only, exactly as Gate 12 defined it."""
     schema = client.get("/openapi.json").json()
     for path, methods in schema["paths"].items():
-        # The data-source family has its own exact-method guard in `test_auth_scope.py`.
-        if not path.startswith("/api/v1/properties/") or "/data-sources" in path:
+        # The data-source and analysis families have their own exact-method guards in
+        # `test_auth_scope.py`.
+        if (
+            not path.startswith("/api/v1/properties/")
+            or "/data-sources" in path
+            or "/analysis/" in path
+        ):
             continue
         if path in (_ASK_PATH, _HOME_ASK_PATH):
             assert set(methods) == {"post"}, path

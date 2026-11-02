@@ -8,7 +8,13 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
-from app.modules.ingestion.models import DataSource, ImportFile, ImportJob, ImportJobStatus
+from app.modules.ingestion.models import (
+    DataSource,
+    DataSourceDomain,
+    ImportFile,
+    ImportJob,
+    ImportJobStatus,
+)
 from app.modules.ingestion.schemas import DataSourceCreate, ImportFileCreate, ImportJobCreate
 from app.modules.properties.models import Property
 
@@ -156,6 +162,27 @@ class ImportJobRepository:
             .order_by(ImportJob.finished_at.desc(), ImportJob.id.desc())
             .limit(1)
         )
+
+    def latest_succeeded_by_domain(self, property_id: UUID) -> dict[DataSourceDomain, datetime]:
+        """When the latest SUCCEEDED import of each kind of data of ONE property finished, through
+        its active sources only (a source that was switched off no longer speaks for the property).
+        A kind with no such import has no key: "nothing imported" is never a date."""
+        rows = self._session.execute(
+            select(DataSource.domain, func.max(ImportJob.finished_at))
+            .join(
+                DataSource,
+                (DataSource.workspace_id == ImportJob.workspace_id)
+                & (DataSource.id == ImportJob.data_source_id),
+            )
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.property_id == property_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+                DataSource.is_active.is_(True),
+            )
+            .group_by(DataSource.domain)
+        ).all()
+        return {domain: finished for domain, finished in rows if finished is not None}
 
     def has_succeeded_between(
         self, data_source_id: UUID, not_before: datetime, not_after: datetime

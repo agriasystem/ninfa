@@ -349,7 +349,7 @@ def test_no_worker_task_and_no_scheduler_was_added() -> None:
             for path in engine_free_worker_files(WORKER_DIR)
         ), word
     tasks = (WORKER_DIR / "tasks.py").read_text(encoding="utf-8")
-    assert tasks.count("@app.task") == 3  # heartbeat + Gate 25B run_property + 26B run_policy
+    assert tasks.count("@app.task") == 4  # + the refresh after an import
 
 
 def test_the_dependency_manifests_do_not_mention_scientific_ai_or_currency_libraries() -> None:
