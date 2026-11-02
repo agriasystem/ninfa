@@ -1,4 +1,4 @@
-import type { AnalysisDomain, DomainState, NightStatus } from "@ninfa/contracts";
+import type { AnalysisDomain, DomainState, LaborRevenueGap, NightStatus } from "@ninfa/contracts";
 
 import { formatCount } from "@/lib/decisions/format";
 
@@ -182,14 +182,41 @@ export const datiCopy = {
     notAnalyzedNote: "I costi non fanno parte dell'analisi di oggi: qui sono mostrati i dati registrati.",
   },
   labor: {
-    summaryTitle: "Ore pianificate",
+    heading: "Personale",
+    subtitle: "Ore, costi e impatto sul business della tua struttura.",
+    kpiGroupLabel: "Indicatori del personale",
     basis: (range: string) => `Prossimi 7 giorni (${range}), dal piano più recente.`,
-    categoriesTitle: "Ore pianificate per ruolo",
-    caption: "Ore pianificate per ruolo",
+    kpi: {
+      hours: "Ore pianificate",
+      cost: "Costo pianificato",
+      hourlyCost: "Costo medio/ora",
+      incidence: "Incidenza sui ricavi",
+      revenuePerHour: "Ricavo per ora",
+      hoursNote: (range: string) => `Prossimi 7 giorni (${range})`,
+      samePeriod: "Stesso periodo delle ore",
+      hourlyCostNote: "Costo pianificato diviso le ore pianificate",
+      incidenceNote: "Sui ricavi on-books degli stessi giorni",
+      revenuePerHourNote: "Ricavi on-books per ora di personale, non per singola persona",
+      noCost: "Non tutte le righe del piano hanno un costo.",
+      noHours: "Non ci sono ore pianificate per questo periodo.",
+    },
+    hoursAndCostsTitle: "Ore e costi del personale",
+    factHours: "Ore totali",
+    factCost: "Costo totale",
+    factHourlyCost: "Costo medio/ora",
+    factRevenue: "Ricavi on-books",
+    revenueNote: (range: string) =>
+      `Ricavi delle camere già prenotate, ${range}: solo ciò che è a sistema oggi.`,
+    synthesisTitle: "In sintesi",
+    categoriesTitle: "Ore e performance per ruolo",
+    caption: "Ore, costi e peso di ogni ruolo",
     colCategory: "Ruolo",
     colHours: "Ore pianificate",
     colCost: "Costo pianificato",
+    colHourlyCost: "Costo medio/ora",
+    colShare: "% costo personale",
     colDays: "Giorni con dati",
+    colIncidence: "Incidenza sui ricavi",
     daysComplete: (complete: number) => `${complete}`,
     daysIncomplete: (incomplete: number) =>
       incomplete === 1 ? "1 giorno incompleto" : `${incomplete} giorni incompleti`,
@@ -202,7 +229,23 @@ export const datiCopy = {
     decisionLink: "Apri la decisione",
     notAnalyzedNote:
       "Il personale non fa parte dell'analisi di oggi: qui sono mostrate le ore pianificate registrate.",
-    noRatioNote: "NINFA non calcola incidenza, produttività o rapporto con i ricavi.",
+    // Why there is no revenue beside the labor figures: they are only ever compared on the same days.
+    revenueGap: {
+      NO_LABOR: "Non ci sono ore pianificate da confrontare.",
+      NO_ANALYSIS: "Servono prenotazioni analizzate per gli stessi giorni.",
+      PERIOD_NOT_COVERED: "Non ci sono ricavi confrontabili per tutti i giorni di questo periodo.",
+      LABOR_INCOMPLETE: "Alcuni giorni del piano sono senza ore: il confronto non sarebbe corretto.",
+      NO_REVENUE: "Non ci sono ricavi on-books in questi giorni.",
+    } satisfies Record<LaborRevenueGap, string>,
+    // Deterministic, from the backend's own figures.
+    synthesis: {
+      complete: (incidence: string, hourlyCost: string) =>
+        `Il costo del personale incide per il ${incidence} sui ricavi on-books del periodo, con un costo medio di ${hourlyCost} per ora pianificata.`,
+      hoursAndCosts:
+        "Sono disponibili ore e costi del personale. Le metriche legate ai ricavi saranno calcolate quando NINFA avrà ricavi confrontabili sullo stesso periodo.",
+      noCost:
+        "Sono disponibili le ore del personale. Costo medio e incidenza sui ricavi saranno calcolati quando tutte le righe del piano avranno un costo.",
+    },
   },
   freshness: {
     bookings: "Ultimo import prenotazioni",

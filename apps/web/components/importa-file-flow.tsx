@@ -2,15 +2,18 @@
 
 import { useEffect, useRef } from "react";
 
-import type { DataSourceDomain, UnderstandingBlocker } from "@ninfa/contracts";
+import type { DataSourceDomain, ImportLimitsResponse, UnderstandingBlocker } from "@ninfa/contracts";
 
+import { useAnalysisStatus } from "@/lib/analysis/use-analysis-status";
 import { formatPropertyLocalDateLongItalian, propertyLocalDate } from "@/lib/date/property-date";
 import { oggiRoute } from "@/lib/routes";
 import { sourcesCopy } from "@/lib/sources/copy";
 import { problemText } from "@/lib/sources/problem-text";
 import { periodText } from "@/lib/sources/understanding-format";
-import { useImportFlow, type ImportFlowState } from "@/lib/sources/use-import-flow";
+import { useImportFlow, type ImportFlowState, type RejectedFile } from "@/lib/sources/use-import-flow";
+import { fileSizeText, useImportLimits } from "@/lib/sources/use-import-limits";
 
+import { AnalysisNotice } from "./analysis-notice";
 import { CheckCircleIcon, SpinnerIcon } from "./icons";
 import { ImportaFileDropzone } from "./importa-file-dropzone";
 import { StrutturaImportMapping } from "./struttura-import-mapping";
@@ -66,6 +69,18 @@ function Reading({ phase }: { phase: "reading" | "verifying" }) {
   );
 }
 
+/** Once the file is in, the analysis follows by itself on the server: this says where it stands, live. */
+function ImportedAnalysis({ propertyId }: { propertyId: string }) {
+  const analysis = useAnalysisStatus({ propertyId });
+  return <AnalysisNotice analysis={analysis} showUpToDate />;
+}
+
+/** Why a file never left the browser, with the backend's own limit when that is the reason. */
+function rejectedText(rejected: RejectedFile, limits: ImportLimitsResponse | null): string {
+  if (rejected === "TOO_LARGE" && limits !== null) return PAGE.tooLarge(fileSizeText(limits.max_file_bytes));
+  return PAGE.rejected[rejected];
+}
+
 export interface ImportaFileFlowProps {
   propertyId: string;
   timeZone: string;
@@ -91,10 +106,12 @@ export function ImportaFileFlow({
   onImported,
   onAccessLost,
 }: ImportaFileFlowProps) {
+  const limits = useImportLimits(propertyId);
   const flow = useImportFlow({
     propertyId,
     snapshotLocalDate: propertyLocalDate(new Date(), timeZone),
     review,
+    limits,
     onImported,
     onAccessLost,
   });
@@ -139,7 +156,8 @@ export function ImportaFileFlow({
 
       {state.step === "choose" ? (
         <ImportaFileDropzone
-          problem={state.rejected === null ? null : PAGE.rejected[state.rejected]}
+          problem={state.rejected === null ? null : rejectedText(state.rejected, limits)}
+          limits={limits}
           onFiles={(files) => void flow.chooseFiles(files)}
         />
       ) : (
@@ -305,7 +323,7 @@ export function ImportaFileFlow({
               {state.result.configuration_saved ? (
                 <p className="struttura-flow__note">{FLOW.configurationSaved}</p>
               ) : null}
-              <p className="struttura-flow__note">{PAGE.done.analysis}</p>
+              <ImportedAnalysis propertyId={propertyId} />
               <div className="struttura-flow__actions">
                 <StrutturaLinkButton variant="primary" href={oggiRoute(propertyId)}>
                   {PAGE.done.goToday}

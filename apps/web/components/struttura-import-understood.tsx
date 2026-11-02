@@ -18,6 +18,11 @@ function fieldName(field: string): string {
   return (sourcesCopy.fields as Record<string, string>)[field] ?? field;
 }
 
+/** What the file does not state and NINFA read from its absence, as the backend names it. */
+function assumedText(field: string): string {
+  return (COPY.assumed as Record<string, string>)[field] ?? COPY.assumedFallback(fieldName(field));
+}
+
 /** What is shown as the "value" of a recognised thing: a value seen in the file, or - for a department that
  * is not a column - where it comes from. Never a personal datum: the backend sends none. */
 function valueText(item: UnderstandingRecognized): string {
@@ -78,6 +83,11 @@ export function StrutturaImportUnderstood({
           ))}
         </ul>
         {period !== null ? <p className="struttura-flow__note">{period}</p> : null}
+        {understanding.assumed.map((field) => (
+          <p key={field} className="struttura-flow__note">
+            {assumedText(field)}
+          </p>
+        ))}
         {known ? <p className="struttura-flow__note">{COPY.sameAsLastTime}</p> : null}
         {dateNote !== null ? <p className="struttura-flow__note">{dateNote}</p> : null}
       </div>

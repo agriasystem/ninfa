@@ -7,6 +7,7 @@ import type {
   FileInspectionResponse,
   ImportFieldKey,
   ImportFormatHint,
+  ImportLimitsResponse,
   ImportMapping,
   ImportProblem,
   ImportValidationResponse,
@@ -31,15 +32,6 @@ import {
   withDateOrder,
   withDecimalStyle,
 } from "./mapping-decision";
-
-/** The files Smart Import reads. An electronic invoice (XML) has its own path: see `use-invoice-import.ts`. */
-const FILE_EXTENSIONS = [".csv", ".xlsx"];
-
-export const FILE_ACCEPT = ".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-
-/** The backend's own limit (`MAX_FILE_BYTES`), and it stays the one that decides: this only spares the browser
- * from reading into memory a file that would be refused anyway. */
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 /**
  * The first reading of a file nobody has said anything about. The API reads a file "as" a kind of data, but the
@@ -160,6 +152,8 @@ export interface ImportFlowOptions {
   /** The person asked to look at the columns again for this kind of source: nothing is left to the document,
    * and the saved configuration is not applied on its own. */
   review?: DataSourceDomain | null;
+  /** What a file may be, as the backend said (`null`: it has not said yet). */
+  limits?: ImportLimitsResponse | null;
   /** Called once an import SUCCEEDED, so the page can re-read the list of imports from the backend. */
   onImported: () => void;
   /** The session is over, or the property is no longer the person's: the caller re-resolves them. */
@@ -213,15 +207,18 @@ export function problemOfFailure(result: Extract<ApiResult<unknown>, { ok: false
   return "GENERIC";
 }
 
-/** Why a file is not even sent: its name says NINFA cannot read it, or it plainly holds nothing. */
-function rejectionOf(files: readonly File[]): RejectedFile | null {
+/** Why a file is not even sent: its name says NINFA cannot read it, or it plainly holds nothing. The limits are
+ * the backend's (`limits`), and it stays the one that decides: this only spares the browser from reading into
+ * memory a file that would be refused anyway. With no answer about them yet, the backend simply judges the file. */
+function rejectionOf(files: readonly File[], limits: ImportLimitsResponse | null): RejectedFile | null {
   if (files.length > 1) return "SEVERAL";
   const [file] = files;
   if (file === undefined) return null;
-  const name = file.name.toLowerCase();
-  if (!FILE_EXTENSIONS.some((extension) => name.endsWith(extension))) return "WRONG_TYPE";
   if (file.size === 0) return "EMPTY";
-  if (file.size > MAX_FILE_BYTES) return "TOO_LARGE";
+  if (limits === null) return null;
+  const name = file.name.toLowerCase();
+  if (!limits.file_extensions.some((extension) => name.endsWith(extension))) return "WRONG_TYPE";
+  if (file.size > limits.max_file_bytes) return "TOO_LARGE";
   return null;
 }
 
@@ -252,6 +249,7 @@ export function useImportFlow({
   propertyId,
   snapshotLocalDate,
   review = null,
+  limits = null,
   onImported,
   onAccessLost,
 }: ImportFlowOptions): ImportFlow {
@@ -520,7 +518,7 @@ export function useImportFlow({
 
   const chooseFiles = useCallback(
     async (files: readonly File[]) => {
-      const rejected = rejectionOf(files);
+      const rejected = rejectionOf(files, limits);
       if (rejected !== null) {
         setState({ step: "choose", rejected });
         return;
@@ -529,7 +527,7 @@ export function useImportFlow({
       if (file === undefined) return;
       await (review !== null ? readFile(file, review) : readUnknownFile(file));
     },
-    [review, readFile, readUnknownFile],
+    [review, limits, readFile, readUnknownFile],
   );
 
   const chooseSheet = useCallback(

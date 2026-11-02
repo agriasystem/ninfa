@@ -39,6 +39,12 @@ vi.mock("@/lib/api/data-sources", () => ({
   checkMapping: (...args: unknown[]) => checkMappingMock(...args),
   validateImport: (...args: unknown[]) => validateImportMock(...args),
   importMatchedFile: (...args: unknown[]) => importMatchedFileMock(...args),
+  getImportLimits: () => Promise.resolve({ ok: false, status: 500, code: "NO_ANSWER", message: "" }),
+}));
+
+vi.mock("@/lib/api/analysis", () => ({
+  getAnalysisStatus: () => Promise.resolve({ ok: false, status: 500, code: "NO_ANSWER", message: "" }),
+  requestAnalysisRefresh: vi.fn(),
 }));
 
 function textOf(node: Node): string {
@@ -69,6 +75,32 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("a file NINFA understands by itself", () => {
+  it("says what the file does not state and how NINFA reads it: one room per row, never hidden", async () => {
+    understandFileMock.mockResolvedValue(ok(understoodInspection({ assumed: ["rooms"] })));
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("prenotazioni.xlsx"));
+
+    const box = panel();
+    await within(box).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(flat(box)).toContain("Il file non dice quante camere ha ogni prenotazione: NINFA ne conta una per riga.");
+    expect(within(box).getByRole("button", { name: "Importa dati" })).not.toBeNull();
+    expect(flat(box)).not.toContain("Numero di camere");
+  });
+
+  it("says nothing about the rooms when the file counts them", async () => {
+    understandFileMock.mockResolvedValue(ok(understoodInspection({ assumed: [] })));
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("prenotazioni.xlsx"));
+
+    const box = panel();
+    await within(box).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(flat(box)).not.toContain("una per riga");
+  });
+
   it("shows what it found and ONE button - no question, no matching table", async () => {
     understandFileMock.mockResolvedValue(ok(understoodInspection()));
     validateImportMock.mockResolvedValue(ok(realisticValidation()));

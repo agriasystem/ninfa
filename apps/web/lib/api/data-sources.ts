@@ -2,6 +2,7 @@ import type {
   DataSourceDomain,
   DataSourcesResponse,
   FileInspectionResponse,
+  ImportLimitsResponse,
   ImportMapping,
   ImportPreviewResponse,
   ImportResultResponse,
@@ -39,6 +40,14 @@ export function getRecentImports(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ApiResult<RecentImportsResponse>> {
   return apiRequest<RecentImportsResponse>(`${dataSourcesPath(propertyId)}/imports`, { method: "GET" }, fetchImpl);
+}
+
+/** GET - what a file may be, as the backend enforces it: a page repeats none of these limits. */
+export function getImportLimits(
+  propertyId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ApiResult<ImportLimitsResponse>> {
+  return apiRequest<ImportLimitsResponse>(`${dataSourcesPath(propertyId)}/import-limits`, { method: "GET" }, fetchImpl);
 }
 
 /** DELETE - switch a source off. The data it already delivered are kept. */

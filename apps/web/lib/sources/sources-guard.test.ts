@@ -289,6 +289,15 @@ describe("Importa file: one way in, and the same Smart Import", () => {
         .filter((line) => /\bfrom\b/u.test(line));
       for (const line of imports) expect(line, `${file}: ${line}`).not.toMatch(/decisions|feed|recommendations|ask-ninfa/iu);
     }
+    // the analysis follows the import on the server: the page only reads where it stands
+    expect(withoutComments(read("lib/api/analysis.ts"))).not.toMatch(/\/decisions|detector|sync/iu);
+    expect(withoutComments(read("lib/sources/use-import-flow.ts"))).not.toMatch(/requestAnalysisRefresh/u);
+  });
+
+  it("repeats none of the backend's limits: the size of a file is the backend's to say", () => {
+    for (const file of ["lib/sources/copy.ts", "lib/sources/use-import-flow.ts", "components/importa-file-dropzone.tsx", "components/importa-file-flow.tsx"]) {
+      expect(withoutComments(read(file)), file).not.toMatch(/\b10\s*MB\b|10 \* 1024|MAX_FILE_BYTES/u);
+    }
   });
 });
 

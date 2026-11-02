@@ -12,8 +12,10 @@ import type {
 } from "@ninfa/contracts";
 
 import {
+  analysisStatusOf,
   csvFile,
   failure,
+  IMPORT_LIMITS,
   matchedResultOf,
   ok,
   PROPERTY_ID,
@@ -36,6 +38,15 @@ const validateImportMock = vi.fn();
 const importMatchedFileMock = vi.fn();
 const checkMappingMock = vi.fn();
 const getRecentImportsMock = vi.fn();
+const getImportLimitsMock = vi.fn();
+
+const getAnalysisStatusMock = vi.fn();
+const requestAnalysisRefreshMock = vi.fn();
+
+vi.mock("@/lib/api/analysis", () => ({
+  getAnalysisStatus: (...args: unknown[]) => getAnalysisStatusMock(...args),
+  requestAnalysisRefresh: (...args: unknown[]) => requestAnalysisRefreshMock(...args),
+}));
 
 vi.mock("@/lib/api/data-sources", () => ({
   understandFile: (...args: unknown[]) => understandFileMock(...args),
@@ -43,6 +54,7 @@ vi.mock("@/lib/api/data-sources", () => ({
   importMatchedFile: (...args: unknown[]) => importMatchedFileMock(...args),
   checkMapping: (...args: unknown[]) => checkMappingMock(...args),
   getRecentImports: (...args: unknown[]) => getRecentImportsMock(...args),
+  getImportLimits: (...args: unknown[]) => getImportLimitsMock(...args),
 }));
 
 const refreshSessionMock = vi.fn();
@@ -96,6 +108,9 @@ function renderScreen(props: Partial<Parameters<typeof ImportaFileScreen>[0]> = 
   return userEvent.setup({ applyAccept: false });
 }
 
+/** The zone says the backend's limit once it has answered: from then on the page can use it. */
+const limitsKnown = () => within(panel()).findByText(/fino a/u);
+
 /** A backend whose verdict is the same whichever kind the file is read as, as the real one's is. */
 function documentThatIs(kind: DataSourceDomain, level: "HIGH" | "MEDIUM" = "HIGH") {
   understandFileMock.mockImplementation(({ domain }: { domain: DataSourceDomain }) =>
@@ -139,12 +154,17 @@ beforeEach(() => {
     importMatchedFileMock,
     checkMappingMock,
     getRecentImportsMock,
+    getImportLimitsMock,
+    getAnalysisStatusMock,
+    requestAnalysisRefreshMock,
     refreshSessionMock,
   ]) {
     mock.mockReset();
   }
   session = sessionWith([PROPERTY_ID]);
   getRecentImportsMock.mockResolvedValue(ok({ imports: [] }));
+  getImportLimitsMock.mockResolvedValue(ok(IMPORT_LIMITS));
+  getAnalysisStatusMock.mockResolvedValue(ok(analysisStatusOf({ state: "IN_PROGRESS", last_analysis_at: null })));
   checkMappingMock.mockResolvedValue(ok({ valid: true, missing: [], problems: [] }));
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-23T09:45:00Z"));
@@ -176,6 +196,7 @@ describe("the page", () => {
 
   it("the drop zone is the thing on the page: it asks for the file, and for nothing else", async () => {
     renderScreen();
+    await limitsKnown();
 
     expect(flat(zone())).toBe("Trascina qui il tuo file oppure Selezionalo dal computer CSV o Excel (.xlsx), fino a 10 MB");
     expect(picker().type).toBe("file");
@@ -299,15 +320,42 @@ describe("handing over the file", () => {
     await waitFor(() => expect(understandFileMock).toHaveBeenCalled());
   });
 
-  it("refuses a file over the limit without reading it into memory", async () => {
+  it("refuses a file over the backend's limit without reading it into memory", async () => {
     const user = renderScreen();
+    await limitsKnown();
     const huge = new File(["x"], "enorme.csv");
-    Object.defineProperty(huge, "size", { value: 10 * 1024 * 1024 + 1 });
+    Object.defineProperty(huge, "size", { value: IMPORT_LIMITS.max_file_bytes + 1 });
 
     await user.upload(picker(), huge);
 
-    expect(within(panel()).getByRole("alert").textContent).toContain("Il file supera i 10 MB");
+    expect(within(panel()).getByRole("alert").textContent).toContain("Il file supera 10 MB");
     expect(understandFileMock).not.toHaveBeenCalled();
+  });
+
+  it("the limit is the backend's: another limit on the server is another limit on the page", async () => {
+    getImportLimitsMock.mockResolvedValue(ok({ ...IMPORT_LIMITS, max_file_bytes: 25 * 1024 * 1024 }));
+    documentThatIs("BOOKINGS");
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderScreen();
+
+    expect((await limitsKnown()).textContent).toBe("CSV o Excel (.xlsx), fino a 25 MB");
+    const big = new File(["x"], "grande.csv");
+    Object.defineProperty(big, "size", { value: 11 * 1024 * 1024 });
+    await user.upload(picker(), big);
+
+    await waitFor(() => expect(understandFileMock).toHaveBeenCalled());
+  });
+
+  it("with no answer about the limits, the page checks nothing by itself: the backend decides", async () => {
+    getImportLimitsMock.mockResolvedValue(failure("INTERNAL", 500));
+    documentThatIs("BOOKINGS");
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderScreen();
+
+    expect(within(panel()).getByText("CSV o Excel (.xlsx)")).not.toBeNull();
+    await user.upload(picker(), new File(["x"], "export.pdf"));
+
+    await waitFor(() => expect(understandFileMock).toHaveBeenCalled());
   });
 
   it("one file at a time", () => {
@@ -608,7 +656,6 @@ describe("the import", () => {
     expect(text).toContain("1.284 righe");
     expect(text).toContain("Elementi: 1280 nuovi, 4 già presenti.");
     expect(text).toContain("dal 26 ottobre 2026 al 1 novembre 2026");
-    expect(text).toContain("I nuovi dati entreranno nella prossima analisi di NINFA.");
     expect(within(panel()).getByRole("link", { name: "Vai a Oggi" }).getAttribute("href")).toBe(
       `/oggi?property=${PROPERTY_ID}`,
     );
@@ -618,6 +665,37 @@ describe("the import", () => {
     await user.click(within(panel()).getByRole("button", { name: "Importa un altro file" }));
     expect(picker()).not.toBeNull();
     expect(document.activeElement).toBe(picker());
+  });
+
+  it("once the file is in, the analysis follows by itself: the page says where it stands, and starts nothing", async () => {
+    const user = await toTheSummary();
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf()));
+    getAnalysisStatusMock.mockClear();
+    expect(getAnalysisStatusMock).not.toHaveBeenCalled(); // nothing was asked before the import
+
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    expect(await within(panel()).findByText("Aggiornamento analisi…")).not.toBeNull();
+    expect(requestAnalysisRefreshMock).not.toHaveBeenCalled();
+    expect(within(panel()).queryByRole("button", { name: "Avvia analisi" })).toBeNull();
+    expect(within(panel()).getByRole("link", { name: "Vai a Oggi" })).not.toBeNull();
+  });
+
+  it("an analysis that did not start offers the recovery, and the backend decides again", async () => {
+    getAnalysisStatusMock.mockResolvedValue(ok(analysisStatusOf({ state: "FAILED", can_retry: true })));
+    requestAnalysisRefreshMock.mockResolvedValue(ok(analysisStatusOf({ state: "IN_PROGRESS" })));
+    const user = await toTheSummary();
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf()));
+
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    expect(
+      await within(panel()).findByText("Aggiornamento analisi non riuscito: i dati importati sono al sicuro."),
+    ).not.toBeNull();
+    await user.click(within(panel()).getByRole("button", { name: "Riprova" }));
+
+    expect(requestAnalysisRefreshMock).toHaveBeenCalledWith(PROPERTY_ID);
+    expect(await within(panel()).findByText("Aggiornamento analisi…")).not.toBeNull();
   });
 
   it("dates a staff file with the property's own day, and only a staff file", async () => {

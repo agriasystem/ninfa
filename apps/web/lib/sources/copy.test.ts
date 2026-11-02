@@ -13,7 +13,8 @@ describe("the formats of the files, as the person reads them", () => {
       sourcesCopy.methods.channelCsv.body,
       sourcesCopy.methods.laborCsv.body,
       sourcesCopy.methods.costsRegister.body,
-      sourcesCopy.importPage.drop.formats,
+      sourcesCopy.importPage.drop.formats(null),
+      sourcesCopy.importPage.drop.formats("10 MB"),
       sourcesCopy.importPage.rejected.WRONG_TYPE,
     ];
     for (const text of offered) expect(text).toMatch(/CSV o Excel \(\.xlsx\)/u);

@@ -531,6 +531,36 @@ export interface DataLaborCategory {
   days_complete: number;
   days_incomplete: number;
   planned_cost: DecimalString | null;
+  /** Planned cost / planned hours. */
+  average_hourly_cost: DecimalString | null;
+  /** The share of the property's planned labor cost. */
+  cost_share_pct: DecimalString | null;
+  /** The role's cost over the property's reference revenue. A role never has revenue of its own. */
+  revenue_incidence_pct: DecimalString | null;
+}
+
+/** Why the labor figures have no revenue beside them: they are only ever compared on the SAME days. */
+export type LaborRevenueGap =
+  | "NO_LABOR"
+  | "NO_ANALYSIS"
+  | "PERIOD_NOT_COVERED"
+  | "LABOR_INCOMPLETE"
+  | "NO_REVENUE";
+
+/** The planned labor of the window as a whole. Every division is the backend's: the page only formats. */
+export interface DataLaborEconomics {
+  planned_hours: DecimalString | null;
+  planned_cost: DecimalString | null;
+  average_hourly_cost: DecimalString | null;
+  /** The days actually compared. */
+  period_start: string | null;
+  period_end: string | null;
+  period_days: number;
+  /** The ON-BOOKS room revenue of exactly those days: what is booked so far, never a forecast. */
+  reference_revenue: DecimalString | null;
+  revenue_gap: LaborRevenueGap | null;
+  cost_to_revenue_pct: DecimalString | null;
+  revenue_per_hour: DecimalString | null;
 }
 
 export interface DataLaborDecision {
@@ -551,6 +581,7 @@ export interface DataLabor {
   days_with_data: number;
   categories: DataLaborCategory[];
   decision: DataLaborDecision | null;
+  economics: DataLaborEconomics;
 }
 
 /** A FACT about one domain's data: when the latest successful import of its source finished. */
@@ -705,6 +736,39 @@ export interface RecentImport {
 
 export interface RecentImportsResponse {
   imports: RecentImport[];
+}
+
+/** What a file may be: the backend's own limits, so that no page repeats them. */
+export interface ImportLimitsResponse {
+  max_file_bytes: number;
+  max_rows: number;
+  max_columns: number;
+  file_extensions: string[];
+}
+
+// --- Where the analysis stands against the data (beside the feed, which keeps its own four states) ---
+
+export type AnalysisUpdateState =
+  | "NO_DATA"
+  | "NEEDS_BOOKINGS"
+  | "SEVERAL_SOURCES"
+  | "NEW_DATA"
+  | "IN_PROGRESS"
+  | "DELAYED"
+  | "DEFERRED"
+  | "FAILED"
+  | "UP_TO_DATE";
+
+export interface AnalysisStatusResponse {
+  state: AnalysisUpdateState;
+  /** The kinds of data the property holds, whatever was analysed: a partial property is not empty. */
+  imported_domains: DataSourceDomain[];
+  latest_import_at: string | null;
+  last_analysis_at: string | null;
+  /** DEFERRED only: when the refresh is due again. */
+  next_attempt_at: string | null;
+  /** The backend's word on whether asking for a refresh would do anything. */
+  can_retry: boolean;
 }
 
 // --- Smart Import: the hotel's own CSV / Excel file, its columns matched by the person -------------------
@@ -967,6 +1031,9 @@ export interface Understanding {
   people: number | null;
   questions: UnderstandingQuestion[];
   blockers: UnderstandingBlocker[];
+  /** The fields the file does not state and whose absence means something (one row, one room): nothing
+   * NINFA read, so never among `recognized`, and said on the summary. */
+  assumed: string[];
 }
 
 /** What the person has already said, so a question is never asked twice. */

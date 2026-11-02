@@ -2,8 +2,10 @@
 
 import { useRef, useState, type ChangeEvent, type DragEvent } from "react";
 
+import type { ImportLimitsResponse } from "@ninfa/contracts";
+
 import { sourcesCopy } from "@/lib/sources/copy";
-import { FILE_ACCEPT } from "@/lib/sources/use-import-flow";
+import { fileAcceptOf, fileSizeText } from "@/lib/sources/use-import-limits";
 
 import { UploadIcon } from "./icons";
 
@@ -12,6 +14,8 @@ const COPY = sourcesCopy.importPage.drop;
 export interface ImportaFileDropzoneProps {
   /** Why the last file was not taken, already in plain words. */
   problem: string | null;
+  /** What a file may be, as the backend said (`null`: it has not said yet). */
+  limits: ImportLimitsResponse | null;
   onFiles: (files: readonly File[]) => void;
 }
 
@@ -21,7 +25,7 @@ export interface ImportaFileDropzoneProps {
  * no script for what the browser already does. It looks at nothing but the list of files: what they are is for the
  * flow to judge.
  */
-export function ImportaFileDropzone({ problem, onFiles }: ImportaFileDropzoneProps) {
+export function ImportaFileDropzone({ problem, limits, onFiles }: ImportaFileDropzoneProps) {
   const [dragging, setDragging] = useState(false);
   // Crossing a child of the zone fires leave + enter on the zone: only the last leave is the real one.
   const depth = useRef(0);
@@ -72,11 +76,13 @@ export function ImportaFileDropzone({ problem, onFiles }: ImportaFileDropzonePro
         <span className="importa-drop__title">{COPY.title}</span>
         <span className="importa-drop__or">{COPY.or}</span>
         <span className="struttura-button struttura-button--primary importa-drop__pick">{COPY.pick}</span>
-        <span className="importa-drop__formats">{COPY.formats}</span>
+        <span className="importa-drop__formats">
+          {COPY.formats(limits === null ? null : fileSizeText(limits.max_file_bytes))}
+        </span>
         <input
           type="file"
           className="visually-hidden"
-          accept={FILE_ACCEPT}
+          accept={fileAcceptOf(limits)}
           aria-label={COPY.inputLabel}
           onChange={handlePick}
         />

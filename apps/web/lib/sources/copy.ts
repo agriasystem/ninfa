@@ -328,7 +328,8 @@ export const sourcesCopy = {
     check_in: "Data di arrivo",
     check_out: "Data di partenza",
     status: "Stato",
-    rooms: "Numero di camere",
+    // The rooms OF THE BOOKING: the rooms of the hotel are a property's own data (Struttura).
+    rooms: "Camere della prenotazione",
     room_revenue: "Importo della camera",
     channel: "Canale",
     guests: "Ospiti",
@@ -567,6 +568,11 @@ export const sourcesCopy = {
         : `${count} righe hanno un reparto che NINFA non conosce: verranno importate come «Altro».`,
     // The explain view: Campo / Valore / Origine
     explainTitle: "Cosa ho riconosciuto",
+    // What the file does not state and NINFA reads from its absence: said on the summary, never hidden.
+    assumed: {
+      rooms: "Il file non dice quante camere ha ogni prenotazione: NINFA ne conta una per riga.",
+    },
+    assumedFallback: (field: string) => `Il file non indica: ${field}. NINFA usa il valore previsto.`,
     columns: { field: "Campo", value: "Valore", origin: "Origine" },
     tableLabel: "Cosa ha riconosciuto NINFA",
     toCheck: "Da controllare",
@@ -684,16 +690,19 @@ export const sourcesCopy = {
       title: "Trascina qui il tuo file",
       or: "oppure",
       pick: "Selezionalo dal computer",
-      formats: "CSV o Excel (.xlsx), fino a 10 MB",
+      // The size is the backend's own limit: never written here.
+      formats: (size: string | null) =>
+        size === null ? "CSV o Excel (.xlsx)" : `CSV o Excel (.xlsx), fino a ${size}`,
       inputLabel: "Seleziona un file CSV o Excel",
     },
     rejected: {
       WRONG_TYPE:
         "Questo formato non è supportato: scegli un file CSV o Excel (.xlsx). Le fatture elettroniche XML si importano da Struttura, in Fonti dati.",
       EMPTY: "Il file è vuoto: non c'è nulla da importare.",
-      TOO_LARGE: "Il file supera i 10 MB: è troppo grande per essere importato.",
+      TOO_LARGE: "Il file è troppo grande per essere importato.",
       SEVERAL: "Trascina un file alla volta.",
     },
+    tooLarge: (size: string) => `Il file supera ${size}: è troppo grande per essere importato.`,
     checking: {
       reading: "Sto leggendo il file…",
       verifying: "Sto controllando tutte le righe…",
@@ -715,7 +724,6 @@ export const sourcesCopy = {
       kind: "Tipo di dati",
       rows: "Contenuto",
       period: "Periodo",
-      analysis: "I nuovi dati entreranno nella prossima analisi di NINFA.",
       goToday: "Vai a Oggi",
       another: "Importa un altro file",
     },

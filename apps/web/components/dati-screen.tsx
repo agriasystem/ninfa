@@ -2,10 +2,12 @@
 
 import type { DataOverviewResponse, DataPeriod } from "@ninfa/contracts";
 
+import { useAnalysisStatus } from "@/lib/analysis/use-analysis-status";
 import { datiCopy } from "@/lib/data/copy";
 import type { DatiTab } from "@/lib/data/tabs";
 import { useDataOverview } from "@/lib/data/use-data-overview";
 
+import { AnalysisNotice } from "./analysis-notice";
 import { DatiSkeleton } from "./dati-skeleton";
 import { DatiOverviewPanel } from "./dati-overview-panel";
 import {
@@ -81,6 +83,8 @@ function DatiContent({
     period,
     onPropertyInvalid,
   });
+  // A refresh that ends brings its figures here by itself.
+  const analysis = useAnalysisStatus({ propertyId, onSettled: () => void refresh() });
 
   return (
     <div className="dati-screen">
@@ -90,6 +94,7 @@ function DatiContent({
           <RefreshButton busy={busy} onRefresh={() => void refresh()} label={datiCopy.refresh} />
         </div>
         <p className="dati-screen__subtitle">{datiCopy.subtitle}</p>
+        <AnalysisNotice analysis={analysis} />
       </header>
 
       <DatiTabs active={tab} onSelect={onSelectTab} />

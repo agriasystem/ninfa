@@ -26,6 +26,7 @@ import {
   partialOverview,
   unknownCoverageOverview,
 } from "@/test/data-support";
+import { analysisStatusOf } from "@/test/sources-support";
 
 import { DatiScreen } from "./dati-screen";
 
@@ -41,6 +42,11 @@ vi.mock("@/lib/api/data-overview", () => ({
 vi.mock("@/lib/api/ask-ninfa", () => ({
   askNinfa: (...args: unknown[]) => miaMock(...args),
   askMiaHome: (...args: unknown[]) => miaMock(...args),
+}));
+const getAnalysisStatusMock = vi.fn();
+vi.mock("@/lib/api/analysis", () => ({
+  getAnalysisStatus: (...args: unknown[]) => getAnalysisStatusMock(...args),
+  requestAnalysisRefresh: vi.fn(),
 }));
 
 /** The readable text of a node: sibling elements are separated by a space (the plain `textContent` glues
@@ -117,6 +123,33 @@ beforeEach(() => {
   getDataOverviewMock.mockReset();
   miaMock.mockReset();
   signIn([property("p1", "Residenza Alba")]);
+  getAnalysisStatusMock.mockReset();
+  getAnalysisStatusMock.mockResolvedValue({ ok: true, data: analysisStatusOf() });
+});
+
+describe("/dati - where the analysis stands", () => {
+  it("a page at rest says nothing about it", async () => {
+    await renderLoaded();
+    await waitFor(() => expect(getAnalysisStatusMock).toHaveBeenCalled());
+
+    expect(screen.queryByText("Aggiornamento analisi…")).toBeNull();
+    expect(screen.queryByText("Analisi aggiornata.")).toBeNull();
+  });
+
+  it("a refresh under way says so, and its end brings the new figures by itself", { timeout: 10000 }, async () => {
+    getAnalysisStatusMock.mockResolvedValue({
+      ok: true,
+      data: analysisStatusOf({ state: "IN_PROGRESS" }),
+    });
+    await renderLoaded();
+    expect(await screen.findByText("Aggiornamento analisi…")).not.toBeNull();
+    const before = getDataOverviewMock.mock.calls.length;
+
+    getAnalysisStatusMock.mockResolvedValue({ ok: true, data: analysisStatusOf() });
+
+    await waitFor(() => expect(screen.queryByText("Aggiornamento analisi…")).toBeNull(), { timeout: 6000 });
+    await waitFor(() => expect(getDataOverviewMock.mock.calls.length).toBeGreaterThan(before));
+  });
 });
 
 describe("/dati - route, shell and tabs", () => {
@@ -200,7 +233,7 @@ describe("/dati - route, shell and tabs", () => {
     await renderLoaded(fullOverview(), { initialTab: "labor" });
 
     expect(screen.getByRole("tab", { name: "Personale" }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("region", { name: "Ore pianificate per ruolo" })).not.toBeNull();
+    expect(screen.getByRole("region", { name: "Ore e performance per ruolo" })).not.toBeNull();
   });
 });
 
@@ -908,7 +941,7 @@ describe("Personale tab", () => {
   it("shows planned hours by role - Italian names, hours and cost only when known", async () => {
     await renderLoaded(fullOverview(), { initialTab: "labor" });
 
-    const rows = within(region("Ore pianificate per ruolo")).getAllByRole("row").slice(1).map((row) => flat(row));
+    const rows = within(region("Ore e performance per ruolo")).getAllByRole("row").slice(1).map((row) => flat(row));
     expect(rows[0]).toContain("Governanza");
     expect(rows[0]).toContain("112,0 h");
     expect(rows[0]).toContain("1.680,00 €");
@@ -927,17 +960,188 @@ describe("Personale tab", () => {
     expect(within(decision).getByRole("link", { name: "Apri la decisione" }).getAttribute("href")).toBe(`/oggi/decisioni/${D_LABOR}?property=p1`);
   });
 
-  it("invents no incidence, productivity, FTE or labor-cost ratio - and says so", async () => {
+  /** The plan of a week against the revenue of the same days: every figure as the backend sent it. */
+  function compared(): DataOverviewResponse {
+    const overview = fullOverview();
+    return {
+      ...overview,
+      labor: {
+        ...overview.labor,
+        categories: [
+          {
+            category: "HOUSEKEEPING",
+            planned_hours: "15.00",
+            days_complete: 7,
+            days_incomplete: 0,
+            planned_cost: "230.55",
+            average_hourly_cost: "15.37",
+            cost_share_pct: "60.00",
+            revenue_incidence_pct: "16.02",
+          },
+          {
+            category: "FRONT_OFFICE",
+            planned_hours: "10.00",
+            days_complete: 5,
+            days_incomplete: 0,
+            planned_cost: "153.70",
+            average_hourly_cost: "15.37",
+            cost_share_pct: "40.00",
+            revenue_incidence_pct: "10.68",
+          },
+        ],
+        economics: {
+          planned_hours: "25.00",
+          planned_cost: "384.25",
+          average_hourly_cost: "15.37",
+          period_start: overview.labor.window_start,
+          period_end: overview.labor.window_end,
+          period_days: 7,
+          reference_revenue: "1439.00",
+          revenue_gap: null,
+          cost_to_revenue_pct: "26.70",
+          revenue_per_hour: "57.56",
+        },
+      },
+    };
+  }
+
+  const kpi = (name: string) => screen.getByRole("article", { name });
+
+  it("the five figures are distinct, the backend's, and in plain units", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    expect(screen.getByRole("heading", { level: 2, name: "Personale" })).not.toBeNull();
+    expect(screen.getByText("Ore, costi e impatto sul business della tua struttura.")).not.toBeNull();
+    expect(flat(kpi("Ore pianificate"))).toContain("25,0 h");
+    expect(flat(kpi("Costo pianificato"))).toContain("384,25 €");
+    expect(flat(kpi("Costo medio/ora"))).toContain("15,37 €/h");
+    expect(flat(kpi("Incidenza sui ricavi"))).toContain("26,7");
+    expect(flat(kpi("Ricavo per ora"))).toContain("57,56 €/h");
+    expect(flat(kpi("Ricavo per ora"))).toContain("non per singola persona");
+  });
+
+  it("never shows the same fraction twice, as a percentage and as a ratio", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    expect(document.body.textContent).not.toContain("0,267");
+    expect(document.body.textContent).not.toMatch(/Rapporto costo/iu);
+  });
+
+  it("calls the revenue on-books and never a forecast", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    const card = region("Ore e costi del personale");
+    expect(flat(card)).toContain("Ricavi on-books");
+    expect(flat(card)).toContain("1.439,00 €");
+    expect(document.body.textContent).not.toMatch(/Ricavi previsti/iu);
+  });
+
+  it("'In sintesi' says the real figures in the same words each time", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    const synthesis = screen.getByRole("region", { name: "In sintesi" });
+    expect(flat(synthesis)).toContain(
+      "Il costo del personale incide per il 26,7% sui ricavi on-books del periodo, con un costo medio di 15,37 € per ora pianificata.",
+    );
+  });
+
+  it("the old sentence that said NINFA does not calculate them is gone", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    expect(document.body.textContent).not.toContain("NINFA non calcola");
+  });
+
+  it("each role has its cost, its rate, its share and its incidence, and no productivity of its own", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    const table = within(region("Ore e performance per ruolo"));
+    const headers = table.getAllByRole("columnheader").map((cell) => cell.textContent);
+    expect(headers).toEqual([
+      "Ruolo",
+      "Ore pianificate",
+      "Costo pianificato",
+      "Costo medio/ora",
+      "% costo personale",
+      "Incidenza sui ricavi",
+      "Giorni con dati",
+    ]);
+    const first = flat(table.getAllByRole("row")[1] as HTMLElement);
+    expect(first).toContain("Governanza");
+    expect(first).toContain("230,55 €");
+    expect(first).toContain("15,37 €/h");
+    expect(first).toContain("60");
+    expect(first).toContain("16");
+    expect(headers.join(" ")).not.toMatch(/Ricavo per ora|Produttivit/iu);
+  });
+
+  it("with hours and costs but no comparable revenue, nothing is invented and it says why", async () => {
+    const overview = compared();
+    await renderLoaded(
+      {
+        ...overview,
+        labor: {
+          ...overview.labor,
+          categories: overview.labor.categories.map((row) => ({ ...row, revenue_incidence_pct: null })),
+          economics: {
+            ...overview.labor.economics,
+            reference_revenue: null,
+            revenue_gap: "PERIOD_NOT_COVERED",
+            cost_to_revenue_pct: null,
+            revenue_per_hour: null,
+          },
+        },
+      },
+      { initialTab: "labor" },
+    );
+
+    expect(flat(kpi("Ore pianificate"))).toContain("25,0 h");
+    expect(flat(kpi("Costo medio/ora"))).toContain("15,37 €/h");
+    expect(flat(kpi("Incidenza sui ricavi"))).toContain("Non disponibile");
+    expect(flat(kpi("Incidenza sui ricavi"))).toContain("Non ci sono ricavi confrontabili");
+    expect(flat(kpi("Ricavo per ora"))).toContain("Non disponibile");
+    expect(flat(screen.getByRole("region", { name: "In sintesi" }))).toContain(
+      "Sono disponibili ore e costi del personale.",
+    );
+    expect(screen.queryByRole("columnheader", { name: "Incidenza sui ricavi" })).toBeNull();
+  });
+
+  it("with no revenue on the books for those days it says that, never 0 %", async () => {
+    const overview = compared();
+    await renderLoaded(
+      {
+        ...overview,
+        labor: {
+          ...overview.labor,
+          economics: {
+            ...overview.labor.economics,
+            reference_revenue: null,
+            revenue_gap: "NO_REVENUE",
+            cost_to_revenue_pct: null,
+            revenue_per_hour: null,
+          },
+        },
+      },
+      { initialTab: "labor" },
+    );
+
+    expect(flat(kpi("Incidenza sui ricavi"))).toContain("Non ci sono ricavi on-books in questi giorni.");
+    expect(flat(kpi("Incidenza sui ricavi"))).not.toContain("0,0");
+  });
+
+  it("a plan with no cost has hours only, and says what is missing", async () => {
     await renderLoaded(fullOverview(), { initialTab: "labor" });
 
-    expect(flat(region("Ore pianificate"))).toContain("NINFA non calcola incidenza, produttività o rapporto con i ricavi.");
-    expect(document.body.textContent).not.toMatch(/FTE|incidenza %|produttività \d/iu);
+    expect(flat(kpi("Ore pianificate"))).toContain("189,0 h");
+    expect(flat(kpi("Costo pianificato"))).toContain("Non disponibile");
+    expect(flat(screen.getByRole("region", { name: "In sintesi" }))).toContain(
+      "Sono disponibili le ore del personale.",
+    );
   });
 
   it("says plainly when no labor source or no data exists", async () => {
     await renderLoaded(partialOverview(), { initialTab: "labor" });
 
-    const summary = region("Ore pianificate");
+    const summary = region("Ore e costi del personale");
     expect(within(summary).getByText("Personale non disponibile")).not.toBeNull();
     expect(flat(summary)).toContain("Nessuna origine dati disponibile.");
     expect(flat(summary)).toContain("Ultimo import personale: nessuna origine dati configurata");

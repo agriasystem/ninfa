@@ -1,9 +1,11 @@
 import type {
+  AnalysisStatusResponse,
   DataSourceCard,
   DataSourcesResponse,
   FileInspectionResponse,
   ImportColumnInfo,
   ImportFieldSpec,
+  ImportLimitsResponse,
   ImportMapping,
   ImportProfileInfo,
   ImportPreviewResponse,
@@ -412,6 +414,27 @@ export function xlsxFile(name = "turni.xlsx"): File {
   });
 }
 
+/** The backend's own limits, as `GET .../data-sources/import-limits` says them. */
+export const IMPORT_LIMITS: ImportLimitsResponse = {
+  max_file_bytes: 10 * 1024 * 1024,
+  max_rows: 100_000,
+  max_columns: 200,
+  file_extensions: [".csv", ".xlsx"],
+};
+
+/** Where the analysis stands, as `GET .../analysis/status` says it. */
+export function analysisStatusOf(overrides: Partial<AnalysisStatusResponse> = {}): AnalysisStatusResponse {
+  return {
+    state: "UP_TO_DATE",
+    imported_domains: ["BOOKINGS"],
+    latest_import_at: "2026-10-23T08:00:00Z",
+    last_analysis_at: "2026-10-23T08:01:00Z",
+    next_attempt_at: null,
+    can_retry: false,
+    ...overrides,
+  };
+}
+
 // --- Smart Import V3: NINFA understood the document ---------------------------------------------------------
 
 /** The decision NINFA proposes for the realistic staff file (title, summary, totals, department column). */
@@ -439,6 +462,7 @@ export function proposalOf(overrides: Partial<ImportMapping> = {}): ImportMappin
 
 export function understandingOf(overrides: Partial<Understanding> = {}): Understanding {
   return {
+    assumed: [],
     level: "READY",
     detection: {
       domain: "LABOR",

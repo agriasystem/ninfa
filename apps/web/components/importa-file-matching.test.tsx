@@ -48,6 +48,12 @@ vi.mock("@/lib/api/data-sources", () => ({
   checkMapping: (...args: unknown[]) => checkMappingMock(...args),
   validateImport: (...args: unknown[]) => validateImportMock(...args),
   importMatchedFile: (...args: unknown[]) => importMatchedFileMock(...args),
+  getImportLimits: () => Promise.resolve({ ok: false, status: 500, code: "NO_ANSWER", message: "" }),
+}));
+
+vi.mock("@/lib/api/analysis", () => ({
+  getAnalysisStatus: () => Promise.resolve({ ok: false, status: 500, code: "NO_ANSWER", message: "" }),
+  requestAnalysisRefresh: vi.fn(),
 }));
 
 function textOf(node: Node): string {

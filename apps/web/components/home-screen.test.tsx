@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DecisionFeedResponse } from "@ninfa/contracts";
+import type { AnalysisStatusResponse, DecisionFeedResponse } from "@ninfa/contracts";
+
+import { analysisStatusOf } from "@/test/sources-support";
 
 import {
   GOLDEN_ACTION_REQUIRED_EIGHT_ITEMS,
@@ -35,6 +37,12 @@ vi.mock("@/lib/api/decisions", () => ({
 }));
 vi.mock("@/lib/api/ask-ninfa", () => ({
   askMiaHome: (...args: unknown[]) => askMiaHomeMock(...args),
+}));
+const getAnalysisStatusMock = vi.fn();
+const requestAnalysisRefreshMock = vi.fn();
+vi.mock("@/lib/api/analysis", () => ({
+  getAnalysisStatus: (...args: unknown[]) => getAnalysisStatusMock(...args),
+  requestAnalysisRefresh: (...args: unknown[]) => requestAnalysisRefreshMock(...args),
 }));
 
 const TIME_ZONE = "Europe/Rome";
@@ -70,6 +78,10 @@ function resolveFeed(data: DecisionFeedResponse) {
   getDecisionFeedMock.mockResolvedValue({ ok: true, data });
 }
 
+function statusIs(overrides: Partial<AnalysisStatusResponse>) {
+  getAnalysisStatusMock.mockResolvedValue({ ok: true, data: analysisStatusOf(overrides) });
+}
+
 /** The Home's real hero <h1>: while the feed loads, the page's h1 is the hidden "Oggi" placeholder,
  * so "the h1" must mean the FIRST h1 that is not that placeholder. */
 function heroHeading() {
@@ -86,6 +98,9 @@ beforeEach(() => {
   getDecisionFeedMock.mockReset();
   askMiaHomeMock.mockReset();
   resolveFeed(feed({ feed_state: "NO_ACTION_REQUIRED", as_of_local_date: TODAY }));
+  getAnalysisStatusMock.mockReset();
+  requestAnalysisRefreshMock.mockReset();
+  statusIs({ state: "UP_TO_DATE" });
 });
 
 afterEach(() => {
@@ -489,6 +504,130 @@ describe("Home - NOT_PROCESSED (Gate 24 preserved)", () => {
     await heroHeading();
 
     expect(screen.getByRole("textbox", { name: "La tua domanda per Mia" })).not.toBeNull();
+  });
+});
+
+describe("Home - where the analysis stands against the data", () => {
+  const noRun = () => notProcessed({ as_of_local_date: TODAY });
+
+  it("with nothing imported, it is the old message and the way to the first file", async () => {
+    resolveFeed(noRun());
+    statusIs({ state: "NO_DATA", imported_domains: [], latest_import_at: null, last_analysis_at: null });
+    renderHome();
+
+    expect((await heroHeading()).textContent).toBe("Analisi non ancora disponibile");
+    const link = await screen.findByRole("link", { name: /Importa un file/u });
+    expect(link.getAttribute("href")).toContain("/importa-file?property=prop-1");
+  });
+
+  it("with an import just done, it is never 'Analisi non ancora disponibile'", async () => {
+    resolveFeed(noRun());
+    statusIs({ state: "IN_PROGRESS", last_analysis_at: null });
+    renderHome();
+
+    await screen.findByRole("heading", { level: 1, name: "Aggiornamento analisi…" });
+    expect(screen.queryByText("Analisi non ancora disponibile")).toBeNull();
+    expect(screen.getByText(/Il risultato comparirà qui da solo/u)).not.toBeNull();
+    // it normally needs nobody: no button while it is under way
+    expect(screen.queryByRole("button", { name: "Avvia analisi" })).toBeNull();
+  });
+
+  it("a refresh that ends brings the result by itself, with no press and no reload", { timeout: 10000 }, async () => {
+    getDecisionFeedMock.mockResolvedValueOnce({ ok: true, data: noRun() });
+    statusIs({ state: "IN_PROGRESS", last_analysis_at: null });
+    renderHome();
+    await screen.findByRole("heading", { level: 1, name: "Aggiornamento analisi…" });
+    expect(getDecisionFeedMock).toHaveBeenCalledTimes(1);
+
+    getDecisionFeedMock.mockResolvedValue({
+      ok: true,
+      data: feed({ feed_state: "NO_ACTION_REQUIRED", as_of_local_date: TODAY }),
+    });
+    statusIs({ state: "UP_TO_DATE" });
+
+    await screen.findByRole("heading", { level: 1, name: "Tutto sotto controllo" }, { timeout: 6000 });
+    expect(getDecisionFeedMock).toHaveBeenCalledTimes(2);
+    expect(requestAnalysisRefreshMock).not.toHaveBeenCalled();
+  });
+
+  it("a page at rest asks nothing again", { timeout: 10000 }, async () => {
+    resolveFeed(feed({ feed_state: "NO_ACTION_REQUIRED", as_of_local_date: TODAY }));
+    statusIs({ state: "UP_TO_DATE" });
+    renderHome();
+    await screen.findByRole("heading", { level: 1, name: "Tutto sotto controllo" });
+    await waitFor(() => expect(getAnalysisStatusMock).toHaveBeenCalledTimes(1));
+
+    await new Promise((resolve) => setTimeout(resolve, 3500));
+
+    expect(getAnalysisStatusMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a failed refresh says so, keeps the data's word, and offers the recovery", async () => {
+    resolveFeed(noRun());
+    statusIs({ state: "FAILED", can_retry: true, last_analysis_at: null });
+    requestAnalysisRefreshMock.mockResolvedValue({
+      ok: true,
+      data: analysisStatusOf({ state: "IN_PROGRESS", last_analysis_at: null }),
+    });
+    renderHome();
+
+    await screen.findByRole("heading", { level: 1, name: "Aggiornamento analisi non riuscito" });
+    expect(screen.getByText(/I dati importati sono al sicuro/u)).not.toBeNull();
+    expect(screen.queryByText("Tutto sotto controllo")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Riprova" }));
+
+    expect(requestAnalysisRefreshMock).toHaveBeenCalledWith("prop-1");
+    await screen.findByRole("heading", { level: 1, name: "Aggiornamento analisi…" });
+  });
+
+  it("imports the analysis has not seen say so, and can be asked for", async () => {
+    resolveFeed(noRun());
+    statusIs({ state: "NEW_DATA", can_retry: true });
+    renderHome();
+
+    await screen.findByRole("heading", { level: 1, name: "Nuovi dati importati" });
+    expect(screen.getByRole("button", { name: "Avvia analisi" })).not.toBeNull();
+  });
+
+  it("a day that keeps its first observation says when the data will count", async () => {
+    resolveFeed(noRun());
+    statusIs({ state: "DEFERRED", next_attempt_at: "2026-10-09T00:05:00Z" });
+    renderHome();
+
+    await screen.findByRole("heading", { level: 1, name: "Nuovi dati importati" });
+    expect(screen.getByText(/entreranno nell'analisi di domani/u)).not.toBeNull();
+  });
+
+  it("staff and costs with no bookings is not an empty hotel: it says what it has and what it lacks", async () => {
+    resolveFeed(noRun());
+    statusIs({ state: "NEEDS_BOOKINGS", imported_domains: ["LABOR", "COSTS"], last_analysis_at: null });
+    renderHome();
+
+    await screen.findByRole("heading", { level: 1, name: "Hai importato personale e costi" });
+    expect(screen.getByText(/servono anche le prenotazioni/u)).not.toBeNull();
+    expect(screen.getByRole("link", { name: /Importa le prenotazioni/u }).getAttribute("href")).toContain(
+      "/importa-file?property=prop-1",
+    );
+    expect(screen.getByRole("link", { name: /Apri Dati/u }).getAttribute("href")).toContain("/dati");
+    expect(screen.queryByText("Analisi non ancora disponibile")).toBeNull();
+  });
+
+  it("today's run keeps its own word: what arrived after it is one line beside it", async () => {
+    resolveFeed(feed({ feed_state: "NO_ACTION_REQUIRED", as_of_local_date: TODAY }));
+    statusIs({ state: "IN_PROGRESS" });
+    renderHome();
+
+    await screen.findByRole("heading", { level: 1, name: "Tutto sotto controllo" });
+    expect(await screen.findByText("Aggiornamento analisi…")).not.toBeNull();
+  });
+
+  it("with no answer about the analysis, the Home says what it always said", async () => {
+    resolveFeed(noRun());
+    getAnalysisStatusMock.mockResolvedValue({ ok: false, status: 500, code: "INTERNAL", message: "" });
+    renderHome();
+
+    expect((await heroHeading()).textContent).toBe("Analisi non ancora disponibile");
   });
 });
 

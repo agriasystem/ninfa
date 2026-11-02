@@ -1,5 +1,7 @@
 import type {
   AnalysisDomain,
+  AnalysisUpdateState,
+  DataSourceDomain,
   DecisionStatus,
   DecisionType,
   LifecycleTransition,
@@ -50,6 +52,8 @@ export const copy = {
     // docs/architecture/pilot-readiness-v1.md.
     notProcessedBody: "NINFA non ha ancora completato l'analisi per oggi.",
     notProcessedNeverAnalyzed: "NINFA non ha ancora completato una prima analisi.",
+    noDataBody: "Importa i primi dati della struttura e NINFA avvierà l'analisi da sola.",
+    importFirstFile: "Importa un file",
     lastSuccessfulAnalysis: (businessDate: string) =>
       `L'ultima analisi completata risale al ${businessDate}.`,
     dataQualityTitle: "Analisi parziale",
@@ -150,6 +154,46 @@ export const copy = {
     historyLoadingMore: "Caricamento…",
     historyLoadMoreError: "Non siamo riusciti a caricare altri eventi. Riprova.",
   },
+  // Where the analysis stands against the data: never in place of the feed's own four states, only where the
+  // feed has nothing to say (no run yet today) and as one line beside them.
+  analysisUpdate: {
+    retry: "Riprova",
+    // Not "Aggiorna analisi": that is the button that only re-reads what is on the page.
+    start: "Avvia analisi",
+    importBookings: "Importa le prenotazioni",
+    openData: "Apri Dati",
+    openStructure: "Controlla le fonti",
+    hero: {
+      IN_PROGRESS: {
+        title: "Aggiornamento analisi…",
+        body: "NINFA sta analizzando i dati che hai importato. Il risultato comparirà qui da solo.",
+      },
+      DELAYED: {
+        title: "Aggiornamento analisi…",
+        body: "Sta richiedendo più del previsto. I dati importati sono al sicuro e il risultato comparirà qui appena pronto.",
+      },
+      NEW_DATA: {
+        title: "Nuovi dati importati",
+        body: "L'analisi non è ancora partita.",
+      },
+      DEFERRED: {
+        title: "Nuovi dati importati",
+        body: "Le prenotazioni sono cambiate dopo la lettura di oggi: entreranno nell'analisi di domani.",
+      },
+      FAILED: {
+        title: "Aggiornamento analisi non riuscito",
+        body: "I dati importati sono al sicuro: è l'analisi a non essersi aggiornata.",
+      },
+      SEVERAL_SOURCES: {
+        title: "Più origini di prenotazioni",
+        body: "NINFA non ne sceglie una da sola: controlla le fonti in Struttura.",
+      },
+    },
+    // A property with staff or costs and no bookings is not empty: what it holds is said, and what it lacks.
+    needsBookingsTitle: (kinds: string) => `Hai importato ${kinds}`,
+    needsBookingsBody:
+      "Per l'analisi di Oggi servono anche le prenotazioni. Intanto trovi i tuoi dati nella pagina Dati.",
+  },
 } as const;
 
 /** `Decision.status` (OPEN/RESOLVED) - "Aperta" never implies "you must act", only that the
@@ -208,6 +252,37 @@ export const analysisDomainLabels: Record<AnalysisDomain, string> = {
   COSTS: "Costi",
   LABOR: "Personale",
 };
+
+const IMPORTED_KIND_NAMES: Record<DataSourceDomain, string> = {
+  BOOKINGS: "prenotazioni",
+  COSTS: "costi",
+  LABOR: "personale",
+};
+
+/** "personale", "personale e costi": the kinds of data a property holds, in plain words. */
+export function importedKindsText(domains: readonly DataSourceDomain[]): string {
+  const names = domains.map((domain) => IMPORTED_KIND_NAMES[domain]);
+  if (names.length < 2) return names.join("");
+  return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
+}
+
+/** Where the analysis stands against the data, one line for each of the backend's states. "NO_DATA" has nothing
+ * to say here: a page with no data says it in its own way. */
+const ANALYSIS_UPDATE_LINES: Record<AnalysisUpdateState, string | null> = {
+  NO_DATA: null,
+  NEEDS_BOOKINGS: "Per l'analisi servono anche le prenotazioni.",
+  SEVERAL_SOURCES: "Ci sono più origini di prenotazioni: NINFA non ne sceglie una.",
+  NEW_DATA: "Nuovi dati importati: l'analisi non è ancora partita.",
+  IN_PROGRESS: "Aggiornamento analisi…",
+  DELAYED: "Aggiornamento analisi: sta richiedendo più del previsto.",
+  DEFERRED: "Nuovi dati importati: entreranno nell'analisi di domani.",
+  FAILED: "Aggiornamento analisi non riuscito: i dati importati sono al sicuro.",
+  UP_TO_DATE: "Analisi aggiornata.",
+};
+
+export function analysisUpdateLine(state: AnalysisUpdateState): string | null {
+  return ANALYSIS_UPDATE_LINES[state];
+}
 
 /** "Not analysed", agreeing with each domain's own grammatical gender/number (the approved Home
  * reference itself writes "Non analizzati" under Costi and "Non analizzato" under Personale) - one

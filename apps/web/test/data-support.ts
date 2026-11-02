@@ -217,8 +217,26 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
       currency: "EUR",
       days_with_data: 7,
       categories: [
-        { category: "HOUSEKEEPING", planned_hours: "112.00", days_complete: 7, days_incomplete: 0, planned_cost: "1680.00" },
-        { category: "KITCHEN", planned_hours: "77.00", days_complete: 6, days_incomplete: 1, planned_cost: null },
+        {
+          category: "HOUSEKEEPING",
+          planned_hours: "112.00",
+          days_complete: 7,
+          days_incomplete: 0,
+          planned_cost: "1680.00",
+          average_hourly_cost: "15.00",
+          cost_share_pct: null,
+          revenue_incidence_pct: null,
+        },
+        {
+          category: "KITCHEN",
+          planned_hours: "77.00",
+          days_complete: 6,
+          days_incomplete: 1,
+          planned_cost: null,
+          average_hourly_cost: null,
+          cost_share_pct: null,
+          revenue_incidence_pct: null,
+        },
       ],
       decision: {
         decision_id: D_LABOR,
@@ -227,6 +245,19 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
         scheduled_hours: "32.00",
         expected_hours: "24.00",
         excess_hours: "8.00",
+      },
+      // One day without hours and one role without a cost: no total, and no comparison with the revenue.
+      economics: {
+        planned_hours: "189.00",
+        planned_cost: null,
+        average_hourly_cost: null,
+        period_start: AS_OF,
+        period_end: addDays(AS_OF, 6),
+        period_days: 7,
+        reference_revenue: null,
+        revenue_gap: "LABOR_INCOMPLETE",
+        cost_to_revenue_pct: null,
+        revenue_per_hour: null,
       },
     },
     decisions: [

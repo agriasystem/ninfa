@@ -65,6 +65,7 @@ describe("the data-source API client", () => {
       "forgetImportConfiguration",
       "getDataSources",
       "getImportConfiguration",
+      "getImportLimits",
       "getRecentImports",
       "importFile",
       "importMatchedFile",
