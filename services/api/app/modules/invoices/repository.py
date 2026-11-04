@@ -24,6 +24,8 @@ from app.modules.invoices.models import (
     InvoiceImportRow,
     InvoiceLine,
     InvoiceMappingProfile,
+    SourceFormat,
+    is_current_invoice,
 )
 
 _CHUNK = 1000
@@ -38,6 +40,8 @@ InvoiceIdentity = tuple[UUID, str, date, DocumentKind]
 class ExistingInvoice:
     id: UUID
     source_fingerprint: str
+    revision: int = 1
+    source_format: SourceFormat = SourceFormat.FATTURAPA_XML
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +93,7 @@ class InvoiceRepository:
     def find_by_identities(
         self, property_id: UUID, identities: Sequence[InvoiceIdentity]
     ) -> dict[InvoiceIdentity, ExistingInvoice]:
-        """The stored invoices of the property at these identities (one statement per block, a
+        """The current invoices of the property at these identities (one statement per block, a
         join with a VALUES list served by the unique identity key). The data source is NOT part of
         the identity: the same invoice from another source is the same invoice."""
         found: dict[InvoiceIdentity, ExistingInvoice] = {}
@@ -111,6 +115,8 @@ class InvoiceRepository:
                     Invoice.invoice_date,
                     Invoice.document_kind,
                     Invoice.source_fingerprint,
+                    Invoice.revision,
+                    Invoice.source_format,
                 )
                 .join(
                     wanted,
@@ -122,6 +128,7 @@ class InvoiceRepository:
                 .where(
                     Invoice.workspace_id == self._tenant.workspace_id,
                     Invoice.property_id == property_id,
+                    is_current_invoice(),
                 )
             )
             for row in rows:
@@ -132,7 +139,7 @@ class InvoiceRepository:
                         row.invoice_date,
                         row.document_kind,
                     )
-                ] = ExistingInvoice(row.id, row.source_fingerprint)
+                ] = ExistingInvoice(row.id, row.source_fingerprint, row.revision, row.source_format)
         return found
 
     def insert_invoices(self, rows: Sequence[dict[str, Any]]) -> None:

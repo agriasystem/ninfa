@@ -4,7 +4,8 @@ One statement returns the whole history a target needs: the canonical invoice li
 property between two dates, summed by (month of the invoice date, currency, category). The sums
 are done by PostgreSQL on exact NUMERIC values, so no float and no per-invoice or per-line read
 exists. It reads `invoices` and `invoice_lines` only: never the staging rows, never a file, never
-the data source of an invoice (the Gate 6 identity is cross-source: a document counts ONCE).
+the data source of an invoice (the Gate 6 identity is cross-source: a document counts ONCE), and
+of a document corrected by a later file only its newest version (`is_current_invoice`).
 
 Every query carries the workspace_id of the TenantContext. The repository never writes.
 """
@@ -18,7 +19,12 @@ from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
 from app.modules.intelligence.costs.types import MonthlyCostAggregate
-from app.modules.invoices.models import DocumentKind, Invoice, InvoiceLine
+from app.modules.invoices.models import (
+    DocumentKind,
+    Invoice,
+    InvoiceLine,
+    is_current_invoice,
+)
 
 
 class CostLineRepository:
@@ -47,6 +53,7 @@ class CostLineRepository:
                     Invoice.workspace_id == self._tenant.workspace_id,
                     Invoice.property_id == property_id,
                     Invoice.invoice_date < before,
+                    is_current_invoice(),
                 )
                 .group_by(month)
                 .order_by(month.desc())
@@ -91,6 +98,7 @@ class CostLineRepository:
                 Invoice.property_id == property_id,
                 Invoice.invoice_date >= first,
                 Invoice.invoice_date <= last,
+                is_current_invoice(),
             )
             .group_by(month, Invoice.currency, InvoiceLine.cost_category)
             .order_by(month, Invoice.currency, InvoiceLine.cost_category)
