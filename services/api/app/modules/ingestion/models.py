@@ -113,6 +113,9 @@ class ImportJob(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(String(100))
     error_message: Mapped[str | None] = mapped_column(Text)
+    # Did this import change the canonical data? False: the same data arrived again, and nothing
+    # downstream has a reason to move. NULL: not recorded (a job from before it was).
+    changed_data: Mapped[bool | None] = mapped_column()
 
     data_source: Mapped["DataSource"] = relationship("DataSource", viewonly=True)
     files: Mapped[list["ImportFile"]] = relationship("ImportFile", viewonly=True)

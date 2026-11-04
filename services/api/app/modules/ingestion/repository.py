@@ -163,10 +163,54 @@ class ImportJobRepository:
             .limit(1)
         )
 
-    def latest_succeeded_by_domain(self, property_id: UUID) -> dict[DataSourceDomain, datetime]:
+    def latest_changing_for_data_source(self, data_source_id: UUID) -> ImportJob | None:
+        """The latest SUCCEEDED import of this data source that changed its data: what the source
+        holds today came, at the latest, from this one. A file that brought nothing new is not it,
+        so analysing again after one is an idempotent replay and not a new run. A job from before
+        this was recorded counts as a change (nothing can be said of it)."""
+        return self._session.scalar(
+            select(ImportJob)
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.data_source_id == data_source_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+                ImportJob.changed_data.is_not(False),
+            )
+            .order_by(ImportJob.finished_at.desc(), ImportJob.id.desc())
+            .limit(1)
+        )
+
+    def latest_changing_for_domain(
+        self, property_id: UUID, domain: DataSourceDomain
+    ) -> ImportJob | None:
+        """The same, across the active sources of one kind of data of ONE property."""
+        return self._session.scalar(
+            select(ImportJob)
+            .join(
+                DataSource,
+                (DataSource.workspace_id == ImportJob.workspace_id)
+                & (DataSource.id == ImportJob.data_source_id),
+            )
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.property_id == property_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+                ImportJob.changed_data.is_not(False),
+                DataSource.domain == domain,
+                DataSource.is_active.is_(True),
+            )
+            .order_by(ImportJob.finished_at.desc(), ImportJob.id.desc())
+            .limit(1)
+        )
+
+    def latest_succeeded_by_domain(
+        self, property_id: UUID, *, changed_only: bool = False
+    ) -> dict[DataSourceDomain, datetime]:
         """When the latest SUCCEEDED import of each kind of data of ONE property finished, through
         its active sources only (a source that was switched off no longer speaks for the property).
-        A kind with no such import has no key: "nothing imported" is never a date."""
+        A kind with no such import has no key: "nothing imported" is never a date. `changed_only`
+        leaves out the imports that brought nothing new."""
+        conditions = [ImportJob.changed_data.is_not(False)] if changed_only else []
         rows = self._session.execute(
             select(DataSource.domain, func.max(ImportJob.finished_at))
             .join(
@@ -179,6 +223,7 @@ class ImportJobRepository:
                 ImportJob.property_id == property_id,
                 ImportJob.status == ImportJobStatus.SUCCEEDED,
                 DataSource.is_active.is_(True),
+                *conditions,
             )
             .group_by(DataSource.domain)
         ).all()
@@ -226,9 +271,10 @@ class ImportJobRepository:
         self._session.flush()
         return job
 
-    def succeed(self, import_job_id: UUID) -> ImportJob:
+    def succeed(self, import_job_id: UUID, *, changed_data: bool | None = None) -> ImportJob:
         job = self._load_for_transition(import_job_id, {ImportJobStatus.RUNNING})
         job.status = ImportJobStatus.SUCCEEDED
+        job.changed_data = changed_data
         job.finished_at = datetime.now(UTC)
         job.error_code = None
         job.error_message = None

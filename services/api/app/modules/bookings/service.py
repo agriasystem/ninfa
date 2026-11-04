@@ -132,6 +132,11 @@ class BookingImportResult:
     def succeeded(self) -> bool:
         return self.status == ImportJobStatus.SUCCEEDED
 
+    @property
+    def changed_data(self) -> bool:
+        """Did any booking change? Read from the bookings, never from the file's name or bytes."""
+        return self.bookings_created + self.bookings_updated > 0
+
 
 @dataclass(frozen=True)
 class BookingDryRun:
@@ -607,7 +612,7 @@ class BookingImportService:
                 ],
             )
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job)
+            self._jobs.succeed(ids.job, changed_data=outcome.created + outcome.updated > 0)
             self._session.commit()
         except Exception as error:
             self._session.rollback()  # nothing of this batch survives

@@ -58,10 +58,24 @@ class SnapshotSource:
 
 
 @dataclass(frozen=True, slots=True)
+class StoredRun:
+    """What `_store` did. `revision` is the revision of the rows it wrote, if any."""
+
+    created: int
+    revised: int
+    unchanged: int
+    skipped: int
+    revision: int
+
+
+@dataclass(frozen=True, slots=True)
 class SnapshotRunResult:
     """Outcome of a run. Counts only: the snapshots themselves are read back through the
     repository. `skipped_observed` is only ever non-zero for a reconstruction (an existing
-    observation is left alone)."""
+    observation is left alone). `revised` is how many of the `created` rows are a night seen again
+    with a different content; `revision` is the day's observation after this run, and the import is
+    the latest one known when it looked (read under the same lock as the bookings: never younger
+    than what was seen)."""
 
     origin: SnapshotOrigin
     property_id: UUID
@@ -74,6 +88,10 @@ class SnapshotRunResult:
     unchanged: int
     skipped_observed: int
     calculation_version: str = CALCULATION_VERSION
+    revised: int = 0
+    revision: int = 1
+    import_job_id: UUID | None = None
+    import_finished_at: datetime | None = None
 
     @property
     def total(self) -> int:
@@ -196,18 +214,22 @@ class SnapshotServiceBase:
         existing: dict[SnapshotKey, StoredSnapshotRef],
         *,
         origin: SnapshotOrigin,
-    ) -> tuple[int, int, int]:
-        """Insert what is new; compare what exists. Returns (created, unchanged, skipped).
+    ) -> StoredRun:
+        """Insert what is new; compare what exists.
 
-        Rules, identical for both origins except the first one:
+        Rules, identical for both origins except the first two:
 
         * an existing OBSERVED row is never touched by a RECONSTRUCTION (skipped: OBSERVED wins);
+        * an OBSERVED row seen again with a different content stays as it is, and the new content
+          joins the day as its next revision: looking twice in one day is not a conflict. The rows
+          that did not change are not written again. Same input, same outcome: no change anywhere,
+          no revision;
         * the same fingerprint (same origin, same content) is an idempotent no-op;
         * anything else on the same key is a conflict. Nothing is updated and, as the caller
           rolls back, nothing of this run is stored.
         """
         to_insert: list[NewSnapshot] = []
-        unchanged = skipped = 0
+        unchanged = skipped = revised = 0
         conflicts: list[dict[str, str]] = []
         for snapshot in calculated:
             current = existing.get(snapshot.key)
@@ -220,6 +242,9 @@ class SnapshotServiceBase:
                 snapshot.content_fingerprint,
             ):
                 unchanged += 1
+            elif current.origin == SnapshotOrigin.OBSERVED and origin == SnapshotOrigin.OBSERVED:
+                to_insert.append(snapshot)
+                revised += 1
             else:
                 conflicts.append(
                     {
@@ -230,12 +255,21 @@ class SnapshotServiceBase:
                 )
         if conflicts:
             raise self._conflict(len(conflicts), conflicts)
-        inserted = self._snapshots.insert_if_absent(source.property_id, to_insert)
+        revision = 1
+        if origin == SnapshotOrigin.OBSERVED and calculated:
+            # One observation of one day: `calculated` is about a single snapshot day.
+            latest = self._snapshots.latest_revision(
+                source.data_source_id, calculated[0].content.snapshot_local_date
+            )
+            revision = latest + 1 if to_insert else max(latest, 1)
+        inserted = self._snapshots.insert_if_absent(
+            source.property_id, to_insert, revision=revision
+        )
         if inserted != {snapshot.key for snapshot in to_insert}:
             # Somebody wrote a key between our read and our insert (a writer that bypassed the
             # lock). Treated as a conflict: the caller rolls the whole run back.
             raise self._conflict(len(to_insert) - len(inserted), [])
-        return len(inserted), unchanged, skipped
+        return StoredRun(len(inserted), revised, unchanged, skipped, revision)
 
     @staticmethod
     def _conflict(count: int, conflicts: list[dict[str, str]]) -> SnapshotError:

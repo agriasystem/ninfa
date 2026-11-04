@@ -14,7 +14,7 @@ from app.db.base import Base
 from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
-HEAD = "0013_property_analysis_policy"  # Gate 26B's own migration, and the real current global head
+HEAD = "0014_same_day_revisions"  # V1.2's own migration, and the real current global head
 GATE_23B_HEAD = "0012_input_provenance"
 GATE_22_HEAD = "0011_analysis_coverage"
 GATE_13_HEAD = "0010_auth_session"
@@ -64,6 +64,8 @@ GATE_8_TABLES = {
 GATE_11_TABLES = {"decision_runs", "decisions", "decision_observations"}
 GATE_13_TABLES = {"user_credentials", "auth_sessions"}
 # Gate 26B (0013_property_analysis_policy): the automatic-analysis policy, one row per property.
+# V1.2 (0014_same_day_revisions) adds no table: a revision column on three, a flag on import jobs.
+GATE_26B_HEAD = "0013_property_analysis_policy"
 GATE_26B_TABLES = {"property_analysis_policies"}
 MODEL_TABLES = (
     GATE_1_TABLES
@@ -131,7 +133,7 @@ def at_head(db_engine: Engine, test_database_url: str) -> Iterator[None]:
 # --- revision history ------------------------------------------------------------------------
 
 
-def test_gate_0_to_23b_migrations_are_untouched_and_gate_26b_sits_on_top(
+def test_gate_0_to_26b_migrations_are_untouched_and_v1_2_sits_on_top(
     test_database_url: str,
 ) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
@@ -139,7 +141,8 @@ def test_gate_0_to_23b_migrations_are_untouched_and_gate_26b_sits_on_top(
     assert scripts.get_heads() == [HEAD]
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
     assert revisions == {
-        HEAD: GATE_23B_HEAD,
+        HEAD: GATE_26B_HEAD,
+        GATE_26B_HEAD: GATE_23B_HEAD,
         GATE_23B_HEAD: GATE_22_HEAD,
         GATE_22_HEAD: GATE_13_HEAD,
         GATE_13_HEAD: GATE_11_HEAD,

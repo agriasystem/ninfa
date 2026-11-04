@@ -155,7 +155,7 @@ def test_the_identity_has_no_data_source_in_it(db_session: Session) -> None:
         text(
             "SELECT a.attname FROM pg_constraint c JOIN pg_attribute a"
             " ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)"
-            " WHERE c.conname = 'uq_invoices_identity' ORDER BY a.attname"
+            " WHERE c.conname = 'uq_invoices_identity_revision' ORDER BY a.attname"
         )
     ).scalars()
     assert sorted(columns) == [
@@ -163,6 +163,7 @@ def test_the_identity_has_no_data_source_in_it(db_session: Session) -> None:
         "invoice_date",
         "normalized_invoice_number",
         "property_id",
+        "revision",
         "supplier_id",
         "workspace_id",
     ]
@@ -176,7 +177,7 @@ def test_the_same_identity_from_another_data_source_is_refused_by_the_database(
     job = factory.import_job(other)
     file = factory.import_file(job)
 
-    with rejects(pg.UniqueViolation, "uq_invoices_identity"):
+    with rejects(pg.UniqueViolation, "uq_invoices_identity_revision"):
         db_session.add(
             Invoice(
                 **invoice_values(

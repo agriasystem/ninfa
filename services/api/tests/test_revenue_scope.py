@@ -225,11 +225,10 @@ def test_there_is_no_migration_for_gate_5() -> None:
     script = ScriptDirectory.from_config(alembic_config("postgresql+psycopg://unused/unused"))
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
     assert revisions["0007_invoice_supplier_ingestion"] == "0006_expected_engine"
-    # Gate 7 also added none: Gate 6's 0007 is directly followed by Gate 8's 0008. Gate 23B's own
-    # 0012 (input provenance) is the real chain head, unrelated to revenue detection.
+    # Gate 7 also added none: Gate 6's 0007 is directly followed by Gate 8's 0008.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0013_property_analysis_policy"]
-    assert len(revisions) == 13
+    assert script.get_heads() == ["0014_same_day_revisions"]
+    assert len(revisions) == 14
 
 
 # --- read-only, no clock, no float ------------------------------------------------------------

@@ -40,12 +40,13 @@ def _snapshot(factory: LaborFactory, tenant: LaborTenant, **overrides):  # type:
 # --- LaborSnapshot ------------------------------------------------------------------------------
 
 
-def test_snapshot_identity_is_unique_per_data_source_and_date(
+def test_snapshot_identity_is_unique_per_data_source_date_and_revision(
     db_session: Session, factory: LaborFactory, tenant: LaborTenant, rejects: Rejects
 ) -> None:
     _snapshot(factory, tenant, snapshot_local_date=date(2026, 3, 1))
     with rejects(
-        psycopg.errors.UniqueViolation, "uq_labor_snapshots_data_source_id_snapshot_local_date"
+        psycopg.errors.UniqueViolation,
+        "uq_labor_snapshots_data_source_id_snapshot_local_date_revision",
     ):
         db_session.execute(
             insert(LaborSnapshot),

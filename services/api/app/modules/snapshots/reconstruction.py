@@ -108,7 +108,7 @@ class BookingSnapshotReconstructionService(SnapshotServiceBase):
                 stay_date_start,
                 stay_date_end,
             )
-            created, unchanged, skipped = self._store(
+            stored = self._store(
                 source, calculated, existing, origin=SnapshotOrigin.RECONSTRUCTED_APPROXIMATE
             )
             logger.info(
@@ -117,9 +117,9 @@ class BookingSnapshotReconstructionService(SnapshotServiceBase):
                 self._tenant.workspace_id,
                 source.property_id,
                 source.data_source_id,
-                created,
-                unchanged,
-                skipped,
+                stored.created,
+                stored.unchanged,
+                stored.skipped,
             )
             return SnapshotRunResult(
                 origin=SnapshotOrigin.RECONSTRUCTED_APPROXIMATE,
@@ -129,9 +129,9 @@ class BookingSnapshotReconstructionService(SnapshotServiceBase):
                 snapshot_date_last=snapshot_date_end,
                 stay_date_first=stay_date_start,
                 stay_date_last=stay_date_end,
-                created=created,
-                unchanged=unchanged,
-                skipped_observed=skipped,
+                created=stored.created,
+                unchanged=stored.unchanged,
+                skipped_observed=stored.skipped,
             )
 
         return self._finish(run)

@@ -17,7 +17,7 @@ from tests.support import alembic_config
 
 GATE_2_HEAD = "0004_booking_ingestion"
 GATE_3_HEAD = "0005_booking_snapshots_metrics"
-HEAD = "0013_property_analysis_policy"  # the global head (Gate 26B); Gate 3's own is GATE_3_HEAD
+HEAD = "0014_same_day_revisions"  # the global head (V1.2); Gate 3's own is GATE_3_HEAD
 GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_3_FUNCTION = "booking_snapshots_forbid_update"
@@ -100,17 +100,19 @@ def test_0004_to_0005_to_0004_to_0005_recreates_an_identical_schema(
     at_head: None, db_engine: Engine, test_database_url: str
 ) -> None:
     config = alembic_config(test_database_url)
-    before = columns_of(db_engine)
+    at_head_columns = columns_of(db_engine)
 
-    command.downgrade(config, GATE_2_HEAD)  # 0006 and 0005 -> 0004
+    command.downgrade(config, GATE_2_HEAD)  # everything after 0005, and 0005 -> 0004
     command.upgrade(config, GATE_3_HEAD)  # 0004 -> 0005
     assert revision(db_engine) == GATE_3_HEAD
-    assert columns_of(db_engine) == before
+    gate_3_columns = columns_of(db_engine)  # its own shape: later gates widen these tables
     command.downgrade(config, GATE_2_HEAD)  # and once more: it is repeatable
+    command.upgrade(config, GATE_3_HEAD)
+    assert columns_of(db_engine) == gate_3_columns
     command.upgrade(config, "head")
 
     assert revision(db_engine) == HEAD
-    assert columns_of(db_engine) == before
+    assert columns_of(db_engine) == at_head_columns
     assert function_exists(db_engine, GATE_3_FUNCTION)
 
 
@@ -220,11 +222,12 @@ def test_snapshot_indexes_are_the_key_the_curve_and_the_gate_4_fk_target(
     assert columns == {
         "pk_booking_snapshots": ["id"],
         # the logical key; its order also serves "all the nights of one snapshot day"
-        "uq_booking_snapshots_data_source_snapshot_date_stay_date": [
+        "uq_booking_snapshots_source_snapshot_stay_revision": [
             "workspace_id",
             "data_source_id",
             "snapshot_local_date",
             "stay_date",
+            "revision",
         ],
         # the booking curve of one stay night, already in snapshot-day order
         "ix_booking_snapshots_booking_curve": [
@@ -271,5 +274,8 @@ def test_the_curve_query_is_served_by_the_curve_index_in_snapshot_day_order(
         " AND stay_date = '2026-04-10' ORDER BY snapshot_local_date",
     )
 
-    assert "ix_booking_snapshots_booking_curve" in curve
+    assert (
+        "ix_booking_snapshots_booking_curve" in curve
+        or "uq_booking_snapshots_source_snapshot_stay_revision" in curve
+    ), curve
     assert "Sort" not in curve  # the index delivers the snapshot-day order itself

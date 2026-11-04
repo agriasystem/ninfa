@@ -81,15 +81,23 @@ class RoomInventoryDaily(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class BookingSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
-    """The daily "on the books" state of ONE data source for ONE stay night.
+    """The "on the books" state of ONE data source for ONE stay night, as of one observation.
 
-    Row = (data source, snapshot_local_date, stay_date): "as of the end of that property-local
-    day, this many rooms were on the books for that night". One row per stay night even when
-    nothing is booked (the absence of bookings is data). Immutable (a trigger refuses UPDATE):
-    a correction is a new calculation, never an edit.
+    Row = (data source, snapshot_local_date, stay_date, revision): "at that moment of that
+    property-local day, this many rooms were on the books for that night". One row per stay night
+    even when nothing is booked (the absence of bookings is data). Immutable (a trigger refuses
+    UPDATE): a correction is a new calculation, never an edit.
+
+    `revision` counts the observations of ONE day of ONE source. A second look that finds a night
+    changed adds a row for THAT night with the next revision, and leaves every other row alone: the
+    state as of revision r is, per night, the row with the highest revision <= r. The newest
+    revision of a day is what represents that day from then on, in a new analysis and in the history
+    of any later day (`BookingSnapshotRepository` never hands out two rows for one night and day);
+    an older one stays reachable by its id, for the runs and baselines that read it.
 
     The unique key deliberately does NOT contain `origin`: an existing observation and a later
-    reconstruction of the same day compete for the same key and the observation wins.
+    reconstruction of the same day compete for the same key and the observation wins. A
+    reconstruction has no revisions: it is one inference of a finished day.
 
     Metrics are copied at calculation time (in particular `rooms_available`): later changes to
     the inventory or to the bookings never alter a stored snapshot.
@@ -102,6 +110,9 @@ class BookingSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     data_source_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
 
     snapshot_local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default=text("1")
+    )
     as_of_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     stay_date: Mapped[date] = mapped_column(Date, nullable=False)
     origin: Mapped[SnapshotOrigin] = mapped_column(enum_column(SnapshotOrigin, 32), nullable=False)
@@ -143,13 +154,15 @@ class BookingSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             ondelete="RESTRICT",
         ),
         # The logical key. No `origin` in it. Its column order also serves "all rows of one
-        # snapshot day of a source", so no separate index is needed for that access path.
+        # snapshot day of a source", and the newest revision of each, so no separate index is
+        # needed for those access paths.
         UniqueConstraint(
             "workspace_id",
             "data_source_id",
             "snapshot_local_date",
             "stay_date",
-            name="uq_booking_snapshots_data_source_snapshot_date_stay_date",
+            "revision",
+            name="uq_booking_snapshots_source_snapshot_stay_revision",
         ),
         # Foreign-key target for Gate 4 (redundant with the primary key): a row that references
         # a snapshot of its own workspace/property/data source AND of a given origin, so that an
@@ -171,6 +184,10 @@ class BookingSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             "snapshot_local_date",
         ),
         CheckConstraint(values_check("origin", SnapshotOrigin), name="origin_valid"),
+        CheckConstraint("revision >= 1", name="revision_positive"),
+        CheckConstraint(
+            "revision = 1 OR origin = 'OBSERVED'", name="only_an_observation_is_revised"
+        ),
         CheckConstraint("booking_count_on_books >= 0", name="booking_count_non_negative"),
         CheckConstraint("rooms_on_books >= 0", name="rooms_on_books_non_negative"),
         CheckConstraint(

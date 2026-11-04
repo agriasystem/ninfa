@@ -30,7 +30,6 @@ from app.modules.bookings.models import Booking, BookingChannel
 from app.modules.ingestion.models import DataSource, DataSourceDomain, DataSourceType, ImportJob
 from app.modules.properties.models import Property
 from app.modules.snapshots.common import SnapshotRunResult
-from app.modules.snapshots.errors import SnapshotError, SnapshotErrorCode
 from app.modules.snapshots.models import BookingSnapshot, RoomInventoryDaily, SnapshotOrigin
 from app.modules.snapshots.observed import ObservedSnapshotService
 from app.modules.snapshots.reconstruction import BookingSnapshotReconstructionService
@@ -210,7 +209,7 @@ def test_repeating_the_run_from_a_fresh_session_is_a_no_op(committed: Committed)
     assert committed.snapshot_rows() == before
 
 
-def test_a_conflict_rolls_back_for_real_and_leaves_the_stored_rows_alone(
+def test_a_second_look_commits_a_revision_and_leaves_the_stored_rows_alone(
     committed: Committed,
 ) -> None:
     committed.observe()
@@ -219,11 +218,13 @@ def test_a_conflict_rolls_back_for_real_and_leaves_the_stored_rows_alone(
         committed.add_booking(session, "LATE-1", room_revenue=Decimal("100.00"))
         session.commit()
 
-    with pytest.raises(SnapshotError) as info:
-        committed.observe(FixedClock(NOW + timedelta(hours=1)))
+    result = committed.observe(FixedClock(NOW + timedelta(hours=1)))
 
-    assert info.value.error_code == SnapshotErrorCode.CONFLICT
-    assert committed.snapshot_rows() == before
+    assert result.revision == 2
+    assert result.revised == result.created > 0
+    after = committed.snapshot_rows()
+    assert all(row in after for row in before)  # whatever was seen stays what it was
+    assert len(after) == len(before) + result.created
     assert advisory_lock_is_free(committed.engine, committed.data_source_id)
 
 

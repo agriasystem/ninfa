@@ -234,46 +234,40 @@ def test_a_second_run_with_a_wider_range_only_adds_the_new_nights(
     assert count_snapshots(db_session) == 5
 
 
-def test_a_different_content_for_the_same_key_is_a_conflict_and_the_row_is_not_updated(
+def test_a_night_seen_changed_joins_the_day_as_its_next_revision_and_the_row_is_not_updated(
     world: World, db_session: Session
 ) -> None:
     world.observe(night(0), night(2))
-    before = snapshot_of(world, night(1)).content_fingerprint
+    first = snapshot_of(world, night(1))
+    first_id, before = first.id, first.content_fingerprint
 
     world.book(night(1), night(2), rooms=3)  # the bookings changed after the observation
 
-    with pytest.raises(SnapshotError) as info:
-        world.observe(night(0), night(2))
+    result = world.observe(night(0), night(2))
 
-    assert info.value.error_code == SnapshotErrorCode.CONFLICT
-    assert info.value.code == "BOOKING_SNAPSHOT_CONFLICT"
-    assert info.value.status_code == 409
-    assert info.value.details == {
-        "conflict_count": 1,
-        "conflicts": [
-            {
-                "snapshot_local_date": "2026-03-15",
-                "stay_date": str(night(1)),
-                "existing_origin": "OBSERVED",
-            }
-        ],
-    }
-    stored = snapshot_of(world, night(1))
-    assert stored.content_fingerprint == before and stored.rooms_on_books == 0  # untouched
-    assert count_snapshots(db_session) == 3
+    assert (result.created, result.revised, result.unchanged) == (1, 1, 2)
+    assert result.revision == 2
+    latest = snapshot_of(world, night(1))
+    assert (latest.revision, latest.rooms_on_books) == (2, 3)
+    assert latest.id != first_id
+    db_session.expire_all()
+    older = BookingSnapshotRepository(db_session, world.tenant.context).get_by_id(first_id)
+    assert older is not None
+    assert (older.revision, older.rooms_on_books, older.content_fingerprint) == (1, 0, before)
+    assert count_snapshots(db_session) == 4  # the two unchanged nights were not written again
 
 
-def test_a_conflict_stores_nothing_of_the_run_not_even_the_new_nights(
+def test_a_second_look_also_adds_the_new_nights_at_its_own_revision(
     world: World, db_session: Session
 ) -> None:
     world.observe(night(0), night(1))
     world.book(night(1), night(2))  # changes night 1 only
 
-    with pytest.raises(SnapshotError):
-        world.observe(night(1), night(4))  # night 1 conflicts, 2..4 would be new
+    result = world.observe(night(1), night(4))  # night 1 changed, 2..4 are new
 
-    assert count_snapshots(db_session) == 2
-    assert world.stored(TODAY, night(2)) is None
+    assert (result.created, result.revised, result.unchanged, result.revision) == (4, 1, 0, 2)
+    assert count_snapshots(db_session) == 6
+    assert snapshot_of(world, night(2)).revision == 2
 
 
 def test_the_next_local_day_observes_again_without_touching_the_old_observation(
@@ -318,8 +312,14 @@ def test_an_existing_reconstruction_of_the_same_key_blocks_an_observation_it_is_
 
 
 def test_the_session_is_usable_after_a_conflict(world: World, db_session: Session) -> None:
-    world.observe(night(0), night(0))
-    world.book(night(0), night(1))
+    insert_snapshot(
+        db_session,
+        world.tenant,
+        origin=SnapshotOrigin.RECONSTRUCTED_APPROXIMATE,
+        snapshot_local_date=TODAY,
+        stay_date=night(0),
+    )
+    world.commit()
     with pytest.raises(SnapshotError):
         world.observe(night(0), night(0))
 
@@ -465,10 +465,12 @@ def test_a_later_inventory_change_does_not_alter_an_existing_observation(world: 
 
     row = snapshot_of(world, night(0))
     assert (row.rooms_available, row.occupancy_on_books) == (20, Decimal("50.00"))
-    # and re-running the same day is a conflict, not a silent refresh
-    with pytest.raises(SnapshotError):
-        world.observe(night(0), night(0))
-    assert snapshot_of(world, night(0)).rooms_available == 20
+    row_id = row.id
+    # and looking again the same day is a new revision, not a rewrite of what was seen
+    assert world.observe(night(0), night(0)).revision == 2
+    assert snapshot_of(world, night(0)).rooms_available == 50
+    older = BookingSnapshotRepository(world.session, world.tenant.context).get_by_id(row_id)
+    assert older is not None and older.rooms_available == 20
 
 
 def test_the_next_observation_copies_the_new_inventory(world: World) -> None:

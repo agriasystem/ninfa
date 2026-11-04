@@ -23,7 +23,7 @@ GATE_4_HEAD = "0006_expected_engine"
 # them touch these tables/triggers/keys.
 GATE_6_HEAD = "0007_invoice_supplier_ingestion"
 GATE_8_HEAD = "0008_labor_ingestion"
-HEAD = "0013_property_analysis_policy"
+HEAD = "0014_same_day_revisions"
 GATE_6_TABLES = {
     "suppliers",
     "supplier_identifiers",
@@ -60,7 +60,7 @@ EXPECTED_INDEXES = {
     },
     "invoices": {
         "pk_invoices",
-        "uq_invoices_identity",
+        "uq_invoices_identity_revision",
         "uq_invoices_workspace_id_id",
         "ix_invoices_workspace_id_property_id_invoice_date_supplier_id",
     },

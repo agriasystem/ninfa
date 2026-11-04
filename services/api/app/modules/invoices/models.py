@@ -5,6 +5,10 @@ accounting document: immutable once written (a database trigger refuses every UP
 by (workspace, property, supplier, normalised number, date, kind) and NOT by the data source it
 came from, so the same invoice arriving through an XML file and an accounting export is one cost.
 
+A row of a spreadsheet can be corrected, and then the corrected document is the next `revision` of
+that identity: the older one stays, with the import that brought it, and only the newest counts
+(`is_current_invoice`). A FatturaPA is a fiscal document: it is never replaced.
+
 Amounts are signed CANONICAL amounts: a CREDIT_NOTE carries negative amounts, so a plain
 SUM(line_total) is always right without anyone re-reading TD04.
 """
@@ -17,6 +21,7 @@ from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
+    ColumnElement,
     Date,
     ForeignKeyConstraint,
     Index,
@@ -26,10 +31,11 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    exists,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, aliased, mapped_column
 
 from app.db.base import Base
 from app.db.mixins import CreatedAtMixin, TimestampMixin, UUIDPrimaryKeyMixin
@@ -77,6 +83,9 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     invoice_number: Mapped[str] = mapped_column(String(255), nullable=False)
     normalized_invoice_number: Mapped[str] = mapped_column(String(255), nullable=False)
     invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
+    revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default=text("1")
+    )
     due_date: Mapped[date | None] = mapped_column(Date)
 
     document_type_code: Mapped[str | None] = mapped_column(String(20))
@@ -145,7 +154,8 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             "normalized_invoice_number",
             "invoice_date",
             "document_kind",
-            name="uq_invoices_identity",
+            "revision",
+            name="uq_invoices_identity_revision",
         ),
         # Foreign-key target of the lines.
         UniqueConstraint("workspace_id", "id", name="uq_invoices_workspace_id_id"),
@@ -157,6 +167,7 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             "invoice_date",
             "supplier_id",
         ),
+        CheckConstraint("revision >= 1", name="revision_positive"),
         CheckConstraint("btrim(invoice_number) <> ''", name="invoice_number_not_blank"),
         CheckConstraint(
             "btrim(normalized_invoice_number) <> ''", name="normalized_invoice_number_not_blank"
@@ -180,6 +191,20 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             " AND (gross_amount IS NULL OR gross_amount <= 0))",
             name="credit_note_amounts_not_positive",
         ),
+    )
+
+
+def is_current_invoice() -> ColumnElement[bool]:
+    """The condition every reading of costs carries: no newer version of the same document."""
+    newer = aliased(Invoice)
+    return ~exists().where(
+        newer.workspace_id == Invoice.workspace_id,
+        newer.property_id == Invoice.property_id,
+        newer.supplier_id == Invoice.supplier_id,
+        newer.normalized_invoice_number == Invoice.normalized_invoice_number,
+        newer.invoice_date == Invoice.invoice_date,
+        newer.document_kind == Invoice.document_kind,
+        newer.revision > Invoice.revision,
     )
 
 
