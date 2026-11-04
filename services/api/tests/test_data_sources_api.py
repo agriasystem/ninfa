@@ -393,6 +393,7 @@ def test_a_failed_import_answers_with_a_reason_never_with_technical_text(
         "unchanged",
         "already_imported",
         "changed_data",
+        "removed",
     }
 
 
@@ -448,6 +449,7 @@ def test_a_successful_first_import_creates_the_source_and_configures_the_card(
         "unchanged": 0,
         "already_imported": False,
         "changed_data": True,
+        "removed": 0,
     }
     (source,) = sources_of(db_session, env, DataSourceDomain.BOOKINGS)
     assert source.is_active is True

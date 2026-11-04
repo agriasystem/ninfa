@@ -38,6 +38,9 @@ class QuestionKind(StrEnum):
     # The arrival is after the departure on (nearly) every row: the two columns may be swapped.
     # `column` is the arrival's header, the only choice the departure's.
     DATES_REVERSED = "DATES_REVERSED"
+    # Records NINFA holds for this period are not in this file: does the file hold everything of the
+    # period, or a part of it? Only asked when the answer changes what counts.
+    FILE_SCOPE = "FILE_SCOPE"
 
 
 class UnderstandingLevel(StrEnum):
@@ -113,6 +116,8 @@ class Question:
     labels: tuple[LabelCount, ...] = ()
     # How many labels there were in all (the list shows the most frequent ones).
     total_labels: int = 0
+    # FILE_SCOPE: how many records stored for this period the file does not hold.
+    absent_records: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +212,9 @@ class UnderstandingInfo:
     # The fields the file does not state and whose absence has a meaning of its own (one row, one
     # room): nothing NINFA read, so never among `recognized`, and said on the summary.
     assumed: tuple[str, ...] = ()
+    # What this import will stop counting, because the file is known to hold everything of its
+    # period: said on the summary, before anyone presses anything.
+    removes: int = 0
 
 
 __all__ = [

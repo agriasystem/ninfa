@@ -649,6 +649,24 @@ class SmartImportService:
             )
         return resolved.config, None, resolved.format_hints
 
+    def scope_effect(
+        self,
+        adapter: FileDomain,
+        mapping: MappingInput,
+        filename: str,
+        content: bytes,
+        source: DataSource,
+    ) -> int:
+        """How much of what the source holds would stop counting if this file is complete: 0 when it
+        makes no difference, which is when nobody needs to be asked what the file is. Reads only."""
+        try:
+            config, refused, _ = self._config_for(adapter, mapping, filename, content, source)
+            if config is None or refused is not None:
+                return 0
+            return adapter.scope_effect(source, filename, content, config)
+        except (AppError, ValueError):
+            return 0
+
     def _to_dry_run(
         self,
         adapter: FileDomain,
@@ -886,6 +904,7 @@ class SmartImportService:
                 origin=origin,
                 # how THIS family is read travels with it: never the next family's business
                 layout=safe_layout((documents.get("format_options") or {}).get("layout")),
+                file_scope=confirmation.file_scope,
             )
             if families is None and origin != Via.REUSE:
                 # the engine alone never replaces what a person confirmed

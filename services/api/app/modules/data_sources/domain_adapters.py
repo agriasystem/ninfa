@@ -36,7 +36,7 @@ from app.modules.data_sources.mapping_types import (
     FieldSpec,
 )
 from app.modules.document_understanding.layout import LayoutSpec
-from app.modules.ingestion.models import DataSourceDomain
+from app.modules.ingestion.models import DataSource, DataSourceDomain
 from app.modules.ingestion.suggestions import SuggestionConfidence, suggest_fields
 from app.modules.invoices import mapping as invoice_mapping
 from app.modules.invoices.cost_categories import CostCategory
@@ -180,6 +180,11 @@ class FileDomain(ABC):
 
     @abstractmethod
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]: ...
+
+    def scope_effect(self, source: DataSource, filename: str, content: bytes, config: Any) -> int:
+        """How much of what the source holds would stop counting if this file is complete. 0 for a
+        kind of data where absence never means anything: a cost register may always be partial."""
+        return 0
 
 
 # --- bookings -------------------------------------------------------------------------------------
@@ -336,6 +341,15 @@ class BookingsDomain(FileDomain):
                 channels=result.summary.get("channels"),
                 revenue=result.summary.get("revenue"),
             ),
+        )
+
+    def scope_effect(
+        self, source: DataSource, filename: str, content: bytes, config: MappingConfig
+    ) -> int:
+        return BookingImportService(
+            self._session, self._tenant
+        ).bookings_a_complete_file_would_remove(
+            source.id, source.property_id, filename=filename, content=content, mapping=config
         )
 
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]:
@@ -501,6 +515,13 @@ class LaborDomain(FileDomain):
                 actual_cost=result.summary.get("actual_cost"),
                 currency=result.summary.get("currency"),
             ),
+        )
+
+    def scope_effect(
+        self, source: DataSource, filename: str, content: bytes, config: LaborMappingConfig
+    ) -> int:
+        return LaborImportService(self._session, self._tenant).cells_a_complete_file_would_clear(
+            source.id, filename=filename, content=content, mapping=config
         )
 
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]:

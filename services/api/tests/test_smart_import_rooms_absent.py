@@ -162,8 +162,10 @@ def test_the_next_file_of_the_same_layout_asks_nothing_and_still_says_it(
     proposal = understand(api_client, env, "BOOKINGS", "p.csv", first)["proposal"]
     assert import_mapped(api_client, env, "BOOKINGS", "p.csv", first, proposal).status_code == 200
 
+    # another month: on the same dates, the first file's bookings would be absent from it
+    december = [[cell.replace("/11/", "/12/") for cell in row] for row in _rows()]
     later = csv_bytes(
-        [HEADER, *[[f"NEXT-{r[0]}", *r[1:]] for r in _rows()]], delimiter=";", bom=True
+        [HEADER, *[[f"NEXT-{r[0]}", *r[1:]] for r in december]], delimiter=";", bom=True
     )
     body = understand(api_client, env, "BOOKINGS", "p2.csv", later)
 

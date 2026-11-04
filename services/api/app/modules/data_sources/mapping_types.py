@@ -17,7 +17,7 @@ from app.modules.data_sources.files import ImportProblem
 from app.modules.data_sources.source_learning import LearningInfo
 from app.modules.data_sources.understanding_types import Question, UnderstandingInfo
 from app.modules.document_understanding.layout import LayoutSpec
-from app.modules.ingestion.models import DataSourceDomain
+from app.modules.ingestion.models import DataSourceDomain, FileScope
 
 MAX_COLUMNS = 200
 MAX_HEADER_LENGTH = 200
@@ -81,6 +81,10 @@ class MappingInput(BaseModel):
     # The words the person taught NINFA: {"role_mapping": {"HK": "HOUSEKEEPING"}} (a department
     # label, a status, a cost category). Kept in the configuration of THIS source only.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # What this file says about the records it does not hold, as the server knows it from a person
+    # (an answer, or the family's memory). Verified with the rest of a decision the server issued;
+    # ignored on a matching built by hand, where nobody was asked.
+    file_scope: FileScope | None = None
     # Set by the server on the decisions IT issues (see `SmartImportDecision`); absent on a matching
     # the person builds by hand.
     smart_import: SmartImportDecision | None = None

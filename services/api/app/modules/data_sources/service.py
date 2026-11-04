@@ -124,6 +124,8 @@ class ImportOutcome:
     configuration_saved: bool = False
     # True: the file changed what NINFA holds. Otherwise nothing downstream has a reason to move.
     changed_data: bool = False
+    # Records this file made no longer current, because it holds everything of its period.
+    removed: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -378,8 +380,10 @@ class DataSourcesService:
         if mapping is None:
             return None, None
         if reference is None:
-            return mapping, self._manual_confirmation(
-                property_id, domain, filename, content, mapping
+            # (nobody was asked what a file matched by hand is: absence says nothing about it)
+            by_hand = mapping.model_copy(update={"file_scope": None})
+            return by_hand, self._manual_confirmation(
+                property_id, domain, filename, content, by_hand
             ) if confirm else None
         try:
             answers = UnderstandAnswers.model_validate(reference.answers)
@@ -857,6 +861,7 @@ class DataSourcesService:
                 content=content,
                 property_id=property_id,
                 mapping_override=override,
+                file_scope=None if mapped.mapping is None else mapped.mapping.file_scope,
             )
             return (
                 ImportOutcome(
@@ -871,6 +876,7 @@ class DataSourcesService:
                     unchanged=booking.bookings_unchanged,
                     already_imported=booking.duplicate_of_import_file_id is not None,
                     changed_data=booking.changed_data,
+                    removed=booking.bookings_removed,
                 ),
                 resolved,
             )
@@ -907,6 +913,7 @@ class DataSourcesService:
             snapshot_local_date=snapshot_local_date,
             property_id=property_id,
             mapping_override=override,
+            file_scope=None if mapped.mapping is None else mapped.mapping.file_scope,
         )
         return (
             ImportOutcome(
@@ -919,6 +926,7 @@ class DataSourcesService:
                 created=labor.entries_created,
                 already_imported=labor.duplicate_of_import_file_id is not None,
                 changed_data=labor.changed_data,
+                removed=labor.cells_cleared,
             ),
             resolved,
         )

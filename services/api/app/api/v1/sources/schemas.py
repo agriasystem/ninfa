@@ -88,6 +88,7 @@ class ImportResultResponse(BaseModel):
     already_imported: bool
     # False: the file said what NINFA already holds: no new analysis is coming, none is needed.
     changed_data: bool
+    removed: int
 
 
 # --- Smart Import: match the columns of the hotel own file ------------------------------
@@ -149,6 +150,7 @@ class QuestionResponse(BaseModel):
     choices: list[ChoiceResponse]
     labels: list[LabelCountResponse]
     total_labels: int
+    absent_records: int
 
 
 class BlockerResponse(BaseModel):
@@ -224,6 +226,7 @@ class UnderstandingResponse(BaseModel):
     questions: list[QuestionResponse]
     blockers: list[BlockerResponse]
     assumed: list[str]
+    removes: int
 
 
 class DryRunSummaryResponse(BaseModel):
