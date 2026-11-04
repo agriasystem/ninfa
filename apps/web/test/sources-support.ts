@@ -153,6 +153,7 @@ export function resultOf(overrides: Partial<ImportResultResponse> = {}): ImportR
     unchanged: 0,
     already_imported: false,
     changed_data: true,
+    removed: 0,
     ...overrides,
   };
 }
@@ -464,6 +465,7 @@ export function proposalOf(overrides: Partial<ImportMapping> = {}): ImportMappin
 export function understandingOf(overrides: Partial<Understanding> = {}): Understanding {
   return {
     assumed: [],
+    removes: 0,
     level: "READY",
     detection: {
       domain: "LABOR",
@@ -547,6 +549,7 @@ export function questionOf(
     choices: [],
     labels: [],
     total_labels: 0,
+    absent_records: 0,
     ...overrides,
   };
 }

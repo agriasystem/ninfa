@@ -723,6 +723,8 @@ export interface ImportResultResponse {
   already_imported: boolean;
   /** `false`: the file said what NINFA already holds: no new analysis is coming, none is needed. */
   changed_data: boolean;
+  /** What stopped counting because a file said to be complete no longer holds it (kept in the history). */
+  removed: number;
 }
 
 /** One import attempt of a property, for "Importazioni recenti". A failed one says only that it failed. */
@@ -869,6 +871,8 @@ export interface ImportMapping {
   layout?: ImportLayout | null;
   /** The words the person taught NINFA: `{ role_mapping: { HK: "HOUSEKEEPING" } }`. */
   labels?: Record<string, Record<string, string>>;
+  /** What the person said this file is. Set by the server on the decisions it issues; never built here. */
+  file_scope?: ImportFileScope | null;
   /** Set by the server on the decisions it issues; absent on a matching the person builds by hand. */
   smart_import?: ImportSmartImportRef | null;
 }
@@ -919,6 +923,9 @@ export interface ImportProfileInfo {
  * BLOCKED = the file cannot be imported as it is, and says why. */
 export type UnderstandingLevel = "READY" | "ASK" | "MANUAL" | "BLOCKED";
 
+/** What a file holds of its period: everything, a part, or only what is new. Said by a person, never guessed. */
+export type ImportFileScope = "FULL" | "PARTIAL" | "DELTA";
+
 export type UnderstandingQuestionKind =
   | "DOMAIN"
   | "TABLE"
@@ -932,7 +939,9 @@ export type UnderstandingQuestionKind =
   | "DATE_ORDER"
   | "DECIMAL_STYLE"
   /** The arrival is after the departure on (nearly) every row: `column` is the arrival, the one choice the departure. */
-  | "DATES_REVERSED";
+  | "DATES_REVERSED"
+  /** Stored records of this file's period are not in it, and what that means changes what counts. */
+  | "FILE_SCOPE";
 
 export type UnderstandingOriginKind =
   | "COLUMN"
@@ -970,6 +979,8 @@ export interface UnderstandingQuestion {
   /** VALUE_LABELS: the unknown words, most frequent first, with how many rows each. */
   labels: { label: string; count: number }[];
   total_labels: number;
+  /** FILE_SCOPE: how many stored records of the file's period it does not hold. */
+  absent_records: number;
 }
 
 export type UnderstandingBlockerCode =
@@ -1035,6 +1046,8 @@ export interface Understanding {
   /** The fields the file does not state and whose absence means something (one row, one room): nothing
    * NINFA read, so never among `recognized`, and said on the summary. */
   assumed: string[];
+  /** What stops counting if this file is imported, because it is complete and no longer holds it. */
+  removes: number;
 }
 
 /** What the person has already said, so a question is never asked twice. */
@@ -1050,6 +1063,7 @@ export interface UnderstandAnswers {
   decimal_style?: "COMMA" | "POINT" | null;
   column_fields?: Record<string, string>;
   labels?: Record<string, Record<string, string>>;
+  file_scope?: ImportFileScope | null;
 }
 
 export interface FileInspectionResponse {

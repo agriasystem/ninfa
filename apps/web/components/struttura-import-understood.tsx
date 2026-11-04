@@ -122,6 +122,11 @@ export function StrutturaImportUnderstood({
           {COPY.amountsCheck[document.amounts]}
         </p>
       ) : null}
+      {understanding.removes > 0 ? (
+        <div className="struttura-preview__attention" role="note">
+          <p>{COPY.removes[domain === "LABOR" ? "LABOR" : "BOOKINGS"](understanding.removes)}</p>
+        </div>
+      ) : null}
       {validation.rows_unclassified > 0 && validation.rows_invalid === 0 ? (
         <div className="struttura-preview__attention" role="note">
           <p>{COPY.unclassified(validation.rows_unclassified)}</p>

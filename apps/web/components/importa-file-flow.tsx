@@ -310,7 +310,12 @@ export function ImportaFileFlow({
                   <dt>{PAGE.done.rows}</dt>
                   <dd>
                     {UNDERSTANDING.facts.rows(state.result.rows_total)}.{" "}
-                    {FLOW.doneCounts(state.result.created, state.result.updated, state.result.unchanged)}
+                    {FLOW.doneCounts(
+                      state.result.created,
+                      state.result.updated,
+                      state.result.unchanged,
+                      state.result.removed,
+                    )}
                   </dd>
                 </div>
                 {periodText(state.validation) !== null ? (

@@ -336,6 +336,28 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
         </>
       );
       break;
+    case "FILE_SCOPE": {
+      const scope = step.inspection.domain === "LABOR" ? COPY.FILE_SCOPE.LABOR : COPY.FILE_SCOPE.BOOKINGS;
+      body = (
+        <>
+          {heading(scope.title)}
+          <p className="struttura-flow__note">{scope.absent(question.absent_records)}</p>
+          <div className="struttura-question__choices struttura-question__choices--stacked">
+            {(["FULL", "PARTIAL", "DELTA"] as const).map((value) => (
+              <StrutturaButton
+                key={value}
+                variant="outline"
+                onClick={() => void flow.answer({ file_scope: value })}
+              >
+                {scope[value]}
+              </StrutturaButton>
+            ))}
+          </div>
+          <p className="struttura-flow__note">{COPY.FILE_SCOPE.remembered}</p>
+        </>
+      );
+      break;
+    }
     case "DECIMAL_STYLE":
       body = (
         <>

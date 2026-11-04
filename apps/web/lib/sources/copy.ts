@@ -194,11 +194,12 @@ export const sourcesCopy = {
     missingGroup: (names: string[]) => names.join(" oppure "),
     confirm: "Conferma importazione",
     doneTitle: "Importazione completata",
-    doneCounts: (created: number, updated: number, unchanged: number) => {
+    doneCounts: (created: number, updated: number, unchanged: number, removed = 0) => {
       const parts: string[] = [];
       if (created > 0) parts.push(`${created} nuov${created === 1 ? "o" : "i"}`);
       if (updated > 0) parts.push(`${updated} aggiornat${updated === 1 ? "o" : "i"}`);
       if (unchanged > 0) parts.push(`${unchanged} già present${unchanged === 1 ? "e" : "i"}`);
+      if (removed > 0) parts.push(`${removed} non più nel file`);
       return parts.length > 0 ? `Elementi: ${parts.join(", ")}.` : "Nessun nuovo elemento.";
     },
     doneNote: "L'ultimo aggiornamento di questa fonte è stato registrato.",
@@ -508,6 +509,16 @@ export const sourcesCopy = {
   // --- NINFA understands the file: "File riconosciuto" and the few questions ------------------------------
   understanding: {
     recognizedTitle: "File riconosciuto",
+    removes: {
+      BOOKINGS: (count: number) =>
+        count === 1
+          ? "1 prenotazione che in questo file non compare non sarà più contata. Resta nello storico di NINFA."
+          : `${count} prenotazioni che in questo file non compaiono non saranno più contate. Restano nello storico di NINFA.`,
+      LABOR: (count: number) =>
+        count === 1
+          ? "1 giornata di reparto che in questo file non compare non sarà più contata. Resta nello storico di NINFA."
+          : `${count} giornate di reparto che in questo file non compaiono non saranno più contate. Restano nello storico di NINFA.`,
+    },
     kinds: {
       BOOKINGS: "NINFA ha riconosciuto un file di prenotazioni",
       LABOR: "NINFA ha riconosciuto un file del personale",
@@ -645,6 +656,30 @@ export const sourcesCopy = {
       },
       DATE_ORDER: { title: "Come sono scritte le date di questo file?" },
       DECIMAL_STYLE: { title: "Come sono scritti i numeri con i decimali?" },
+      FILE_SCOPE: {
+        BOOKINGS: {
+          title:
+            "Questo file contiene tutte le prenotazioni del periodo oppure soltanto quelle nuove o modificate?",
+          FULL: "Tutte le prenotazioni del periodo",
+          PARTIAL: "Solo una parte (per esempio un canale)",
+          DELTA: "Solo quelle nuove o modificate",
+          absent: (count: number) =>
+            count === 1
+              ? "In NINFA c'è 1 prenotazione di questo periodo che in questo file non compare."
+              : `In NINFA ci sono ${count} prenotazioni di questo periodo che in questo file non compaiono.`,
+        },
+        LABOR: {
+          title: "Questo file contiene tutti i reparti del periodo oppure solo alcuni?",
+          FULL: "Tutti i reparti del periodo",
+          PARTIAL: "Solo alcuni reparti",
+          DELTA: "Solo i turni nuovi o modificati",
+          absent: (count: number) =>
+            count === 1
+              ? "In NINFA c'è 1 giornata di reparto di questo periodo che in questo file non compare."
+              : `In NINFA ci sono ${count} giornate di reparto di questo periodo che in questo file non compaiono.`,
+        },
+        remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
+      },
       DATES_REVERSED: {
         title: (arrival: string, departure: string) =>
           `Le colonne «${arrival}» e «${departure}» sembrano invertite. Vuoi controllarle?`,
