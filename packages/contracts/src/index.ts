@@ -689,7 +689,6 @@ export type ImportProblem =
   | "DUPLICATE_COLUMNS"
   | "INVALID_ROWS"
   | "UNSUPPORTED_FORMAT"
-  | "SAME_DAY_CONFLICT"
   /** Smart Import: matching the columns of a file the person already has. */
   | "MAPPING_INCOMPLETE"
   | "FORMAT_UNCLEAR"
@@ -722,6 +721,8 @@ export interface ImportResultResponse {
   updated: number;
   unchanged: number;
   already_imported: boolean;
+  /** `false`: the file said what NINFA already holds: no new analysis is coming, none is needed. */
+  changed_data: boolean;
 }
 
 /** One import attempt of a property, for "Importazioni recenti". A failed one says only that it failed. */

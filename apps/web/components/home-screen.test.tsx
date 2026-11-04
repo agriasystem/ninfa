@@ -590,7 +590,7 @@ describe("Home - where the analysis stands against the data", () => {
     expect(screen.getByRole("button", { name: "Avvia analisi" })).not.toBeNull();
   });
 
-  it("a day that keeps its first observation says when the data will count", async () => {
+  it("a refresh that has to wait for tomorrow says when the data will count", async () => {
     resolveFeed(noRun());
     statusIs({ state: "DEFERRED", next_attempt_at: "2026-10-09T00:05:00Z" });
     renderHome();

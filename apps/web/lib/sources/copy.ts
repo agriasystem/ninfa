@@ -218,8 +218,6 @@ export const sourcesCopy = {
     DUPLICATE_COLUMNS: "Il file ha colonne con lo stesso nome: rinomina o elimina quelle duplicate.",
     INVALID_ROWS: "Alcune righe del file non sono valide, quindi non è stato importato nulla.",
     UNSUPPORTED_FORMAT: "Questa fattura non è in un formato che NINFA sa leggere.",
-    SAME_DAY_CONFLICT:
-      "Per oggi hai già caricato un file del personale diverso: carica la versione aggiornata domani.",
     MAPPING_INCOMPLETE: "Le colonne non sono ancora abbinate in modo completo.",
     FORMAT_UNCLEAR:
       "NINFA non riesce a capire come sono scritte le date o i numeri di questo file: indicalo tu.",
@@ -724,6 +722,7 @@ export const sourcesCopy = {
       kind: "Tipo di dati",
       rows: "Contenuto",
       period: "Periodo",
+      nothingNew: "Questo file non cambia nulla di ciò che NINFA ha già: l'analisi resta quella di prima.",
       goToday: "Vai a Oggi",
       another: "Importa un altro file",
     },

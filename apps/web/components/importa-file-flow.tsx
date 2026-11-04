@@ -323,7 +323,11 @@ export function ImportaFileFlow({
               {state.result.configuration_saved ? (
                 <p className="struttura-flow__note">{FLOW.configurationSaved}</p>
               ) : null}
-              <ImportedAnalysis propertyId={propertyId} />
+              {state.result.changed_data ? (
+                <ImportedAnalysis propertyId={propertyId} />
+              ) : (
+                <p className="struttura-flow__note">{PAGE.done.nothingNew}</p>
+              )}
               <div className="struttura-flow__actions">
                 <StrutturaLinkButton variant="primary" href={oggiRoute(propertyId)}>
                   {PAGE.done.goToday}

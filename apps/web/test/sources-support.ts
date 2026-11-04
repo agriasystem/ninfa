@@ -152,6 +152,7 @@ export function resultOf(overrides: Partial<ImportResultResponse> = {}): ImportR
     updated: 0,
     unchanged: 0,
     already_imported: false,
+    changed_data: true,
     ...overrides,
   };
 }

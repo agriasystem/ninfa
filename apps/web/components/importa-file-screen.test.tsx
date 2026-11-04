@@ -436,6 +436,42 @@ describe("the kind of data is what the document says it is", () => {
     },
   );
 
+  it("a file that changes nothing says so and does not promise an analysis", async () => {
+    documentThatIs("BOOKINGS", "HIGH");
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    importMatchedFileMock.mockResolvedValue(
+      ok(matchedResultOf({ created: 0, unchanged: 96, rows_total: 96, changed_data: false, configuration_saved: false })),
+    );
+    getAnalysisStatusMock.mockClear();
+    const user = renderScreen();
+
+    await user.upload(picker(), xlsxFile());
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" });
+    const text = flat(panel());
+    expect(text).toContain("Questo file non cambia nulla di ciò che NINFA ha già");
+    expect(text).toContain("96 già presenti");
+    expect(text).not.toContain("Aggiornamento analisi");
+    expect(getAnalysisStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("a file that changes something follows the analysis, and does not say nothing changed", async () => {
+    documentThatIs("BOOKINGS", "HIGH");
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({ created: 3, changed_data: true })));
+    const user = renderScreen();
+
+    await user.upload(picker(), xlsxFile());
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" });
+    await waitFor(() => expect(getAnalysisStatusMock).toHaveBeenCalled());
+    expect(flat(panel())).not.toContain("Questo file non cambia nulla");
+  });
+
   it("a verdict that only leads is followed too: the summary names the kind and only the button imports", async () => {
     documentThatIs("LABOR", "MEDIUM");
     validateImportMock.mockResolvedValue(ok(realisticValidation()));

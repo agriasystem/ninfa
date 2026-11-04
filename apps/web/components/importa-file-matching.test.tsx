@@ -846,19 +846,6 @@ describe("when a file cannot be used, or the import fails", () => {
     expect(onImportedMock).not.toHaveBeenCalled();
   });
 
-  it("a same-day staff conflict says to upload the updated version tomorrow", async () => {
-    const user = await toTheImport();
-    importMatchedFileMock.mockResolvedValue(
-      ok(matchedResultOf({ succeeded: false, problem: "SAME_DAY_CONFLICT", created: 0, configuration_saved: false })),
-    );
-
-    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
-
-    expect(flat(await within(panel()).findByRole("alert"))).toContain(
-      "Per oggi hai già caricato un file del personale diverso: carica la versione aggiornata domani.",
-    );
-  });
-
   it("a saved configuration that does not fit the file is said in one sentence", async () => {
     const user = await toTheImport();
     importMatchedFileMock.mockResolvedValue(
