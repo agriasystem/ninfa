@@ -11,6 +11,7 @@ from app.core.tenant import TenantContext
 from app.modules.ingestion.models import (
     DataSource,
     DataSourceDomain,
+    FileScope,
     ImportFile,
     ImportJob,
     ImportJobStatus,
@@ -271,10 +272,17 @@ class ImportJobRepository:
         self._session.flush()
         return job
 
-    def succeed(self, import_job_id: UUID, *, changed_data: bool | None = None) -> ImportJob:
+    def succeed(
+        self,
+        import_job_id: UUID,
+        *,
+        changed_data: bool | None = None,
+        file_scope: FileScope | None = None,
+    ) -> ImportJob:
         job = self._load_for_transition(import_job_id, {ImportJobStatus.RUNNING})
         job.status = ImportJobStatus.SUCCEEDED
         job.changed_data = changed_data
+        job.file_scope = file_scope
         job.finished_at = datetime.now(UTC)
         job.error_code = None
         job.error_message = None

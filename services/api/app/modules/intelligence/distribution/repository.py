@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
-from app.modules.bookings.models import Booking
+from app.modules.bookings.models import Booking, is_current_booking
 from app.modules.bookings.repository import BookingChannelRepository
 from app.modules.intelligence.distribution.channels import ChannelRow
 from app.modules.intelligence.distribution.temporal import StayRecord
@@ -67,6 +67,7 @@ class DistributionRepository:
             Booking.data_source_id == data_source_id,
             Booking.check_in <= last_night,
             Booking.check_out > first_night,
+            is_current_booking(),
         )
         return [(StayRecord(*row[:7]), row[7]) for row in self._session.execute(query)]
 

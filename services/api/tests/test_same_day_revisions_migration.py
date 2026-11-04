@@ -1,7 +1,7 @@
 """Migration 0014_same_day_revisions: additive, every existing row is revision 1, one head, and it
 will not go back once going back would destroy evidence.
 
-The current global head lives here (`test_01`); the older migration files name it as a constant.
+The current global head lives in `test_import_scope_migration.py`.
 """
 
 import uuid
@@ -18,6 +18,7 @@ from tests.support import alembic_config
 
 HEAD = "0014_same_day_revisions"
 PREVIOUS_HEAD = "0013_property_analysis_policy"
+CURRENT_GLOBAL_HEAD = "0015_import_scope"
 REVISED_TABLES = ("booking_snapshots", "labor_snapshots", "invoices")
 
 
@@ -44,10 +45,9 @@ def _uniques(engine: Engine, table: str) -> dict[str, list[str]]:
     }
 
 
-def test_01_there_is_exactly_one_head_and_it_sits_on_0013(test_database_url: str) -> None:
+def test_01_it_sits_on_0013(test_database_url: str) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
-    assert scripts.get_heads() == [HEAD]
     assert scripts.get_revision(HEAD).down_revision == PREVIOUS_HEAD
 
 
@@ -76,7 +76,7 @@ def test_02_the_keys_gain_a_revision_and_the_downgrade_restores_them(
     assert "uq_invoices_identity" in _uniques(db_engine, "invoices")
 
     command.upgrade(config, "head")
-    assert _revision(db_engine) == HEAD
+    assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     for table in REVISED_TABLES:
         assert "revision" in _columns(db_engine, table)
 
@@ -179,6 +179,6 @@ def test_05_the_downgrade_refuses_to_destroy_a_second_revision(
     try:
         with pytest.raises(RuntimeError, match="second revision"):
             command.downgrade(alembic_config(test_database_url), PREVIOUS_HEAD)
-        assert _revision(db_engine) == HEAD
+        assert _revision(db_engine) == CURRENT_GLOBAL_HEAD  # refused: nothing moved at all
     finally:
         _purge(db_engine, workspace)

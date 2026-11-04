@@ -13,7 +13,7 @@ from sqlalchemy import Engine, inspect, text
 from tests.support import alembic_config
 
 GATE_3_HEAD = "0005_booking_snapshots_metrics"
-HEAD = "0014_same_day_revisions"  # the global chain head (V1.2); Gate 4's own is 0006
+HEAD = "0015_import_scope"  # the global chain head (V1.2); Gate 4's own is 0006
 GATE_4_TABLES = {"booking_expected_baselines", "booking_expected_comparables"}
 GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
 FUNCTION = "booking_expected_forbid_update"

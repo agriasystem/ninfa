@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
 from app.core.tenant import TenantContext
-from app.modules.bookings.models import Booking, BookingStatus
+from app.modules.bookings.models import Booking, BookingStatus, is_current_booking
 from app.modules.properties.repository import PropertyRepository
 from app.modules.snapshots.calculation import SnapshotContent, StayRecord
 from app.modules.snapshots.models import BookingSnapshot, RoomInventoryDaily, SnapshotOrigin
@@ -468,6 +468,7 @@ class BookingStayRepository:
             Booking.data_source_id == data_source_id,
             Booking.check_in <= last_night,
             Booking.check_out > first_night,
+            is_current_booking(),
         )
         if statuses is not None:
             query = query.where(Booking.status.in_(sorted(statuses)))

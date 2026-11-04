@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     CheckConstraint,
+    ColumnElement,
     Date,
     DateTime,
     ForeignKeyConstraint,
@@ -170,6 +171,11 @@ class Booking(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     Tenant integrity is carried by composite foreign keys, all including workspace_id and
     property_id: to the data source, to the channel and to the first/last import job (which
     must also belong to the booking's own data source).
+
+    A booking a complete file no longer holds is not deleted: `removed_at` says it is no longer
+    current, and every reading of what is on the books leaves it out (`is_current_booking`). It
+    stays with where it went (`removed_by_import_job_id`) and where it was last seen
+    (`last_seen_import_job_id`); a later file that holds it again brings it back.
     """
 
     __tablename__ = "bookings"
@@ -202,6 +208,9 @@ class Booking(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     source_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     first_import_job_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     last_import_job_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    removed_by_import_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen_import_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid)
 
     data_source: Mapped["DataSource"] = relationship("DataSource", viewonly=True)
     channel: Mapped["BookingChannel"] = relationship("BookingChannel", viewonly=True)
@@ -245,6 +254,28 @@ class Booking(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             name="fk_bookings_last_import_job",
             ondelete="RESTRICT",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "property_id", "data_source_id", "removed_by_import_job_id"],
+            [
+                "import_jobs.workspace_id",
+                "import_jobs.property_id",
+                "import_jobs.data_source_id",
+                "import_jobs.id",
+            ],
+            name="fk_bookings_removed_by_import_job",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "property_id", "data_source_id", "last_seen_import_job_id"],
+            [
+                "import_jobs.workspace_id",
+                "import_jobs.property_id",
+                "import_jobs.data_source_id",
+                "import_jobs.id",
+            ],
+            name="fk_bookings_last_seen_import_job",
+            ondelete="RESTRICT",
+        ),
         # The identity of a booking inside its source system: the basis of idempotent imports.
         UniqueConstraint(
             "workspace_id",
@@ -254,6 +285,11 @@ class Booking(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
         CheckConstraint("btrim(source_record_id) <> ''", name="source_record_id_not_blank"),
         CheckConstraint(values_check("status", BookingStatus), name="status_valid"),
+        CheckConstraint(
+            "(removed_by_import_job_id IS NULL) = (removed_at IS NULL)"
+            " AND (last_seen_import_job_id IS NULL OR removed_at IS NOT NULL)",
+            name="removal_is_whole",
+        ),
         CheckConstraint("check_out > check_in", name="check_out_after_check_in"),
         CheckConstraint("rooms > 0", name="rooms_positive"),
         CheckConstraint("guests IS NULL OR guests > 0", name="guests_positive"),
@@ -286,6 +322,11 @@ class Booking(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "ix_bookings_workspace_id_property_id_status", "workspace_id", "property_id", "status"
         ),
     )
+
+
+def is_current_booking() -> ColumnElement[bool]:
+    """The condition every reading of what is on the books carries."""
+    return Booking.removed_at.is_(None)
 
 
 class BookingImportRow(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
