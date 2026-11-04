@@ -1,8 +1,8 @@
 """The Personale block of the Dati overview: planned labor of the next 7 days, and what it weighs.
 
 Nothing about labor is defined here. The entries are the canonical labor entries (Labor ingestion
-V1) and a work date's entries are those of the MOST RECENT labor snapshot that covers it
-(`latest_snapshot_rows_by_ work_date`, the labor detector's own rule). A day's hours of a category
+V1) and a work date's entries are those that count on it (`labor.current_plan`, the labor
+detector's own rule: several files of one source never add up). A day's hours of a category
 are used only when EVERY entry of that day and category has planned minutes - never half known,
 the detector's own "actual-first" spirit applied to the plan: an incomplete day is counted and
 left out, not guessed.
@@ -42,10 +42,7 @@ from app.modules.data_overview.types import (
     UnavailableReason,
 )
 from app.modules.decision_memory.types import FeedItem
-from app.modules.intelligence.labor.aggregation import (
-    LaborEntryRow,
-    latest_snapshot_rows_by_work_date,
-)
+from app.modules.intelligence.labor.aggregation import LaborEntryRow
 from app.modules.intelligence.labor.repository import LaborEvaluationRepository
 
 LABOR_WINDOW_DAYS = 7
@@ -179,8 +176,7 @@ class LaborOverviewReader:
             return unavailable(source_reason or UnavailableReason.NO_SOURCE)
 
         days = self.window_days(as_of)
-        raw = self._repository.entries_as_of(source_id, as_of, days)
-        by_date = latest_snapshot_rows_by_work_date(raw)
+        by_date = self._repository.current_plan(source_id, as_of, days)
         if not by_date:
             return unavailable(UnavailableReason.NO_DATA)
 

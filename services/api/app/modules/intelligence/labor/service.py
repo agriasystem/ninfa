@@ -29,11 +29,7 @@ from app.modules.intelligence.demand.service import (
     DemandForecastErrorCode,
     DemandForecastService,
 )
-from app.modules.intelligence.labor.aggregation import (
-    LaborEntryRow,
-    build_target_plan,
-    latest_snapshot_rows_by_work_date,
-)
+from app.modules.intelligence.labor.aggregation import LaborEntryRow, build_target_plan
 from app.modules.intelligence.labor.cost_proxy import TargetCategoryCost
 from app.modules.intelligence.labor.detector import evaluate_labor_overstaffing
 from app.modules.intelligence.labor.errors import LaborDecisionError, LaborDecisionErrorCode
@@ -114,14 +110,23 @@ class LaborDecisionService:
 
         candidates = candidate_work_dates(target_work_date, target_as_of_date)
         wanted_dates = {target_work_date, *candidates}
-        raw_rows = self._labor.entries_as_of(labor_data_source_id, target_as_of_date, wanted_dates)
-        by_date = latest_snapshot_rows_by_work_date(raw_rows)
+        by_date = self._labor.current_plan(labor_data_source_id, target_as_of_date, wanted_dates)
 
         target_labor_snapshot_id: UUID | None = None
         target_day_rows: list[LaborEntryRow] | None = None
         found = by_date.get(target_work_date)
         if found is not None:
-            target_labor_snapshot_id, target_day_rows = found
+            newest_file, target_day_rows = found
+            # The file this evaluation reads: the one the category's own rows came from, which may
+            # be older than another department's file for the same day.
+            target_labor_snapshot_id = next(
+                (
+                    row.labor_snapshot_id
+                    for row in target_day_rows
+                    if row.labor_category == labor_category
+                ),
+                newest_file,
+            )
         target_plan = (
             None if target_day_rows is None else build_target_plan(target_day_rows, labor_category)
         )

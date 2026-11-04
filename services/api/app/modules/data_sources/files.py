@@ -51,7 +51,6 @@ class ImportProblem(StrEnum):
     DUPLICATE_COLUMNS = "DUPLICATE_COLUMNS"
     INVALID_ROWS = "INVALID_ROWS"
     UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
-    SAME_DAY_CONFLICT = "SAME_DAY_CONFLICT"
     # Smart Import: matching the columns of a file the person already has.
     MAPPING_INCOMPLETE = "MAPPING_INCOMPLETE"  # the matching misses something or contradicts itself
     FORMAT_UNCLEAR = "FORMAT_UNCLEAR"  # dates or numbers are written in a way NINFA cannot tell
@@ -77,7 +76,6 @@ _PROBLEM_BY_CODE: dict[str, ImportProblem] = {
     "DOCUMENT_CONFLICT": ImportProblem.INVALID_ROWS,
     "UNSUPPORTED_FATTURAPA": ImportProblem.UNSUPPORTED_FORMAT,
     "XML_SECURITY_REJECTED": ImportProblem.UNSUPPORTED_FORMAT,
-    "SNAPSHOT_CONFLICT": ImportProblem.SAME_DAY_CONFLICT,
 }
 
 

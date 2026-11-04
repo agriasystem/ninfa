@@ -6,13 +6,18 @@ It is given a Session and a TenantContext and it OWNS the transaction boundaries
     T1  create ImportJob (PENDING) + ImportFile metadata, mark RUNNING             commit
     T2  detect type -> parse -> map -> normalise -> classify -> validate -> stage      commit
     T3  (any invalid row) mark the job FAILED                                    commit
-    T4  (all valid) lock, write the LaborSnapshot + its LaborEntry rows (or reuse an
-        identical existing snapshot), mark rows IMPORTED, job SUCCEEDED          commit / rollback
+    T4  (all valid) lock, write the LaborSnapshot + its LaborEntry rows (or nothing, when the
+        file changes nothing of what counts), mark rows IMPORTED, job SUCCEEDED  commit / rollback
 
 The job outcome and the staged diagnostics are committed independently of the canonical write, so
 a rolled-back canonicalisation still leaves a FAILED job and its staging rows. `snapshot_local_date`
 is always given EXPLICITLY by the caller (never `date.today()`, never a file's mtime): determinism,
 replay and backtest all depend on it.
+
+A source can take any number of files, on any day. Each file that changes something is a snapshot of
+its own, next to the others and never over them: which rows count is `labor.current_plan`'s rule.
+Week A then week B live side by side; a second version of a week replaces it; files that overlap
+share the days by the same rule; a file that says what already counts writes nothing at all.
 
 Supported sources: structured CSV and XLSX. NOT supported: PDF, OCR, an HR API, calendar scraping.
 
@@ -22,6 +27,7 @@ Pass a session with no uncommitted work: the service commits (and may roll back)
 import hashlib
 import logging
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
@@ -52,10 +58,12 @@ from app.modules.ingestion.repository import (
 from app.modules.ingestion.schemas import ImportFileCreate, ImportJobCreate
 from app.modules.labor.canonical import (
     CanonicalEntry,
+    content_key,
     entry_from_payload,
     entry_payload,
     snapshot_fingerprint,
 )
+from app.modules.labor.current_plan import current_rows
 from app.modules.labor.errors import LaborErrorCode, LaborImportError
 from app.modules.labor.mapping import (
     LaborMappingConfig,
@@ -134,6 +142,10 @@ class LaborImportResult:
     @property
     def succeeded(self) -> bool:
         return self.status == ImportJobStatus.SUCCEEDED
+
+    @property
+    def changed_data(self) -> bool:
+        return self.entries_created > 0
 
 
 @dataclass(frozen=True)
@@ -519,16 +531,11 @@ class LaborImportService:
                 data_source_id=str(ids.data_source),
                 entries=entries,
             )
-            existing = self._snapshots.get_by_identity(ids.data_source, snapshot_local_date)
-            if existing is not None:
-                if existing.source_fingerprint != fingerprint:
-                    raise LaborImportError(
-                        LaborErrorCode.SNAPSHOT_CONFLICT,
-                        "A labor snapshot already exists for this date with different content: "
-                        "a revision must arrive as a new snapshot date",
-                        details={"reason": "different_content"},
-                    )
-                snapshot_id = existing.id
+            already_counting = self._snapshot_already_saying(
+                ids.data_source, snapshot_local_date, entries
+            )
+            if already_counting is not None:
+                snapshot_id = already_counting
                 created = 0
                 reused = True
             else:
@@ -539,6 +546,9 @@ class LaborImportService:
                         "property_id": ids.property,
                         "data_source_id": ids.data_source,
                         "snapshot_local_date": snapshot_local_date,
+                        "revision": self._snapshots.next_revision(
+                            ids.data_source, snapshot_local_date
+                        ),
                         "source_import_job_id": ids.job,
                         "source_import_file_id": ids.file,
                         "source_fingerprint": fingerprint,
@@ -552,7 +562,7 @@ class LaborImportService:
                 reused = False
 
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job)
+            self._jobs.succeed(ids.job, changed_data=not reused)
             self._session.commit()
         except LaborImportError:
             raise  # rolled back and recorded as FAILED by import_file
@@ -589,6 +599,32 @@ class LaborImportService:
             entries_created=created,
             duplicate_of_import_file_id=duplicate_of,
         )
+
+    def _snapshot_already_saying(
+        self, data_source_id: UUID, as_of: date, entries: Sequence[CanonicalEntry]
+    ) -> UUID | None:
+        """The newest snapshot behind the file's own days when every cell the file speaks for
+        already counts with exactly this content, or None when the file changes something.
+
+        Compared on the canonical content, never on the file: the same plan in another order or
+        another file is the same plan, and going back to an earlier version is a change."""
+        days = {entry.work_date for entry in entries}
+        categories = {entry.labor_category for entry in entries}
+        stored = self._entries.plan_rows_as_of(data_source_id, as_of, days)
+        plan = current_rows(
+            stored, self._entries.categories_of({row.labor_snapshot_id for row in stored})
+        )
+        for day in days:
+            if day not in plan:
+                return None
+            counting = Counter(
+                content_key(row) for row in plan[day][1] if row.labor_category in categories
+            )
+            if counting != Counter(
+                content_key(entry) for entry in entries if entry.work_date == day
+            ):
+                return None
+        return plan[min(days)][0]
 
     def _load_entries(self, ids: _Ids) -> list[CanonicalEntry]:
         """The canonical entries of the staged VALID rows, in file order."""

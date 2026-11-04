@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, Protocol
 
 from app.modules.labor.roles import LaborCategory, LaborClassificationMethod
 
@@ -79,6 +79,47 @@ class CanonicalEntry:
             "classification_method": self.classification_method.value,
             "classification_confidence": plain(self.classification_confidence),
         }
+
+
+class EntryContent(Protocol):
+    """What says the logical content of an entry, wherever it was read from."""
+
+    @property
+    def work_date(self) -> date: ...
+    @property
+    def role_normalized(self) -> str | None: ...
+    @property
+    def labor_category(self) -> LaborCategory: ...
+    @property
+    def planned_minutes(self) -> int | None: ...
+    @property
+    def actual_minutes(self) -> int | None: ...
+    @property
+    def planned_cost(self) -> Decimal | None: ...
+    @property
+    def actual_cost(self) -> Decimal | None: ...
+    @property
+    def currency(self) -> str | None: ...
+    @property
+    def classification_method(self) -> LaborClassificationMethod: ...
+    @property
+    def classification_confidence(self) -> Decimal: ...
+
+
+def content_key(entry: EntryContent) -> tuple[object, ...]:
+    """Two entries with equal keys say the same thing: no row number, no import, no raw label."""
+    return (
+        entry.work_date,
+        entry.role_normalized,
+        entry.labor_category,
+        entry.planned_minutes,
+        entry.actual_minutes,
+        money_text(entry.planned_cost),
+        money_text(entry.actual_cost),
+        entry.currency,
+        entry.classification_method,
+        plain(entry.classification_confidence),
+    )
 
 
 def snapshot_fingerprint(

@@ -10,7 +10,7 @@ for the whole day (every category, not just the target one): a row without that 
 does not participate (there is no minutes value to classify on that basis).
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -24,6 +24,7 @@ from app.modules.intelligence.labor.precision import (
     percent_of,
 )
 from app.modules.intelligence.labor.types import LaborBasis
+from app.modules.labor.current_plan import current_rows
 from app.modules.labor.roles import LaborCategory
 
 _SIXTY = Decimal(60)
@@ -57,6 +58,7 @@ class RawLaborEntryRow(NamedTuple):
     actual_cost: Decimal | None
     currency: str | None
     classification_confidence: Decimal
+    revision: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,24 +101,19 @@ class HistoricalDay:
 
 def latest_snapshot_rows_by_work_date(
     rows: Sequence[RawLaborEntryRow],
+    categories_of: Mapping[UUID, Collection[LaborCategory]] | None = None,
 ) -> dict[date, tuple[UUID, list[LaborEntryRow]]]:
-    """For each work date, the entries of the MOST RECENT labor snapshot that covers it.
+    """For each work date, the newest labor snapshot that covers it and the entries that count.
 
-    A rolling near-term export (each snapshot covers only the next few weeks) and a full-horizon
-    export (every snapshot restates the whole plan) are both handled correctly: different work
-    dates may legitimately resolve to different labor snapshots.
+    A rolling near-term export (each snapshot covers only the next few weeks), a full-horizon
+    export (every snapshot restates the whole plan) and several files of one day are all handled
+    by the same rule, `labor.current_plan.current_rows`: different work dates may legitimately
+    resolve to different labor snapshots, and one work date's categories to different files.
     """
-    winning_snapshot_local_date: dict[date, date] = {}
-    winning_snapshot_id: dict[date, UUID] = {}
-    for row in rows:
-        current = winning_snapshot_local_date.get(row.work_date)
-        if current is None or row.snapshot_local_date > current:
-            winning_snapshot_local_date[row.work_date] = row.snapshot_local_date
-            winning_snapshot_id[row.work_date] = row.labor_snapshot_id
-    grouped: dict[date, list[LaborEntryRow]] = {}
-    for row in rows:
-        if row.labor_snapshot_id == winning_snapshot_id.get(row.work_date):
-            grouped.setdefault(row.work_date, []).append(
+    return {
+        work_date: (
+            snapshot_id,
+            [
                 LaborEntryRow(
                     labor_snapshot_id=row.labor_snapshot_id,
                     labor_category=row.labor_category,
@@ -127,10 +124,10 @@ def latest_snapshot_rows_by_work_date(
                     currency=row.currency,
                     classification_confidence=row.classification_confidence,
                 )
-            )
-    return {
-        work_date: (winning_snapshot_id[work_date], entries)
-        for work_date, entries in grouped.items()
+                for row in counted
+            ],
+        )
+        for work_date, (snapshot_id, counted) in current_rows(rows, categories_of).items()
     }
 
 
