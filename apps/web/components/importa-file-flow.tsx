@@ -252,6 +252,7 @@ export function ImportaFileFlow({
               onImport={() => void flow.confirm()}
               onReview={flow.reviewColumns}
               onChooseOther={flow.reset}
+              onAnswer={(patch) => void flow.answer(patch)}
             />
           ) : null}
 

@@ -130,6 +130,8 @@ export function withDecimalStyle(decision: ImportMapping, style: "COMMA" | "POIN
 export function personAnswered(answers: UnderstandAnswers): boolean {
   return (
     Object.keys(answers.column_fields ?? {}).length > 0 ||
+    // (what a file is, said for this import only, is not something to remember)
+    answers.remember_scope === true ||
     [
       answers.grid_hours,
       answers.amount_basis,
@@ -139,7 +141,6 @@ export function personAnswered(answers: UnderstandAnswers): boolean {
       answers.department_value,
       answers.table_key,
       answers.sheet_name,
-      answers.file_scope,
     ].some((value) => value !== undefined && value !== null && value !== "")
   );
 }

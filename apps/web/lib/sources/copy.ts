@@ -225,6 +225,8 @@ export const sourcesCopy = {
     PROFILE_NOT_USABLE:
       "La configurazione salvata non funziona con questo file: controlla le colonne e abbinale di nuovo.",
     SHEET_REQUIRED: "Il file Excel ha più fogli con dati: scegli quale importare.",
+    DATA_CHANGED:
+      "I dati di NINFA sono cambiati dopo che questo file è stato letto. Caricalo di nuovo per rivedere cosa cambia.",
     GENERIC: "NINFA non è riuscita a leggere questa fonte. Riprova oppure carica un altro file.",
   } satisfies Record<ImportProblem, string>,
   // what to do next, by method (appended to the sentence of the problem where it helps)
@@ -509,6 +511,22 @@ export const sourcesCopy = {
   // --- NINFA understands the file: "File riconosciuto" and the few questions ------------------------------
   understanding: {
     recognizedTitle: "File riconosciuto",
+    keeps: {
+      BOOKINGS: {
+        note: (count: number) =>
+          count === 1
+            ? "1 prenotazione di questo periodo non compare in questo file e resta contata."
+            : `${count} prenotazioni di questo periodo non compaiono in questo file e restano contate.`,
+        action: "Il file le contiene tutte?",
+      },
+      LABOR: {
+        note: (count: number) =>
+          count === 1
+            ? "1 giornata di reparto di questo periodo non compare in questo file e resta contata."
+            : `${count} giornate di reparto di questo periodo non compaiono in questo file e restano contate.`,
+        action: "Il file contiene tutto il piano?",
+      },
+    },
     removes: {
       BOOKINGS: (count: number) =>
         count === 1
@@ -679,6 +697,35 @@ export const sourcesCopy = {
               : `In NINFA ci sono ${count} giornate di reparto di questo periodo che in questo file non compaiono.`,
         },
         remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
+      },
+      FILE_SCOPE_CONFIRM: {
+        BOOKINGS: {
+          found: (count: number) =>
+            count === 1
+              ? "NINFA ha trovato 1 prenotazione presente nei dati precedenti ma non in questo file."
+              : `NINFA ha trovato ${count} prenotazioni presenti nei dati precedenti ma non in questo file.`,
+          title: "Questo file contiene tutte le prenotazioni del periodo?",
+          yes: "Sì, contiene tutte le prenotazioni",
+          ifYes: (count: number) =>
+            count === 1
+              ? "Se le contiene tutte, quella prenotazione non sarà più contata e resterà nello storico."
+              : `Se le contiene tutte, quelle ${count} prenotazioni non saranno più contate e resteranno nello storico.`,
+        },
+        LABOR: {
+          found: (count: number) =>
+            count === 1
+              ? "Nel nuovo file non compare 1 giornata di reparto presente nel piano precedente."
+              : `Nel nuovo file non compaiono ${count} giornate di reparto presenti nel piano precedente.`,
+          title: "Questo file contiene tutto il piano del periodo?",
+          yes: "Sì, contiene tutto il piano",
+          ifYes: (count: number) =>
+            count === 1
+              ? "Se contiene tutto il piano, quella giornata non sarà più contata e resterà nello storico."
+              : `Se contiene tutto il piano, quelle ${count} giornate non saranno più contate e resteranno nello storico.`,
+        },
+        no: "No, contiene solo una parte",
+        ifNo: "Se ne contiene solo una parte, NINFA non toglie nulla.",
+        remember: "Ricorda questa scelta per i prossimi file",
       },
       DATES_REVERSED: {
         title: (arrival: string, departure: string) =>

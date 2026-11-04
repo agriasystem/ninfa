@@ -201,6 +201,10 @@ export function problemOfFailure(result: Extract<ApiResult<unknown>, { ok: false
   if (result.code === "SEVERAL_SOURCES") return "SEVERAL_SOURCES";
   // Another import of the same data is still running: nothing was changed, the user can try again.
   if (result.code === "IMPORT_IN_PROGRESS") return "IMPORT_IN_PROGRESS";
+  // Another file arrived after this one was read: what it would do is no longer what the person saw.
+  if (result.code === "IMPORT_DECISION_CHANGED" || result.code === "UNRESOLVED_IMPORT_QUESTIONS") {
+    return "DATA_CHANGED";
+  }
   if (result.code === "DATA_SOURCE_NOT_FOUND" || result.code === "PROPERTY_NOT_FOUND") {
     return "SOURCE_GONE";
   }
@@ -540,6 +544,18 @@ export function useImportFlow({
 
   const answer = useCallback(
     async (patch: Partial<UnderstandAnswers>, confirmedDomain?: boolean) => {
+      if (state.step === "ready") {
+        // A word about the file from its summary: read again, with what was said so far.
+        const reference = state.decision?.smart_import;
+        if (reference === undefined || reference === null) return;
+        await readFile(
+          state.file,
+          state.inspection.domain,
+          mergeAnswers(reference.answers as UnderstandAnswers, patch),
+          reference.confirmed_domain,
+        );
+        return;
+      }
       if (state.step !== "ask") return;
       await readFile(
         state.file,

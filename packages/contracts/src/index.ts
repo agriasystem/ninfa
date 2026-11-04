@@ -694,6 +694,8 @@ export type ImportProblem =
   | "FORMAT_UNCLEAR"
   | "PROFILE_NOT_USABLE"
   | "SHEET_REQUIRED"
+  /** What the file would take away changed after it was read: it must be read again. */
+  | "DATA_CHANGED"
   | "GENERIC";
 
 export interface ImportPreviewResponse {
@@ -873,6 +875,9 @@ export interface ImportMapping {
   labels?: Record<string, Record<string, string>>;
   /** What the person said this file is. Set by the server on the decisions it issues; never built here. */
   file_scope?: ImportFileScope | null;
+  /** Carried back as the backend built it: the server reads the file again, and refuses a decision that differs. */
+  remembered_file_scope?: ImportFileScope | null;
+  expected_removals?: number;
   /** Set by the server on the decisions it issues; absent on a matching the person builds by hand. */
   smart_import?: ImportSmartImportRef | null;
 }
@@ -926,6 +931,16 @@ export type UnderstandingLevel = "READY" | "ASK" | "MANUAL" | "BLOCKED";
 /** What a file holds of its period: everything, a part, or only what is new. Said by a person, never guessed. */
 export type ImportFileScope = "FULL" | "PARTIAL" | "DELTA";
 
+/** What the server found about the records a file does not hold. Never worked out on the page. */
+export interface ImportScopePreflight {
+  /** What this import would apply; `null`: nobody has said, or a person must say it first. */
+  effective_scope: ImportFileScope | null;
+  remembered_scope: ImportFileScope | null;
+  /** What would stop counting if this file holds everything of its period. */
+  removal_count: number;
+  requires_scope_confirmation: boolean;
+}
+
 export type UnderstandingQuestionKind =
   | "DOMAIN"
   | "TABLE"
@@ -941,7 +956,9 @@ export type UnderstandingQuestionKind =
   /** The arrival is after the departure on (nearly) every row: `column` is the arrival, the one choice the departure. */
   | "DATES_REVERSED"
   /** Stored records of this file's period are not in it, and what that means changes what counts. */
-  | "FILE_SCOPE";
+  | "FILE_SCOPE"
+  /** This kind of file is remembered as complete and would take something away: a memory does not do that alone. */
+  | "FILE_SCOPE_CONFIRM";
 
 export type UnderstandingOriginKind =
   | "COLUMN"
@@ -1048,6 +1065,7 @@ export interface Understanding {
   assumed: string[];
   /** What stops counting if this file is imported, because it is complete and no longer holds it. */
   removes: number;
+  scope: ImportScopePreflight;
 }
 
 /** What the person has already said, so a question is never asked twice. */
@@ -1064,6 +1082,8 @@ export interface UnderstandAnswers {
   column_fields?: Record<string, string>;
   labels?: Record<string, Record<string, string>>;
   file_scope?: ImportFileScope | null;
+  /** That answer is also for the next files of this structure: only then does the memory change. */
+  remember_scope?: boolean;
 }
 
 export interface FileInspectionResponse {

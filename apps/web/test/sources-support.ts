@@ -466,6 +466,12 @@ export function understandingOf(overrides: Partial<Understanding> = {}): Underst
   return {
     assumed: [],
     removes: 0,
+    scope: {
+      effective_scope: null,
+      remembered_scope: null,
+      removal_count: 0,
+      requires_scope_confirmation: false,
+    },
     level: "READY",
     detection: {
       domain: "LABOR",

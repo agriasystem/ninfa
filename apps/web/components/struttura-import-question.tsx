@@ -56,6 +56,56 @@ function Choices({
   );
 }
 
+/**
+ * "Does THIS file hold everything of its period?" The backend found that something would stop counting and
+ * gives the number; this says what each answer does and sends it back. The answer is about this import: the
+ * memory of the source changes only if the person ticks the box, which starts empty.
+ */
+export function StrutturaScopeConfirmation({
+  domain,
+  absent,
+  onAnswer,
+}: {
+  domain: DataSourceDomain;
+  absent: number;
+  onAnswer: (patch: Partial<UnderstandAnswers>) => void;
+}) {
+  const [remember, setRemember] = useState(false);
+  const words = domain === "LABOR" ? COPY.FILE_SCOPE_CONFIRM.LABOR : COPY.FILE_SCOPE_CONFIRM.BOOKINGS;
+  return (
+    <>
+      <p className="struttura-flow__note">{words.found(absent)}</p>
+      <h3 className="struttura-flow__subtitle" id="struttura-question-title">
+        {words.title}
+      </h3>
+      <p className="struttura-flow__note">{words.ifYes(absent)}</p>
+      <p className="struttura-flow__note">{COPY.FILE_SCOPE_CONFIRM.ifNo}</p>
+      <div className="struttura-question__choices struttura-question__choices--stacked">
+        <StrutturaButton
+          variant="outline"
+          onClick={() => onAnswer({ file_scope: "FULL", remember_scope: remember })}
+        >
+          {words.yes}
+        </StrutturaButton>
+        <StrutturaButton
+          variant="outline"
+          onClick={() => onAnswer({ file_scope: "PARTIAL", remember_scope: remember })}
+        >
+          {COPY.FILE_SCOPE_CONFIRM.no}
+        </StrutturaButton>
+      </div>
+      <label className="struttura-match__save">
+        <input
+          type="checkbox"
+          checked={remember}
+          onChange={(event) => setRemember(event.target.checked)}
+        />
+        <span>{COPY.FILE_SCOPE_CONFIRM.remember}</span>
+      </label>
+    </>
+  );
+}
+
 export interface StrutturaImportQuestionProps {
   step: AskStep;
   flow: Pick<ImportFlow, "answer" | "teach" | "chooseKind" | "matchByHand" | "reset">;
@@ -347,7 +397,7 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
               <StrutturaButton
                 key={value}
                 variant="outline"
-                onClick={() => void flow.answer({ file_scope: value })}
+                onClick={() => void flow.answer({ file_scope: value, remember_scope: true })}
               >
                 {scope[value]}
               </StrutturaButton>
@@ -358,6 +408,15 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
       );
       break;
     }
+    case "FILE_SCOPE_CONFIRM":
+      body = (
+        <StrutturaScopeConfirmation
+          domain={step.inspection.domain}
+          absent={question.absent_records}
+          onAnswer={(patch) => void flow.answer(patch)}
+        />
+      );
+      break;
     case "DECIMAL_STYLE":
       body = (
         <>

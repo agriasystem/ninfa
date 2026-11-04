@@ -562,7 +562,8 @@ describe("a file that leaves out something NINFA holds", () => {
     await user.click(within(panel()).getByRole("button", { name: "Tutte le prenotazioni del periodo" }));
 
     await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
-    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { file_scope: "FULL" } });
+    // the first answer about a kind of file says it will be remembered, and it is
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { file_scope: "FULL", remember_scope: true } });
     // said BEFORE anything is imported, and that the history stays
     expect(flat(panel())).toContain(
       "3 prenotazioni che in questo file non compaiono non saranno più contate. Restano nello storico di NINFA.",
@@ -616,6 +617,234 @@ describe("a file that leaves out something NINFA holds", () => {
     await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { file_scope: value } });
   });
+});
+
+describe("a file a remembered source would lose something to", () => {
+  const known = {
+    status: "RECOGNIZED" as const,
+    reason: null,
+    mapping: proposalOf(),
+    last_used_at: "2026-10-22T08:15:00Z",
+    missing_columns: [],
+  };
+  const confirmation = (domain: "BOOKINGS" | "LABOR", absent: number) =>
+    ok(
+      understoodInspection(
+        {
+          level: "ASK",
+          questions: [questionOf("FILE_SCOPE_CONFIRM", { absent_records: absent })],
+          scope: {
+            effective_scope: null,
+            remembered_scope: "FULL",
+            removal_count: absent,
+            requires_scope_confirmation: true,
+          },
+        },
+        { domain, profile: known },
+      ),
+    );
+
+  it("says how many, what each answer does and nothing technical, with the box empty", async () => {
+    understandFileMock.mockResolvedValueOnce(confirmation("BOOKINGS", 7));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("prenotazioni.xlsx"));
+
+    await within(panel()).findByText("Questo file contiene tutte le prenotazioni del periodo?");
+    const text = flat(panel());
+    expect(text).toContain("NINFA ha trovato 7 prenotazioni presenti nei dati precedenti ma non in questo file.");
+    expect(text).toContain("quelle 7 prenotazioni non saranno più contate e resteranno nello storico.");
+    expect(text).toContain("Se ne contiene solo una parte, NINFA non toglie nulla.");
+    for (const technical of ["FULL", "PARTIAL", "DELTA", "snapshot", "tombstone", "scope"]) {
+      expect(text).not.toContain(technical);
+    }
+    const box = within(panel()).getByRole("checkbox", { name: "Ricorda questa scelta per i prossimi file" });
+    expect((box as HTMLInputElement).checked).toBe(false);
+    expect(validateImportMock).not.toHaveBeenCalled();
+  });
+
+  it("a yes is about this import, and the summary says what will stop counting", async () => {
+    understandFileMock.mockResolvedValueOnce(confirmation("BOOKINGS", 7));
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection(
+          { removes: 7 },
+          { domain: "BOOKINGS", profile: known, proposal: proposalOf({ file_scope: "FULL", expected_removals: 7 }) },
+        ),
+      ),
+    );
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({ removed: 7 })));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("prenotazioni.xlsx"));
+    await user.click(await within(panel()).findByRole("button", { name: "Sì, contiene tutte le prenotazioni" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({
+      answers: { file_scope: "FULL", remember_scope: false },
+    });
+    expect(flat(panel())).toContain("7 prenotazioni che in questo file non compaiono non saranno più contate.");
+
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" });
+    const sent = importMatchedFileMock.mock.calls[0]?.[0] as {
+      mapping: { file_scope: string; expected_removals: number };
+      saveConfiguration: boolean;
+    };
+    expect(sent.mapping.file_scope).toBe("FULL");
+    expect(sent.mapping.expected_removals).toBe(7); // carried back as the server built it
+    expect(sent.saveConfiguration).toBe(false); // nothing to remember about a known source
+    expect(flat(panel())).toContain("7 non più nel file");
+  });
+
+  it("a no takes nothing away, is not remembered, and says what stays", async () => {
+    understandFileMock.mockResolvedValueOnce(confirmation("BOOKINGS", 7));
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection(
+          {
+            scope: {
+              effective_scope: "PARTIAL",
+              remembered_scope: "FULL",
+              removal_count: 7,
+              requires_scope_confirmation: false,
+            },
+          },
+          {
+            domain: "BOOKINGS",
+            profile: known,
+            proposal: proposalOf({
+              file_scope: "PARTIAL",
+              smart_import: { answers: { file_scope: "PARTIAL" }, confirmed_domain: false },
+            }),
+          },
+        ),
+      ),
+    );
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({ created: 0, unchanged: 89 })));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("prenotazioni.xlsx"));
+    await user.click(await within(panel()).findByRole("button", { name: "No, contiene solo una parte" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({
+      answers: { file_scope: "PARTIAL", remember_scope: false },
+    });
+    const text = flat(panel());
+    expect(text).toContain("7 prenotazioni di questo periodo non compaiono in questo file e restano contate.");
+    expect(text).not.toContain("non saranno più contate");
+    // it has just been answered: not offered again
+    expect(within(panel()).queryByRole("button", { name: "Il file le contiene tutte?" })).toBeNull();
+
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" });
+    const sent = importMatchedFileMock.mock.calls[0]?.[0] as { saveConfiguration: boolean };
+    expect(sent.saveConfiguration).toBe(false);
+  });
+
+  it("the memory changes only when the box is ticked", async () => {
+    understandFileMock.mockResolvedValueOnce(confirmation("BOOKINGS", 7));
+    understandFileMock.mockResolvedValueOnce(
+      ok(understoodInspection({}, { domain: "BOOKINGS", profile: known, proposal: proposalOf({ file_scope: "PARTIAL" }) })),
+    );
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf()));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("prenotazioni.xlsx"));
+    await user.click(await within(panel()).findByRole("checkbox", { name: "Ricorda questa scelta per i prossimi file" }));
+    await user.click(within(panel()).getByRole("button", { name: "No, contiene solo una parte" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({
+      answers: { file_scope: "PARTIAL", remember_scope: true },
+    });
+
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" });
+    const sent = importMatchedFileMock.mock.calls[0]?.[0] as { saveConfiguration: boolean };
+    expect(sent.saveConfiguration).toBe(true);
+  });
+
+  it("speaks of the plan for a staff file", async () => {
+    understandFileMock.mockResolvedValueOnce(confirmation("LABOR", 3));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("turni.xlsx"));
+
+    await within(panel()).findByText("Questo file contiene tutto il piano del periodo?");
+    expect(flat(panel())).toContain("Nel nuovo file non compaiono 3 giornate di reparto presenti nel piano precedente.");
+    expect(within(panel()).getByRole("button", { name: "Sì, contiene tutto il piano" })).not.toBeNull();
+    expect(within(panel()).getByRole("button", { name: "No, contiene solo una parte" })).not.toBeNull();
+  });
+
+  it("a memory of a part asks nothing, says what stays, and can be corrected from the summary", async () => {
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection(
+          {
+            scope: {
+              effective_scope: "PARTIAL",
+              remembered_scope: "PARTIAL",
+              removal_count: 4,
+              requires_scope_confirmation: false,
+            },
+          },
+          {
+            domain: "BOOKINGS",
+            profile: known,
+            proposal: proposalOf({ file_scope: "PARTIAL" }),
+          },
+        ),
+      ),
+    );
+    understandFileMock.mockResolvedValueOnce(
+      ok(understoodInspection({ removes: 4 }, { domain: "BOOKINGS", profile: known, proposal: proposalOf({ file_scope: "FULL" }) })),
+    );
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderFlow();
+
+    await pick(user, xlsxFile("prenotazioni.xlsx"));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(flat(panel())).toContain("4 prenotazioni di questo periodo non compaiono in questo file e restano contate.");
+    expect(within(panel()).queryByRole("checkbox", { name: "Ricorda questa scelta per i prossimi file" })).toBeNull();
+
+    await user.click(within(panel()).getByRole("button", { name: "Il file le contiene tutte?" }));
+    await user.click(within(panel()).getByRole("checkbox", { name: "Ricorda questa scelta per i prossimi file" }));
+    await user.click(within(panel()).getByRole("button", { name: "Sì, contiene tutte le prenotazioni" }));
+
+    await waitFor(() => expect(understandFileMock).toHaveBeenCalledTimes(2));
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({
+      answers: { file_scope: "FULL", remember_scope: true },
+    });
+    expect(await within(panel()).findByText(/4 prenotazioni che in questo file non compaiono/u)).not.toBeNull();
+  });
+
+  it.each(["IMPORT_DECISION_CHANGED", "UNRESOLVED_IMPORT_QUESTIONS"])(
+    "when the data moved after the reading (%s) it says so and nothing is imported",
+    async (code) => {
+      understandFileMock.mockResolvedValue(ok(understoodInspection({}, { domain: "BOOKINGS" })));
+      validateImportMock.mockResolvedValue(ok(realisticValidation()));
+      importMatchedFileMock.mockResolvedValue({ ok: false, status: 409, code, message: "technical" });
+      const user = renderFlow();
+
+      await pick(user, xlsxFile("prenotazioni.xlsx"));
+      await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+      await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+      const alert = await within(panel()).findByRole("alert");
+      expect(flat(alert)).toContain("I dati di NINFA sono cambiati dopo che questo file è stato letto.");
+      expect(flat(alert)).toContain("Non è stato importato nulla.");
+      expect(flat(alert)).not.toContain("technical");
+    },
+  );
 });
 
 describe("when NINFA is not sure enough", () => {

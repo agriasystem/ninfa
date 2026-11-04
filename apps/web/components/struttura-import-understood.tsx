@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 
-import type { UnderstandingRecognized } from "@ninfa/contracts";
+import type { UnderstandAnswers, UnderstandingRecognized } from "@ninfa/contracts";
 
 import { sourcesCopy } from "@/lib/sources/copy";
 import { factsOf, originText, periodText } from "@/lib/sources/understanding-format";
 import type { ReadyStep } from "@/lib/sources/use-import-flow";
 
 import { StrutturaRowProblems } from "./struttura-import-preview";
+import { StrutturaScopeConfirmation } from "./struttura-import-question";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.understanding;
@@ -41,6 +42,8 @@ export interface StrutturaImportUnderstoodProps {
   onImport: () => void;
   onReview: () => void;
   onChooseOther: () => void;
+  /** A word about the file from this summary: NINFA reads it again with it. */
+  onAnswer: (patch: Partial<UnderstandAnswers>) => void;
 }
 
 /**
@@ -56,8 +59,10 @@ export function StrutturaImportUnderstood({
   onImport,
   onReview,
   onChooseOther,
+  onAnswer,
 }: StrutturaImportUnderstoodProps) {
   const [explaining, setExplaining] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
   const { understanding, validation, inspection } = step;
   if (understanding === null) return null;
   const domain = inspection.domain;
@@ -70,6 +75,12 @@ export function StrutturaImportUnderstood({
   const document = understanding.document;
   const known = inspection.profile.status === "RECOGNIZED";
   const suggested = understanding.recognized.some((item) => item.origin.kind === "ASSISTANT");
+  // What the file leaves out stays, on a memory or on an earlier word about this very file: said here,
+  // with a quiet way to correct it. What the person has just answered is not offered again.
+  const { scope } = understanding;
+  const left = scope.removal_count > 0 && scope.effective_scope !== "FULL";
+  const answered = step.decision?.smart_import?.answers.file_scope != null;
+  const words = domain === "LABOR" ? COPY.keeps.LABOR : COPY.keeps.BOOKINGS;
 
   return (
     <>
@@ -126,6 +137,27 @@ export function StrutturaImportUnderstood({
         <div className="struttura-preview__attention" role="note">
           <p>{COPY.removes[domain === "LABOR" ? "LABOR" : "BOOKINGS"](understanding.removes)}</p>
         </div>
+      ) : null}
+      {left ? <p className="struttura-flow__note">{words.note(scope.removal_count)}</p> : null}
+      {left && !answered ? (
+        <div className="struttura-flow__actions">
+          <StrutturaButton
+            variant="soft"
+            expanded={correcting}
+            onClick={() => setCorrecting((value) => !value)}
+          >
+            {words.action}
+          </StrutturaButton>
+        </div>
+      ) : null}
+      {left && !answered && correcting ? (
+        <section className="struttura-question" aria-labelledby="struttura-question-title">
+          <StrutturaScopeConfirmation
+            domain={domain}
+            absent={scope.removal_count}
+            onAnswer={onAnswer}
+          />
+        </section>
       ) : null}
       {validation.rows_unclassified > 0 && validation.rows_invalid === 0 ? (
         <div className="struttura-preview__attention" role="note">
