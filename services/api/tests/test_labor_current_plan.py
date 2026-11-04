@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date
 from uuid import UUID, uuid4
 
-from app.modules.labor.current_plan import current_rows
+from app.modules.labor.current_plan import Basis, FileCoverage, current_rows
 from app.modules.labor.roles import LaborCategory as C
 
 MON, TUE, WED, THU = (date(2026, 11, day) for day in (2, 3, 4, 5))
@@ -20,6 +20,14 @@ class Row:
     work_date: date
     labor_category: C
     hours: int = 8
+
+    @property
+    def planned_minutes(self) -> int:
+        return self.hours * 60
+
+    @property
+    def actual_minutes(self) -> None:
+        return None
 
 
 def file(
@@ -114,14 +122,134 @@ def test_what_a_file_names_is_read_from_the_whole_file_not_from_the_rows_asked_f
     first = file((TUE, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 8))
     second = file((MON, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 8), revision=2)
     only_tuesday = [row for row in [*first, *second] if row.work_date == TUE]
-    categories_of = {
-        first[0].labor_snapshot_id: {C.SPA_WELLNESS, C.FRONT_OFFICE},
-        second[0].labor_snapshot_id: {C.SPA_WELLNESS, C.FRONT_OFFICE},
+    named = frozenset({C.SPA_WELLNESS, C.FRONT_OFFICE})
+    files = {
+        first[0].labor_snapshot_id: FileCoverage(TODAY, 1, named, True, False),
+        second[0].labor_snapshot_id: FileCoverage(TODAY, 2, named, True, False),
     }
 
-    counted = current_rows(only_tuesday, categories_of)[TUE][1]
+    counted = current_rows(only_tuesday, files)[TUE][1]
 
     assert [(row.labor_category, row.hours) for row in counted] == [(C.FRONT_OFFICE, 8)]
+
+
+def _complete(rows: list[Row], *, first: date, last: date, revision: int) -> FileCoverage:
+    return FileCoverage(
+        TODAY,
+        revision,
+        frozenset(row.labor_category for row in rows),
+        True,
+        False,
+        complete_from=first,
+        complete_to=last,
+    )
+
+
+def test_a_complete_file_speaks_for_every_category_of_its_days_named_or_not() -> None:
+    older = file((MON, C.FRONT_OFFICE, 8), (MON, C.HOUSEKEEPING, 5))
+    newer = file((MON, C.FRONT_OFFICE, 6), revision=2)
+    files = {newer[0].labor_snapshot_id: _complete(newer, first=MON, last=MON, revision=2)}
+
+    counted = current_rows([*older, *newer], files)[MON][1]
+
+    assert [(row.labor_category, row.hours) for row in counted] == [(C.FRONT_OFFICE, 6)]
+
+
+def test_without_that_word_the_same_file_leaves_the_other_department_alone() -> None:
+    older = file((MON, C.FRONT_OFFICE, 8), (MON, C.HOUSEKEEPING, 5))
+    newer = file((MON, C.FRONT_OFFICE, 6), revision=2)
+
+    assert hours_on([*older, *newer], MON) == {C.FRONT_OFFICE: 6, C.HOUSEKEEPING: 5}
+
+
+def test_a_complete_file_clears_a_day_of_its_period_it_has_no_row_for() -> None:
+    older = file((MON, C.FRONT_OFFICE, 8), (TUE, C.FRONT_OFFICE, 8), (WED, C.FRONT_OFFICE, 8))
+    newer = file((MON, C.FRONT_OFFICE, 6), (WED, C.FRONT_OFFICE, 6), revision=2)
+    files = {newer[0].labor_snapshot_id: _complete(newer, first=MON, last=WED, revision=2)}
+
+    plan = current_rows([*older, *newer], files)
+
+    assert TUE not in plan
+    assert {MON, WED} <= plan.keys()
+
+
+def test_a_complete_file_with_no_row_among_those_read_still_speaks() -> None:
+    """Reading Tuesday only, the file has no row there, and it is the file that says so."""
+    older = file((TUE, C.FRONT_OFFICE, 8))
+    newer_id = uuid4()
+    files = {
+        newer_id: FileCoverage(
+            TODAY, 2, frozenset({C.FRONT_OFFICE}), True, False, complete_from=MON, complete_to=WED
+        )
+    }
+
+    assert current_rows(older, files) == {}
+
+
+def test_a_complete_file_says_nothing_outside_its_period() -> None:
+    older = file((THU, C.FRONT_OFFICE, 8))
+    newer = file((MON, C.FRONT_OFFICE, 6), revision=2)
+    files = {newer[0].labor_snapshot_id: _complete(newer, first=MON, last=WED, revision=2)}
+
+    assert THU in current_rows([*older, *newer], files)
+
+
+@dataclass(frozen=True)
+class Worked:
+    """A row of a file of hours worked: there is no plan in it."""
+
+    labor_snapshot_id: UUID
+    snapshot_local_date: date
+    revision: int
+    work_date: date
+    labor_category: C
+    hours: int = 8
+
+    @property
+    def planned_minutes(self) -> None:
+        return None
+
+    @property
+    def actual_minutes(self) -> int:
+        return self.hours * 60
+
+
+def test_hours_worked_do_not_take_the_place_of_the_plan() -> None:
+    plan_rows = file((MON, C.FRONT_OFFICE, 8))
+    worked = [Worked(uuid4(), TODAY, 2, MON, C.FRONT_OFFICE, 3)]
+    rows: list[Row | Worked] = [*plan_rows, *worked]
+
+    planned = current_rows(rows, basis=Basis.PLANNED)[MON]
+    actual = current_rows(rows, basis=Basis.ACTUAL)[MON]
+
+    assert planned[1] == plan_rows
+    assert actual[1] == worked
+
+
+def test_a_plan_does_not_take_the_place_of_the_hours_worked() -> None:
+    worked = [Worked(uuid4(), TODAY, 1, MON, C.FRONT_OFFICE, 3)]
+    plan_rows = file((MON, C.FRONT_OFFICE, 8), revision=2)
+    rows: list[Row | Worked] = [*worked, *plan_rows]
+
+    assert current_rows(rows, basis=Basis.PLANNED)[MON][1] == plan_rows
+    assert current_rows(rows, basis=Basis.ACTUAL)[MON][1] == worked
+
+
+def test_a_file_of_hours_worked_never_clears_the_plan() -> None:
+    plan_rows = file((MON, C.FRONT_OFFICE, 8), (MON, C.HOUSEKEEPING, 5))
+    worked = [Worked(uuid4(), TODAY, 2, MON, C.FRONT_OFFICE, 3)]
+
+    rows: list[Row | Worked] = [*plan_rows, *worked]
+    planned = current_rows(rows, basis=Basis.PLANNED)[MON][1]
+
+    assert {row.labor_category for row in planned} == {C.FRONT_OFFICE, C.HOUSEKEEPING}
+
+
+def test_rows_with_nothing_on_a_basis_are_what_is_known_when_nobody_says_more() -> None:
+    """So whoever reads the plan sees a gap rather than a day with no staff."""
+    worked = [Worked(uuid4(), TODAY, 1, MON, C.FRONT_OFFICE, 3)]
+
+    assert current_rows(worked, basis=Basis.PLANNED)[MON][1] == worked
 
 
 def test_going_back_to_an_earlier_version_is_simply_the_newest_file() -> None:

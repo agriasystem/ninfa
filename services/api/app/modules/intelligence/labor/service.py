@@ -110,7 +110,9 @@ class LaborDecisionService:
 
         candidates = candidate_work_dates(target_work_date, target_as_of_date)
         wanted_dates = {target_work_date, *candidates}
-        by_date = self._labor.current_plan(labor_data_source_id, target_as_of_date, wanted_dates)
+        by_date, worked_by_date = self._labor.current_labor(
+            labor_data_source_id, target_as_of_date, wanted_dates
+        )
 
         target_labor_snapshot_id: UUID | None = None
         target_day_rows: list[LaborEntryRow] | None = None
@@ -148,7 +150,7 @@ class LaborDecisionService:
             return occupancy_by_date.get(day)
 
         def labor_of(day):  # type: ignore[no-untyped-def]
-            return by_date.get(day)
+            return worked_by_date.get(day)
 
         def select(forecast_rooms):  # type: ignore[no-untyped-def]
             return select_comparables(

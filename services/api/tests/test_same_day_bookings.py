@@ -9,7 +9,6 @@ story, what a revised day means for the history of later days, is the anti-leaka
 
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
-from types import SimpleNamespace
 from typing import Any
 from uuid import NAMESPACE_OID, uuid5
 
@@ -33,10 +32,9 @@ from app.modules.decisions.types import DecisionStatus, LifecycleTransition
 from app.modules.ingestion.models import ImportJob, ImportJobStatus
 from app.modules.intelligence.expected.models import BookingExpectedBaseline
 from app.modules.intelligence.expected.repository import ExpectedRepository
-from app.modules.intelligence.expected.seasonality import eligible_stay_dates
 from app.modules.intelligence.priority.types import PriorityContext
 from app.modules.snapshots.models import BookingSnapshot, SnapshotOrigin
-from app.modules.snapshots.repository import BookingSnapshotRepository, RoomInventoryRepository
+from app.modules.snapshots.repository import BookingSnapshotRepository
 from tests.decision_support import CLEAR, TRIGGERED, revenue_evaluation, sync_run
 from tests.expected_support import (
     ELIGIBLE,
@@ -47,7 +45,16 @@ from tests.expected_support import (
     add_snapshots,
     snapshot_row,
 )
-from tests.refresh_support import Hotel, booking_row, local_today, make_hotel, purge
+from tests.refresh_support import (
+    Hotel,
+    booking_row,
+    local_today,
+    make_hotel,
+    pickup_decisions,
+    purge,
+    rooms_on,
+    seed_slow_night,
+)
 from tests.support import BookingFactory
 
 
@@ -706,49 +713,7 @@ def test_the_enqueue_helper_still_answers_none_when_a_job_is_waiting_to_run(hote
 
 @pytest.fixture
 def slow_night(hotel: Hotel) -> date:
-    """A night ten days away whose comparable nights all gained rooms in their last week, and which
-    gained none: what makes the real pickup detector speak, from real snapshots and real engines."""
-    stay = local_today() + timedelta(days=10)
-    source = hotel.bookings_source()
-    tenant = SimpleNamespace(
-        workspace=SimpleNamespace(id=hotel.tenant.workspace_id),
-        property=SimpleNamespace(id=hotel.property_id),
-        data_source=SimpleNamespace(id=source),
-    )
-    rows = [snapshot_row(tenant, local_today() - timedelta(days=7), stay, rooms=1)]  # type: ignore[arg-type]
-    for past in [day for day in eligible_stay_dates(stay) if day < local_today()][:8]:
-        rows.append(snapshot_row(tenant, past - timedelta(days=17), past, rooms=10))  # type: ignore[arg-type]
-        rows.append(snapshot_row(tenant, past - timedelta(days=10), past, rooms=20))  # type: ignore[arg-type]
-        rows.append(snapshot_row(tenant, past, past, rooms=30))  # type: ignore[arg-type]
-    with hotel.session() as session:
-        add_snapshots(session, tenant, rows)  # type: ignore[arg-type]
-        RoomInventoryRepository(session, hotel.tenant).set_for_date(
-            hotel.property_id, stay, rooms_available=40
-        )
-        session.commit()
-    return stay
-
-
-def _pickup_decisions(hotel: Hotel) -> list[tuple[Any, ...]]:
-    with hotel.session() as session:
-        return [
-            tuple(row)
-            for row in session.execute(
-                select(
-                    Decision.id,
-                    Decision.status,
-                    Decision.episode_count,
-                    Decision.resolved_local_date,
-                ).where(
-                    Decision.workspace_id == hotel.tenant.workspace_id,
-                    Decision.decision_type == "REV_PICKUP_LOW",
-                )
-            ).all()
-        ]
-
-
-def _rooms_on(night_offset: int, count: int) -> list[dict[str, Any]]:
-    return [booking_row(f"R{index}", night_offset) for index in range(count)]
+    return seed_slow_night(hotel)
 
 
 def test_a_real_signal_is_one_decision_through_every_file_of_the_day(
@@ -757,38 +722,38 @@ def test_a_real_signal_is_one_decision_through_every_file_of_the_day(
     offset = (slow_night - local_today()).days
 
     # the morning's file: two rooms, one more than a week ago, when history says ten more
-    hotel.import_bookings("mattina.csv", _rooms_on(offset, 2))
+    hotel.import_bookings("mattina.csv", rooms_on(offset, 2))
     morning = hotel.refresh().result
     assert morning.decisions_created >= 1
-    [(decision, status, episodes, resolved)] = _pickup_decisions(hotel)
+    [(decision, status, episodes, resolved)] = pickup_decisions(hotel)
     assert (status, episodes, resolved) == (DecisionStatus.OPEN, 1, None)
 
     # the afternoon's: the rooms came. The same day, the same Decision: the normal rule closes it.
-    hotel.import_bookings("pomeriggio.csv", _rooms_on(offset, 14))
+    hotel.import_bookings("pomeriggio.csv", rooms_on(offset, 14))
     afternoon = hotel.refresh().result
     assert afternoon.decision_run_id != morning.decision_run_id
     assert afternoon.decisions_created == 0
     assert afternoon.decisions_resolved >= 1
-    [(same, status, episodes, resolved)] = _pickup_decisions(hotel)
+    [(same, status, episodes, resolved)] = pickup_decisions(hotel)
     assert same == decision
     assert (status, episodes, resolved) == (DecisionStatus.RESOLVED, 1, local_today())
 
     # the evening's: they were cancelled. It reopens, as a new episode of the same Decision.
-    cancelled = [{**row, "status": "cancelled"} for row in _rooms_on(offset, 14)[2:]]
-    hotel.import_bookings("sera.csv", [*_rooms_on(offset, 2), *cancelled])
+    cancelled = [{**row, "status": "cancelled"} for row in rooms_on(offset, 14)[2:]]
+    hotel.import_bookings("sera.csv", [*rooms_on(offset, 2), *cancelled])
     evening = hotel.refresh().result
     assert evening.decisions_created == 0
     assert evening.decisions_reopened >= 1
-    [(same, status, episodes, resolved)] = _pickup_decisions(hotel)
+    [(same, status, episodes, resolved)] = pickup_decisions(hotel)
     assert same == decision
     assert (status, episodes, resolved) == (DecisionStatus.OPEN, 2, None)
 
     # and the same file again moves nothing at all
     runs = len(hotel.runs())
-    hotel.import_bookings("sera-di-nuovo.csv", [*_rooms_on(offset, 2), *cancelled])
+    hotel.import_bookings("sera-di-nuovo.csv", [*rooms_on(offset, 2), *cancelled])
     assert hotel.refresh().result.is_idempotent_replay is True
     assert len(hotel.runs()) == runs
-    assert _pickup_decisions(hotel) == [(decision, DecisionStatus.OPEN, 2, None)]
+    assert pickup_decisions(hotel) == [(decision, DecisionStatus.OPEN, 2, None)]
 
     # three observations of one night in one day, and each run read its own
     assert [row.revision for row in rows_of_today(hotel, offset)] == [1, 2, 3]

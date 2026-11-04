@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
 from app.modules.bookings.models import ImportRowStatus
-from app.modules.ingestion.models import DataSource
+from app.modules.ingestion.models import DataSource, FileScope, ImportJob
+from app.modules.labor.current_plan import FileCoverage
 from app.modules.labor.models import (
     LaborEntry,
     LaborImportRow,
@@ -153,22 +154,61 @@ class LaborEntryRepository:
         )
         return [StoredPlanRow(*row) for row in rows]
 
-    def categories_of(self, snapshot_ids: Collection[UUID]) -> dict[UUID, set[LaborCategory]]:
-        """The categories each snapshot names, on any of its dates (one statement)."""
-        named: dict[UUID, set[LaborCategory]] = {}
-        if not snapshot_ids:
-            return named
+    def coverage_of_files(self, data_source_id: UUID, as_of_date: date) -> dict[UUID, FileCoverage]:
+        """What each file known at `as_of_date` speaks for, from the whole file (one statement).
+        A complete file with no row on a day still speaks for that day, so every file is here, not
+        only those with rows among the dates being read."""
         rows = self._session.execute(
-            select(LaborEntry.labor_snapshot_id, LaborEntry.labor_category)
-            .where(
-                LaborEntry.workspace_id == self._tenant.workspace_id,
-                LaborEntry.labor_snapshot_id.in_(list(snapshot_ids)),
+            select(
+                LaborSnapshot.id,
+                LaborSnapshot.snapshot_local_date,
+                LaborSnapshot.revision,
+                ImportJob.file_scope,
+                LaborEntry.labor_category,
+                func.min(LaborEntry.work_date),
+                func.max(LaborEntry.work_date),
+                func.bool_or(LaborEntry.planned_minutes.is_not(None)),
+                func.bool_or(LaborEntry.actual_minutes.is_not(None)),
             )
-            .distinct()
+            .join(
+                LaborEntry,
+                (LaborEntry.workspace_id == LaborSnapshot.workspace_id)
+                & (LaborEntry.labor_snapshot_id == LaborSnapshot.id),
+            )
+            .join(
+                ImportJob,
+                (ImportJob.workspace_id == LaborSnapshot.workspace_id)
+                & (ImportJob.id == LaborSnapshot.source_import_job_id),
+            )
+            .where(
+                LaborSnapshot.workspace_id == self._tenant.workspace_id,
+                LaborSnapshot.data_source_id == data_source_id,
+                LaborSnapshot.snapshot_local_date <= as_of_date,
+            )
+            .group_by(
+                LaborSnapshot.id,
+                LaborSnapshot.snapshot_local_date,
+                LaborSnapshot.revision,
+                ImportJob.file_scope,
+                LaborEntry.labor_category,
+            )
         )
-        for snapshot_id, category in rows:
-            named.setdefault(snapshot_id, set()).add(category)
-        return named
+        coverage: dict[UUID, FileCoverage] = {}
+        for snapshot, day, revision, scope, category, first, last, planned, actual in rows:
+            known = coverage.get(snapshot)
+            complete = scope is FileScope.FULL
+            first_day = min(first, known.complete_from) if known and known.complete_from else first
+            last_day = max(last, known.complete_to) if known and known.complete_to else last
+            coverage[snapshot] = FileCoverage(
+                day,
+                revision,
+                (known.categories if known else frozenset()) | {category},
+                bool(planned) or (known.has_planned if known else False),
+                bool(actual) or (known.has_actual if known else False),
+                first_day if complete else None,
+                last_day if complete else None,
+            )
+        return coverage
 
     def list_for_snapshot(self, snapshot_id: UUID) -> Sequence[LaborEntry]:
         return self._session.scalars(

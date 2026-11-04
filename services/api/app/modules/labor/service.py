@@ -17,7 +17,8 @@ replay and backtest all depend on it.
 A source can take any number of files, on any day. Each file that changes something is a snapshot of
 its own, next to the others and never over them: which rows count is `labor.current_plan`'s rule.
 Week A then week B live side by side; a second version of a week replaces it; files that overlap
-share the days by the same rule; a file that says what already counts writes nothing at all.
+share the days by the same rule; hours worked never take the place of the plan; a file known to be
+complete clears what it no longer holds; a file that says what already counts writes nothing at all.
 
 Supported sources: structured CSV and XLSX. NOT supported: PDF, OCR, an HR API, calendar scraping.
 
@@ -27,9 +28,9 @@ Pass a session with no uncommitted work: the service commits (and may roll back)
 import hashlib
 import logging
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import PurePath
 from typing import Any
@@ -48,6 +49,7 @@ from app.modules.ingestion.models import (
     DataSource,
     DataSourceDomain,
     DataSourceType,
+    FileScope,
     ImportJobStatus,
 )
 from app.modules.ingestion.repository import (
@@ -63,7 +65,7 @@ from app.modules.labor.canonical import (
     entry_payload,
     snapshot_fingerprint,
 )
-from app.modules.labor.current_plan import current_rows
+from app.modules.labor.current_plan import Basis, FileCoverage, current_rows
 from app.modules.labor.errors import LaborErrorCode, LaborImportError
 from app.modules.labor.mapping import (
     LaborMappingConfig,
@@ -79,6 +81,7 @@ from app.modules.labor.repository import (
     LaborMappingProfileRepository,
     LaborSnapshotRepository,
     StagedRow,
+    StoredPlanRow,
 )
 from app.modules.labor.roles import LaborClassificationMethod
 from app.modules.labor.structured import (
@@ -93,6 +96,8 @@ from app.modules.properties.repository import PropertyRepository
 logger = logging.getLogger(__name__)
 
 _MAX_SUMMARY_MESSAGE = 500
+# Stands for the file being read, next to the stored ones, while nothing has been written.
+_THIS_FILE = UUID(int=0)
 
 # The Gate 2 readers raise BookingImportError: their codes become the labor codes.
 _READER_CODES = {
@@ -138,6 +143,8 @@ class LaborImportResult:
     row_error_summary: dict[str, int] = field(default_factory=dict)
     details: dict[str, Any] = field(default_factory=dict)
     duplicate_of_import_file_id: UUID | None = None
+    # (day, department) that stopped counting because this complete file does not hold them.
+    cells_cleared: int = 0
 
     @property
     def succeeded(self) -> bool:
@@ -341,6 +348,25 @@ class LaborImportService:
             summary=_summary(valid),
         )
 
+    def cells_a_complete_file_would_clear(
+        self, data_source_id: UUID, *, filename: str, content: bytes, mapping: LaborMappingConfig
+    ) -> int:
+        """How many (day, department) would stop counting if THIS file is complete, that its plain
+        reading leaves alone. Read-only. 0 when it makes no difference, and for a file that cannot
+        be read cleanly: what is wrong with it is said when it is tried, not here."""
+        options = mapping.format_options
+        table = self._open_table(content, filename, options.sheet_name, options=options)
+        raw_rows = extract(table, mapping)
+        if not raw_rows:
+            return 0
+        staged, _ = _stage(parse_structured(raw_rows, mapping))
+        if any(row.validation_status == ImportRowStatus.INVALID for row in staged):
+            return 0
+        entries = [entry_from_payload(row.normalized_payload or {}) for row in staged]
+        if not entries:
+            return 0
+        return _Reading.of(self._entries, data_source_id, date.max, entries).cells_cleared()
+
     # --- import -------------------------------------------------------------------------------
 
     def import_file(
@@ -353,6 +379,7 @@ class LaborImportService:
         mime_type: str | None = None,
         property_id: UUID | None = None,
         mapping_override: LaborMappingConfig | None = None,
+        file_scope: FileScope | None = None,
     ) -> LaborImportResult:
         """Import one labor file into the canonical model, atomically and idempotently.
 
@@ -362,6 +389,9 @@ class LaborImportService:
         `mapping_override` reads THIS file with a mapping the caller has just built from it,
         instead of the data source's saved profile, and saves nothing: the caller decides whether
         to keep it, once the import has succeeded.
+
+        `file_scope` is what the caller knows this file to be: only `FileScope.FULL` makes what it
+        does not hold, between its first day and its last, stop counting.
         """
         if type(snapshot_local_date) is not date:
             raise LaborImportError(
@@ -392,7 +422,14 @@ class LaborImportService:
 
         try:
             result = self._run(
-                ids, filename, content, snapshot_local_date, duplicate_of, prop, mapping_override
+                ids,
+                filename,
+                content,
+                snapshot_local_date,
+                duplicate_of,
+                prop,
+                mapping_override,
+                file_scope,
             )
         except LaborImportError as error:
             result = self._fail(ids, error.error_code, error.message, _details(error), duplicate_of)
@@ -430,6 +467,7 @@ class LaborImportService:
         duplicate_of: UUID | None,
         prop: Property,
         mapping_override: LaborMappingConfig | None = None,
+        file_scope: FileScope | None = None,
     ) -> LaborImportResult:
         stored_signature: str | None = None
         if mapping_override is not None:
@@ -488,7 +526,7 @@ class LaborImportService:
                 summary=summary,
                 counts=counts,
             )
-        return self._canonicalize(ids, snapshot_local_date, duplicate_of, counts, prop)
+        return self._canonicalize(ids, snapshot_local_date, duplicate_of, counts, prop, file_scope)
 
     def _open_table(
         self,
@@ -519,6 +557,7 @@ class LaborImportService:
         duplicate_of: UUID | None,
         counts: _Counts,
         prop: Property,
+        file_scope: FileScope | None = None,
     ) -> LaborImportResult:
         """Every valid row becomes a canonical entry of ONE labor snapshot, or none does."""
         try:
@@ -531,9 +570,9 @@ class LaborImportService:
                 data_source_id=str(ids.data_source),
                 entries=entries,
             )
-            already_counting = self._snapshot_already_saying(
-                ids.data_source, snapshot_local_date, entries
-            )
+            reading = _Reading.of(self._entries, ids.data_source, snapshot_local_date, entries)
+            cleared = reading.cells_cleared() if file_scope is FileScope.FULL else 0
+            already_counting = reading.snapshot_already_saying_it(file_scope)
             if already_counting is not None:
                 snapshot_id = already_counting
                 created = 0
@@ -562,7 +601,7 @@ class LaborImportService:
                 reused = False
 
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job, changed_data=not reused)
+            self._jobs.succeed(ids.job, changed_data=not reused, file_scope=file_scope)
             self._session.commit()
         except LaborImportError:
             raise  # rolled back and recorded as FAILED by import_file
@@ -592,6 +631,7 @@ class LaborImportService:
             error_code=None,
             error_message=None,
             labor_snapshot_id=snapshot_id,
+            cells_cleared=cleared,
             snapshot_reused=reused,
             rows_total=counts.rows,
             rows_valid=counts.valid,
@@ -599,32 +639,6 @@ class LaborImportService:
             entries_created=created,
             duplicate_of_import_file_id=duplicate_of,
         )
-
-    def _snapshot_already_saying(
-        self, data_source_id: UUID, as_of: date, entries: Sequence[CanonicalEntry]
-    ) -> UUID | None:
-        """The newest snapshot behind the file's own days when every cell the file speaks for
-        already counts with exactly this content, or None when the file changes something.
-
-        Compared on the canonical content, never on the file: the same plan in another order or
-        another file is the same plan, and going back to an earlier version is a change."""
-        days = {entry.work_date for entry in entries}
-        categories = {entry.labor_category for entry in entries}
-        stored = self._entries.plan_rows_as_of(data_source_id, as_of, days)
-        plan = current_rows(
-            stored, self._entries.categories_of({row.labor_snapshot_id for row in stored})
-        )
-        for day in days:
-            if day not in plan:
-                return None
-            counting = Counter(
-                content_key(row) for row in plan[day][1] if row.labor_category in categories
-            )
-            if counting != Counter(
-                content_key(entry) for entry in entries if entry.work_date == day
-            ):
-                return None
-        return plan[min(days)][0]
 
     def _load_entries(self, ids: _Ids) -> list[CanonicalEntry]:
         """The canonical entries of the staged VALID rows, in file order."""
@@ -728,6 +742,106 @@ class LaborImportService:
 
 
 # --- module functions -----------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _Reading:
+    """What counts on a file's days today, and what would count with the file: nothing written.
+    Compared on the canonical content, never on the file: the same plan in another order or another
+    file is the same plan, and going back to an earlier version is a change."""
+
+    stored: Sequence[StoredPlanRow]
+    files: Mapping[UUID, FileCoverage]
+    entries: Sequence[CanonicalEntry]
+    as_of: date
+    revision: int
+
+    @classmethod
+    def of(
+        cls,
+        repository: LaborEntryRepository,
+        data_source_id: UUID,
+        as_of: date,
+        entries: Sequence[CanonicalEntry],
+    ) -> "_Reading":
+        first, last = (min(e.work_date for e in entries), max(e.work_date for e in entries))
+        days = [first + timedelta(days=offset) for offset in range((last - first).days + 1)]
+        files = repository.coverage_of_files(data_source_id, as_of)
+        return cls(
+            repository.plan_rows_as_of(data_source_id, as_of, days),
+            files,
+            entries,
+            as_of,
+            max((file.revision for file in files.values()), default=0) + 1,
+        )
+
+    def _with_the_file(
+        self, scope: FileScope | None
+    ) -> tuple[list[StoredPlanRow], dict[UUID, FileCoverage]]:
+        rows = [
+            StoredPlanRow(
+                _THIS_FILE,
+                self.as_of,
+                self.revision,
+                entry.work_date,
+                entry.role_normalized,
+                entry.labor_category,
+                entry.planned_minutes,
+                entry.actual_minutes,
+                entry.planned_cost,
+                entry.actual_cost,
+                entry.currency,
+                entry.classification_method,
+                entry.classification_confidence,
+            )
+            for entry in self.entries
+        ]
+        complete = scope is FileScope.FULL
+        files = dict(self.files)
+        files[_THIS_FILE] = FileCoverage(
+            self.as_of,
+            self.revision,
+            frozenset(entry.labor_category for entry in self.entries),
+            any(entry.planned_minutes is not None for entry in self.entries),
+            any(entry.actual_minutes is not None for entry in self.entries),
+            min(entry.work_date for entry in self.entries) if complete else None,
+            max(entry.work_date for entry in self.entries) if complete else None,
+        )
+        return [*self.stored, *rows], files
+
+    @staticmethod
+    def _cells(
+        rows: Sequence[StoredPlanRow], files: Mapping[UUID, FileCoverage]
+    ) -> dict[tuple[Basis, date, Any], Counter[tuple[object, ...]]]:
+        cells: dict[tuple[Basis, date, Any], Counter[tuple[object, ...]]] = {}
+        for basis in Basis:
+            for day, (_, counted) in current_rows(rows, files, basis=basis).items():
+                for row in counted:
+                    cell = cells.setdefault((basis, day, row.labor_category), Counter())
+                    cell[content_key(row)] += 1
+        return cells
+
+    def cells_with_the_file(
+        self, scope: FileScope | None
+    ) -> dict[tuple[Basis, date, Any], Counter[tuple[object, ...]]]:
+        return self._cells(*self._with_the_file(scope))
+
+    def cells_cleared(self) -> int:
+        """How many (day, department) a complete file stops counting that a plain reading keeps."""
+        plain = self.cells_with_the_file(None)
+        complete = self.cells_with_the_file(FileScope.FULL)
+        return len({cell[1:] for cell in plain if cell not in complete})
+
+    def snapshot_already_saying_it(self, scope: FileScope | None) -> UUID | None:
+        """The newest snapshot behind the file's days when nothing counts differently with the file,
+        or None when it changes something."""
+        if self.cells_with_the_file(scope) != self._cells(self.stored, self.files):
+            return None
+        counting = [current_rows(self.stored, self.files, basis=basis) for basis in Basis]
+        for plan in counting:
+            for day in sorted(plan):
+                return plan[day][0]
+        return None
 
 
 def _unclassified_labels(valid: list[StagedRow]) -> list[tuple[str, int]]:

@@ -4,8 +4,9 @@ ONE statement returns, for every work date a target evaluation needs (the target
 every historical candidate day), every `LaborEntry` of a snapshot with `snapshot_local_date <=`
 the target's own as-of date. `latest_snapshot_rows_by_work_date` (pure, `aggregation.py`) then
 picks what counts on each work date (`current_plan` does both, plus the one statement that says
-which categories each file names): a rolling near-term export, a full-horizon export and several
-files of one day are all handled correctly, with no query per day.
+what each file speaks for; `current_labor` also reads the hours worked, for a comparison with the
+past): a rolling near-term export, a full-horizon export and several files of one day are all
+handled correctly, with no query per day.
 
 It reads `labor_entries`/`labor_snapshots` only: never the staging rows, never a file. The
 repository never writes.
@@ -23,6 +24,7 @@ from app.modules.intelligence.labor.aggregation import (
     LaborEntryRow,
     RawLaborEntryRow,
     latest_snapshot_rows_by_work_date,
+    worked_rows_by_work_date,
 )
 from app.modules.labor.models import LaborEntry, LaborSnapshot
 from app.modules.labor.repository import LaborEntryRepository
@@ -42,9 +44,20 @@ class LaborEvaluationRepository:
         self, data_source_id: UUID, as_of_date: date, work_dates: Collection[date]
     ) -> dict[date, tuple[UUID, list[LaborEntryRow]]]:
         """What counts on each of these work dates, known at `as_of_date`."""
+        return self.current_labor(data_source_id, as_of_date, work_dates)[0]
+
+    def current_labor(
+        self, data_source_id: UUID, as_of_date: date, work_dates: Collection[date]
+    ) -> tuple[
+        dict[date, tuple[UUID, list[LaborEntryRow]]],
+        dict[date, tuple[UUID, list[LaborEntryRow]]],
+    ]:
+        """The plan of each of these dates, and what a comparison with the past reads of each."""
         rows = self.entries_as_of(data_source_id, as_of_date, work_dates)
-        return latest_snapshot_rows_by_work_date(
-            rows, self._entries.categories_of({row.labor_snapshot_id for row in rows})
+        files = self._entries.coverage_of_files(data_source_id, as_of_date)
+        return (
+            latest_snapshot_rows_by_work_date(rows, files),
+            worked_rows_by_work_date(rows, files),
         )
 
     def entries_as_of(

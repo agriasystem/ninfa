@@ -62,7 +62,9 @@ class Pilot:
         with Session(self.engine) as session:
             return list(
                 session.scalars(
-                    select(DecisionRun).where(DecisionRun.workspace_id == self.tenant.workspace_id)
+                    select(DecisionRun)
+                    .where(DecisionRun.workspace_id == self.tenant.workspace_id)
+                    .order_by(DecisionRun.run_sequence)
                 ).all()
             )
 

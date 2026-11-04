@@ -10,7 +10,7 @@ for the whole day (every category, not just the target one): a row without that 
 does not participate (there is no minutes value to classify on that basis).
 """
 
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -24,7 +24,7 @@ from app.modules.intelligence.labor.precision import (
     percent_of,
 )
 from app.modules.intelligence.labor.types import LaborBasis
-from app.modules.labor.current_plan import current_rows
+from app.modules.labor.current_plan import Basis, FileCoverage, current_rows
 from app.modules.labor.roles import LaborCategory
 
 _SIXTY = Decimal(60)
@@ -99,11 +99,48 @@ class HistoricalDay:
     quality: ClassificationQuality
 
 
+def _projected(row: RawLaborEntryRow) -> LaborEntryRow:
+    return LaborEntryRow(
+        labor_snapshot_id=row.labor_snapshot_id,
+        labor_category=row.labor_category,
+        planned_minutes=row.planned_minutes,
+        actual_minutes=row.actual_minutes,
+        planned_cost=row.planned_cost,
+        actual_cost=row.actual_cost,
+        currency=row.currency,
+        classification_confidence=row.classification_confidence,
+    )
+
+
+def worked_rows_by_work_date(
+    rows: Sequence[RawLaborEntryRow],
+    files: Mapping[UUID, FileCoverage] | None = None,
+) -> dict[date, tuple[UUID, list[LaborEntryRow]]]:
+    """For each work date, what a comparison with the past reads: per category, the hours worked
+    where they are known, else the plan. The two never mix inside a category, which is what lets
+    `build_historical_day` stay ACTUAL-FIRST when they come from two different files."""
+    actual = current_rows(rows, files, basis=Basis.ACTUAL)
+    planned = current_rows(rows, files, basis=Basis.PLANNED)
+    merged: dict[date, tuple[UUID, list[LaborEntryRow]]] = {}
+    for work_date in {*actual, *planned}:
+        worked = actual.get(work_date)
+        plan = planned.get(work_date)
+        known = {row.labor_category for row in worked[1]} if worked else set()
+        day = [
+            *(worked[1] if worked else []),
+            *(row for row in (plan[1] if plan else []) if row.labor_category not in known),
+        ]
+        snapshot = worked[0] if worked else plan[0] if plan else None
+        if snapshot is not None:
+            merged[work_date] = (snapshot, [_projected(row) for row in day])
+    return merged
+
+
 def latest_snapshot_rows_by_work_date(
     rows: Sequence[RawLaborEntryRow],
-    categories_of: Mapping[UUID, Collection[LaborCategory]] | None = None,
+    files: Mapping[UUID, FileCoverage] | None = None,
 ) -> dict[date, tuple[UUID, list[LaborEntryRow]]]:
-    """For each work date, the newest labor snapshot that covers it and the entries that count.
+    """For each work date, the newest labor snapshot in the plan and the entries of the plan.
 
     A rolling near-term export (each snapshot covers only the next few weeks), a full-horizon
     export (every snapshot restates the whole plan) and several files of one day are all handled
@@ -113,21 +150,9 @@ def latest_snapshot_rows_by_work_date(
     return {
         work_date: (
             snapshot_id,
-            [
-                LaborEntryRow(
-                    labor_snapshot_id=row.labor_snapshot_id,
-                    labor_category=row.labor_category,
-                    planned_minutes=row.planned_minutes,
-                    actual_minutes=row.actual_minutes,
-                    planned_cost=row.planned_cost,
-                    actual_cost=row.actual_cost,
-                    currency=row.currency,
-                    classification_confidence=row.classification_confidence,
-                )
-                for row in counted
-            ],
+            [_projected(row) for row in counted],
         )
-        for work_date, (snapshot_id, counted) in current_rows(rows, categories_of).items()
+        for work_date, (snapshot_id, counted) in current_rows(rows, files).items()
     }
 
 
