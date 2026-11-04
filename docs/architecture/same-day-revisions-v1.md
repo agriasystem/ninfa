@@ -16,7 +16,7 @@ Decisions and alternatives: [ADR 0039](adr/0039-same-day-revisions.md). The refr
 | is the same data | no-op | no-op | no-op | no-op |
 | brings new records | they are added | new work dates live beside the others | new documents add up | new documents add up |
 | changes a record | updated, by `source_record_id` | the (day, category) cells it names are replaced | the document's next revision | **refused**, nothing changes |
-| leaves a record out | it stays | it stays, unless the file names that category on that day | it stays | it stays |
+| leaves a record out | it stays, unless a person said the file is complete | it stays, unless the file names that category on that day or a person said it is complete | it stays | it stays |
 
 "The same data" is judged on the canonical content, never on the file's name or bytes: the same plan in another order,
 or part of what already counts, is the same data. Going back to an earlier version is a change.
@@ -87,8 +87,10 @@ The identity of "the same datum" is (workspace, property, source, work date, cat
 holds none. Not a role label, because it is free text a second export may write differently: `Reception mattina` and
 `Ricevimento AM` in two versions of a plan are one cell, and that is what makes the second replace the first.
 
-**What the rule cannot see:** a file that drops a category altogether, on every day it covers, says nothing about it. The
-older rows stay until a file names it again. It is a stale figure, never a sum, and it is written here because it is real.
+**What the rule alone cannot see:** a file that drops a category altogether, on every day it covers, says nothing about
+it, unless a person said the file is complete: then it speaks for every category of its period
+([import-scope-semantics-v1.md](import-scope-semantics-v1.md)). Hours planned and hours worked are read separately, each by
+this same rule: a file speaks only on what it carries.
 
 From a `LaborSnapshot` one can read which import brought it (`source_import_job_id`) and what it said; from a run, which
 files its evaluations read (`input_provenance.labor.snapshot_ids`) and which import last changed the source.
@@ -124,7 +126,8 @@ be said of it).
 
 ## What was refused to keep this simple
 
-- A file cannot delete: a row that is not in a later file stays. Deleting by absence would make a partial export destroy
-  what a full one said. The two limits above follow from this.
+- A file does not delete by itself: a row that is not in a later file stays, unless a person said the file is complete,
+  and even then it is marked and kept ([import-scope-semantics-v1.md](import-scope-semantics-v1.md)). Deleting by absence
+  alone would make a partial export destroy what a full one said.
 - No per-row history of bookings: `bookings` keeps the current state (Gate 2), and an observation is what freezes it.
 - No revision for a reconstruction: it is one inference of a finished day.

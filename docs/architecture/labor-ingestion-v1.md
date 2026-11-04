@@ -90,7 +90,9 @@ canonical JSON text so the fingerprint never depends on the input row order.
 A file that says what already counts is a no-op (`snapshot_reused=True`, zero new entries, the job's
 `changed_data` is false), compared cell by cell on the canonical content. Any other file is a new
 snapshot, on its date, at that date's next `revision`, and never an edit of an existing one: what
-counts is decided on reading ([same-day-revisions-v1.md](same-day-revisions-v1.md)).
+counts is decided on reading ([same-day-revisions-v1.md](same-day-revisions-v1.md)). A file a person
+said is complete also speaks for what it leaves out, and hours planned and worked are read apart
+([import-scope-semantics-v1.md](import-scope-semantics-v1.md)).
 
 ## Atomicity
 

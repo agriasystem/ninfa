@@ -74,7 +74,8 @@ no question is about a column that does not change the result, and a real column
 - A channel change is a new run on the same observation: a snapshot holds no channel, and no revision is invented for
   it; Distribution reads the bookings, so it sees the change.
 - A file that drops a category altogether, on every day it covers, says nothing about it: the older rows stay until a
-  file names it again. A stale figure, never a sum. Likewise a document a later cost file does not mention stays.
+  file names it again. A stale figure, never a sum. Likewise a document a later cost file does not mention stays. (ADR 0040
+  closes this for a file a person says is complete, and separates hours worked from the plan. Costs stay as they are.)
 - A run's freshness is the latest import that changed the data: a file re-imported later, identical, does not move it.
 - `DEFERRED` is left for a stored reconstruction on today's key (the property's time zone changed), which clears by
   itself. A job told to wait no longer holds back a request for now.

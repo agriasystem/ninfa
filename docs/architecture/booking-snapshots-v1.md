@@ -58,7 +58,8 @@ The daily on-books metrics live **in the snapshot itself**: there is no separate
 no key/value (EAV) structure.
 
 A row exists for **every** stay night of the requested range, also when nothing is booked: the
-absence of bookings is data (`booking_count = 0`, `rooms = 0`, revenue `0.00`, ADR `NULL`).
+absence of bookings is data (`booking_count = 0`, `rooms = 0`, revenue `0.00`, ADR `NULL`). A booking a
+complete file took away is not on the books (`is_current_booking()`): the nights it was on get the day's next revision.
 
 ## Stay-night semantics
 

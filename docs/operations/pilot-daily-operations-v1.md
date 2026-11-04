@@ -136,7 +136,12 @@ A property can import as many files as it needs, of any kind, on any day (see
   it names, and hours and costs never add up;
 - a corrected row of a cost spreadsheet: the document's next version, and only the newest counts. A
   FatturaPA that comes back different is refused, on purpose: it is corrected by a credit note;
-- the same data again: nothing moves, and the page says so.
+- the same data again: nothing moves, and the page says so;
+- a file that leaves out something NINFA holds: the page asks once whether it holds everything of its
+  period. If it does, what it no longer holds stops counting and stays in the history, and the summary says how
+  much before anything is imported. If it holds a part, or only what is new, nothing goes. The answer is
+  remembered for files of that structure (`docs/architecture/import-scope-semantics-v1.md`). The CLI imports
+  never ask, and so never take anything away.
 
 A re-run by hand (`python -m app.cli.analysis`) follows the same rules, and with identical data it is a safe
 replay. **Never delete snapshots or edit the database to "fix" a day:** a file with the right data is enough.
