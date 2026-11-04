@@ -143,9 +143,10 @@ with get_sessionmaker()() as session:
 
 `BookingSnapshotReconstructionService(...).reconstruct(...)` infers **completed earlier days**; its
 rows are `RECONSTRUCTED_APPROXIMATE` and never replace an observation (read
-[booking-snapshots-v1.md](../architecture/booking-snapshots-v1.md) before using them). Observing is
-meant to run once per property-local day; running it again the same day is a no-op unless the
-bookings or the inventory changed, which raises `BOOKING_SNAPSHOT_CONFLICT`. Migration `0005` adds
+[booking-snapshots-v1.md](../architecture/booking-snapshots-v1.md) before using them). A source can
+be observed as often as the data change: running it again the same day is a no-op unless the bookings
+or the inventory changed, which adds the day's next revision and rewrites nothing
+([same-day-revisions-v1.md](../architecture/same-day-revisions-v1.md)). Migration `0005` adds
 the two tables; `npm run db:migrate` applies it. The golden scenario lives in
 `tests/fixtures/snapshots/`; its expected file is regenerated, independently of the application, with
 `uv run --all-packages python tests/fixtures/snapshots/generate_masseria_snapshots_expected.py`.
