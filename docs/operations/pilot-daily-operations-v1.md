@@ -140,8 +140,9 @@ A property can import as many files as it needs, of any kind, on any day (see
 - a file that leaves out something NINFA holds: the page asks once whether it holds everything of its
   period. If it does, what it no longer holds stops counting and stays in the history, and the summary says how
   much before anything is imported. If it holds a part, or only what is new, nothing goes. The answer is
-  remembered for files of that structure (`docs/architecture/import-scope-semantics-v1.md`). The CLI imports
-  never ask, and so never take anything away.
+  remembered for files of that structure, but a remembered "complete" asks again whenever something would stop
+  counting, and that answer is about that import unless "Ricorda questa scelta" is ticked
+  (`docs/architecture/import-scope-semantics-v1.md`). The CLI imports never ask, and so never take anything away.
 
 A re-run by hand (`python -m app.cli.analysis`) follows the same rules, and with identical data it is a safe
 replay. **Never delete snapshots or edit the database to "fix" a day:** a file with the right data is enough.

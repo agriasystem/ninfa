@@ -9,18 +9,21 @@ A record missing from a later file does not always say the same thing:
 | only what is new or changed (`DELTA`) | nothing |
 
 The three are not told apart by looking at the file. How many rows it has, its dates, its name, the hotel: none of these
-says it, and a wrong guess silently deletes or silently keeps. So **NINFA asks a person, once, and only when the answer
-changes what counts**, and remembers it for files of that structure. Decisions and alternatives:
-[ADR 0040](adr/0040-import-scope-semantics.md). The same-day machinery this sits on:
+says it, and a wrong guess silently deletes or silently keeps. So **NINFA asks a person, only when the answer changes what
+counts**, and remembers it for files of that structure. **A memory saves a question only while nothing would stop counting**:
+it never takes anything away by itself. Decisions and alternatives: [ADR 0040](adr/0040-import-scope-semantics.md),
+[ADR 0041](adr/0041-remembered-scope-safety.md). The same-day machinery this sits on:
 [same-day-revisions-v1.md](same-day-revisions-v1.md).
 
 ## When the question is asked
 
 ```
-READY, a source exists, and the file's reading would change something if the file were complete
-   |-- this family of files has an answer ------> use it, no question
-   |-- the person just answered ----------------> use it, remember it
-   `-- nobody has said anything ---------------> ASK, once, after every other question of the file
+READY, a source exists, and reading the file as complete would stop something counting
+   |-- the person answered on this import --------> that answer, for this import
+   |-- these very bytes were said to be a part ---> the same: not asked twice
+   |-- this family is remembered as a part -------> no question, nothing goes; the summary says what stays
+   |-- this family is remembered as complete -----> ASK again: a memory takes nothing away by itself
+   `-- nobody has said anything ------------------> ASK, after every other question of the file
 ```
 
 - A first file never asks: nothing is stored, nothing can be absent.
@@ -32,6 +35,12 @@ The copy names no concept: *"Questo file contiene tutte le prenotazioni del peri
 modificate?"*, with how many stored records are concerned. A staff file: *"Questo file contiene tutti i reparti del
 periodo oppure solo alcuni?"*. There is no settings screen.
 
+With a family remembered as complete, the question says what is at stake and offers two answers, *"Sì, contiene tutte le
+prenotazioni"* and *"No, contiene solo una parte"* (for staff, *"Questo file contiene tutto il piano del periodo?"*), and what each
+one does. It is about this import. A box that starts empty, *"Ricorda questa scelta per i prossimi file"*, is the only thing
+that changes the memory. A family remembered as a part asks nothing: the summary says what stays and offers the same two answers
+behind a quiet action, which is how a wrong memory is corrected.
+
 ## Who holds the answer
 
 | | |
@@ -39,14 +48,24 @@ periodo oppure solo alcuni?"*. There is no settings screen.
 | where it lives | `Memory.file_scope`, the family's own memory in the profile's `format_options["learning"]` |
 | what it is about | **the file's structure**, never the page or the upload |
 | trust | apart from the family's `trust`: answering it confirms nothing about the columns |
-| a later file of that family | the answer holds (`kept_scope`), with columns moved, renamed to what reads the same, or added |
+| a later file of that family | the answer holds (`kept_scope`), with columns moved, renamed to what reads the same, or added; a remembered "complete" still asks if something would stop counting |
+| what changes it | only an answer sent with `remember_scope`: the first question sends it and says so on screen, the confirmation only with its box ticked |
 | a file lacking a remembered column | another family: it asks for itself |
 | a file that could be two families | no family, no answer |
 | a file that contradicts what was confirmed | no answer |
 | what an import was | `import_jobs.file_scope`, on the job, for audit and for reading the staff plan |
+| what was remembered then | `import_jobs.remembered_file_scope`: with `file_scope`, why something stopped counting ([ADR 0041](adr/0041-remembered-scope-safety.md)) |
 
-The server re-reads the file with the answers and compares the decision (`_settle`), as for every other answer. A posted
-mapping that says `FULL` when the answers say otherwise is refused; a mapping built by hand has its `file_scope` dropped.
+## What the server checks, and when
+
+| When | What | If it no longer holds |
+|---|---|---|
+| reading the file | `ScopePreflight`: `effective_scope`, `remembered_scope`, `removal_count`, `requires_scope_confirmation` | |
+| before the commit (`_settle`) | the file is read again with the answers, and the whole decision compared, `file_scope`, `remembered_file_scope` and `expected_removals` included | refused with 409, nothing happens, the page says to read the file again |
+| at the commit, under the source's lock | what would go is counted again against `expected_removals` | the job fails with `IMPORT_PLAN_CHANGED`, nothing of the file is imported |
+
+A figure from the browser never decides anything: posted back different it gets the decision refused, and what goes is always
+computed from what the source holds. A mapping built by hand has all three dropped.
 
 An import with no word about scope (the pilot's CLI, a saved configuration, a first file) is treated as if absence says
 nothing: this gate takes nothing away unless a person said so.
@@ -145,7 +164,8 @@ head when that branch is rebased on main. Nothing is resolved here, and that bra
 - A complete file with a single row, or two, reads as `MANUAL`: too few values for the columns to be sure, as for any file.
   Manual matching carries no scope, so it takes nothing away.
 - A booking checking in after the file's last row stays (see the interval above).
-- The answer is about a family: a hotel that sends one complete export and one partial export with the same columns has one
-  family, and the answer holds for both until somebody corrects it. There is no screen for that yet: a file with other
-  columns is what starts another family.
+- A department missing on a day the file names, when the file names that department elsewhere, stops counting without a
+  question and under any answer: that is the replacement rule of [same-day-revisions-v1.md](same-day-revisions-v1.md), not an
+  absence. The file speaks for that day and that department. Pinned by a test.
+- A figure that moved refuses the file even if the person would have agreed to the new one: it is simply read again.
 - A department cleared by a complete file is not listed by name on the page: the page gives the count.

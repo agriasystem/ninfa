@@ -50,8 +50,8 @@ hours worked has no plan in it. So actual hours could take the place of planned 
 - Reads of current bookings go through `is_current_booking()`. A new read that forgets it would count removed bookings: all
   three current reads carry it, and a test pins each.
 - The labor no-op compares what counts with and without the file, so a complete file that only clears is a change.
-- A family has one answer. Two exports with the same columns and different meanings would share it until a later gate gives
-  people a way to correct it.
+- A family has one answer. Two exports with the same columns and different meanings would share it. ADR 0041 closes what
+  that could do: a remembered answer no longer takes anything away by itself, and it can be corrected where it shows.
 - The downgrade of `0015_import_scope` refuses once it would change what the data say.
 - `feature/mia-v3-company-intelligence` still has `0014_mia_conversations`: to renumber after the real head when rebased.
 
