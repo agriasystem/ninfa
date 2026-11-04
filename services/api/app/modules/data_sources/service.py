@@ -93,6 +93,7 @@ from app.modules.ingestion.repository import (
     ImportJobRepository,
 )
 from app.modules.ingestion.schemas import DataSourceCreate
+from app.modules.ingestion.scope import ScopePlan
 from app.modules.invoices.service import InvoiceImportService, detect_source
 from app.modules.labor.mapping import LaborField
 from app.modules.labor.service import LaborImportService
@@ -106,6 +107,14 @@ _RECENT_IMPORTS_SHOWN = 10
 # How long an import waits for another import of the same kind and property to finish. An import is
 # seconds of work (10 MB at most); past this wait the caller is told to retry instead of hanging.
 IMPORT_LOCK_WAIT_MS = 30_000
+
+
+def _scope_plan(mapping: MappingInput | None) -> ScopePlan:
+    """What a verified decision says about the records its file does not hold. A saved configuration
+    says nothing: with no word about the file, absence means nothing."""
+    if mapping is None:
+        return ScopePlan()
+    return ScopePlan(mapping.file_scope, mapping.remembered_file_scope, mapping.expected_removals)
 
 
 @dataclass(frozen=True, slots=True)
@@ -381,7 +390,9 @@ class DataSourcesService:
             return None, None
         if reference is None:
             # (nobody was asked what a file matched by hand is: absence says nothing about it)
-            by_hand = mapping.model_copy(update={"file_scope": None})
+            by_hand = mapping.model_copy(
+                update={"file_scope": None, "remembered_file_scope": None, "expected_removals": 0}
+            )
             return by_hand, self._manual_confirmation(
                 property_id, domain, filename, content, by_hand
             ) if confirm else None
@@ -861,7 +872,7 @@ class DataSourcesService:
                 content=content,
                 property_id=property_id,
                 mapping_override=override,
-                file_scope=None if mapped.mapping is None else mapped.mapping.file_scope,
+                scope=_scope_plan(mapped.mapping),
             )
             return (
                 ImportOutcome(
@@ -913,7 +924,7 @@ class DataSourcesService:
             snapshot_local_date=snapshot_local_date,
             property_id=property_id,
             mapping_override=override,
-            file_scope=None if mapped.mapping is None else mapped.mapping.file_scope,
+            scope=_scope_plan(mapped.mapping),
         )
         return (
             ImportOutcome(

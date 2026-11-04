@@ -20,6 +20,7 @@ Everything is scoped by the request's `TenantContext` and property: a saved conf
 ONE data source of ONE property of ONE workspace and is reachable only through it.
 """
 
+import hashlib
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
@@ -92,8 +93,8 @@ from app.modules.data_sources.understanding_redaction import (
 )
 from app.modules.data_sources.understanding_types import Question
 from app.modules.document_understanding.layout import LayoutSpec
-from app.modules.ingestion.models import DataSource, DataSourceDomain
-from app.modules.ingestion.repository import ImportJobRepository
+from app.modules.ingestion.models import DataSource, DataSourceDomain, FileScope
+from app.modules.ingestion.repository import ImportFileRepository, ImportJobRepository
 from app.modules.ingestion.suggestions import SuggestionConfidence
 
 logger = logging.getLogger(__name__)
@@ -172,6 +173,7 @@ class SmartImportService:
         self._session = session
         self._tenant = tenant
         self._jobs = ImportJobRepository(session, tenant)
+        self._files = ImportFileRepository(session, tenant)
 
     # --- the domain ---------------------------------------------------------------------------
 
@@ -666,6 +668,15 @@ class SmartImportService:
             return adapter.scope_effect(source, filename, content, config)
         except (AppError, ValueError):
             return 0
+
+    def scope_said_of_this_file(self, source: DataSource, content: bytes) -> FileScope | None:
+        """What was said about these very bytes the last time they were imported, when it was a part
+        of the period or what was new: the same file need not be explained twice. Never that it was
+        complete: that one took something away once is no reason to take anything away now."""
+        digest = hashlib.sha256(content).hexdigest()
+        earlier = self._files.find_successful_for_data_source(source.id, digest)
+        scope = None if earlier is None else earlier.import_job.file_scope
+        return None if scope is FileScope.FULL else scope
 
     def _to_dry_run(
         self,

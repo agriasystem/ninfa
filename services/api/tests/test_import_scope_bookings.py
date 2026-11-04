@@ -115,6 +115,7 @@ def _current(session: Session, env: SourcesEnv) -> set[str]:
 
 
 ONE_TWO_THREE = (row(1), row(2), row(3))
+COMPLETE_FROM_NOW_ON = {"file_scope": "FULL", "remember_scope": True}
 
 
 # --- a complete file ------------------------------------------------------------------------------
@@ -386,17 +387,17 @@ def test_the_answer_is_remembered_and_the_next_file_of_that_structure_asks_nothi
     api_client: TestClient, env: SourcesEnv, db_session: Session
 ) -> None:
     _import(api_client, env, file_of(*ONE_TWO_THREE))
-    _import(api_client, env, file_of(row(1), row(3)), {"file_scope": "FULL"}, name="b.xlsx")
+    _import(api_client, env, file_of(row(1), row(3)), COMPLETE_FROM_NOW_ON, name="b.xlsx")
     assert _family_scope(db_session, env) == [(FileScope.FULL, Trust.ENGINE)]
 
-    # a later export, another name: P-001 is gone too
-    content = file_of(row(3))
+    # a later export, another name, and nothing would stop counting
+    content = file_of(row(1), row(3), row(4))
     body = understand(api_client, env, BOOKINGS, "export-del-giorno-dopo.xlsx", content)
 
     assert body["understanding"]["level"] == "READY"
     assert _questions(body) == []
     assert body["proposal"]["file_scope"] == "FULL"
-    assert body["understanding"]["removes"] == 1
+    assert body["understanding"]["removes"] == 0
 
 
 def test_answering_about_the_file_confirms_nothing_about_its_columns(
@@ -404,7 +405,8 @@ def test_answering_about_the_file_confirms_nothing_about_its_columns(
 ) -> None:
     """A word about the file is not a word about its columns: the family keeps the trust it had."""
     _import(api_client, env, file_of(*ONE_TWO_THREE))
-    _import(api_client, env, file_of(row(1), row(3)), {"file_scope": "DELTA"}, name="b.xlsx")
+    answers = {"file_scope": "DELTA", "remember_scope": True}
+    _import(api_client, env, file_of(row(1), row(3)), answers, name="b.xlsx")
 
     (profile,) = profiles_of(db_session, env, BookingMappingProfile)
     db_session.refresh(profile)
@@ -420,7 +422,8 @@ def test_a_remembered_partial_answer_keeps_a_later_file_from_taking_anything_awa
     api_client: TestClient, env: SourcesEnv, db_session: Session
 ) -> None:
     _import(api_client, env, file_of(*ONE_TWO_THREE))
-    _import(api_client, env, file_of(row(1), row(3)), {"file_scope": "PARTIAL"}, name="b.xlsx")
+    answers = {"file_scope": "PARTIAL", "remember_scope": True}
+    _import(api_client, env, file_of(row(1), row(3)), answers, name="b.xlsx")
 
     done = _import(api_client, env, file_of(row(3)), name="c.xlsx")
 
@@ -432,7 +435,7 @@ def test_another_structure_does_not_inherit_the_answer(
     api_client: TestClient, env: SourcesEnv, db_session: Session
 ) -> None:
     _import(api_client, env, file_of(*ONE_TWO_THREE))
-    _import(api_client, env, file_of(row(1), row(3)), {"file_scope": "FULL"}, name="b.xlsx")
+    _import(api_client, env, file_of(row(1), row(3)), COMPLETE_FROM_NOW_ON, name="b.xlsx")
     # the same bookings from another export: a column it remembers is gone, so it is another family
     without_rooms = [[cell for at, cell in enumerate(one) if at != 4] for one in ALWAYS]
     headers = [header for header in HEADERS if header != "Camere"]
@@ -448,7 +451,8 @@ def test_a_header_renamed_to_what_reads_the_same_is_still_that_structure(
     api_client: TestClient, env: SourcesEnv, db_session: Session
 ) -> None:
     _import(api_client, env, file_of(*ONE_TWO_THREE))
-    _import(api_client, env, file_of(row(1), row(3)), {"file_scope": "PARTIAL"}, name="b.xlsx")
+    answers = {"file_scope": "PARTIAL", "remember_scope": True}
+    _import(api_client, env, file_of(row(1), row(3)), answers, name="b.xlsx")
     renamed = xlsx_bytes({"Altro": [["Numero prenotazione", *HEADERS[1:]], *ALWAYS, row(3)]})
 
     body = understand(api_client, env, BOOKINGS, "c.xlsx", renamed)
@@ -461,15 +465,15 @@ def test_a_column_more_is_the_same_structure_and_keeps_the_answer(
     api_client: TestClient, env: SourcesEnv, db_session: Session
 ) -> None:
     _import(api_client, env, file_of(*ONE_TWO_THREE))
-    _import(api_client, env, file_of(row(1), row(3)), {"file_scope": "FULL"}, name="b.xlsx")
+    answers = {"file_scope": "PARTIAL", "remember_scope": True}
+    _import(api_client, env, file_of(row(1), row(3)), answers, name="b.xlsx")
 
     body = understand(
         api_client, env, BOOKINGS, "c.xlsx", file_of(row(3), extra={"Trattamento": "BB"})
     )
 
     assert _questions(body) == []
-    assert body["proposal"]["file_scope"] == "FULL"
-    assert body["understanding"]["removes"] == 1
+    assert body["proposal"]["file_scope"] == "PARTIAL"
 
 
 def test_the_question_comes_last_after_what_the_file_itself_needs_answered(

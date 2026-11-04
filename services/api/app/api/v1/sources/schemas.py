@@ -217,6 +217,13 @@ class DocumentSummaryResponse(BaseModel):
     amounts: str | None = None
 
 
+class ScopePreflightResponse(BaseModel):
+    effective_scope: str | None
+    remembered_scope: str | None
+    removal_count: int
+    requires_scope_confirmation: bool
+
+
 class UnderstandingResponse(BaseModel):
     level: str
     detection: DetectionResponse
@@ -227,6 +234,7 @@ class UnderstandingResponse(BaseModel):
     blockers: list[BlockerResponse]
     assumed: list[str]
     removes: int
+    scope: ScopePreflightResponse
 
 
 class DryRunSummaryResponse(BaseModel):
@@ -414,6 +422,7 @@ __all__ = [
     "InvalidRowResponse",
     "MappedFileRequest",
     "UnderstandRequest",
+    "ScopePreflightResponse",
     "UnderstandingResponse",
     "DryRunSummaryResponse",
     "QuestionResponse",

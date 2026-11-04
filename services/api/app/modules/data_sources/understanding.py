@@ -128,6 +128,7 @@ from app.modules.data_sources.understanding_types import (
     Question,
     QuestionKind,
     Recognized,
+    ScopePreflight,
     SheetSummary,
     SkippedSummary,
     TableSummary,
@@ -197,8 +198,10 @@ class UnderstandAnswers(BaseModel):
     column_fields: dict[str, str] = Field(default_factory=dict, max_length=60)
     # What the person taught: {"role_mapping": {"HK": "HOUSEKEEPING"}}.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict, max_length=4)
-    # What the file says about the records it does not hold.
+    # What THIS file says about the records it does not hold.
     file_scope: FileScope | None = None
+    # That answer is also for the next files of this structure: only then does the memory change.
+    remember_scope: bool = False
 
 
 @dataclass(slots=True)
@@ -637,17 +640,34 @@ class UnderstandingService:
         # A word about the file as a whole, and asked only of a file that is otherwise ready: until
         # then NINFA cannot even say which records are in it. It is never read from the file: a
         # person says it (now, or for this family before); with no such word, absence says nothing.
-        known_scope = answers.file_scope or kept_scope(choice)
-        removes = 0
+        # And a memory never takes anything away by itself: the same source can export a part with
+        # the same columns, so a person says it again whenever something would really stop counting.
+        remembered_scope = kept_scope(choice)
+        file_scope = answers.file_scope or remembered_scope
+        removal_count = 0
+        confirm = False
         if level == UnderstandingLevel.READY and source is not None:
-            effect = self._smart.scope_effect(adapter, decision, filename, content, source)
-            if effect and known_scope is None:
-                questions = [*questions, _scope_question(effect)]
-                level = UnderstandingLevel.ASK
-            elif effect and known_scope is FileScope.FULL:
-                removes = effect
-        if known_scope is not None:
-            decision = decision.model_copy(update={"file_scope": known_scope})
+            removal_count = self._smart.scope_effect(adapter, decision, filename, content, source)
+            if removal_count and answers.file_scope is None:
+                said = self._smart.scope_said_of_this_file(source, content)
+                if said is not None:
+                    file_scope = said
+                elif remembered_scope is None:
+                    questions = [*questions, _scope_question(removal_count)]
+                    level = UnderstandingLevel.ASK
+                elif remembered_scope is FileScope.FULL:
+                    confirm = True
+                    file_scope = None
+                    questions = [*questions, _scope_confirmation(removal_count)]
+                    level = UnderstandingLevel.ASK
+        removes = removal_count if file_scope is FileScope.FULL else 0
+        decision = decision.model_copy(
+            update={
+                "file_scope": file_scope,
+                "remembered_file_scope": remembered_scope,
+                "expected_removals": removes,
+            }
+        )
         columns = tuple(
             self._column_info(sample, cp)
             for sample, cp in zip(samples, proposal.columns, strict=True)
@@ -665,6 +685,7 @@ class UnderstandingService:
             blockers=tuple(blockers),
             assumed=tuple(sorted(assumed)),
             removes=removes,
+            scope=ScopePreflight(file_scope, remembered_scope, removal_count, confirm),
         )
         complete = check.valid
         canonical = complete and all(
@@ -1665,6 +1686,15 @@ def _scope_question(absent_records: int) -> Question:
     )
 
 
+def _scope_confirmation(absent_records: int) -> Question:
+    return Question(
+        id="FILE_SCOPE_CONFIRM",
+        kind=QuestionKind.FILE_SCOPE_CONFIRM,
+        choices=(Choice(FileScope.FULL.value), Choice(FileScope.PARTIAL.value)),
+        absent_records=absent_records,
+    )
+
+
 def _synthetic_header(table: SourceTable, kind: str) -> str | None:
     wanted = DEPARTMENT_HEADERS.get(kind)
     if wanted is None:
@@ -1714,7 +1744,8 @@ def confirmation_from(answers: UnderstandAnswers, learning: LearningInfo | None)
         classified,
         shape,
         None if learning is None else learning.family,
-        answers.file_scope,
+        # (an answer about this import stays with this import, unless the person says otherwise)
+        answers.file_scope if answers.remember_scope else None,
     )
 
 

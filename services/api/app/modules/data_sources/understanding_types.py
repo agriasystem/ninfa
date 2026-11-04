@@ -11,6 +11,8 @@ label.
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from app.modules.ingestion.models import FileScope
+
 
 class QuestionKind(StrEnum):
     # What kind of data is this file? (the choices are the kinds of data)
@@ -41,6 +43,9 @@ class QuestionKind(StrEnum):
     # Records NINFA holds for this period are not in this file: does the file hold everything of the
     # period, or a part of it? Only asked when the answer changes what counts.
     FILE_SCOPE = "FILE_SCOPE"
+    # This family of files is remembered as complete, and this file would take something away: a
+    # memory does not do that by itself. Does THIS file hold everything of its period?
+    FILE_SCOPE_CONFIRM = "FILE_SCOPE_CONFIRM"
 
 
 class UnderstandingLevel(StrEnum):
@@ -116,7 +121,7 @@ class Question:
     labels: tuple[LabelCount, ...] = ()
     # How many labels there were in all (the list shows the most frequent ones).
     total_labels: int = 0
-    # FILE_SCOPE: how many records stored for this period the file does not hold.
+    # FILE_SCOPE, FILE_SCOPE_CONFIRM: how many records of this period the file does not hold.
     absent_records: int = 0
 
 
@@ -200,6 +205,20 @@ class DocumentSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class ScopePreflight:
+    """What the server found about the records this file does not hold. Computed from what the
+    source holds now, never told by a page, and computed again when the file is imported."""
+
+    # What this import would apply. None: nobody has said, or a person must say it first.
+    effective_scope: FileScope | None = None
+    # What this family of files remembers.
+    remembered_scope: FileScope | None = None
+    # What would stop counting if this file holds everything of its period.
+    removal_count: int = 0
+    requires_scope_confirmation: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class UnderstandingInfo:
     level: UnderstandingLevel
     detection: Detection
@@ -215,6 +234,7 @@ class UnderstandingInfo:
     # What this import will stop counting, because the file is known to hold everything of its
     # period: said on the summary, before anyone presses anything.
     removes: int = 0
+    scope: ScopePreflight = field(default_factory=ScopePreflight)
 
 
 __all__ = [
@@ -230,6 +250,7 @@ __all__ = [
     "Question",
     "QuestionKind",
     "Recognized",
+    "ScopePreflight",
     "SheetSummary",
     "SkippedSummary",
     "TableSummary",

@@ -434,7 +434,8 @@ def test_the_answer_is_remembered_for_that_structure(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
     _import(api_client, env, staff_file(BOTH_NAMES))
-    _import(api_client, env, staff_file(("Reception",)), {"file_scope": "PARTIAL"}, name="b.xlsx")
+    answers = {"file_scope": "PARTIAL", "remember_scope": True}
+    _import(api_client, env, staff_file(("Reception",)), answers, name="b.xlsx")
 
     body = understand(api_client, env, LABOR, "c.xlsx", staff_file(("Housekeeping",)))
 
@@ -447,7 +448,8 @@ def test_another_structure_does_not_inherit_the_answer(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
     _import(api_client, env, staff_file(BOTH_NAMES))
-    _import(api_client, env, staff_file(("Reception",)), {"file_scope": "FULL"}, name="b.xlsx")
+    answers = {"file_scope": "FULL", "remember_scope": True}
+    _import(api_client, env, staff_file(("Reception",)), answers, name="b.xlsx")
     other_headers = ["Data", "Settore", "Ore pianificate", "Spesa prevista"]
     rows = [[datetime(2027, 3, 1 + offset), "Reception", 8, 100] for offset in range(7)]
     other = xlsx_bytes({"Altro": [other_headers, *rows]})

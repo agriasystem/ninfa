@@ -85,6 +85,11 @@ class MappingInput(BaseModel):
     # (an answer, or the family's memory). Verified with the rest of a decision the server issued;
     # ignored on a matching built by hand, where nobody was asked.
     file_scope: FileScope | None = None
+    # What the family remembered when the server read the file, and what that reading found would
+    # stop counting. Issued and verified like `file_scope`: posted back different, they only get the
+    # decision refused, and what is taken away is computed again when it is taken away.
+    remembered_file_scope: FileScope | None = None
+    expected_removals: int = 0
     # Set by the server on the decisions IT issues (see `SmartImportDecision`); absent on a matching
     # the person builds by hand.
     smart_import: SmartImportDecision | None = None

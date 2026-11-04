@@ -56,6 +56,8 @@ class ImportProblem(StrEnum):
     FORMAT_UNCLEAR = "FORMAT_UNCLEAR"  # dates or numbers are written in a way NINFA cannot tell
     PROFILE_NOT_USABLE = "PROFILE_NOT_USABLE"  # the saved configuration cannot read this file
     SHEET_REQUIRED = "SHEET_REQUIRED"  # an Excel file with several sheets: one must be chosen
+    # What the file would take away changed after it was read: it must be read again.
+    DATA_CHANGED = "DATA_CHANGED"
     GENERIC = "GENERIC"
 
 
@@ -72,6 +74,7 @@ _PROBLEM_BY_CODE: dict[str, ImportProblem] = {
     "AMBIGUOUS_DATE_FORMAT": ImportProblem.INVALID_ROWS,
     "AMBIGUOUS_NUMBER_FORMAT": ImportProblem.INVALID_ROWS,
     "VALIDATION_FAILED": ImportProblem.INVALID_ROWS,
+    "IMPORT_PLAN_CHANGED": ImportProblem.DATA_CHANGED,
     "CANONICALIZATION_FAILED": ImportProblem.INVALID_ROWS,
     "DOCUMENT_CONFLICT": ImportProblem.INVALID_ROWS,
     "UNSUPPORTED_FATTURAPA": ImportProblem.UNSUPPORTED_FORMAT,
