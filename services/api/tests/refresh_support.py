@@ -32,6 +32,7 @@ from app.modules.ingestion.canonical_csv import (
 )
 from app.modules.ingestion.models import DataSourceDomain, FileScope
 from app.modules.ingestion.repository import DataSourceRepository
+from app.modules.ingestion.scope import ScopePlan
 from app.modules.intelligence.expected.seasonality import eligible_stay_dates
 from app.modules.labor.mapping import LaborField
 from app.modules.labor.service import LaborImportService
@@ -117,7 +118,7 @@ class Hotel:
                     filename=name,
                     content=content,
                     property_id=self.property_id,
-                    file_scope=file_scope,
+                    scope=ScopePlan(file_scope),
                 )
             assert result.succeeded, result
             return
@@ -164,7 +165,7 @@ class Hotel:
                     content=content,
                     snapshot_local_date=on or local_today(),
                     property_id=self.property_id,
-                    file_scope=file_scope,
+                    scope=ScopePlan(file_scope),
                 )
             assert result.succeeded, result
             return source_id

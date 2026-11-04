@@ -79,6 +79,7 @@ from app.modules.ingestion.repository import (
     ImportJobRepository,
 )
 from app.modules.ingestion.schemas import ImportFileCreate, ImportJobCreate
+from app.modules.ingestion.scope import NO_SCOPE, ScopePlan
 from app.modules.properties.models import Property
 from app.modules.properties.repository import PropertyRepository
 
@@ -379,7 +380,7 @@ class BookingImportService:
         mime_type: str | None = None,
         property_id: UUID | None = None,
         mapping_override: MappingConfig | None = None,
-        file_scope: FileScope | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> BookingImportResult:
         """Import one booking file into the canonical model, atomically and idempotently.
 
@@ -390,9 +391,9 @@ class BookingImportService:
         instead of the data source's saved profile, and saves nothing: the caller decides whether
         to keep it, once the import has succeeded.
 
-        `file_scope` is what the caller knows this file to be. Only `FileScope.FULL` makes the
-        absence of a booking mean anything; with anything else, or nothing, bookings the file does
-        not hold are left alone.
+        `scope` is what the caller knows this file to be. Only `FileScope.FULL` makes the absence of
+        a booking mean anything; with anything else, or nothing, bookings the file does not hold are
+        left alone.
 
         Raises BookingImportError(BOOKING_INVALID_DATA_SOURCE) when the data source cannot be
         used (nothing is created). Every later problem ends as a FAILED ImportJob and a returned
@@ -422,7 +423,7 @@ class BookingImportService:
 
         try:
             result = self._run(
-                ids, filename, content, timezone, duplicate_of, mapping_override, file_scope
+                ids, filename, content, timezone, duplicate_of, mapping_override, scope
             )
         except BookingImportError as error:
             result = self._fail(ids, error.error_code, error.message, error.details, duplicate_of)
@@ -460,7 +461,7 @@ class BookingImportService:
         timezone: ZoneInfo,
         duplicate_of: UUID | None,
         mapping_override: MappingConfig | None = None,
-        file_scope: FileScope | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> BookingImportResult:
         detect_file_type(filename, content)  # unsupported types first, before anything else
         stored_signature: str | None = None
@@ -521,7 +522,7 @@ class BookingImportService:
                 counts=counts,
             )
         return self._canonicalize(
-            ids, timezone, duplicate_of, schema.signature_matches, counts, file_scope
+            ids, timezone, duplicate_of, schema.signature_matches, counts, scope
         )
 
     def _extract(self, table: SourceTable, config: MappingConfig) -> list[_ExtractedRow]:
@@ -627,11 +628,12 @@ class BookingImportService:
         duplicate_of: UUID | None,
         signature_matches: bool,
         counts: _RowCounts,
-        file_scope: FileScope | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> BookingImportResult:
         """T4: every valid row becomes a canonical booking, or none does. An explicit status is
         always what counts: only a complete file makes a booking it does not hold no longer
-        current, and only inside the period the file itself covers."""
+        current, and only inside the period the file itself covers. What it takes away is computed
+        here, under the lock: if that is not what the person was shown, nothing is imported."""
         try:
             # One canonicalisation per data source at a time: a concurrent import of the same
             # source waits, then sees these bookings and treats them as known.
@@ -640,6 +642,22 @@ class BookingImportService:
             bookings = [
                 NormalizedBooking.from_payload(row.normalized_payload or {}) for row in staged
             ]
+            complete = scope.file_scope is FileScope.FULL and bool(bookings)
+            held = [booking.source_record_id for booking in bookings]
+            first = min((booking.check_in for booking in bookings), default=None)
+            last = max((booking.check_in for booking in bookings), default=None)
+            if complete and first is not None and last is not None:
+                absent = self._bookings.count_absent_from(ids.data_source, held, first, last)
+                if scope.is_stale(absent):
+                    return self._fail(
+                        ids,
+                        BookingErrorCode.IMPORT_PLAN_CHANGED,
+                        "What this file would take away changed after it was read: "
+                        "nothing was imported",
+                        {"schema_signature_matches": signature_matches},
+                        duplicate_of,
+                        counts=counts,
+                    )
 
             channel_ids: dict[str, UUID] = {}
             for booking in bookings:
@@ -657,19 +675,16 @@ class BookingImportService:
                 ],
             )
             removed = 0
-            if file_scope is FileScope.FULL and bookings:
+            if complete and first is not None and last is not None:
                 removed = self._bookings.remove_absent_from(
-                    ids.data_source,
-                    ids.job,
-                    [booking.source_record_id for booking in bookings],
-                    min(booking.check_in for booking in bookings),
-                    max(booking.check_in for booking in bookings),
+                    ids.data_source, ids.job, held, first, last
                 )
             self._rows.mark_valid_rows_imported(ids.job)
             self._jobs.succeed(
                 ids.job,
                 changed_data=outcome.created + outcome.updated + removed > 0,
-                file_scope=file_scope,
+                file_scope=scope.file_scope,
+                remembered_file_scope=scope.remembered_file_scope,
             )
             self._session.commit()
         except Exception as error:

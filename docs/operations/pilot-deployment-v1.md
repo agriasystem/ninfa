@@ -173,11 +173,11 @@ startup**: they are this explicit step.
    ```
 7. **Verify the schema.** The current revision must equal the head, and there must be one head:
    ```bash
-   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" current   # 0015_import_scope (head)
-   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" heads     # 0015_import_scope
+   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" current   # 0016_remembered_scope (head)
+   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" heads     # 0016_remembered_scope
    ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" check     # No new upgrade operations detected.
    ```
-   The required head at this release is **`0015_import_scope`**. If a later release
+   The required head at this release is **`0016_remembered_scope`**. If a later release
    adds migrations, this document is updated with it.
 8. **Start the API:** `sudo systemctl start ninfa-api`; confirm `GET /api/v1/health` returns 200.
 9. **Start the worker:** `sudo systemctl start ninfa-worker`; confirm "Starting worker" in its log.

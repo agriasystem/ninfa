@@ -13,7 +13,7 @@ Record the date, the release commit and who ran it.
 | 2 | **Frontend loads over HTTPS** | open `https://<origin>/login` in a browser | the login page loads, valid certificate, no mixed-content warning; `http://<origin>/` redirects to HTTPS |
 | 3 | **API docs are off** | on the host: `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/docs` | `404` (production disables interactive docs) |
 | 4 | **Database connectivity** | `ninfa-py -m procrastinate -a worker.app.app healthchecks` | `DB connection: OK` and the jobs table found |
-| 5 | **Migration state** | `ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" current` and `… heads` | both `0015_import_scope` (current marked `(head)`) |
+| 5 | **Migration state** | `ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" current` and `… heads` | both `0016_remembered_scope` (current marked `(head)`) |
 | 6 | **Worker operational** | `ninfa-py -m worker heartbeat`, then `journalctl -u ninfa-worker -n 50` | within seconds the worker logs `Worker heartbeat: job executed`; `list_jobs task=system.heartbeat` in the Procrastinate shell shows `succeeded` |
 | 7 | **Policy / status command** | `ninfa-py -m worker analysis-status` | runs and prints `enabled_policies=N …` (0 on a fresh install) |
 | 8 | **Login** | a real pilot user logs in through the browser | lands on Oggi; in the browser's developer tools the `ninfa_session` cookie is **HttpOnly, Secure, SameSite=Lax**, with no explicit `Domain` |

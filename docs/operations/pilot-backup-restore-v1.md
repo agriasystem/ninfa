@@ -38,7 +38,7 @@ database**.
    reach production data (a temporary env file, never `/etc/ninfa/api.env`, with
    `ASK_NINFA_PROVIDER=unconfigured` and no API key).
 3. **Alembic current is correct:** `current` shows the revision that matches the backup's release
-   (the head of the release that was running, for example `0015_import_scope`), and
+   (the head of the release that was running, for example `0016_remembered_scope`), and
    `alembic check` reports no differences.
 4. **Critical tables are readable**, by an AGRIA administrator with a read-only session: row counts
    look right for `users`, `workspaces`, `properties`, `data_sources`, `import_jobs`, `bookings`,

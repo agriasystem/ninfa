@@ -1,7 +1,7 @@
 """Migration 0015_import_scope: additive, every existing row keeps meaning what it meant, one head,
 and it will not go back once going back would change what the data say.
 
-The current global head lives here (`test_01`); the older migration files name it as a constant.
+The current global head lives in `test_remembered_scope_migration.py`.
 """
 
 import uuid
@@ -18,6 +18,7 @@ from tests.support import alembic_config
 
 HEAD = "0015_import_scope"
 PREVIOUS_HEAD = "0014_same_day_revisions"
+CURRENT_GLOBAL_HEAD = "0016_remembered_scope"
 
 
 @pytest.fixture
@@ -36,10 +37,9 @@ def _columns(engine: Engine, table: str) -> set[str]:
     return {column["name"] for column in inspect(engine).get_columns(table)}
 
 
-def test_01_there_is_exactly_one_head_and_it_sits_on_0014(test_database_url: str) -> None:
+def test_01_this_migration_sits_on_0014(test_database_url: str) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
-    assert scripts.get_heads() == [HEAD]
     assert scripts.get_revision(HEAD).down_revision == PREVIOUS_HEAD
 
 
@@ -67,7 +67,7 @@ def test_03_the_columns_come_and_go_with_it(
     assert "file_scope" not in _columns(db_engine, "import_jobs")
 
     command.upgrade(config, "head")
-    assert _revision(db_engine) == HEAD
+    assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert removal <= _columns(db_engine, "bookings")
 
 
@@ -179,7 +179,7 @@ def test_05_the_downgrade_refuses_to_bring_a_removed_booking_back(
     try:
         with pytest.raises(RuntimeError, match="count it again"):
             command.downgrade(alembic_config(test_database_url), PREVIOUS_HEAD)
-        assert _revision(db_engine) == HEAD
+        assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     finally:
         _purge(db_engine, workspace)
 
@@ -191,7 +191,7 @@ def test_06_the_downgrade_refuses_to_forget_a_complete_file(
     try:
         with pytest.raises(RuntimeError, match="complete file"):
             command.downgrade(alembic_config(test_database_url), PREVIOUS_HEAD)
-        assert _revision(db_engine) == HEAD
+        assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     finally:
         _purge(db_engine, workspace)
 

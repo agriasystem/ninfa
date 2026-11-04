@@ -133,6 +133,9 @@ class ImportJob(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     # What this file was known to be when it was imported. NULL: not known, and then the absence of
     # a record says nothing.
     file_scope: Mapped[FileScope | None] = mapped_column(enum_column(FileScope, 16))
+    # What the family of files remembered when this import was read: with `file_scope`, what
+    # explains why a record stopped counting, or why it did not. NULL: nothing was remembered.
+    remembered_file_scope: Mapped[FileScope | None] = mapped_column(enum_column(FileScope, 16))
 
     data_source: Mapped["DataSource"] = relationship("DataSource", viewonly=True)
     files: Mapped[list["ImportFile"]] = relationship("ImportFile", viewonly=True)
@@ -159,6 +162,10 @@ class ImportJob(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         CheckConstraint(
             f"file_scope IS NULL OR {values_check('file_scope', FileScope)}",
             name="file_scope_valid",
+        ),
+        CheckConstraint(
+            f"remembered_file_scope IS NULL OR {values_check('remembered_file_scope', FileScope)}",
+            name="remembered_file_scope_valid",
         ),
         CheckConstraint(
             "(status = 'PENDING' AND started_at IS NULL AND finished_at IS NULL)"

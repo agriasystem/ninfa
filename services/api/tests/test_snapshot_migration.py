@@ -17,7 +17,7 @@ from tests.support import alembic_config
 
 GATE_2_HEAD = "0004_booking_ingestion"
 GATE_3_HEAD = "0005_booking_snapshots_metrics"
-HEAD = "0015_import_scope"  # the global head (V1.2); Gate 3's own is GATE_3_HEAD
+HEAD = "0016_remembered_scope"  # the global head (V1.2); Gate 3's own is GATE_3_HEAD
 GATE_3_TABLES = {"room_inventory_daily", "booking_snapshots"}
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_3_FUNCTION = "booking_snapshots_forbid_update"

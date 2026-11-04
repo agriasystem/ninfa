@@ -278,11 +278,13 @@ class ImportJobRepository:
         *,
         changed_data: bool | None = None,
         file_scope: FileScope | None = None,
+        remembered_file_scope: FileScope | None = None,
     ) -> ImportJob:
         job = self._load_for_transition(import_job_id, {ImportJobStatus.RUNNING})
         job.status = ImportJobStatus.SUCCEEDED
         job.changed_data = changed_data
         job.file_scope = file_scope
+        job.remembered_file_scope = remembered_file_scope
         job.finished_at = datetime.now(UTC)
         job.error_code = None
         job.error_message = None

@@ -247,8 +247,8 @@ def test_there_is_no_migration_for_gate_7() -> None:
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
     # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0015_import_scope"]
-    assert len(revisions) == 15  # 0001 .. 0015: Gate 7 added none
+    assert script.get_heads() == ["0016_remembered_scope"]
+    assert len(revisions) == 16  # 0001 .. 0016: Gate 7 added none
 
 
 # --- read-only, no clock, no float ---------------------------------------------------------------

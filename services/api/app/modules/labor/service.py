@@ -58,6 +58,7 @@ from app.modules.ingestion.repository import (
     ImportJobRepository,
 )
 from app.modules.ingestion.schemas import ImportFileCreate, ImportJobCreate
+from app.modules.ingestion.scope import NO_SCOPE, ScopePlan
 from app.modules.labor.canonical import (
     CanonicalEntry,
     content_key,
@@ -379,7 +380,7 @@ class LaborImportService:
         mime_type: str | None = None,
         property_id: UUID | None = None,
         mapping_override: LaborMappingConfig | None = None,
-        file_scope: FileScope | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> LaborImportResult:
         """Import one labor file into the canonical model, atomically and idempotently.
 
@@ -390,8 +391,8 @@ class LaborImportService:
         instead of the data source's saved profile, and saves nothing: the caller decides whether
         to keep it, once the import has succeeded.
 
-        `file_scope` is what the caller knows this file to be: only `FileScope.FULL` makes what it
-        does not hold, between its first day and its last, stop counting.
+        `scope` is what the caller knows this file to be: only `FileScope.FULL` makes what it does
+        not hold, between its first day and its last, stop counting.
         """
         if type(snapshot_local_date) is not date:
             raise LaborImportError(
@@ -429,7 +430,7 @@ class LaborImportService:
                 duplicate_of,
                 prop,
                 mapping_override,
-                file_scope,
+                scope,
             )
         except LaborImportError as error:
             result = self._fail(ids, error.error_code, error.message, _details(error), duplicate_of)
@@ -467,7 +468,7 @@ class LaborImportService:
         duplicate_of: UUID | None,
         prop: Property,
         mapping_override: LaborMappingConfig | None = None,
-        file_scope: FileScope | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> LaborImportResult:
         stored_signature: str | None = None
         if mapping_override is not None:
@@ -526,7 +527,7 @@ class LaborImportService:
                 summary=summary,
                 counts=counts,
             )
-        return self._canonicalize(ids, snapshot_local_date, duplicate_of, counts, prop, file_scope)
+        return self._canonicalize(ids, snapshot_local_date, duplicate_of, counts, prop, scope)
 
     def _open_table(
         self,
@@ -557,9 +558,11 @@ class LaborImportService:
         duplicate_of: UUID | None,
         counts: _Counts,
         prop: Property,
-        file_scope: FileScope | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> LaborImportResult:
-        """Every valid row becomes a canonical entry of ONE labor snapshot, or none does."""
+        """Every valid row becomes a canonical entry of ONE labor snapshot, or none does. What a
+        complete file stops counting is computed here, under the lock: if that is not what the
+        person was shown, nothing is imported."""
         try:
             lock_data_source(self._session, ids.data_source)  # one canonicalisation per source
 
@@ -571,8 +574,18 @@ class LaborImportService:
                 entries=entries,
             )
             reading = _Reading.of(self._entries, ids.data_source, snapshot_local_date, entries)
-            cleared = reading.cells_cleared() if file_scope is FileScope.FULL else 0
-            already_counting = reading.snapshot_already_saying_it(file_scope)
+            cleared = reading.cells_cleared() if scope.file_scope is FileScope.FULL else 0
+            if scope.file_scope is FileScope.FULL and scope.is_stale(cleared):
+                return self._fail(
+                    ids,
+                    LaborErrorCode.IMPORT_PLAN_CHANGED,
+                    "What this file would stop counting changed after it was read: "
+                    "nothing was imported",
+                    None,
+                    duplicate_of,
+                    counts=counts,
+                )
+            already_counting = reading.snapshot_already_saying_it(scope.file_scope)
             if already_counting is not None:
                 snapshot_id = already_counting
                 created = 0
@@ -601,7 +614,12 @@ class LaborImportService:
                 reused = False
 
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job, changed_data=not reused, file_scope=file_scope)
+            self._jobs.succeed(
+                ids.job,
+                changed_data=not reused,
+                file_scope=scope.file_scope,
+                remembered_file_scope=scope.remembered_file_scope,
+            )
             self._session.commit()
         except LaborImportError:
             raise  # rolled back and recorded as FAILED by import_file

@@ -18,7 +18,7 @@ from tests.support import alembic_config
 
 HEAD = "0014_same_day_revisions"
 PREVIOUS_HEAD = "0013_property_analysis_policy"
-CURRENT_GLOBAL_HEAD = "0015_import_scope"
+CURRENT_GLOBAL_HEAD = "0016_remembered_scope"
 REVISED_TABLES = ("booking_snapshots", "labor_snapshots", "invoices")
 
 
