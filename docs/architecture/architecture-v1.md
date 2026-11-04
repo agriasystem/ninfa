@@ -301,7 +301,8 @@ resolves each supplier by **VAT number, then tax code, then IBAN hash, then exac
 IBAN so **the raw IBAN is never stored**, and **never merges on a fuzzy match**: a similar name only
 opens a `PENDING` possible-duplicate review. An invoice is identified by property, supplier, number,
 date and kind (**not** by the data source), is **immutable** and carries **signed** amounts (a credit
-note is negative); re-imports are idempotent and a changed document is `INVOICE_DOCUMENT_CONFLICT`.
+note is negative); re-imports are idempotent, a corrected spreadsheet row is the document's next
+revision, and a changed FatturaPA is `INVOICE_DOCUMENT_CONFLICT`.
 Lines get a cost category by deterministic rules with a provenance confidence. Import is **atomic**:
 parse, validate and stage, then one transaction or nothing. **PDF, OCR and signed .p7m are not
 supported.** No cost baseline, cost per occupied room, anomaly, decision, API, worker task or

@@ -146,7 +146,8 @@ a conflict when it is not.
 | Situation | Result |
 | --------- | ------ |
 | same identity, same fingerprint | no-op (the existing invoice is reused; counted as `invoices_unchanged`) |
-| same identity, different canonical content | `INVOICE_DOCUMENT_CONFLICT` — never a silent update; the whole import is rolled back |
+| same identity, different canonical content, both from a spreadsheet | the document's next `revision`: the older one stays, only the newest counts ([same-day-revisions-v1.md](same-day-revisions-v1.md)) |
+| same identity, different canonical content, a FatturaPA on either side | `INVOICE_DOCUMENT_CONFLICT` — a fiscal document is never replaced; the whole import is rolled back |
 | the same file twice in one data source | no duplicate; the result names the earlier file (`duplicate_of_import_file_id`, informational) |
 | the same invoice twice inside one import | `INVOICE_DOCUMENT_CONFLICT` (`duplicate_in_import`) |
 | the same number in another property, on another date, from another supplier, or as an invoice vs a credit note | another invoice |
@@ -309,7 +310,7 @@ Branch on the code, never the message.
 | `INVOICE_AMBIGUOUS_DATE_FORMAT`, `INVOICE_AMBIGUOUS_NUMBER_FORMAT` | formats that must be stated |
 | `INVOICE_UNSUPPORTED_FATTURAPA`, `INVOICE_XML_SECURITY_REJECTED` | XML that is not 1.2.x FatturaPA; a DOCTYPE / entity |
 | `INVOICE_VALIDATION_FAILED` | at least one invalid row (see the row codes) |
-| `INVOICE_DOCUMENT_CONFLICT` | an existing invoice with a different content, or a duplicate in the file |
+| `INVOICE_DOCUMENT_CONFLICT` | a fiscal document that comes back with a different content, or a duplicate in the file |
 | `SUPPLIER_IDENTITY_CONFLICT`, `SUPPLIER_NAME_AMBIGUOUS` | supplier resolution refused to guess |
 | `INVOICE_CANONICALIZATION_FAILED`, `INVOICE_INTERNAL_ERROR` | the database refused the batch (constraint name only); a bug |
 

@@ -94,8 +94,9 @@ deployment package, the daily wrapper (`scripts/run-daily-analysis.sh`) and the 
 
 The Gate 25 CLI (`python -m app.cli.analysis`) and `python -m worker enqueue-analysis` stay
 available. A manual run today also blocks the automatic one. Re-running the same data is a safe
-replay; running again the same day **after the bookings changed** raises the existing snapshot
-CONFLICT. This is intentional and unchanged: import before the cut-off, then let the day run once.
+replay; running again the same day **after the bookings changed** analyses the day's next revision
+([same-day-revisions-v1.md](same-day-revisions-v1.md)). The scheduled run itself is unchanged: it does
+not run twice in a day, and imports through the web API bring the analysis up to date on their own.
 
 ## Not solved / deferred
 

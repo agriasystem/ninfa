@@ -85,10 +85,12 @@ PostgreSQL `ENUM`, so the list changes with an ordinary migration.
 property_id, data_source_id, entries}`, where `entries` is every canonical entry's payload
 (work date, normalised role, category, minutes, cost, currency, classification provenance —
 **never** the file name, the import job id, `created_at` or a row number), sorted by their own
-canonical JSON text so the fingerprint never depends on the input row order. Same snapshot date +
-same fingerprint: a no-op that reuses the existing `LaborSnapshot` (`snapshot_reused=True`, zero
-new entries). Same snapshot date + a different fingerprint: `LABOR_SNAPSHOT_CONFLICT` — a revision
-of the plan must arrive as a NEW snapshot date, never an edit of an existing one.
+canonical JSON text so the fingerprint never depends on the input row order.
+
+A file that says what already counts is a no-op (`snapshot_reused=True`, zero new entries, the job's
+`changed_data` is false), compared cell by cell on the canonical content. Any other file is a new
+snapshot, on its date, at that date's next `revision`, and never an edit of an existing one: what
+counts is decided on reading ([same-day-revisions-v1.md](same-day-revisions-v1.md)).
 
 ## Atomicity
 
@@ -102,7 +104,7 @@ an unexpected exception never leaves a job `RUNNING`.
 Job-level: `LABOR_INVALID_DATA_SOURCE`, `LABOR_UNSUPPORTED_FILE_TYPE`, `LABOR_UNREADABLE_FILE`,
 `LABOR_EMPTY_FILE`, `LABOR_FILE_LIMIT_EXCEEDED`, `LABOR_DUPLICATE_HEADER`, `LABOR_MAPPING_REQUIRED`,
 `LABOR_INVALID_MAPPING`, `LABOR_SOURCE_SCHEMA_CHANGED`, `LABOR_AMBIGUOUS_DATE_FORMAT`,
-`LABOR_AMBIGUOUS_NUMBER_FORMAT`, `LABOR_SNAPSHOT_DATE_REQUIRED`, `LABOR_SNAPSHOT_CONFLICT`,
+`LABOR_AMBIGUOUS_NUMBER_FORMAT`, `LABOR_SNAPSHOT_DATE_REQUIRED`,
 `LABOR_VALIDATION_FAILED`, `LABOR_CANONICALIZATION_FAILED`, `LABOR_INTERNAL_ERROR`. Row-level (also
 used as job-level summary keys): `LABOR_REQUIRED_VALUE_MISSING`, `LABOR_INVALID_DATE`,
 `LABOR_INVALID_NUMBER`, `LABOR_NEGATIVE_VALUE`, `LABOR_FRACTIONAL_MINUTES`, `LABOR_HOURS_MISSING`,

@@ -19,7 +19,7 @@ calls the services.
 | Made by | `ObservedSnapshotService.take_snapshot` | `BookingSnapshotReconstructionService.reconstruct` |
 | `as_of_at` | the injected clock's now (UTC) | the exclusive end of the snapshot day (UTC) |
 | Uncertainty | none (current statuses are known) | `uncertain_booking_count` / `uncertain_rooms` |
-| Can it be replaced? | never | never (a different content raises a conflict) |
+| Can it be replaced? | never: a different content is the day's next revision | never (a different content raises a conflict) |
 | Wins a key clash? | **yes**, always | no |
 | Called "exact"? | no: it is evidence of what was seen, not of the past | no, and never "historical truth" |
 
@@ -126,8 +126,8 @@ per property and night. `rooms_total` was **not** added to `Property`.
 service = ObservedSnapshotService(session, TenantContext(workspace_id))
 result = service.take_snapshot(property_id=..., data_source_id=...,
                                stay_date_start=date(2026, 3, 20), stay_date_end=date(2026, 7, 21))
-# result.created / result.unchanged; a different content for a stored key raises
-# SnapshotError with code BOOKING_SNAPSHOT_CONFLICT
+# result.created / result.revised / result.unchanged / result.revision; a different content for
+# a stored key is written at the day's next revision, the stored row stays as it is
 ```
 
 Both dates are included. The caller **cannot** choose `as_of_at` or the snapshot day: `as_of_at` is
@@ -141,10 +141,12 @@ the data source must be a `BOOKINGS` / `FILE_UPLOAD`, active source of **that pr
 `COSTS`/`LABOR` source, another property's, another workspace's or an unknown one is refused; the
 last two are indistinguishable). The range has a limit (731 days).
 
-One observation per data source, snapshot day and stay night: rerunning the same day with the same
-content is an **idempotent no-op** (the first `as_of_at` is kept); rerunning it after the bookings or
-the inventory changed raises `BOOKING_SNAPSHOT_CONFLICT`, stores nothing (the whole run is atomic)
-and never updates the stored row. The next local day observes again.
+A day can be observed more than once: rerunning the same day with the same content is an **idempotent
+no-op** (the first `as_of_at` is kept); rerunning it after the bookings or the inventory changed adds a
+row, for the nights that changed, at the day's next `revision`, and never updates a stored row. The
+newest revision of a night is what every read by day or key returns
+([same-day-revisions-v1.md](same-day-revisions-v1.md)). `BOOKING_SNAPSHOT_CONFLICT` is left for an
+observation over a reconstruction, and for two reconstructions that disagree.
 
 ## Historical reconstruction
 
@@ -314,7 +316,7 @@ and 200 000 stored rows per reconstruction.
 
 | Code | When |
 | ---- | ---- |
-| `BOOKING_SNAPSHOT_CONFLICT` | a stored snapshot with different content exists for the key (HTTP-style status 409) |
+| `BOOKING_SNAPSHOT_CONFLICT` | an observation over a reconstruction of the key, or two reconstructions that disagree (HTTP-style status 409) |
 | `BOOKING_SNAPSHOT_INVALID_PROPERTY` | property unknown/foreign, archived or with an invalid time zone (`details.reason`) |
 | `BOOKING_SNAPSHOT_INVALID_DATA_SOURCE` | `not_found`, `wrong_domain`, `wrong_source_type`, `inactive`, `property_mismatch` |
 | `BOOKING_SNAPSHOT_INVALID_RANGE` | `start_after_end`, `too_long`, `too_many_rows`, `snapshot_date_not_completed` |

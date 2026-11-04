@@ -76,8 +76,8 @@ Then the provenance policy, ordering and caps:
 * Zero is a real value: a comparable with `rooms_on_books = 0` enters the sample.
 
 With the V1 constants at most 24 stay dates can qualify for one target (two seasonal windows of
-about 12 same-weekday dates each) and a data source has exactly one snapshot per (stay date, lead
-time), so the 24 cap is a structural guarantee: it can only bind on hand-built input, and is
+about 12 same-weekday dates each) and a read gives exactly one snapshot per (stay date, lead time),
+the last revision of that day, so the 24 cap is a structural guarantee: it can only bind on hand-built input, and is
 tested there. The query that fetches the candidates asks for the exact `(snapshot day, stay date)`
 keys the calendar allows (a few dozen), never for a scan of the history.
 

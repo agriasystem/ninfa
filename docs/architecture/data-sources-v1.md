@@ -131,12 +131,13 @@ it is never stored by the API; 10 MB maximum (413 `FILE_TOO_LARGE`). The canonic
 CLI to `app/modules/ingestion/canonical_csv.py` and the CLI now imports it: one copy, same behaviour (its tests pass).
 
 Problems are words, never technical text: `UNSUPPORTED_FILE`, `UNREADABLE_FILE`, `EMPTY_FILE`, `NO_ROWS`, `FILE_TOO_LARGE`,
-`MISSING_COLUMNS`, `DUPLICATE_COLUMNS`, `INVALID_ROWS`, `UNSUPPORTED_FORMAT`, `SAME_DAY_CONFLICT`, `GENERIC`. The import
+`MISSING_COLUMNS`, `DUPLICATE_COLUMNS`, `INVALID_ROWS`, `UNSUPPORTED_FORMAT`, `GENERIC`. The import
 service's own error codes are mapped in ONE place (`files.problem_of_code`); the technical detail stays in the server log.
 
 Labor files are dated `snapshot_local_date`: **the property-local day, sent by the page, never guessed** (the import
 service insists on an explicit date; the page tells the user "I dati vengono registrati con la data di oggi (...)"). A
-different labor file for the same day is a `SAME_DAY_CONFLICT`, not an overwrite.
+different labor file for the same day is the next revision of that day, never an overwrite
+([same-day-revisions-v1.md](same-day-revisions-v1.md)).
 
 ## Frontend
 

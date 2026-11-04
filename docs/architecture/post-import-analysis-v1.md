@@ -36,19 +36,18 @@ only the property's identity, so a job that waited still analyses what is there 
 bookings nothing runs, and the status says what the property holds and what it lacks
 (`NEEDS_BOOKINGS`). Labor and costs are still shown in Dati, which reads them directly.
 
-## The day keeps its first observation
+## Several files on one day
 
-`OBSERVED` snapshots are immutable per day (`booking-snapshots-v1.md`): if bookings change after
-today's observation, a new run of the same day raises `BOOKING_SNAPSHOT_CONFLICT`. This gate does not
-force it and does not call it a failure:
+A second file that changes something is analysed the same day, whatever it holds: a changed night joins
+the day as its next revision, and nothing earlier is rewritten ([same-day-revisions-v1.md](same-day-revisions-v1.md)).
+A file that changes nothing queues nothing, moves no status and no provenance.
+
+`DEFERRED` is what is left of the old rule: a stored reconstruction on today's key, which only a change of the
+property's time zone can produce. It clears by itself on the next local day, so it is not called a failure:
 
 - the job ends normally and the refresh is queued for just after the next local midnight;
 - the status says `DEFERRED`, with `next_attempt_at`;
-- today's run stands, and nothing pretends it has seen the new data.
-
-So **a second bookings file on the same day updates the data at once and the analysis the next day**,
-whenever it changes a night of the window. Importing labor or costs afterwards re-runs the analysis
-the same day, because the bookings have not changed.
+- a new import brings a waiting job forward, instead of leaving its data behind it.
 
 ## The status
 
@@ -61,12 +60,12 @@ own tables). Nothing is recorded for it, so nothing can disagree with them.
 | `NO_DATA` | nothing imported | the old message, and the way to the first file |
 | `NEEDS_BOOKINGS` | data, but no bookings | what it holds and what it lacks |
 | `SEVERAL_SOURCES` | several booking sources | it does not choose |
-| `NEW_DATA` | imports newer than the analysis, nothing under way | can be asked for (`can_retry`) |
+| `NEW_DATA` | imports that changed data since the analysis, nothing under way | can be asked for (`can_retry`) |
 | `IN_PROGRESS` | a job is waiting or running | "Aggiornamento analisi…", and it re-reads by itself |
 | `DELAYED` | the same, for more than 5 minutes (a stopped worker) | it takes longer than usual: neither "in progress" for ever nor a failure |
 | `DEFERRED` | see above | the new data count from tomorrow |
 | `FAILED` | the job failed | the data are safe, and the analysis did not update; can be asked again (`can_retry`) |
-| `UP_TO_DATE` | the analysis has seen every import | "Analisi aggiornata." right after an import, nothing at rest |
+| `UP_TO_DATE` | the analysis has seen every import that changed something | "Analisi aggiornata." right after an import, nothing at rest |
 
 `POST .../analysis/refresh` is only the recovery: it queues a job in `NEW_DATA` and `FAILED`, and changes
 nothing in any other state.
@@ -77,11 +76,9 @@ reads the latest. There is no client query cache to invalidate.
 
 ## Decisions to confirm
 
-1. **A second file that changes bookings on the same day waits for the next day.** Re-observing within a
-   day would mean changing what an observation is, with a migration: not done here.
-2. **Revenue for labor is on-books**, the only revenue NINFA holds for days to come (`data-ui-v1.md`).
-3. **A second, different staff file on the same day is refused** by the labor import, which keeps one
-   snapshot per source and day (`LABOR_SNAPSHOT_CONFLICT`), and the page says so. Unchanged here, and
-   two weekly files imported on one day meet it: allowing them needs a migration of its own.
+1. **Revenue for labor is on-books**, the only revenue NINFA holds for days to come (`data-ui-v1.md`).
+
+The two others this document used to list, a second bookings file waiting for the next day and a second
+staff file refused, were lifted by [same-day-revisions-v1.md](same-day-revisions-v1.md).
 
 See [ADR 0038](adr/0038-post-import-analysis-refresh.md).

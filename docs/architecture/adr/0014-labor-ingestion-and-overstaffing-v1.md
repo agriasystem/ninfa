@@ -31,7 +31,7 @@ an HR system, a scheduler, a payroll engine or a fourth reimplementation of dema
    `date.today()` or a file's mtime — for the same reason Gate 3's `BookingSnapshot` reads no clock:
    determinism, replay and backtesting. The same date and the same canonical content is a no-op
    (order-independent: the fingerprint sorts canonical entries); the same date and different content
-   is `LABOR_SNAPSHOT_CONFLICT`. A revision of the plan is a NEW snapshot date, never an edit.
+   is `LABOR_SNAPSHOT_CONFLICT` (superseded by [ADR 0039](0039-same-day-revisions.md): a second file of one date is the next `revision`, and `labor.current_plan` decides what counts). A revision of the plan is a NEW snapshot date, never an edit.
 5. **Deterministic classification, the Gate 6 pattern, not a duplicate.** `labor_category` is decided
    by exactly the same priority ladder as Gate 6's cost categories — explicit source (100), a saved
    mapping (95), a small phrase dictionary (80), or `OTHER` (0) — with the same policy: a role

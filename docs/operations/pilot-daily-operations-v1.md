@@ -125,22 +125,21 @@ or `cancel` commands without a developer.)
   explicit manual commands (`python -m app.cli.analysis run …`, `python -m worker enqueue-analysis
   …`). **Never edit rows or delete snapshots to "fix" a day.**
 
-## Changed bookings after today's analysis (snapshot conflict)
+## Several files on one day
 
-Each day's observation (a property's snapshot per stay night) is **immutable**. If the bookings
-**changed after today's analysis** (a corrected re-import, or a manual analysis earlier in the day on
-older data followed by a new import), a **changed-data re-run the same day may fail on purpose**
-with a snapshot conflict. That is the product working as designed, not a fault:
+A property can import as many files as it needs, of any kind, on any day (see
+`docs/architecture/same-day-revisions-v1.md`):
 
-- the day keeps its first observation; the next day's run proceeds normally;
-- re-running with identical data is a safe replay (no new run);
-- **do not delete snapshots, edit the database or try to force a re-run.**
+- bookings changed after today's analysis: the day's next observation, and a new analysis the same day.
+  The earlier observation stays as it was, and the earlier run keeps pointing at it;
+- a second staff file: new days live beside the others, days it repeats are replaced for the departments
+  it names, and hours and costs never add up;
+- a corrected row of a cost spreadsheet: the document's next version, and only the newest counts. A
+  FatturaPA that comes back different is refused, on purpose: it is corrected by a credit note;
+- the same data again: nothing moves, and the page says so.
 
-An import made through the web page handles this by itself: its refresh is queued for just after the
-next local midnight, and the page says so (see `docs/architecture/post-import-analysis-v1.md`).
-
-To avoid it: finish the import before the dispatch, and do not run a manual analysis before today's
-import.
+A re-run by hand (`python -m app.cli.analysis`) follows the same rules, and with identical data it is a safe
+replay. **Never delete snapshots or edit the database to "fix" a day:** a file with the right data is enough.
 
 ## Weekly and periodic
 
