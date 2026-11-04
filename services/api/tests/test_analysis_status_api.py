@@ -19,6 +19,7 @@ from app.modules.analysis.queue import ANALYSIS_REFRESH_TASK
 from app.modules.bookings.parsers import MAX_COLUMNS, MAX_ROWS
 from app.modules.data_sources.files import MAX_FILE_BYTES
 from tests.data_sources_support import (
+    LABOR_DAY,
     SourcesEnv,
     import_ok,
     malformed_booking_bytes,
@@ -118,6 +119,49 @@ def test_a_second_import_while_one_waits_adds_no_second_job(
     import_ok(api_client, env, "LABOR")
 
     assert [job[0] for job in _jobs(db_session, env)] == ["todo"]
+
+
+def test_the_same_file_again_asks_the_worker_nothing_and_says_it_changed_nothing(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    first = import_ok(api_client, env, "BOOKINGS")
+    assert first["changed_data"] is True
+    db_session.execute(
+        text("UPDATE procrastinate_jobs SET status = 'succeeded' WHERE task_name = :t"),
+        {"t": ANALYSIS_REFRESH_TASK},
+    )
+    db_session.flush()
+
+    second = import_ok(api_client, env, "BOOKINGS")
+
+    assert second["changed_data"] is False
+    assert second["already_imported"] is True
+    assert (second["created"], second["updated"]) == (0, 0)
+    assert [job[0] for job in _jobs(db_session, env)] == ["succeeded"]  # no second job
+
+
+def test_a_file_that_changes_something_asks_the_worker_again(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    first = import_ok(api_client, env, "LABOR")
+    assert first["changed_data"] is True
+    db_session.execute(
+        text("UPDATE procrastinate_jobs SET status = 'succeeded' WHERE task_name = :t"),
+        {"t": ANALYSIS_REFRESH_TASK},
+    )
+    db_session.flush()
+    other = (
+        b"work_date,labor_category,planned_hours,planned_cost,currency\n"
+        b"2026-11-03,HOUSEKEEPING,5,80.00,EUR\n"
+    )
+
+    response = raw(
+        api_client, env.imports_url("LABOR", "personale-2.csv", snapshot=LABOR_DAY), other
+    ).json()
+
+    assert response["succeeded"] is True
+    assert response["changed_data"] is True
+    assert [job[0] for job in _jobs(db_session, env)] == ["succeeded", "todo"]
 
 
 def test_a_failed_import_asks_nothing(

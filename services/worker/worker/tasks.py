@@ -48,7 +48,7 @@ async def heartbeat() -> None:
 
 # A plain `def` on purpose: Procrastinate runs a synchronous task in a thread pool, and the
 # analysis uses a synchronous SQLAlchemy Session. No retry is configured (deterministic failures -
-# unknown ids, snapshot CONFLICT, out-of-order run - would only loop); a failure is the job state
+# unknown ids, an out-of-order run - would only loop); a failure is the job state
 # `failed` plus the real exception in the worker log.
 @app.task(name=ANALYSIS_RUN_PROPERTY_TASK, queue=DEFAULT_QUEUE)
 def run_property_analysis_task(
@@ -135,8 +135,8 @@ def run_policy_analysis_task(*, workspace_id: str, property_id: str) -> None:
 
 # Sync `def` for the same reason as above, and no retry: a real failure stays a failed job, which
 # the status reports and the person can ask to repeat. The one outcome that is due again by itself
-# is a day that keeps its first observation: the refresh is queued for the next local day. `lock`
-# and `queueing_lock` come with the job (`queue.py`): one running and one waiting per property.
+# is a key that cannot be observed yet: the refresh is queued for the next local day. `lock` and
+# `queueing_lock` come with the job (`queue.py`): one running and one waiting per property.
 @app.task(name=ANALYSIS_REFRESH_TASK, queue=DEFAULT_QUEUE)
 def refresh_property_task(*, workspace_id: str, property_id: str) -> None:
     ids = f"workspace_id={workspace_id} property_id={property_id}"

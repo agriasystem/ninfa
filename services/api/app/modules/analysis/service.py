@@ -19,14 +19,15 @@ Procrastinate. It makes no choice for the caller: no source auto-selection, no s
 no cost month default - an omitted optional domain is recorded as SKIPPED/NOT_REQUESTED.
 
 The snapshot day is ALWAYS the real clock's "today" in the property's own time zone (see
-`snapshots/common.py`); the same-day immutability of OBSERVED snapshots is unchanged: a second
-run on the same day after the bookings changed raises the existing snapshot CONFLICT.
+`snapshots/common.py`). An OBSERVED snapshot stays immutable: a second run on the same day after the
+bookings changed adds the day's next revision and analyses that, and the run before keeps pointing
+at what it read. With nothing changed, a second run is an idempotent replay of the first.
 
 FAIL LOUD, NEVER A FALSE ALL-CLEAR (Gate 21A): no detector call below is wrapped in a try/except.
 If one raises, the exception propagates and `DecisionService.sync()` is never reached.
 
 COVERAGE (Gate 22) and PROVENANCE (Gate 23B) are built here, from the same booleans that decide
-the optional steps and from the latest SUCCEEDED import of the EXACT booking data source used.
+the optional steps and from the latest import that changed the EXACT booking data source used.
 """
 
 from dataclasses import dataclass
@@ -45,8 +46,13 @@ from app.modules.decisions.coverage import (
     DomainCoverageStatus,
     DomainSkipReason,
 )
-from app.modules.decisions.provenance import BookingProvenance, RunInputProvenance
+from app.modules.decisions.provenance import (
+    BookingProvenance,
+    DomainProvenance,
+    RunInputProvenance,
+)
 from app.modules.decisions.service import DecisionService
+from app.modules.ingestion.models import DataSourceDomain
 from app.modules.ingestion.repository import ImportJobRepository
 from app.modules.intelligence.costs.service import CostDecisionService
 from app.modules.intelligence.distribution.service import OtaDependencyService
@@ -225,6 +231,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
     # OBSERVED target snapshot and labor category, reusing the same targets as step 3.
     labor_target_count: int | None = None
     labor_evaluation_count: int | None = None
+    labor_files_read: set[UUID] = set()
     if labor_data_source_id is not None:
         target_snapshots = BookingSnapshotRepository(session, tenant).list_for_snapshot_date(
             booking_data_source_id,
@@ -250,6 +257,11 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
             for category in LaborCategory
         ]
         evaluations.extend(labor_evaluations)
+        labor_files_read = {
+            evaluation.target_labor_snapshot_id
+            for evaluation in labor_evaluations
+            if evaluation.target_labor_snapshot_id is not None
+        }
         labor_target_count = len(target_snapshots)
         labor_evaluation_count = len(labor_evaluations)
 
@@ -273,29 +285,37 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         )
     )
 
-    # 8. Provenance (Gate 23B): the latest SUCCEEDED import known, right now, for the EXACT
-    # booking data source this run used. No successful import yet is a legitimate, non-fatal
-    # outcome: freshness stays UNKNOWN, never fabricated.
-    latest_booking_import = ImportJobRepository(session, tenant).latest_succeeded_for_data_source(
-        booking_data_source_id
+    # 8. Provenance (Gate 23B): the observation this run read, and the latest import that had
+    # changed the EXACT booking data source when it looked (`take_snapshot` read it under its lock).
+    # No such import yet is a legitimate, non-fatal outcome: freshness stays UNKNOWN, never
+    # fabricated. Labor and costs: the same fact, for the data this run looked at.
+    imports = ImportJobRepository(session, tenant)
+    labor_provenance: DomainProvenance | None = None
+    if labor_data_source_id is not None:
+        labor_import = imports.latest_changing_for_data_source(labor_data_source_id)
+        labor_provenance = DomainProvenance(
+            data_source_id=labor_data_source_id,
+            import_job_id=None if labor_import is None else labor_import.id,
+            snapshot_ids=tuple(sorted(labor_files_read, key=str)),
+        )
+    cost_provenance: DomainProvenance | None = None
+    if cost_months:
+        cost_import = imports.latest_changing_for_domain(prop.id, DataSourceDomain.COSTS)
+        cost_provenance = DomainProvenance(
+            data_source_id=None if cost_import is None else cost_import.data_source_id,
+            import_job_id=None if cost_import is None else cost_import.id,
+        )
+    provenance = RunInputProvenance(
+        bookings=BookingProvenance(
+            data_source_id=booking_data_source_id,
+            import_job_id=snapshot_result.import_job_id,
+            last_successful_import_finished_at=snapshot_result.import_finished_at,
+            snapshot_local_date=as_of_local_date,
+            observation_revision=snapshot_result.revision,
+        ),
+        labor=labor_provenance,
+        costs=cost_provenance,
     )
-    if latest_booking_import is None:
-        provenance = RunInputProvenance(
-            bookings=BookingProvenance(
-                data_source_id=booking_data_source_id,
-                import_job_id=None,
-                last_successful_import_finished_at=None,
-            )
-        )
-    else:
-        assert latest_booking_import.finished_at is not None  # SUCCEEDED implies finished_at
-        provenance = RunInputProvenance(
-            bookings=BookingProvenance(
-                data_source_id=booking_data_source_id,
-                import_job_id=latest_booking_import.id,
-                last_successful_import_finished_at=latest_booking_import.finished_at,
-            )
-        )
 
     # 9. Rank, then persist. Every evaluation gathered above reaches BOTH calls, or an exception
     # already propagated above and neither call happens.

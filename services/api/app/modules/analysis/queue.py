@@ -9,6 +9,9 @@ enqueued" is: one job waiting per property at most.
 The job carries only the property's identity: what to analyse is decided when it runs
 (`analysis.refresh.run_refresh`), so a job that waited still analyses what is there by then. Its
 state stays here, in the queue's own tables, rather than in a second table that could disagree.
+
+A job told to wait for a later moment does not hold back a request for now: it is simply brought
+forward, instead of leaving new data waiting behind it.
 """
 
 from dataclasses import dataclass
@@ -61,7 +64,7 @@ def enqueue_refresh(
     scheduled_at: datetime | None = None,
 ) -> int | None:
     """Queue a refresh in the caller's transaction (the caller commits). Returns the job id, or None
-    when one is already waiting: it will read whatever is there when it runs, so that is enough."""
+    when one is already waiting to run: it will read whatever is there then, so that is enough."""
     lock = _lock_of(property_id)
     args = {"workspace_id": str(tenant.workspace_id), "property_id": str(property_id)}
     job_id: int | None = session.scalar(
@@ -71,7 +74,10 @@ def enqueue_refresh(
                 (queue_name, task_name, lock, queueing_lock, args, scheduled_at)
             VALUES
                 (:queue, :task, :lock, :lock, CAST(:args AS jsonb), :scheduled_at)
-            ON CONFLICT (queueing_lock) WHERE status = 'todo' DO NOTHING
+            ON CONFLICT (queueing_lock) WHERE status = 'todo' DO UPDATE
+                SET scheduled_at = EXCLUDED.scheduled_at
+                WHERE procrastinate_jobs.scheduled_at IS NOT NULL
+                  AND EXCLUDED.scheduled_at IS NULL
             RETURNING id
             """
         ),

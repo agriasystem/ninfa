@@ -182,7 +182,7 @@ def test_02_a_duplicate_identical_execution_the_same_day_is_a_safe_replay(
     assert "is_idempotent_replay=True" in completed[1]
 
 
-def test_03_changed_bookings_then_a_same_day_second_analysis_surfaces_the_snapshot_conflict(
+def test_03_changed_bookings_then_a_same_day_second_analysis_reads_the_next_revision(
     pilot: Pilot, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     assert _enqueue_and_run_worker(pilot.request()) == ["succeeded"]
@@ -214,10 +214,13 @@ def test_03_changed_bookings_then_a_same_day_second_analysis_surfaces_the_snapsh
     with caplog.at_level(logging.ERROR, logger="worker.tasks"):
         statuses = _enqueue_and_run_worker(pilot.request())
 
-    assert statuses == ["failed"]  # no workaround: the existing immutability rule is visible
-    assert any("status=failed error_type=SnapshotError" in m for m in caplog.messages)
+    assert statuses == ["succeeded"]
+    assert not [m for m in caplog.messages if "status=failed" in m]
     runs = pilot.runs()
-    assert [run.id for run in runs] == [first_run.id]  # nothing faked, nothing replaced
+    assert [run.id for run in runs][0] == first_run.id  # nothing replaced
+    assert len(runs) == 2
+    observations = [run.input_provenance["bookings"]["observation"] for run in runs]  # type: ignore[index]
+    assert [observation["revision"] for observation in observations] == [1, 2]
 
 
 def test_04_an_unknown_property_fails_the_job_and_persists_nothing(pilot: Pilot) -> None:

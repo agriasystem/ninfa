@@ -122,6 +122,8 @@ class ImportOutcome:
     already_imported: bool = False
     # Smart Import: the way the columns were matched has been remembered for the next file.
     configuration_saved: bool = False
+    # True: the file changed what NINFA holds. Otherwise nothing downstream has a reason to move.
+    changed_data: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -600,7 +602,7 @@ class DataSourcesService:
                 domain.value,
             )
             raise ImportInProgressError() from error
-        if outcome.succeeded:
+        if outcome.succeeded and outcome.changed_data:
             self._request_analysis_refresh(property_id)
         return outcome
 
@@ -868,6 +870,7 @@ class DataSourcesService:
                     updated=booking.bookings_updated,
                     unchanged=booking.bookings_unchanged,
                     already_imported=booking.duplicate_of_import_file_id is not None,
+                    changed_data=booking.changed_data,
                 ),
                 resolved,
             )
@@ -888,8 +891,10 @@ class DataSourcesService:
                     rows_total=invoices.rows_total,
                     rows_invalid=invoices.rows_invalid,
                     created=invoices.invoices_created,
+                    updated=invoices.invoices_revised,
                     unchanged=invoices.invoices_unchanged,
                     already_imported=invoices.duplicate_of_import_file_id is not None,
+                    changed_data=invoices.changed_data,
                 ),
                 resolved,
             )
@@ -913,6 +918,7 @@ class DataSourcesService:
                 rows_invalid=labor.rows_invalid,
                 created=labor.entries_created,
                 already_imported=labor.duplicate_of_import_file_id is not None,
+                changed_data=labor.changed_data,
             ),
             resolved,
         )
@@ -941,6 +947,7 @@ class DataSourcesService:
             updated=result.bookings_updated,
             unchanged=result.bookings_unchanged,
             already_imported=result.duplicate_of_import_file_id is not None,
+            changed_data=result.changed_data,
         )
 
     def _import_labor(
@@ -974,6 +981,7 @@ class DataSourcesService:
             rows_invalid=result.rows_invalid,
             created=result.entries_created,
             already_imported=result.duplicate_of_import_file_id is not None,
+            changed_data=result.changed_data,
         )
 
     def _import_invoices(
@@ -992,8 +1000,10 @@ class DataSourcesService:
             rows_total=result.rows_total,
             rows_invalid=result.rows_invalid,
             created=result.invoices_created,
+            updated=result.invoices_revised,
             unchanged=result.invoices_unchanged,
             already_imported=result.duplicate_of_import_file_id is not None,
+            changed_data=result.changed_data,
         )
 
     # --- helpers --------------------------------------------------------------------------------

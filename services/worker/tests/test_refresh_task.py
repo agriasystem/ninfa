@@ -1,9 +1,9 @@
 """The `analysis.refresh_property` worker task: its own contract, the analysis replaced by fakes.
 
 Queue behaviour uses Procrastinate's in-memory connector. What is pinned: the name the API enqueues
-is the one the worker registered; a real failure fails the job with no retry; a day that keeps its
-first observation queues the refresh for the next local day and is not a failure; nothing else is
-ever queued by the task.
+is the one the worker registered; a real failure fails the job with no retry; a key that cannot be
+observed yet queues the refresh for the next local day and is not a failure; nothing else is ever
+queued by the task.
 """
 
 from collections.abc import Iterator

@@ -86,6 +86,8 @@ class ImportResultResponse(BaseModel):
     updated: int
     unchanged: int
     already_imported: bool
+    # False: the file said what NINFA already holds: no new analysis is coming, none is needed.
+    changed_data: bool
 
 
 # --- Smart Import: match the columns of the hotel own file ------------------------------

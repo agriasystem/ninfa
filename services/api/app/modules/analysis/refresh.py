@@ -16,9 +16,10 @@ operator would make by hand are made here, and only from what is really stored:
   month in progress (invoices arrive after the fact) and never a month assumed from the calendar.
 
 A failure propagates and fails the job (fail loud: nothing is synced, the imported data stay as they
-are, the status says so). The one expected refusal is the bookings having changed since today's
-observation: a day keeps its first observation, on purpose (booking-snapshots-v1.md). That is not a
-failure and is not forced: the refresh is simply due again on the next local day.
+are, the status says so). Bookings changed since today's observation are simply observed again: the
+day's next revision, analysed now. What is left of `DEFERRED` is a stored row NINFA cannot observe
+over on today's key, a reconstruction (the property's time zone was changed, so today is a day that
+already ended elsewhere): that clears by itself on the next local day, so it is not a failure.
 """
 
 from dataclasses import dataclass
@@ -40,7 +41,6 @@ from app.modules.ingestion.models import DataSource, DataSourceDomain
 from app.modules.ingestion.repository import DataSourceRepository, ImportJobRepository
 from app.modules.intelligence.costs.periods import CalendarMonth
 from app.modules.intelligence.costs.repository import CostLineRepository
-from app.modules.intelligence.labor.aggregation import latest_snapshot_rows_by_work_date
 from app.modules.intelligence.labor.repository import LaborEvaluationRepository
 from app.modules.snapshots.calculation import date_range
 from app.modules.snapshots.errors import SnapshotError, SnapshotErrorCode
@@ -49,14 +49,14 @@ from app.modules.snapshots.localtime import local_date_of, local_day_start
 # How many concluded months of invoices one refresh evaluates at most, newest first: an upper bound
 # for a file that spans years, not a business rule.
 MAX_COST_MONTHS = 12
-# A deferred refresh runs just after local midnight: the new day's first observation.
+# A deferred refresh runs just after local midnight.
 _NEXT_DAY_MARGIN = timedelta(minutes=5)
 
 
 class RefreshOutcomeKind(StrEnum):
     RAN = "RAN"
     SKIPPED = "SKIPPED"  # nothing to run on: `skip_reason` says why, and nothing was written
-    DEFERRED = "DEFERRED"  # the day keeps its first observation: due again at `retry_at`
+    DEFERRED = "DEFERRED"  # today's key cannot be observed yet: due again at `retry_at`
 
 
 class RefreshSkipReason(StrEnum):
@@ -103,10 +103,9 @@ def _labor_scope(
     sources = _active_sources(session, tenant, property_id, DataSourceDomain.LABOR)
     if len(sources) != 1:
         return None, None
-    entries = LaborEvaluationRepository(session, tenant).entries_as_of(
-        sources[0].id, local_today, days
+    dates = frozenset(
+        LaborEvaluationRepository(session, tenant).current_plan(sources[0].id, local_today, days)
     )
-    dates = frozenset(latest_snapshot_rows_by_work_date(entries))
     return (sources[0].id, dates) if dates else (None, None)
 
 
@@ -163,7 +162,7 @@ def plan_refresh(
 def run_refresh(
     session: Session, workspace_id: UUID, property_id: UUID, now: datetime | None = None
 ) -> RefreshOutcome:
-    """One refresh of one property. Anything but the day's own observation rule propagates."""
+    """One refresh of one property. Anything but a key that cannot be observed yet propagates."""
     now = datetime.now(UTC) if now is None else now
     tenant = TenantContext(workspace_id=workspace_id)
     plan = plan_refresh(session, tenant, property_id, now)

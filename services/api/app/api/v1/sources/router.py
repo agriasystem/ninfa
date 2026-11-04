@@ -415,6 +415,7 @@ async def import_file(
         updated=outcome.updated,
         unchanged=outcome.unchanged,
         already_imported=outcome.already_imported,
+        changed_data=outcome.changed_data,
     )
 
 
@@ -543,6 +544,7 @@ async def import_mapped_file(
         unchanged=outcome.unchanged,
         already_imported=outcome.already_imported,
         configuration_saved=outcome.configuration_saved,
+        changed_data=outcome.changed_data,
     )
 
 

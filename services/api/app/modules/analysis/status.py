@@ -37,12 +37,12 @@ class AnalysisUpdateState(StrEnum):
     NO_DATA = "NO_DATA"  # nothing imported yet
     NEEDS_BOOKINGS = "NEEDS_BOOKINGS"  # data, but no bookings: the engines have nothing to run on
     SEVERAL_SOURCES = "SEVERAL_SOURCES"  # several booking sources: NINFA does not choose one
-    NEW_DATA = "NEW_DATA"  # imports newer than the analysis, and no refresh under way
+    NEW_DATA = "NEW_DATA"  # imports that changed data since the analysis, no refresh under way
     IN_PROGRESS = "IN_PROGRESS"  # a refresh is waiting for the worker or running
     DELAYED = "DELAYED"  # the same, for longer than usual
-    DEFERRED = "DEFERRED"  # today keeps its first observation: due again at `next_attempt_at`
+    DEFERRED = "DEFERRED"  # today cannot be observed yet: due again at `next_attempt_at`
     FAILED = "FAILED"  # the refresh failed: the imported data are fine, the analysis is older
-    UP_TO_DATE = "UP_TO_DATE"  # the analysis has seen every import
+    UP_TO_DATE = "UP_TO_DATE"  # the analysis has seen every import that changed something
 
 
 # What the person can ask for again: nothing else is waiting, or could run.
@@ -115,7 +115,10 @@ class AnalysisStatusService:
         now = datetime.now(UTC) if now is None else now
         imports = self._imports.latest_succeeded_by_domain(property_id)
         domains = tuple(domain for domain in DataSourceDomain if domain in imports)
-        latest_import_at = max(imports.values(), default=None)
+        # An import that brought nothing new is history: it says nothing about the analysis. With
+        # imports from before this was recorded, every one counts (none can be told apart).
+        changing = self._imports.latest_succeeded_by_domain(property_id, changed_only=True)
+        latest_import_at = max(changing.values(), default=None)
         last_analysis_at = self._last_analysis_at(property_id)
 
         def answer(
@@ -125,13 +128,15 @@ class AnalysisStatusService:
                 state, domains, latest_import_at, last_analysis_at, next_attempt_at
             )
 
-        if latest_import_at is None:
+        if not imports:
             return answer(AnalysisUpdateState.NO_DATA)
         if DataSourceDomain.BOOKINGS not in imports:
             return answer(AnalysisUpdateState.NEEDS_BOOKINGS)
         if len(self._booking_sources(property_id)) > 1:
             return answer(AnalysisUpdateState.SEVERAL_SOURCES)
 
+        if latest_import_at is None:  # nothing here has ever changed: nothing to bring up to date
+            return answer(AnalysisUpdateState.UP_TO_DATE)
         job = latest_refresh(self._session, self._tenant, property_id)
         state = None if job is None else _state_of_job(job, latest_import_at, now)
         if state is not None:
