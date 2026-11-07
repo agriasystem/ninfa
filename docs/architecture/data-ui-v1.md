@@ -90,11 +90,11 @@ themselves, KPIs one column from 480 px.
 
 | Block | What it shows | Notes |
 | --- | --- | --- |
-| Occupancy card | occupancy of the selected period, `prossimi N giorni`, room-nights; 7 / 30 control; mini tiles Oggi / 7 / 30; last booking import | says "Capienza nota per X di N notti" when some nights are left out |
-| KPI block | Ricavi camera (NINFA-blue highlight), ADR, Camere-notte, Costi di {mese} | a delta only when the backend sent one, always naming its comparison; neutral chip (no good/bad change exists) |
-| Chart | stored occupancy per night, NINFA-blue bars; orange marker above a night with a decision | a night with unknown capacity is a hatched slot (never 0 %); axis grows past 100 % (occupancy is not clamped); no target / expected line (none exists) |
-| OTA card | OTA vs direct, the reference tick, outcome, channel weights | attention indicator only with a real OTA decision; no commission amounts |
-| Detail table | Data, Camere prenotate, Disponibili, Occupazione, Ricavi camera, ADR, Stato | search by date, "Solo attenzione"; only a night with a decision is a link |
+| Occupancy card | occupancy of the selected period, `prossimi N giorni`, room-nights; 7 / 30 control; mini tiles Oggi / 7 / 30; last booking import | says "Capienza nota per X di N notti" when some nights are left out; with no room inventory (`capacity` `MISSING`) "Inventario camere da configurare" + "Le prenotazioni sono disponibili, ma manca la capacità camere della struttura." and tiles "Non calcolabile" (ADR 0043) |
+| KPI block | Ricavi camera (NINFA-blue highlight), ADR, Camere-notte, Costi di {mese} | a delta only when the backend sent one, always naming its comparison; neutral chip (no good/bad change exists); unaffected by a missing inventory |
+| Chart | stored occupancy per night, NINFA-blue bars; orange marker above a night with a decision | a night with unknown capacity is a hatched slot (never 0 %); axis grows past 100 % (occupancy is not clamped); no target / expected line (none exists); with no inventory "Occupazione non calcolabile" and "Configura inventario" -> `/struttura?property=…#struttura-rooms` |
+| OTA card | OTA vs direct, the reference tick, outcome, channel weights | attention indicator only with a real OTA decision; no commission amounts; what the weights are a share of is said before them ("Composizione indicativa" when it is not the booked room-nights); an inconclusive check says why with the backend's counts |
+| Detail table | Data, Camere prenotate, Disponibili, Occupazione, Ricavi camera, ADR, Stato | search by date, "Solo attenzione"; only a night with a decision is a link; fits its card from 1280 px with room for two scrollbars (the status may wrap under its mark, a figure never does; ADR 0043) |
 | Coverage strip | the four areas' state + the costs / labor freshness | "Analizzati / Analisi parziale / Non analizzati / Non disponibile" |
 
 ### Night status (the "Stato" column)
@@ -125,8 +125,8 @@ exact; it is deferred, and the table says "Lo stato riflette solo le decisioni d
   of cost in a recognised category, the category table with the cost per occupied room or the reason it is
   missing, the cost decision with its own figures. Costs in another currency are flagged, never converted.
 - **Personale:** five figures for the next 7 days, each computed once in the backend on exact values:
-  planned hours; planned cost; average hourly cost (`cost / hours`); incidence on revenue
-  (`cost / reference revenue * 100`); revenue per labor hour (`reference revenue / hours`). The reference
+  planned hours; planned cost; average hourly cost (`cost / hours`); "Incidenza sui ricavi on-books"
+  (`cost / reference revenue * 100`); "Ricavo on-books per ora" (`reference revenue / hours`). The reference
   revenue is the on-books room revenue of EXACTLY the days with hours, so labor of one week never meets the
   revenue of another; what cannot be compared is absent with a reason (`LaborRevenueGap`), never a zero. By
   role: hours, cost, hourly cost, share of the labor cost, incidence on revenue, days with data. A role never
@@ -149,6 +149,14 @@ exact; it is deferred, and the table says "Lo stato riflette solo le decisioni d
 - **The run is the authority**: a persisted OTA decision's own figures are shown, with no live read; a live
   evaluation only adds a figure when no decision exists, and one that would now trigger while the run has
   no decision shows "i dati sono cambiati dopo l'analisi" and no number.
+- **Every percentage names its denominator.** The channel weights are a share of the room-nights certain at the
+  end of the analysis day (the OTA check's own population). `channel_mix` carries that total, its OTA / direct
+  and unclassified parts, the room-nights the day observed over the same 30 nights, and whether the two match.
+  When they do not, the bookings' own dates are why (`date_conflicts`: booked or cancelled after the day, a
+  no-show before its arrival), and the card says so with the counts. The check is not relaxed (ADR 0043).
+- **No capacity is ever inferred from the bookings.** A period's `capacity` (`KNOWN` / `PARTIAL` / `MISSING` /
+  `AWAITING_ANALYSIS`) comes from the stored observation and the room inventory as it is now. Without one only
+  the occupancy and the rooms available are missing.
 - **Freshness** is a fact ("Ultimo import prenotazioni: oggi alle 09:31", property timezone), never
   "Dati aggiornati"; each domain has its own line.
 
@@ -161,6 +169,7 @@ exact; it is deferred, and the table says "Lo stato riflette solo le decisioni d
 | Not processed | designed "Non disponibile" cards with the reason, the date of the last analysis, all areas "Non disponibile" |
 | Partial run | hatched unknown-capacity nights, "Analisi parziale" statuses, an OTA card that says why it cannot judge |
 | Area not analysed | "Distribuzione non analizzata" / "Non analizzati" - never read as clear |
+| No room inventory | "Inventario camere da configurare" (card), "Occupazione non calcolabile" + "Configura inventario" (chart), a note under the table; room-nights, revenue and ADR stay. An inventory set after the observation: "Occupazione non ancora calcolata", no link |
 | No costs / labor | "Non ci sono dati di costo sufficienti per questo periodo." / the reason; never 0 |
 
 ## Accessibility
@@ -177,8 +186,14 @@ focusable regions; a status is always a word plus a shape, never colour alone; v
 Backend: pure calculations, the service on real persisted runs (occupancy, unknown capacity, source,
 timezone, OTA outcomes, channel certainty, costs, labor, freshness, coverage), the API (auth, isolation,
 safe 404, validation, no float, no leak, read-only, never touches the model provider) and AST guards.
+ADR 0043 adds: the capacity states with and without a room inventory (and one set after the observation),
+the REAL OTA check failing its reconciliation on a booking dated after the day and on a no-show before its
+arrival, the date conflicts, cancelled bookings in neither count, unclassified channels in the total, the
+same 30 nights on both sides, and the new fields on the wire.
 Frontend: formatting and copy, tabs, the page's URL wiring, the screen across the full / partial /
-unknown-coverage / not-processed worlds, property switching, the period control, and source / CSS guards.
+unknown-coverage / not-processed / no-inventory / unreconciled worlds, property switching, the period
+control, the deep link into Struttura, and source / CSS guards (the on-books wording of Personale, the
+table's fit rules).
 
 ## Explicitly deferred
 

@@ -58,6 +58,13 @@ imports the demo). The demo's capacity is the room types' theoretical capacity (
 operating configuration exists. The demo contains **no data source and no vendor** (the old "Mews / SiteMinder /
 Booking.com connected" demo was removed: a source is "Collegato" only because the backend says so).
 
+**The inventory block is an anchor.** Dati's "Configura inventario" (no room inventory, so no occupancy) links to
+`/struttura?property=…#struttura-rooms` (`strutturaInventoryRoute`): each block's section carries its id, and once the
+blocks are on screen the page scrolls the one the address names into view (the session and the property resolve
+first, so neither the browser nor the router can). Struttura's own "Configura inventario" button is still not wired
+(no inventory endpoint exists); for the pilot the inventory is set with `python -m app.cli.pilot set-room-inventory`
+(ADR 0043).
+
 Wording lives in `lib/structure/copy.ts` (the "Fonti dati" wording is in `lib/sources/copy.ts`); month ranges, the zone
 label ("Europe/Rome (CET)", the standard-time abbreviation), the currency label ("Euro (€)") and "2 adulti + 1 bambino"
 are built in `lib/structure/format.ts`.
