@@ -52,8 +52,9 @@ warning. A count can be missed. Taking data out of what counts should not depend
 - Every decision carries `remembered_file_scope` and `expected_removals`, verified with the rest. Posted back different, they
   only get it refused.
 - A file refused for this reason is a failed job with `IMPORT_PLAN_CHANGED`, and nothing of it is imported.
-- A department missing on a day the file names, when the file names that department elsewhere, is not this rule's: it is the
-  replacement rule of ADR 0039, the same under any answer, and it asks nothing. Pinned by a test.
+- A department missing on a day the file names, when the file names that department elsewhere, was at first left to the
+  replacement rule of ADR 0039, cleared under any answer with nothing asked. [ADR 0042](0042-labor-partial-absence.md)
+  removed that exception: it is an absence like any other, counted, asked about under a remembered `FULL`, and kept by a part.
 - The downgrade of `0016_remembered_scope` refuses once a job holds the column.
 
 See [import-scope-semantics-v1.md](../import-scope-semantics-v1.md).

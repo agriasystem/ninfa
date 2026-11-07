@@ -107,7 +107,9 @@ longer has is not known to it.
 
 ## Staff
 
-The rule of [same-day-revisions-v1.md](same-day-revisions-v1.md) stays, with two additions.
+The rule of [same-day-revisions-v1.md](same-day-revisions-v1.md) stays, with two additions. Any file speaks for the
+(day, department) cells it holds and nothing else: a day it holds and a department it holds elsewhere do not make a cell it
+removes ([ADR 0042](adr/0042-labor-partial-absence.md)).
 
 **A complete file speaks for every department on every day of its period** (first to last work date), named or not. So:
 
@@ -115,6 +117,9 @@ The rule of [same-day-revisions-v1.md](same-day-revisions-v1.md) stays, with two
 |---|---|
 | plan 4-10 Nov with Housekeeping, then complete plan 4-10 Nov without it | Housekeeping stops counting, on all seven days |
 | the same, as a part (Reception only) | Housekeeping stays |
+| Reception and Housekeeping on 4-5 Nov, then a part with Reception on 4 and Housekeeping on 5 | both cells it lacks stay |
+| the same file, complete | Housekeeping on 4 and Reception on 5 stop counting (2, asked about first) |
+| a part with Housekeeping at 0 hours on 4 Nov | a plan of zero hours, not a removal: only a complete file removes |
 | complete plan with no row on 6 Nov at all | nothing counts on 6 Nov |
 | complete plan 4-6 Nov | 7-10 Nov are not its business |
 | a later file that names Housekeeping again | it counts again |
@@ -164,8 +169,8 @@ head when that branch is rebased on main. Nothing is resolved here, and that bra
 - A complete file with a single row, or two, reads as `MANUAL`: too few values for the columns to be sure, as for any file.
   Manual matching carries no scope, so it takes nothing away.
 - A booking checking in after the file's last row stays (see the interval above).
-- A department missing on a day the file names, when the file names that department elsewhere, stops counting without a
-  question and under any answer: that is the replacement rule of [same-day-revisions-v1.md](same-day-revisions-v1.md), not an
-  absence. The file speaks for that day and that department. Pinned by a test.
+- A department missing on a day the file names, when the file names that department elsewhere, is an absence like any
+  other since [ADR 0042](adr/0042-labor-partial-absence.md): kept by a part, a list of changes or a file nobody spoke
+  about; counted and asked about before a complete file takes it away. Pinned by `test_labor_partial_absence.py`.
 - A figure that moved refuses the file even if the person would have agreed to the new one: it is simply read again.
 - A department cleared by a complete file is not listed by name on the page: the page gives the count.

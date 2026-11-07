@@ -132,8 +132,10 @@ A property can import as many files as it needs, of any kind, on any day (see
 
 - bookings changed after today's analysis: the day's next observation, and a new analysis the same day.
   The earlier observation stays as it was, and the earlier run keeps pointing at it;
-- a second staff file: new days live beside the others, days it repeats are replaced for the departments
-  it names, and hours and costs never add up;
+- a second staff file: new days live beside the others, the (day, department) it holds are replaced, and
+  hours and costs never add up. A department it lacks on a day stays, even if the file has that day and
+  that department elsewhere: only a file said to be complete takes it away. A row of 0 hours is a plan of
+  zero hours, not a removal;
 - a corrected row of a cost spreadsheet: the document's next version, and only the newest counts. A
   FatturaPA that comes back different is refused, on purpose: it is corrected by a credit note;
 - the same data again: nothing moves, and the page says so;

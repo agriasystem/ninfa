@@ -69,7 +69,7 @@ Every file that changes something is a snapshot of its own (`labor_snapshots.rev
 them). Nothing is deleted. What counts is one rule, pure, used by the detector, by Dati and by the import itself
 (`labor.current_plan.current_rows`):
 
-> A file speaks for the work dates it names and for the categories it names, together.
+> A file speaks for the cells it holds: each (work date, category) it has a row for.
 > Where it speaks, the newest file wins; where it does not, what was there stays.
 
 | Files | Result |
@@ -78,7 +78,10 @@ them). Nothing is deleted. What counts is one rule, pure, used by the detector, 
 | week A, then week A corrected | same cells: replaced, hours and costs never add up |
 | Mon-Sun, then Thu-Wed | Mon-Wed from the first, Thu-Wed from the second |
 | Reception's file, then Housekeeping's | no category in common: both stay, on the same days |
-| a correction that drops Spa on Sunday | Spa is named and Sunday is named: Sunday has no Spa any more |
+| a file with no Spa on Sunday, but Spa on Monday and Reception on Sunday | Spa on Sunday stays: that cell is not in the file |
+
+The days of a file times its categories are never what it speaks for ([ADR 0042](adr/0042-labor-partial-absence.md)).
+Until the Pilot Safety Final Fix they were, and the last row above emptied Spa on Sunday under any scope, with no question.
 
 "Newest" is (`snapshot_local_date`, `revision`): the order the files came in. Knowledge stays dated: as of yesterday,
 today's file did not exist.
@@ -87,7 +90,7 @@ The identity of "the same datum" is (workspace, property, source, work date, cat
 holds none. Not a role label, because it is free text a second export may write differently: `Reception mattina` and
 `Ricevimento AM` in two versions of a plan are one cell, and that is what makes the second replace the first.
 
-**What the rule alone cannot see:** a file that drops a category altogether, on every day it covers, says nothing about
+**What the rule alone cannot see:** a file that lacks a category, on one day or on every day it covers, says nothing about
 it, unless a person said the file is complete: then it speaks for every category of its period
 ([import-scope-semantics-v1.md](import-scope-semantics-v1.md)). Hours planned and hours worked are read separately, each by
 this same rule: a file speaks only on what it carries.

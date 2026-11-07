@@ -31,6 +31,8 @@ said, that a run keeps pointing at what it read, and that nothing counts twice.
    (`labor.current_plan`): a file speaks for the work dates it names and the categories it names, together. Where it
    speaks the newest file wins, where it does not what was there stays. The unit is (work date, category), the unit
    every labor figure is computed on: not a person (the model holds none), not a role label (free text).
+   *Amended by [ADR 0042](0042-labor-partial-absence.md): a file speaks only for the (work date, category) cells it
+   holds; dates times categories are no longer read as its reach, and only a complete file takes a cell away.*
 5. **Costs: a corrected row of a spreadsheet is the next `revision` of its document**, and only the newest counts
    (`is_current_invoice`). **A FatturaPA is never replaced**: a fiscal document that comes back different is still
    refused, whichever side the XML is on.
