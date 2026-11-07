@@ -77,6 +77,25 @@ class UnavailableReason(StrEnum):
     SEVERAL_SOURCES = "SEVERAL_SOURCES"  # more than one: NINFA does not pick one silently
 
 
+class CapacityState(StrEnum):
+    """Whether the occupancy of a period can be calculated. It needs the number of rooms the
+    property has on each night, which only the room inventory says: a capacity is never inferred
+    from the bookings (rooms booked, room numbers, the busiest night are not an inventory).
+
+    KNOWN              every night with bookings has its capacity in the analysis day's observation
+    PARTIAL            only some do: the occupancy rests on those nights alone (and says so)
+    MISSING            none does, and the property has no room inventory for these nights
+    AWAITING_ANALYSIS  none does, but a room inventory now exists for some of these nights: it was
+                       set after the observation, which copies the capacity when it is taken, and
+                       the next analysis takes it in
+    """
+
+    KNOWN = "KNOWN"
+    PARTIAL = "PARTIAL"
+    MISSING = "MISSING"
+    AWAITING_ANALYSIS = "AWAITING_ANALYSIS"
+
+
 class OtaOutcome(StrEnum):
     """What the OTA check concluded (the persisted decision, or NINFA's own live evaluation)."""
 
@@ -142,6 +161,10 @@ class PeriodMetrics:
     only - a night with an unknown capacity never enters it (it is counted in
     `nights_with_capacity`). Room-nights, revenue and ADR cover every night that has a stored
     snapshot. A window with no stored night has `nights_with_data == 0` and every figure `None`.
+
+    `capacity` says whether the occupancy can be calculated at all (`None` with no night of
+    bookings: there is nothing to put over a capacity). Without an inventory only the occupancy and
+    the rooms available are missing: room-nights, revenue and ADR stay.
     """
 
     start_date: date
@@ -149,6 +172,7 @@ class PeriodMetrics:
     nights_requested: int
     nights_with_data: int
     nights_with_capacity: int
+    capacity: CapacityState | None
     room_nights: int | None
     rooms_on_books_with_capacity: int | None
     rooms_available: int | None
@@ -205,8 +229,45 @@ class ChannelWeight:
 
 @dataclass(frozen=True, slots=True)
 class ChannelMix:
+    """The channel weights of the 30-night window and what they are a share of.
+
+    `total_room_nights` is the denominator of every weight: the room-nights certain at the end of
+    the analysis day (Gate 3's rule, the OTA check's own population). `classified_room_nights` are
+    the OTA and direct ones among them, `unclassified_room_nights` those on a channel NINFA cannot
+    classify (the rest are on an identified other channel). `on_books_room_nights` is the analysis
+    day's own observation of the same nights - the room-nights the page shows everywhere else -
+    `None` unless it holds every night; `matches_on_books` says whether the weights are a share of
+    exactly those (`None` when that observation is not whole). When it is False the weights are
+    indicative: the bookings' own dates disagree with the observation (`BookingDateConflicts`)."""
+
     total_room_nights: int
+    classified_room_nights: int
+    unclassified_room_nights: int
+    on_books_room_nights: int | None
+    matches_on_books: bool | None
     channels: tuple[ChannelWeight, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BookingDateConflicts:
+    """Bookings of the 30-night window whose own dates contradict the analysis day: the only ways
+    the analysis day's observation (statuses as they are) and Gate 3's certainty rule at the end of
+    that day can disagree about a booking. Each is a fact of the imported data that NINFA neither
+    corrects nor guesses around - while any exists, the channel mix cannot be reconciled with the
+    bookings on the books, and the OTA check is not evaluated.
+
+    booked_after            on the books, with a booking date after the analysis day
+    cancelled_after         cancelled, with a cancellation date after the analysis day
+    no_show_before_arrival  marked as a no-show for a stay that had not begun on the analysis day
+    """
+
+    booked_after: int
+    cancelled_after: int
+    no_show_before_arrival: int
+
+    @property
+    def total(self) -> int:
+        return self.booked_after + self.cancelled_after + self.no_show_before_arrival
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,6 +284,8 @@ class DistributionOverview:
     insufficient_reasons: tuple[str, ...]
     decision_id: UUID | None
     channel_mix: ChannelMix | None
+    # Read beside the channel mix, from the same bookings; `None` when the area was not read.
+    date_conflicts: BookingDateConflicts | None
 
 
 # --- costs ----------------------------------------------------------------------------------------
@@ -392,6 +455,8 @@ __all__ = [
     "PERIOD_DAYS_LONG",
     "PERIOD_DAYS_SHORT",
     "Availability",
+    "BookingDateConflicts",
+    "CapacityState",
     "ChannelGroupName",
     "ChannelMix",
     "ChannelWeight",

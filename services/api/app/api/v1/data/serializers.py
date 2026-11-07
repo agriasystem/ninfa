@@ -10,6 +10,7 @@ from app.api.v1.data.schemas import (
     CostDecisionResponse,
     CostsResponse,
     DataOverviewResponse,
+    DateConflictsResponse,
     DecisionRefResponse,
     DistributionResponse,
     DomainFreshnessResponse,
@@ -26,6 +27,7 @@ from app.api.v1.data.schemas import (
 from app.api.v1.decisions.serializers import coverage_response_of, last_successful_analysis_of
 from app.modules.data_overview.types import (
     DATA_OVERVIEW_VERSION,
+    BookingDateConflicts,
     CostOverview,
     DataOverview,
     DecisionRef,
@@ -63,6 +65,7 @@ def _period(period: PeriodMetrics | None) -> PeriodMetricsResponse | None:
         nights_requested=period.nights_requested,
         nights_with_data=period.nights_with_data,
         nights_with_capacity=period.nights_with_capacity,
+        capacity=None if period.capacity is None else period.capacity.value,
         room_nights=period.room_nights,
         rooms_on_books_with_capacity=period.rooms_on_books_with_capacity,
         rooms_available=period.rooms_available,
@@ -103,6 +106,17 @@ def _occupancy(occupancy: OccupancyOverview) -> OccupancyResponse:
     )
 
 
+def _date_conflicts(conflicts: BookingDateConflicts | None) -> DateConflictsResponse | None:
+    if conflicts is None:
+        return None
+    return DateConflictsResponse(
+        booked_after=conflicts.booked_after,
+        cancelled_after=conflicts.cancelled_after,
+        no_show_before_arrival=conflicts.no_show_before_arrival,
+        total=conflicts.total,
+    )
+
+
 def _distribution(distribution: DistributionOverview) -> DistributionResponse:
     mix = distribution.channel_mix
     return DistributionResponse(
@@ -122,6 +136,10 @@ def _distribution(distribution: DistributionOverview) -> DistributionResponse:
             if mix is None
             else ChannelMixResponse(
                 total_room_nights=mix.total_room_nights,
+                classified_room_nights=mix.classified_room_nights,
+                unclassified_room_nights=mix.unclassified_room_nights,
+                on_books_room_nights=mix.on_books_room_nights,
+                matches_on_books=mix.matches_on_books,
                 channels=[
                     ChannelWeightResponse(
                         name=channel.name,
@@ -133,6 +151,7 @@ def _distribution(distribution: DistributionOverview) -> DistributionResponse:
                 ],
             )
         ),
+        date_conflicts=_date_conflicts(distribution.date_conflicts),
     )
 
 

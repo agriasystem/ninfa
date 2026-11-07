@@ -12,12 +12,13 @@ Every definition here is one NINFA already approved; none is new:
 No clock is read: every date arrives explicitly.
 """
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from app.modules.data_overview.types import (
+    CapacityState,
     DecisionRef,
     DomainState,
     NightRow,
@@ -50,18 +51,40 @@ def percent_of(part: int, whole: int) -> Decimal | None:
     return to_cents(Decimal(part) * _HUNDRED / Decimal(whole))
 
 
+def capacity_state(
+    nights: Collection[date], nights_with_known_capacity: int, configured_nights: Collection[date]
+) -> CapacityState | None:
+    """Whether the occupancy of these stored nights can be calculated (see `CapacityState`).
+
+    `nights` are the stay dates with a stored observation, `nights_with_known_capacity` how many of
+    them carry a capacity (0 included: a closed night is a known capacity), `configured_nights` the
+    stay dates the room inventory holds NOW. Nothing is inferred from the bookings: no inventory
+    row, no capacity."""
+    if not nights:
+        return None
+    if nights_with_known_capacity == len(nights):
+        return CapacityState.KNOWN
+    if nights_with_known_capacity > 0:
+        return CapacityState.PARTIAL
+    if any(night in configured_nights for night in nights):
+        return CapacityState.AWAITING_ANALYSIS
+    return CapacityState.MISSING
+
+
 def period_metrics(
     rows: Sequence[BookingSnapshot],
     start: date,
     end: date,
     *,
     rooms_7d_ago: Mapping[date, int] | None = None,
+    configured_nights: Collection[date] = frozenset(),
 ) -> PeriodMetrics:
     """The on-books metrics of the nights `start..end` (both included).
 
     `rooms_7d_ago` maps a stay date to its `rooms_on_books` in the OBSERVED snapshot taken 7 days
     before the analysis day. The comparison exists only when EVERY night of the window has a row
     today AND in that older snapshot: a partial comparison would compare different nights.
+    `configured_nights` are the stay dates the room inventory holds now (`capacity_state`).
     """
     in_window = [row for row in rows if start <= row.stay_date <= end]
     nights_requested = (end - start).days + 1
@@ -75,6 +98,7 @@ def period_metrics(
             nights_requested=nights_requested,
             nights_with_data=0,
             nights_with_capacity=0,
+            capacity=None,
             room_nights=None,
             rooms_on_books_with_capacity=None,
             rooms_available=None,
@@ -104,6 +128,11 @@ def period_metrics(
         nights_requested=nights_requested,
         nights_with_data=len(in_window),
         nights_with_capacity=len(with_capacity),
+        capacity=capacity_state(
+            [row.stay_date for row in in_window],
+            sum(1 for row in in_window if row.rooms_available is not None),
+            configured_nights,
+        ),
         room_nights=room_nights,
         rooms_on_books_with_capacity=on_books_with_capacity if with_capacity else None,
         rooms_available=available if with_capacity else None,

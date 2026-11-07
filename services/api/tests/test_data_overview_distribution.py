@@ -16,8 +16,10 @@ from uuid import UUID
 import pytest
 from sqlalchemy.orm import Session
 
+from app.modules.data_overview.distribution import forward_window
 from app.modules.data_overview.types import (
     Availability,
+    BookingDateConflicts,
     ChannelGroupName,
     OtaOutcome,
     UnavailableReason,
@@ -43,7 +45,7 @@ from tests.data_overview_support import (
     uniform_nights,
 )
 from tests.decision_support import CLEAR, INSUFFICIENT, SUPPRESSED, TRIGGERED, ota_evaluation
-from tests.distribution_support import CANCELLED, DistributionWorld
+from tests.distribution_support import CANCELLED, NO_SHOW, DistributionWorld
 from tests.support import BookingFactory, Tenant
 
 D = Decimal
@@ -415,3 +417,234 @@ def test_another_tenants_channels_and_bookings_are_invisible(
     ).distribution
 
     assert distribution.channel_mix is None
+
+
+# --- what the weights are a share of, and why it may not be the room-nights on the books ----------
+#
+# The real demo property of the product review showed "the channel composition does not match the
+# registered bookings" beside channel weights. Root cause, measured on its data: some bookings carry
+# a booking date AFTER the analysis day, and some are no-shows for stays that had not begun. The
+# analysis day's observation counts a booking by its status as it is; Gate 3's certainty rule at
+# the end of the day (the OTA check's and the weights' own) asks whether it existed yet and whether
+# a no-show could be known. Both rules agree on real dates and disagree only on such dates, so the
+# check is right to refuse; the weights now say what they are a share of, and why.
+
+_LATER = datetime(2026, 8, 2, 9, 0, tzinfo=UTC)  # the morning after the analysis day (Rome)
+
+
+def _observed(db_session: Session, tenant: Tenant, rooms: int, *, days: int = 30) -> None:
+    """The analysis day's observation: `rooms` booked on each of `days` nights, no capacity."""
+    seed_run(
+        db_session, tenant, nights=uniform_nights(AS_OF, rooms=rooms, capacity=None, days=days)
+    )
+
+
+def _end(days: int = 30) -> date:
+    return AS_OF + timedelta(days=days)
+
+
+def test_consistent_dates_reconcile_and_the_weights_are_the_room_nights_on_the_books(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=2)
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end())
+    world.booking(world.channel("Diretto"), AS_OF, _end())
+
+    distribution = overview_of(db_session, tenant).distribution  # the REAL OTA check
+
+    # reconciled: the check goes past it (and stops later, on the missing history)
+    assert distribution.insufficient_reasons == ("OTA_COMPARABLE_SAMPLE_INSUFFICIENT",)
+    mix = distribution.channel_mix
+    assert mix is not None
+    assert (mix.total_room_nights, mix.on_books_room_nights, mix.matches_on_books) == (60, 60, True)
+    assert distribution.date_conflicts == BookingDateConflicts(0, 0, 0)
+
+
+def test_a_booking_dated_after_the_analysis_day_fails_the_real_reconciliation_and_says_why(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=2)  # the observation counts it: it is CONFIRMED
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end())
+    world.booking(world.channel("Diretto"), AS_OF, _end(), booked_at=_LATER)
+
+    distribution = overview_of(db_session, tenant).distribution
+
+    assert distribution.outcome is OtaOutcome.INSUFFICIENT_DATA
+    assert distribution.insufficient_reasons == ("OTA_CHANNEL_MIX_RECONCILIATION_FAILED",)
+    assert distribution.ota_share_pct is None  # still not evaluated: the check is right
+    assert distribution.date_conflicts == BookingDateConflicts(
+        booked_after=1, cancelled_after=0, no_show_before_arrival=0
+    )
+    mix = distribution.channel_mix
+    assert mix is not None
+    # the weights are a share of 30 certain room-nights, not of the 60 observed: said, not hidden
+    assert (mix.total_room_nights, mix.on_books_room_nights, mix.matches_on_books) == (
+        30,
+        60,
+        False,
+    )
+    assert [(channel.name, channel.share_pct) for channel in mix.channels] == [
+        ("Booking.com", D("100.00"))
+    ]
+
+
+def test_a_no_show_before_its_arrival_is_a_date_conflict(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=1)  # the observation never counts a no-show
+    world = _world(db_session, factory, tenant)
+    booking = world.channel("Booking.com")
+    world.booking(booking, AS_OF, _end())
+    world.booking(booking, AS_OF + timedelta(days=5), AS_OF + timedelta(days=7), status=NO_SHOW)
+
+    distribution = overview_of(db_session, tenant).distribution
+
+    assert distribution.insufficient_reasons == ("OTA_CHANNEL_MIX_RECONCILIATION_FAILED",)
+    assert distribution.date_conflicts == BookingDateConflicts(0, 0, 1)
+    mix = distribution.channel_mix
+    assert mix is not None
+    assert (mix.total_room_nights, mix.on_books_room_nights, mix.matches_on_books) == (
+        32,
+        30,
+        False,
+    )
+
+
+def test_a_no_show_whose_stay_has_begun_is_no_conflict(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=1)
+    world = _world(db_session, factory, tenant)
+    booking = world.channel("Booking.com")
+    world.booking(booking, AS_OF, _end())
+    world.booking(booking, AS_OF, AS_OF + timedelta(days=2), status=NO_SHOW)  # arrival: today
+
+    distribution = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    ).distribution
+
+    assert distribution.date_conflicts == BookingDateConflicts(0, 0, 0)
+    assert distribution.channel_mix is not None
+    assert distribution.channel_mix.matches_on_books is True
+
+
+def test_a_cancellation_dated_after_the_analysis_day_is_a_date_conflict(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=1)
+    world = _world(db_session, factory, tenant)
+    booking = world.channel("Booking.com")
+    world.booking(booking, AS_OF, _end())
+    world.booking(booking, AS_OF, _end(), status=CANCELLED, cancelled_at=_LATER)
+
+    distribution = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    ).distribution
+
+    assert distribution.date_conflicts == BookingDateConflicts(0, 1, 0)
+    assert distribution.channel_mix is not None
+    assert distribution.channel_mix.matches_on_books is False
+
+
+def test_cancellations_dated_in_time_or_undated_are_in_neither_count_and_no_conflict(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=1)
+    world = _world(db_session, factory, tenant)
+    booking = world.channel("Booking.com")
+    world.booking(booking, AS_OF, _end())
+    world.booking(
+        booking, AS_OF, _end(), status=CANCELLED, cancelled_at=datetime(2026, 7, 20, tzinfo=UTC)
+    )
+    world.booking(booking, AS_OF, _end(), status=CANCELLED)  # no cancellation date: uncertain
+
+    distribution = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    ).distribution
+
+    assert distribution.date_conflicts == BookingDateConflicts(0, 0, 0)
+    mix = distribution.channel_mix
+    assert mix is not None
+    assert (mix.total_room_nights, mix.matches_on_books) == (30, True)
+
+
+def test_unclassified_channels_stay_in_the_total_and_are_counted_apart(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=4)
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end())
+    world.booking(world.channel("Sito diretto"), AS_OF, _end())
+    world.booking(world.channel("Agency"), AS_OF, _end())
+    world.booking(world.channel("Telefono / Email"), AS_OF, _end())
+
+    mix = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    ).distribution.channel_mix
+
+    assert mix is not None
+    # every weight is over ALL 120 room-nights: the unclassified 30 are in it, and counted apart
+    assert (mix.total_room_nights, mix.classified_room_nights, mix.unclassified_room_nights) == (
+        120,
+        60,
+        30,
+    )
+    assert {channel.name: channel.group for channel in mix.channels} == {
+        "Booking.com": ChannelGroupName.OTA,
+        "Sito diretto": ChannelGroupName.DIRECT,
+        "Agency": ChannelGroupName.OTHER,
+        "Telefono / Email": ChannelGroupName.UNKNOWN,
+    }
+    assert all(channel.share_pct == D("25.00") for channel in mix.channels)
+    assert mix.matches_on_books is True
+
+
+def test_the_weights_and_the_room_nights_on_the_books_cover_the_same_thirty_nights(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=1)
+    world = _world(db_session, factory, tenant)
+    booking = world.channel("Booking.com")
+    world.booking(booking, AS_OF, _end())
+    world.booking(booking, _end(), _end() + timedelta(days=3))  # after the 30th night: in neither
+
+    overview = overview_of(
+        db_session, tenant, period=7, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    )
+
+    month = overview.occupancy.days_30
+    assert month is not None
+    assert forward_window(AS_OF) == (month.start_date, month.end_date)
+    mix = overview.distribution.channel_mix
+    assert mix is not None
+    # the period shown (7 nights) never changes the 30 nights the weights are checked against
+    assert (mix.total_room_nights, mix.on_books_room_nights) == (30, month.room_nights)
+
+
+def test_an_observation_missing_a_night_gives_no_total_to_check_the_weights_against(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=1, days=29)
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end())
+
+    mix = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    ).distribution.channel_mix
+
+    assert mix is not None
+    assert (mix.on_books_room_nights, mix.matches_on_books) == (None, None)  # a part is no total
+
+
+def test_an_area_that_was_not_read_has_no_date_conflicts(
+    db_session: Session, tenant: Tenant
+) -> None:
+    seed_run(db_session, tenant, with_provenance=False)
+
+    distribution = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(AssertionError("no source"))
+    ).distribution
+
+    assert distribution.date_conflicts is None

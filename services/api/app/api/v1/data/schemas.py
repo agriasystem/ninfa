@@ -33,6 +33,8 @@ class PeriodMetricsResponse(BaseModel):
     nights_requested: int
     nights_with_data: int
     nights_with_capacity: int
+    # "KNOWN" | "PARTIAL" | "MISSING" | "AWAITING_ANALYSIS"; null with no night of bookings.
+    capacity: str | None
     room_nights: int | None
     rooms_on_books_with_capacity: int | None
     rooms_available: int | None
@@ -79,8 +81,22 @@ class ChannelWeightResponse(BaseModel):
 
 
 class ChannelMixResponse(BaseModel):
+    # The denominator of every weight, and what is in it (see `ChannelMix`).
     total_room_nights: int
+    classified_room_nights: int
+    unclassified_room_nights: int
+    on_books_room_nights: int | None
+    matches_on_books: bool | None
     channels: list[ChannelWeightResponse]
+
+
+class DateConflictsResponse(BaseModel):
+    """Bookings of the 30-night window whose own dates contradict the analysis day (counts)."""
+
+    booked_after: int
+    cancelled_after: int
+    no_show_before_arrival: int
+    total: int
 
 
 class DistributionResponse(BaseModel):
@@ -96,6 +112,7 @@ class DistributionResponse(BaseModel):
     insufficient_reasons: list[str]
     decision_id: UUID | None
     channel_mix: ChannelMixResponse | None
+    date_conflicts: DateConflictsResponse | None
 
 
 # --- costs -------------------------------------------------------------------------------------
