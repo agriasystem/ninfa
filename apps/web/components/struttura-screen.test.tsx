@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PropertyAccess, SessionContextResponse } from "@ninfa/contracts";
 
+import { STRUTTURA_INVENTORY_ANCHOR, strutturaInventoryRoute } from "@/lib/routes";
 import { demoStructureOverview } from "@/lib/structure/demo-structure";
 import { nothingConfigured, ok } from "@/test/sources-support";
 
@@ -418,5 +419,45 @@ describe("/struttura - the profile, inventory and parameter buttons are ready bu
     expect(actions.onEditParameters).toHaveBeenCalledTimes(1);
     expect(actions.onRoomMenu).toHaveBeenCalledWith("suite");
     await waitFor(() => expect(getDataSourcesMock).toHaveBeenCalled());
+  });
+});
+
+describe("/struttura - the way in from Dati's 'Configura inventario'", () => {
+  const scrolled: Element[] = [];
+  const original = Element.prototype.scrollIntoView;
+
+  beforeEach(() => {
+    scrolled.length = 0;
+    // jsdom lays nothing out and has no scrollIntoView: record which element is brought into view
+    Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+      scrolled.push(this);
+    };
+  });
+
+  afterEach(() => {
+    Element.prototype.scrollIntoView = original;
+    window.history.replaceState(null, "", "/");
+  });
+
+  it("the inventory block is the anchor the link names - no new page, no second setting", () => {
+    renderPage();
+
+    expect(region("2. Inventario camere").id).toBe(STRUTTURA_INVENTORY_ANCHOR);
+    expect(strutturaInventoryRoute("p1")).toBe("/struttura?property=p1#struttura-rooms");
+  });
+
+  it("arriving with that anchor brings the inventory block into view once the page is on screen", async () => {
+    window.history.replaceState(null, "", "/struttura?property=p1#struttura-rooms");
+    renderPage();
+
+    await waitFor(() => expect(scrolled).toHaveLength(1));
+    expect(scrolled[0]).toBe(region("2. Inventario camere"));
+  });
+
+  it("without it the page opens where it always did", async () => {
+    renderPage();
+    await sourcesLoaded();
+
+    expect(scrolled).toHaveLength(0);
   });
 });

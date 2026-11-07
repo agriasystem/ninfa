@@ -39,6 +39,7 @@ export function metrics(overrides: Partial<DataPeriodMetrics> = {}): DataPeriodM
     nights_requested: 1,
     nights_with_data: 1,
     nights_with_capacity: 1,
+    capacity: "KNOWN",
     room_nights: 17,
     rooms_on_books_with_capacity: 17,
     rooms_available: 40,
@@ -128,6 +129,7 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
     nights_requested: 30,
     nights_with_data: 30,
     nights_with_capacity: 29,
+    capacity: "PARTIAL",
     room_nights: 764,
     rooms_on_books_with_capacity: 727,
     rooms_available: 1160,
@@ -174,6 +176,10 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
       decision_id: D_OTA,
       channel_mix: {
         total_room_nights: 870,
+        classified_room_nights: 810,
+        unclassified_room_nights: 0,
+        on_books_room_nights: 870,
+        matches_on_books: true,
         channels: [
           { name: "Booking.com", group: "OTA", room_nights: 390, share_pct: "44.83" },
           { name: "Diretto", group: "DIRECT", room_nights: 240, share_pct: "27.59" },
@@ -181,6 +187,7 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
           { name: "Agency", group: "OTHER", room_nights: 60, share_pct: "6.90" },
         ],
       },
+      date_conflicts: { booked_after: 0, cancelled_after: 0, no_show_before_arrival: 0, total: 0 },
     },
     costs: {
       state: "AVAILABLE",
@@ -312,6 +319,7 @@ export function notProcessedOverview(lastAnalysisDate: string | null = "2026-03-
       classification_coverage_pct: null,
       decision_id: null,
       channel_mix: null,
+      date_conflicts: null,
     },
     costs: {
       ...full.costs,
@@ -343,6 +351,7 @@ export function partialOverview(): DataOverviewResponse {
     nights_requested: 30,
     nights_with_data: 30,
     nights_with_capacity: 28,
+    capacity: "PARTIAL",
     room_nights: 764,
     occupancy_pct: "60.71",
     rooms_available: 1120,
@@ -395,5 +404,70 @@ export function unknownCoverageOverview(): DataOverviewResponse {
     },
     distribution: { ...full.distribution, state: "NOT_AVAILABLE", reason: "COVERAGE_UNKNOWN", outcome: null, ota_share_pct: null, direct_share_pct: null, reference_ota_share_pct: null, classification_coverage_pct: null, decision_id: null, channel_mix: null },
     decisions: [],
+  };
+}
+
+/** The 30 nights of a property whose bookings are imported but whose room inventory is not configured
+ * (the product review's real case): room-nights, revenue and ADR exist, occupancy cannot be calculated. */
+export function missingInventoryOverview(
+  capacity: "MISSING" | "AWAITING_ANALYSIS" = "MISSING",
+): DataOverviewResponse {
+  const full = fullOverview();
+  const noCapacity = { nights_with_capacity: 0, capacity, rooms_available: null, rooms_on_books_with_capacity: null, occupancy_pct: null };
+  const month = metrics({
+    ...noCapacity,
+    start_date: AS_OF,
+    end_date: addDays(AS_OF, 29),
+    nights_requested: 30,
+    nights_with_data: 30,
+    room_nights: 133,
+    room_revenue: "20698.00",
+    adr: "155.62",
+  });
+  return {
+    ...full,
+    occupancy: {
+      ...full.occupancy,
+      today: metrics({ ...noCapacity, room_nights: 3 }),
+      days_7: metrics({ ...noCapacity, start_date: AS_OF, end_date: addDays(AS_OF, 6), nights_requested: 7, nights_with_data: 7, room_nights: 34 }),
+      days_30: month,
+      selected: month,
+      nights: nights(30).map((row) => ({ ...row, rooms_available: null, occupancy_pct: null })),
+    },
+  };
+}
+
+/** The OTA check refused because the channel mix does not reconcile with the bookings on the books: 9
+ * bookings dated after the analysis day and 4 no-shows for stays not yet begun (the review's numbers). */
+export function reconciliationFailedOverview(): DataOverviewResponse {
+  const full = missingInventoryOverview();
+  return {
+    ...full,
+    distribution: {
+      ...full.distribution,
+      outcome: "INSUFFICIENT_DATA",
+      ota_share_pct: null,
+      direct_share_pct: null,
+      reference_ota_share_pct: null,
+      classification_coverage_pct: null,
+      decision_id: null,
+      insufficient_reasons: ["OTA_CHANNEL_MIX_RECONCILIATION_FAILED"],
+      channel_mix: {
+        total_room_nights: 121,
+        classified_room_nights: 101,
+        unclassified_room_nights: 20,
+        on_books_room_nights: 133,
+        matches_on_books: false,
+        channels: [
+          { name: "Sito diretto", group: "DIRECT", room_nights: 31, share_pct: "25.62" },
+          { name: "Booking.com", group: "OTA", room_nights: 30, share_pct: "24.79" },
+          { name: "Expedia", group: "OTA", room_nights: 28, share_pct: "23.14" },
+          { name: "Telefono / Email", group: "UNKNOWN", room_nights: 20, share_pct: "16.53" },
+          { name: "Walk-in", group: "DIRECT", room_nights: 12, share_pct: "9.92" },
+        ],
+      },
+      date_conflicts: { booked_after: 9, cancelled_after: 0, no_show_before_arrival: 4, total: 13 },
+    },
+    decisions: full.decisions.filter((decision) => decision.domain !== "DISTRIBUTION"),
   };
 }

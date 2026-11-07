@@ -17,6 +17,13 @@ export interface DatiOccupancyCardProps {
   onSelectPeriod: (period: DataPeriod) => void;
 }
 
+/** No room inventory for the period (or one set after the observation): the occupancy cannot be
+ * calculated, while the bookings, the revenue and the ADR are real and stay on screen. */
+function inventoryGap(metrics: DataPeriodMetrics | null): "MISSING" | "AWAITING_ANALYSIS" | null {
+  const capacity = metrics?.capacity ?? null;
+  return capacity === "MISSING" || capacity === "AWAITING_ANALYSIS" ? capacity : null;
+}
+
 /** One honest line about WHICH nights the percentage rests on: nights without a stored booking
  * snapshot, and nights whose capacity is unknown, are never silently folded into it. */
 function coverageNotes(metrics: DataPeriodMetrics): string[] {
@@ -24,7 +31,10 @@ function coverageNotes(metrics: DataPeriodMetrics): string[] {
   if (metrics.nights_with_data < metrics.nights_requested) {
     notes.push(datiCopy.occupancy.bookingsKnownFor(metrics.nights_with_data, metrics.nights_requested));
   }
-  if (metrics.nights_with_data > 0) {
+  const gap = inventoryGap(metrics);
+  if (gap !== null) {
+    notes.push(gap === "MISSING" ? datiCopy.occupancy.inventoryMissingNote : datiCopy.occupancy.inventoryAwaitingNote);
+  } else if (metrics.nights_with_data > 0) {
     if (metrics.nights_with_capacity === 0) {
       notes.push(datiCopy.occupancy.capacityUnknown);
     } else if (metrics.nights_with_capacity < metrics.nights_with_data) {
@@ -56,7 +66,9 @@ function MiniTile({
         </>
       ) : (
         <>
-          <p className="dati-tile__value dati-tile__value--na">{datiCopy.notAvailable}</p>
+          <p className="dati-tile__value dati-tile__value--na">
+            {inventoryGap(metrics) !== null ? datiCopy.occupancy.notComputable : datiCopy.notAvailable}
+          </p>
           <p className="dati-tile__detail">
             {metrics !== null && metrics.room_nights !== null
               ? datiCopy.occupancy.roomNightsShort(metrics.room_nights)
@@ -74,7 +86,9 @@ function MiniTile({
  * Everything shown comes from the backend overview. The percentage is `rooms on books / rooms
  * available` over the nights with a KNOWN capacity only, and the card says so whenever some nights are
  * left out; room-nights are never called bookings; and when nothing can be calculated it shows a
- * designed "Non disponibile" with the reason, never a zero.
+ * designed "Non disponibile" with the reason, never a zero. Without a room inventory it says so in the
+ * hotel's terms ("Inventario camere da configurare"): the bookings stay visible, only the percentage
+ * needs the number of rooms (the chart beside it carries "Configura inventario").
  */
 export function DatiOccupancyCard({
   overview,
@@ -87,6 +101,7 @@ export function DatiOccupancyCard({
   const selected = occupancy.selected;
   const available = occupancy.state === "AVAILABLE" && selected !== null;
   const percent = selected?.occupancy_pct ?? null;
+  const gap = inventoryGap(selected);
   const freshness = bookingsFreshnessLine(
     overview.freshness.bookings,
     overview.as_of_local_date,
@@ -105,7 +120,13 @@ export function DatiOccupancyCard({
           {percent !== null ? (
             <p className="dati-occupancy__value">{formatPercent(percent)}</p>
           ) : (
-            <p className="dati-occupancy__value dati-occupancy__value--na">{datiCopy.notAvailable}</p>
+            <p className={`dati-occupancy__value dati-occupancy__value--na${gap !== null ? " dati-occupancy__value--gap" : ""}`}>
+              {gap === "MISSING"
+                ? datiCopy.occupancy.inventoryMissingValue
+                : gap === "AWAITING_ANALYSIS"
+                  ? datiCopy.occupancy.inventoryAwaitingValue
+                  : datiCopy.notAvailable}
+            </p>
           )}
           <p className="dati-occupancy__scope">
             {datiCopy.period.nextDays(overview.period_days)}

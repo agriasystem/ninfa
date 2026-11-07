@@ -10,7 +10,7 @@ import {
 } from "@/lib/data/dates";
 import { formatPercent } from "@/lib/data/format";
 
-import { DatiCard, DatiEmpty } from "./dati-parts";
+import { ConfigureInventoryLink, DatiCard, DatiEmpty } from "./dati-parts";
 
 /** The tallest value the axis must reach, in percent. Occupancy is stored NOT clamped (45 rooms on 40
  * available is 112,5 %), so the axis grows in steps of 25 when a night exceeds 100 - the bars are
@@ -85,6 +85,23 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
   const hasAnyFigure = nights.some((night) => night.occupancy_pct !== null);
 
   if (occupancy.state !== "AVAILABLE" || nights.length === 0 || !hasAnyFigure) {
+    // Bookings without a room inventory are not "no data": say what is missing and where to set it.
+    const capacity = occupancy.state === "AVAILABLE" ? (occupancy.selected?.capacity ?? null) : null;
+    const empty =
+      capacity === "MISSING" ? (
+        <DatiEmpty
+          title={datiCopy.chart.inventoryMissingTitle}
+          body={datiCopy.chart.inventoryMissingBody}
+          action={<ConfigureInventoryLink propertyId={overview.property_id} />}
+        />
+      ) : capacity === "AWAITING_ANALYSIS" ? (
+        <DatiEmpty title={datiCopy.chart.inventoryAwaitingTitle} body={datiCopy.occupancy.inventoryAwaitingNote} />
+      ) : (
+        <DatiEmpty
+          title={datiCopy.chart.emptyTitle}
+          body={unavailableReasonText(occupancy.state === "AVAILABLE" ? "NO_DATA" : occupancy.reason)}
+        />
+      );
     return (
       <DatiCard id="dati-chart" title={title} className="dati-chart">
         <div className="dati-chart__empty">
@@ -93,10 +110,7 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
               <span key={index} style={{ height: `${height}%` }} />
             ))}
           </div>
-          <DatiEmpty
-            title={datiCopy.chart.emptyTitle}
-            body={unavailableReasonText(occupancy.state === "AVAILABLE" ? "NO_DATA" : occupancy.reason)}
-          />
+          {empty}
         </div>
       </DatiCard>
     );

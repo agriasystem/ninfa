@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import type { DataChannelWeight, DataDistribution } from "@ninfa/contracts";
+import type { DataChannelMix, DataChannelWeight, DataDistribution } from "@ninfa/contracts";
 
 import {
   channelGroupLabel,
@@ -57,6 +57,27 @@ function ChannelRows({
   );
 }
 
+/** What every weight is a share of, said before the weights: all the room-nights booked in the next 30
+ * nights (the unclassified ones included), or - when the bookings' own dates keep the two apart - a
+ * different total, and then the composition is only indicative. The backend decides which. */
+function ChannelBasis({ mix }: { mix: DataChannelMix }) {
+  const copy = datiCopy.distribution;
+  if (mix.matches_on_books === false && mix.on_books_room_nights !== null) {
+    return (
+      <p className="dati-ota__basis dati-ota__basis--indicative">
+        {copy.channelsIndicative(mix.total_room_nights, mix.on_books_room_nights)}
+      </p>
+    );
+  }
+  const text =
+    mix.matches_on_books !== true
+      ? copy.channelsBasis(mix.total_room_nights)
+      : mix.unclassified_room_nights > 0
+        ? copy.channelsBasisOnBooksUnclassified(mix.total_room_nights, mix.unclassified_room_nights)
+        : copy.channelsBasisOnBooks(mix.total_room_nights);
+  return <p className="dati-ota__basis">{text}</p>;
+}
+
 export interface DatiDistributionCardProps {
   distribution: DataDistribution;
   propertyId: string;
@@ -103,12 +124,21 @@ export function DatiDistributionCard({
       ? formatDateRange(distribution.window_start, distribution.window_end)
       : null;
   const outcomeText = otaOutcomeText(distribution.outcome);
-  const insufficientBecause =
-    distribution.outcome === "INSUFFICIENT_DATA" && distribution.insufficient_reasons.length > 0
-      ? datiCopy.distribution.insufficientBecause(
-          otaInsufficientReasonsText(distribution.insufficient_reasons),
-        )
-      : null;
+  const insufficient =
+    distribution.outcome === "INSUFFICIENT_DATA" && distribution.insufficient_reasons.length > 0;
+  const insufficientBecause = insufficient
+    ? datiCopy.distribution.insufficientBecause(
+        otaInsufficientReasonsText(distribution.insufficient_reasons, {
+          conflicts: distribution.date_conflicts,
+          coveragePct: distribution.classification_coverage_pct,
+        }),
+      )
+    : null;
+  // The bookings whose own dates contradict today are why the check could not be made: say where to look.
+  const datesToCheck =
+    insufficient &&
+    distribution.insufficient_reasons.includes("OTA_CHANNEL_MIX_RECONCILIATION_FAILED") &&
+    (distribution.date_conflicts?.total ?? 0) > 0;
   const mix = distribution.channel_mix;
   const decisionHref =
     distribution.decision_id !== null
@@ -160,6 +190,7 @@ export function DatiDistributionCard({
         <p className="dati-ota__outcome">
           {outcomeText}
           {insufficientBecause !== null ? ` ${insufficientBecause}` : ""}
+          {datesToCheck ? ` ${datiCopy.distribution.checkBookingsHint}` : ""}
         </p>
       ) : null}
 
@@ -173,6 +204,7 @@ export function DatiDistributionCard({
         <h3 className="dati-ota__channels-title">{datiCopy.distribution.channelsTitle}</h3>
         {mix !== null && mix.channels.length > 0 ? (
           <>
+            <ChannelBasis mix={mix} />
             <ChannelRows channels={mix.channels} limit={full ? null : COMPACT_CHANNELS} />
             {full ? <p className="dati-ota__note">{datiCopy.distribution.channelsNote}</p> : null}
           </>

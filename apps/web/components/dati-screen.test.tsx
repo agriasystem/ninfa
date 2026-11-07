@@ -23,7 +23,9 @@ import {
   fullOverviewSevenDays,
   nights,
   notProcessedOverview,
+  missingInventoryOverview,
   partialOverview,
+  reconciliationFailedOverview,
   unknownCoverageOverview,
 } from "@/test/data-support";
 import { analysisStatusOf } from "@/test/sources-support";
@@ -583,7 +585,14 @@ describe("Panoramica - the OTA card", () => {
       ...data,
       distribution: {
         ...data.distribution,
-        channel_mix: { total_room_nights: 900, channels: [...(data.distribution.channel_mix?.channels ?? []), ...extra] },
+        channel_mix: {
+          total_room_nights: 900,
+          classified_room_nights: 840,
+          unclassified_room_nights: 0,
+          on_books_room_nights: 900,
+          matches_on_books: true,
+          channels: [...(data.distribution.channel_mix?.channels ?? []), ...extra],
+        },
       },
     });
 
@@ -1015,9 +1024,9 @@ describe("Personale tab", () => {
     expect(flat(kpi("Ore pianificate"))).toContain("25,0 h");
     expect(flat(kpi("Costo pianificato"))).toContain("384,25 €");
     expect(flat(kpi("Costo medio/ora"))).toContain("15,37 €/h");
-    expect(flat(kpi("Incidenza sui ricavi"))).toContain("26,7");
-    expect(flat(kpi("Ricavo per ora"))).toContain("57,56 €/h");
-    expect(flat(kpi("Ricavo per ora"))).toContain("non per singola persona");
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).toContain("26,7");
+    expect(flat(kpi("Ricavo on-books per ora"))).toContain("57,56 €/h");
+    expect(flat(kpi("Ricavo on-books per ora"))).toContain("non per singola persona");
   });
 
   it("never shows the same fraction twice, as a percentage and as a ratio", async () => {
@@ -1062,7 +1071,7 @@ describe("Personale tab", () => {
       "Costo pianificato",
       "Costo medio/ora",
       "% costo personale",
-      "Incidenza sui ricavi",
+      "Incidenza sui ricavi on-books",
       "Giorni con dati",
     ]);
     const first = flat(table.getAllByRole("row")[1] as HTMLElement);
@@ -1096,13 +1105,13 @@ describe("Personale tab", () => {
 
     expect(flat(kpi("Ore pianificate"))).toContain("25,0 h");
     expect(flat(kpi("Costo medio/ora"))).toContain("15,37 €/h");
-    expect(flat(kpi("Incidenza sui ricavi"))).toContain("Non disponibile");
-    expect(flat(kpi("Incidenza sui ricavi"))).toContain("Non ci sono ricavi confrontabili");
-    expect(flat(kpi("Ricavo per ora"))).toContain("Non disponibile");
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).toContain("Non disponibile");
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).toContain("Non ci sono ricavi on-books confrontabili");
+    expect(flat(kpi("Ricavo on-books per ora"))).toContain("Non disponibile");
     expect(flat(screen.getByRole("region", { name: "In sintesi" }))).toContain(
       "Sono disponibili ore e costi del personale.",
     );
-    expect(screen.queryByRole("columnheader", { name: "Incidenza sui ricavi" })).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Incidenza sui ricavi on-books" })).toBeNull();
   });
 
   it("with no revenue on the books for those days it says that, never 0 %", async () => {
@@ -1124,8 +1133,8 @@ describe("Personale tab", () => {
       { initialTab: "labor" },
     );
 
-    expect(flat(kpi("Incidenza sui ricavi"))).toContain("Non ci sono ricavi on-books in questi giorni.");
-    expect(flat(kpi("Incidenza sui ricavi"))).not.toContain("0,0");
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).toContain("Non ci sono ricavi on-books in questi giorni.");
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).not.toContain("0,0");
   });
 
   it("a plan with no cost has hours only, and says what is missing", async () => {
@@ -1136,6 +1145,16 @@ describe("Personale tab", () => {
     expect(flat(screen.getByRole("region", { name: "In sintesi" }))).toContain(
       "Sono disponibili le ore del personale.",
     );
+  });
+
+  it("names the two revenue KPIs for what they are, with the backend's figures unchanged", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).toContain("26,7%");
+    expect(flat(kpi("Ricavo on-books per ora"))).toContain("57,56 €/h");
+    expect(screen.queryByRole("article", { name: "Incidenza sui ricavi" })).toBeNull();
+    expect(screen.queryByRole("article", { name: "Ricavo per ora" })).toBeNull();
+    expect(within(region("Ore e performance per ruolo")).getByRole("columnheader", { name: "Incidenza sui ricavi on-books" })).not.toBeNull();
   });
 
   it("says plainly when no labor source or no data exists", async () => {
@@ -1293,5 +1312,228 @@ describe("Dati is deterministic: it never reaches Mia or a model", () => {
     expect(miaMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("textbox", { name: /Mia/u })).toBeNull();
     expect(document.body.textContent).not.toMatch(/Chiedi a Mia/u);
+  });
+});
+
+// --- Pilot review: Dati UX & coverage fix ---------------------------------------------------------------
+
+describe("Occupazione without a room inventory - the cause, not a generic 'no data'", () => {
+  it("the card says the inventory is to be configured and keeps the room-nights it does know", async () => {
+    await renderLoaded(missingInventoryOverview());
+
+    const card = region("Occupazione");
+    expect(within(card).getByText("Inventario camere da configurare", { selector: ".dati-occupancy__value" })).not.toBeNull();
+    expect(flat(card)).toContain("Le prenotazioni sono disponibili, ma manca la capacità camere della struttura.");
+    expect(flat(card)).toContain("prossimi 30 giorni · 133 camere-notte prenotate");
+    // never the old generic words, never a made-up percentage
+    expect(flat(card)).not.toContain("Capienza non nota per questo periodo");
+    expect(card.querySelector(".dati-occupancy__value")?.textContent).not.toMatch(/%|Non disponibile/u);
+  });
+
+  it("each mini summary says the occupancy cannot be calculated and still shows its room-nights", async () => {
+    await renderLoaded(missingInventoryOverview());
+
+    const items = within(region("Occupazione")).getAllByRole("listitem").map((item) => flat(item));
+    expect(items).toEqual([
+      "Oggi Non calcolabile 3 camere-notte",
+      "7 giorni Non calcolabile 34 camere-notte",
+      "30 giorni Non calcolabile 133 camere-notte",
+    ]);
+  });
+
+  it("the bookings, the room revenue and the ADR stay visible: only the occupancy needs the capacity", async () => {
+    await renderLoaded(missingInventoryOverview());
+
+    expect(flat(screen.getByRole("article", { name: "Ricavi camera" }))).toContain("20.698 €");
+    expect(flat(screen.getByRole("article", { name: "ADR" }))).toContain("155,62 €");
+    expect(flat(screen.getByRole("article", { name: "Camere-notte" }))).toContain("133");
+    const rows = within(within(region("Dettaglio soggiorni")).getByRole("table")).getAllByRole("row");
+    expect(rows).toHaveLength(31);
+    expect(flat(rows[1] as HTMLElement)).toMatch(/\d+ — — [\d.]+ € 100,00 €/u);
+  });
+
+  it("the chart names the cause and offers 'Configura inventario', straight to Struttura's inventory block", async () => {
+    await renderLoaded(missingInventoryOverview());
+
+    const chart = region("Occupazione prossimi 30 giorni");
+    expect(within(chart).getByText("Occupazione non calcolabile")).not.toBeNull();
+    expect(flat(chart)).toContain(
+      "Per calcolare l'occupazione NINFA deve conoscere il numero di camere disponibili della struttura.",
+    );
+    expect(flat(chart)).not.toContain("Nessun dato di occupazione");
+    expect(flat(chart)).not.toContain("Non ci sono dati sufficienti per questo periodo.");
+    const link = within(chart).getByRole("link", { name: "Configura inventario" });
+    expect(link.getAttribute("href")).toBe("/struttura?property=p1#struttura-rooms");
+    // one way in, not a second inventory setting inside Dati
+    expect(screen.getAllByRole("link", { name: "Configura inventario" })).toHaveLength(1);
+    expect(screen.queryByRole("textbox", { name: /camere/iu })).toBeNull();
+  });
+
+  it("the detail table says once why two of its columns are dashes", async () => {
+    await renderLoaded(missingInventoryOverview());
+
+    expect(flat(region("Dettaglio soggiorni"))).toContain(
+      "Disponibili e occupazione compariranno quando NINFA conoscerà le camere disponibili della struttura.",
+    );
+  });
+
+  it("the Prenotazioni tab offers the same way to the inventory", async () => {
+    await renderLoaded(missingInventoryOverview(), { initialTab: "bookings" });
+
+    const chart = region("Occupazione prossimi 30 giorni");
+    expect(within(chart).getByRole("link", { name: "Configura inventario" }).getAttribute("href")).toBe(
+      "/struttura?property=p1#struttura-rooms",
+    );
+  });
+
+  it("an inventory set after today's observation is not 'to configure': it waits for the next analysis", async () => {
+    await renderLoaded(missingInventoryOverview("AWAITING_ANALYSIS"));
+
+    const card = region("Occupazione");
+    expect(within(card).getByText("Occupazione non ancora calcolata", { selector: ".dati-occupancy__value" })).not.toBeNull();
+    expect(flat(card)).toContain(
+      "L'inventario camere è configurato: l'occupazione sarà calcolata alla prossima analisi delle prenotazioni.",
+    );
+    expect(within(region("Occupazione prossimi 30 giorni")).getByText("Occupazione non ancora calcolata")).not.toBeNull();
+    expect(screen.queryByRole("link", { name: "Configura inventario" })).toBeNull();
+  });
+
+  it("a property with a known capacity shows no inventory message at all", async () => {
+    await renderLoaded();
+
+    expect(document.body.textContent).not.toMatch(/Inventario camere da configurare|Configura inventario|Non calcolabile/u);
+  });
+});
+
+describe("Dipendenza OTA - the real cause, and what the weights are a share of", () => {
+  it("states the bookings whose own dates contradict today, with the backend's counts, and where to look", async () => {
+    await renderLoaded(reconciliationFailedOverview());
+
+    const text = flat(region("Dipendenza OTA"));
+    expect(text).toContain("I dati non bastano per valutare la dipendenza OTA.");
+    expect(text).toContain(
+      "Perché: 13 prenotazioni del periodo hanno date incoerenti con oggi (9 risultano prenotate dopo oggi; 4 sono segnate come non presentate per soggiorni non ancora iniziati).",
+    );
+    expect(text).toContain("Controlla queste prenotazioni nei dati importati.");
+    expect(text).not.toContain("la composizione per canale non coincide");
+    expect(text).not.toMatch(/OTA_CHANNEL|RECONCILIATION|no-show/iu);
+  });
+
+  it("never presents the weights as the whole portfolio when they are not: 'Composizione indicativa', both totals", async () => {
+    await renderLoaded(reconciliationFailedOverview());
+
+    const card = region("Dipendenza OTA");
+    expect(flat(card)).toContain(
+      "Composizione indicativa: le percentuali sono su 121 camere-notte, non sulle 133 prenotate nei prossimi 30 giorni.",
+    );
+    // said BEFORE the percentages, not under them
+    const basis = card.querySelector(".dati-ota__basis");
+    const list = card.querySelector(".dati-channels");
+    expect(basis && list && basis.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(flat(card)).toContain("Sito diretto Diretto 25,6%");
+    expect(card.querySelector(".dati-ota__value")).toBeNull(); // still no OTA share
+  });
+
+  it("says the same on the Distribuzione tab", async () => {
+    await renderLoaded(reconciliationFailedOverview(), { initialTab: "distribution" });
+
+    const text = flat(region("Dipendenza OTA"));
+    expect(text).toContain("Composizione indicativa");
+    expect(text).toContain("13 prenotazioni del periodo hanno date incoerenti con oggi");
+    expect(text).toContain("Telefono / Email Non classificato 16,5% 20 camere-notte");
+  });
+
+  it("a singular reads as Italian", async () => {
+    const data = reconciliationFailedOverview();
+    await renderLoaded({
+      ...data,
+      distribution: {
+        ...data.distribution,
+        date_conflicts: { booked_after: 0, cancelled_after: 1, no_show_before_arrival: 0, total: 1 },
+      },
+    });
+
+    expect(flat(region("Dipendenza OTA"))).toContain(
+      "Perché: 1 prenotazione del periodo ha date incoerenti con oggi (1 risulta cancellata dopo oggi).",
+    );
+  });
+
+  it("without a date to point at, it says the bookings read by channel differ - and no hint", async () => {
+    const data = reconciliationFailedOverview();
+    await renderLoaded({
+      ...data,
+      distribution: {
+        ...data.distribution,
+        date_conflicts: { booked_after: 0, cancelled_after: 0, no_show_before_arrival: 0, total: 0 },
+      },
+    });
+
+    const text = flat(region("Dipendenza OTA"));
+    expect(text).toContain(
+      "Perché: le prenotazioni lette per canale non coincidono con quelle registrate per lo stesso periodo.",
+    );
+    expect(text).not.toContain("Controlla queste prenotazioni");
+  });
+
+  it("when the weights ARE the room-nights on the books, it says so", async () => {
+    await renderLoaded();
+
+    expect(flat(region("Dipendenza OTA"))).toContain(
+      "Percentuali su tutte le 870 camere-notte prenotate nei prossimi 30 giorni.",
+    );
+  });
+
+  it("...and counts the unclassified channels in, saying how many", async () => {
+    const data = fullOverview();
+    const mix = data.distribution.channel_mix as NonNullable<typeof data.distribution.channel_mix>;
+    await renderLoaded({
+      ...data,
+      distribution: { ...data.distribution, channel_mix: { ...mix, unclassified_room_nights: 60 } },
+    });
+
+    expect(flat(region("Dipendenza OTA"))).toContain(
+      "Percentuali su tutte le 870 camere-notte prenotate nei prossimi 30 giorni, comprese 60 su canali non classificati.",
+    );
+  });
+
+  it("a low classification coverage states the real share NINFA can classify", async () => {
+    const data = fullOverview();
+    await renderLoaded({
+      ...data,
+      distribution: {
+        ...data.distribution,
+        outcome: "INSUFFICIENT_DATA",
+        decision_id: null,
+        ota_share_pct: null,
+        direct_share_pct: null,
+        reference_ota_share_pct: null,
+        classification_coverage_pct: "62.50",
+        insufficient_reasons: ["OTA_CHANNEL_CLASSIFICATION_COVERAGE_LOW"],
+      },
+    });
+
+    expect(flat(region("Dipendenza OTA"))).toContain(
+      "Perché: NINFA riconosce come OTA o dirette solo il 62,5% delle camere-notte del periodo: le altre sono su canali non classificati o di altro tipo.",
+    );
+  });
+
+  it("one hidden channel reads '+ 1 altro canale'", async () => {
+    await renderLoaded(reconciliationFailedOverview());
+
+    expect(flat(region("Dipendenza OTA"))).toContain("+ 1 altro canale");
+  });
+});
+
+describe("Dettaglio soggiorni - laid out to fit a desktop card", () => {
+  it("marks the nights table so its status column can ask for one line without widening the table", async () => {
+    const { container } = await renderLoaded();
+    expect(container.querySelector("table.dati-table--nights:not(.dati-table--nights-wide)")).not.toBeNull();
+  });
+
+  it("the Prenotazioni table is the wide variant, with every column the backend sent", async () => {
+    const { container } = await renderLoaded(fullOverview(), { initialTab: "bookings" });
+    const table = container.querySelector("table.dati-table--nights-wide");
+    expect(table).not.toBeNull();
+    expect(within(table as HTMLElement).getAllByRole("columnheader")).toHaveLength(10);
   });
 });

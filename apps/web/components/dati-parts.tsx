@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { NightStatus } from "@ninfa/contracts";
 
-import { nightStatusText } from "@/lib/data/copy";
+import { datiCopy, nightStatusText } from "@/lib/data/copy";
+import { strutturaInventoryRoute } from "@/lib/routes";
 
 /** The one white rounded card of the Dati workspace. `title` is the card's `<h2>`; a card without a
  * visible title passes `label` instead (still a named region, so a screen reader lists it). */
@@ -43,13 +45,25 @@ export function DatiCard({
   );
 }
 
-/** A designed empty state INSIDE a card (never a blank area): a title, one plain sentence. */
-export function DatiEmpty({ title, body }: { title: string; body?: string }) {
+/** A designed empty state INSIDE a card (never a blank area): a title, one plain sentence and, when the
+ * person can do something about it, the one next step. */
+export function DatiEmpty({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
   return (
     <div className="dati-empty" role="status">
       <p className="dati-empty__title">{title}</p>
       {body ? <p className="dati-empty__body">{body}</p> : null}
+      {action}
     </div>
+  );
+}
+
+/** "Configura inventario": straight to the room inventory block of Struttura - the one place the number
+ * of rooms is configured. Dati never offers a second setting of its own. */
+export function ConfigureInventoryLink({ propertyId }: { propertyId: string }) {
+  return (
+    <Link className="dati-cta" href={strutturaInventoryRoute(propertyId)}>
+      {datiCopy.occupancy.configureInventory}
+    </Link>
   );
 }
 

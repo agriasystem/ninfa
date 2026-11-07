@@ -1,5 +1,12 @@
-import type { AnalysisDomain, DomainState, LaborRevenueGap, NightStatus } from "@ninfa/contracts";
+import type {
+  AnalysisDomain,
+  DataDateConflicts,
+  DomainState,
+  LaborRevenueGap,
+  NightStatus,
+} from "@ninfa/contracts";
 
+import { formatPercent } from "@/lib/data/format";
 import { formatCount } from "@/lib/decisions/format";
 
 /**
@@ -54,6 +61,15 @@ export const datiCopy = {
     roomNightsShort: (count: number) => `${formatCount(count)} camere-notte`,
     unavailableTitle: "Occupazione non disponibile",
     miniTilesLabel: "Occupazione per periodo",
+    // No room inventory: the bookings are real, only what needs the number of rooms is missing. A
+    // capacity is never inferred from the bookings.
+    inventoryMissingValue: "Inventario camere da configurare",
+    inventoryMissingNote: "Le prenotazioni sono disponibili, ma manca la capacità camere della struttura.",
+    inventoryAwaitingValue: "Occupazione non ancora calcolata",
+    inventoryAwaitingNote:
+      "L'inventario camere è configurato: l'occupazione sarà calcolata alla prossima analisi delle prenotazioni.",
+    configureInventory: "Configura inventario",
+    notComputable: "Non calcolabile",
   },
   kpi: {
     groupLabel: "Indicatori del periodo",
@@ -82,6 +98,10 @@ export const datiCopy = {
     unknownCapacityTip: "Capienza non nota: occupazione non calcolabile",
     noDataTip: "Nessun dato per questa notte",
     emptyTitle: "Nessun dato di occupazione",
+    inventoryMissingTitle: "Occupazione non calcolabile",
+    inventoryMissingBody:
+      "Per calcolare l'occupazione NINFA deve conoscere il numero di camere disponibili della struttura.",
+    inventoryAwaitingTitle: "Occupazione non ancora calcolata",
     axisLabel: "Occupazione (%)",
   },
   distribution: {
@@ -96,9 +116,19 @@ export const datiCopy = {
     channelsNote:
       "Il peso è sul totale delle camere-notte di tutti i canali: non coincide con la quota OTA, che è sul solo totale OTA + diretto.",
     channelsEmpty: "Nessuna prenotazione certa da cui ricavare il peso dei canali.",
+    // What the weights are a share of - always said, never left to guess.
+    channelsBasis: (total: number) =>
+      `Percentuali su ${formatCount(total)} camere-notte dei prossimi 30 giorni.`,
+    channelsBasisOnBooks: (total: number) =>
+      `Percentuali su tutte le ${formatCount(total)} camere-notte prenotate nei prossimi 30 giorni.`,
+    channelsBasisOnBooksUnclassified: (total: number, unclassified: number) =>
+      `Percentuali su tutte le ${formatCount(total)} camere-notte prenotate nei prossimi 30 giorni, comprese ${formatCount(unclassified)} su canali non classificati.`,
+    channelsIndicative: (total: number, onBooks: number) =>
+      `Composizione indicativa: le percentuali sono su ${formatCount(total)} camere-notte, non sulle ${formatCount(onBooks)} prenotate nei prossimi 30 giorni.`,
+    checkBookingsHint: "Controlla queste prenotazioni nei dati importati.",
     channelRoomNights: (count: number) => `${formatCount(count)} camere-notte`,
     allChannels: (count: number) => `Tutti i ${count} canali`,
-    moreChannels: (count: number) => `+ altri ${count} canali`,
+    moreChannels: (count: number) => (count === 1 ? "+ 1 altro canale" : `+ altri ${count} canali`),
     infoTitle: "Come leggere i numeri",
     defOtaTerm: "Quota OTA",
     defOtaText:
@@ -135,6 +165,8 @@ export const datiCopy = {
     noData: "Non disponibile",
     notePartial:
       "Lo stato riflette solo le decisioni di NINFA per la notte: non è un giudizio sui numeri.",
+    noteInventory:
+      "Disponibili e occupazione compariranno quando NINFA conoscerà le camere disponibili della struttura.",
     shown: (shown: number, total: number) => `${shown} di ${total} notti`,
     openDecision: "Apri la decisione",
   },
@@ -190,8 +222,8 @@ export const datiCopy = {
       hours: "Ore pianificate",
       cost: "Costo pianificato",
       hourlyCost: "Costo medio/ora",
-      incidence: "Incidenza sui ricavi",
-      revenuePerHour: "Ricavo per ora",
+      incidence: "Incidenza sui ricavi on-books",
+      revenuePerHour: "Ricavo on-books per ora",
       hoursNote: (range: string) => `Prossimi 7 giorni (${range})`,
       samePeriod: "Stesso periodo delle ore",
       hourlyCostNote: "Costo pianificato diviso le ore pianificate",
@@ -216,7 +248,7 @@ export const datiCopy = {
     colHourlyCost: "Costo medio/ora",
     colShare: "% costo personale",
     colDays: "Giorni con dati",
-    colIncidence: "Incidenza sui ricavi",
+    colIncidence: "Incidenza sui ricavi on-books",
     daysComplete: (complete: number) => `${complete}`,
     daysIncomplete: (incomplete: number) =>
       incomplete === 1 ? "1 giorno incompleto" : `${incomplete} giorni incompleti`,
@@ -233,7 +265,8 @@ export const datiCopy = {
     revenueGap: {
       NO_LABOR: "Non ci sono ore pianificate da confrontare.",
       NO_ANALYSIS: "Servono prenotazioni analizzate per gli stessi giorni.",
-      PERIOD_NOT_COVERED: "Non ci sono ricavi confrontabili per tutti i giorni di questo periodo.",
+      PERIOD_NOT_COVERED:
+        "Non ci sono ricavi on-books confrontabili per tutti i giorni di questo periodo.",
       LABOR_INCOMPLETE: "Alcuni giorni del piano sono senza ore: il confronto non sarebbe corretto.",
       NO_REVENUE: "Non ci sono ricavi on-books in questi giorni.",
     } satisfies Record<LaborRevenueGap, string>,
@@ -242,9 +275,9 @@ export const datiCopy = {
       complete: (incidence: string, hourlyCost: string) =>
         `Il costo del personale incide per il ${incidence} sui ricavi on-books del periodo, con un costo medio di ${hourlyCost} per ora pianificata.`,
       hoursAndCosts:
-        "Sono disponibili ore e costi del personale. Le metriche legate ai ricavi saranno calcolate quando NINFA avrà ricavi confrontabili sullo stesso periodo.",
+        "Sono disponibili ore e costi del personale. Le metriche legate ai ricavi on-books saranno calcolate quando NINFA avrà ricavi on-books confrontabili sullo stesso periodo.",
       noCost:
-        "Sono disponibili le ore del personale. Costo medio e incidenza sui ricavi saranno calcolati quando tutte le righe del piano avranno un costo.",
+        "Sono disponibili le ore del personale. Costo medio e incidenza sui ricavi on-books saranno calcolati quando tutte le righe del piano avranno un costo.",
     },
   },
   freshness: {
@@ -356,15 +389,61 @@ const OTA_INSUFFICIENT_REASONS: Record<string, string> = {
     "troppe prenotazioni sono su canali non classificabili come OTA o diretti",
   OTA_SNAPSHOT_WINDOW_INCOMPLETE: "i dati di prenotazione dei prossimi 30 giorni sono incompleti",
   OTA_SNAPSHOT_WINDOW_UNCERTAIN: "alcune prenotazioni del periodo hanno uno stato incerto",
+  // the fallback when the bookings' own dates do not explain it (see `dateConflictsText`)
   OTA_CHANNEL_MIX_RECONCILIATION_FAILED:
-    "la composizione per canale non coincide con le prenotazioni registrate",
+    "le prenotazioni lette per canale non coincidono con quelle registrate per lo stesso periodo",
   OTA_COMPARABLE_SAMPLE_INSUFFICIENT:
     "mancano periodi storici confrontabili per stabilire il livello atteso",
   LOW_CONFIDENCE: "l'affidabilità del confronto è troppo bassa",
 };
 
-export function otaInsufficientReasonsText(codes: readonly string[]): string {
-  const phrases = codes.map((code) => OTA_INSUFFICIENT_REASONS[code] ?? "dati insufficienti");
+function plural(count: number, one: string, many: string): string {
+  return count === 1 ? `1 ${one}` : `${formatCount(count)} ${many}`;
+}
+
+/** Why the channel mix does not reconcile with the bookings on the books, in the bookings' own terms:
+ * how many of the period have dates that contradict today, and how. Counted by the backend. */
+export function dateConflictsText(conflicts: DataDateConflicts): string {
+  const parts = [
+    conflicts.booked_after > 0
+      ? plural(conflicts.booked_after, "risulta prenotata dopo oggi", "risultano prenotate dopo oggi")
+      : null,
+    conflicts.cancelled_after > 0
+      ? plural(conflicts.cancelled_after, "risulta cancellata dopo oggi", "risultano cancellate dopo oggi")
+      : null,
+    conflicts.no_show_before_arrival > 0
+      ? plural(
+          conflicts.no_show_before_arrival,
+          "è segnata come non presentata per un soggiorno non ancora iniziato",
+          "sono segnate come non presentate per soggiorni non ancora iniziati",
+        )
+      : null,
+  ].filter((part): part is string => part !== null);
+  const head = plural(
+    conflicts.total,
+    "prenotazione del periodo ha date incoerenti con oggi",
+    "prenotazioni del periodo hanno date incoerenti con oggi",
+  );
+  return `${head} (${parts.join("; ")})`;
+}
+
+/** The facts a reason can be stated with: the OTA check's own classification coverage, and the date
+ * conflicts read beside the channel weights. */
+export interface OtaReasonFacts {
+  conflicts?: DataDateConflicts | null;
+  coveragePct?: string | null;
+}
+
+export function otaInsufficientReasonsText(codes: readonly string[], facts: OtaReasonFacts = {}): string {
+  const phrases = codes.map((code) => {
+    if (code === "OTA_CHANNEL_MIX_RECONCILIATION_FAILED" && facts.conflicts && facts.conflicts.total > 0) {
+      return dateConflictsText(facts.conflicts);
+    }
+    if (code === "OTA_CHANNEL_CLASSIFICATION_COVERAGE_LOW" && facts.coveragePct) {
+      return `NINFA riconosce come OTA o dirette solo il ${formatPercent(facts.coveragePct)} delle camere-notte del periodo: le altre sono su canali non classificati o di altro tipo`;
+    }
+    return OTA_INSUFFICIENT_REASONS[code] ?? "dati insufficienti";
+  });
   return [...new Set(phrases)].join("; ");
 }
 

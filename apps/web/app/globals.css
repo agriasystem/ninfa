@@ -2705,6 +2705,32 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   color: var(--home-muted);
 }
 
+/* "Configura inventario": the one next step of an empty state, to where it is done (Struttura) */
+.dati-cta {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 40px;
+  margin-top: 6px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: var(--home-link);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.dati-cta:hover {
+  background: #1043c9;
+}
+
+.dati-cta:focus-visible {
+  outline: 2px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
 /* the large occupancy card */
 
 .dati-occupancy__hero {
@@ -2725,6 +2751,14 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   font-size: 1.5rem;
   letter-spacing: -0.01em;
   color: var(--home-muted);
+}
+
+/* what is missing for the percentage, in words: a statement, not a figure (two classes: the phone rule
+   that enlarges the figure comes later in this sheet and must not enlarge a sentence) */
+.dati-occupancy__value.dati-occupancy__value--gap {
+  font-size: 1.25rem;
+  line-height: 1.25;
+  color: var(--home-greeting);
 }
 
 .dati-occupancy__scope {
@@ -3170,10 +3204,17 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 
 .dati-ota__reference-text,
 .dati-ota__coverage,
+.dati-ota__basis,
 .dati-ota__note {
   font-size: 0.8125rem;
   line-height: 1.45;
   color: var(--home-muted);
+}
+
+/* the weights are not a share of the room-nights on the books: said in ink, never in a severity colour */
+.dati-ota__basis--indicative {
+  font-weight: 500;
+  color: var(--home-greeting);
 }
 
 .dati-ota__outcome {
@@ -3379,11 +3420,36 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 
 .dati-table th,
 .dati-table td {
-  padding: 11px 10px;
+  padding: 11px 8px;
   border-bottom: 1px solid #eef2fa;
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+/* A night's status is a word, not a number: on a narrow card it wraps under its mark rather than
+   push the table past its card (a figure never wraps). With room to spare it stays on one line. */
+.dati-table td.dati-table__status {
+  white-space: normal;
+}
+
+.dati-table td.dati-table__status .dati-status {
+  align-items: flex-start;
+  line-height: 1.3;
+}
+
+.dati-table td.dati-table__status .dati-status__mark {
+  margin-top: 0.25em;
+}
+
+/* ...and asks for room for one line when the card has it. As a SHARE of the table it never raises the
+   width below which the table must scroll (a fixed width would). */
+.dati-table--nights th.dati-table__status {
+  width: 22%;
+}
+
+.dati-table--nights-wide th.dati-table__status {
+  width: 16%;
 }
 
 .dati-table thead th {
@@ -3411,12 +3477,12 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
 
 .dati-table th:first-child,
 .dati-table td:first-child {
-  padding-left: 16px;
+  padding-left: 14px;
 }
 
 .dati-table th:last-child,
 .dati-table td:last-child {
-  padding-right: 16px;
+  padding-right: 14px;
 }
 
 .dati-table tbody tr:last-child th,

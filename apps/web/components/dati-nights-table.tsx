@@ -137,6 +137,9 @@ export function DatiNightsTable({ overview, propertyId, variant = "overview" }: 
   }
 
   const columns = variant === "bookings" ? 10 : 7;
+  // Without a room inventory the two capacity columns are dashes: say why once, under the table.
+  const capacity = occupancy.selected?.capacity ?? null;
+  const inventoryGap = capacity === "MISSING" || capacity === "AWAITING_ANALYSIS";
   return (
     <DatiCard
       id={`dati-table-${variant}`}
@@ -168,7 +171,7 @@ export function DatiNightsTable({ overview, propertyId, variant = "overview" }: 
     >
       {/* A scrollable region must be reachable by keyboard: tabindex + a name. */}
       <div className="dati-table__scroll" role="region" aria-label={datiCopy.table.scrollRegion} tabIndex={0}>
-        <table className="dati-table">
+        <table className={`dati-table dati-table--nights${variant === "bookings" ? " dati-table--nights-wide" : ""}`}>
           <caption className="visually-hidden">{datiCopy.table.caption}</caption>
           <thead>
             <tr>
@@ -214,6 +217,7 @@ export function DatiNightsTable({ overview, propertyId, variant = "overview" }: 
       <p className="dati-table__foot" aria-live="polite">
         <span>{datiCopy.table.shown(visible.length, nights.length)}</span>
         <span>{datiCopy.table.notePartial}</span>
+        {inventoryGap ? <span>{datiCopy.table.noteInventory}</span> : null}
       </p>
     </DatiCard>
   );

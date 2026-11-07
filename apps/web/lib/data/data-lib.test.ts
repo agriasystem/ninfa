@@ -306,3 +306,27 @@ describe("freshness is a fact, per domain, in the property's timezone", () => {
     expect(line.text).not.toMatch(/invalid/iu);
   });
 });
+
+describe("copy: Personale compares the plan with the ON-BOOKS revenue of the same days, and says so", () => {
+  /** Every string the Personale copy can produce (functions called with neutral arguments). */
+  function laborStrings(value: unknown): string[] {
+    if (typeof value === "string") return [value];
+    if (typeof value === "function") return [String((value as (...args: string[]) => string)("1", "2", "3"))];
+    if (value !== null && typeof value === "object") return Object.values(value).flatMap(laborStrings);
+    return [];
+  }
+
+  it("names the two revenue KPIs and the role column on-books", () => {
+    expect(datiCopy.labor.kpi.incidence).toBe("Incidenza sui ricavi on-books");
+    expect(datiCopy.labor.kpi.revenuePerHour).toBe("Ricavo on-books per ora");
+    expect(datiCopy.labor.colIncidence).toBe("Incidenza sui ricavi on-books");
+  });
+
+  it("never says 'ricavi' alone: every mention is the on-books revenue (or the rooms already booked)", () => {
+    const mentions = laborStrings(datiCopy.labor).filter((text) => /ricav/iu.test(text));
+    expect(mentions.length).toBeGreaterThan(8);
+    for (const text of mentions) {
+      expect(text, text).toMatch(/ricav\w* on-books|camere già prenotate/iu);
+    }
+  });
+});

@@ -120,7 +120,7 @@ export interface StrutturaSectionProps {
 export function StrutturaSection({ id, Icon, title, description, action, children }: StrutturaSectionProps) {
   const titleId = `${id}-title`;
   return (
-    <section className="struttura-card" aria-labelledby={titleId}>
+    <section id={id} className="struttura-card" aria-labelledby={titleId}>
       <header className="struttura-card__header">
         <span className="struttura-card__icon" aria-hidden="true">
           <Icon />

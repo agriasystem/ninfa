@@ -407,6 +407,8 @@ export type DomainState = "ANALYZED" | "PARTIAL" | "NOT_ANALYZED" | "UNKNOWN";
 
 export type DataAvailability = "AVAILABLE" | "NOT_AVAILABLE";
 
+export type DataCapacityState = "KNOWN" | "PARTIAL" | "MISSING" | "AWAITING_ANALYSIS";
+
 export interface DataDecisionRef {
   decision_id: string;
   decision_type: string;
@@ -422,6 +424,10 @@ export interface DataPeriodMetrics {
   nights_requested: number;
   nights_with_data: number;
   nights_with_capacity: number;
+  /** Whether the occupancy can be calculated at all - null with no night of bookings. MISSING: the
+   * property has no room inventory for these nights (never inferred from the bookings);
+   * AWAITING_ANALYSIS: one was set after the observation and the next analysis takes it in. */
+  capacity: DataCapacityState | null;
   /** Room-nights booked over every stored night - NOT a booking count. */
   room_nights: number | null;
   rooms_on_books_with_capacity: number | null;
@@ -469,8 +475,26 @@ export interface DataChannelWeight {
 }
 
 export interface DataChannelMix {
+  /** The denominator of every weight: the room-nights certain at the end of the analysis day. */
   total_room_nights: number;
+  /** OTA + direct among them. */
+  classified_room_nights: number;
+  /** On a channel NINFA cannot classify. */
+  unclassified_room_nights: number;
+  /** The room-nights the analysis day observed over the same 30 nights (null unless every night is
+   * stored) - the room-nights the rest of the page shows. */
+  on_books_room_nights: number | null;
+  /** Whether the weights are a share of exactly those room-nights (null when they are not known). */
+  matches_on_books: boolean | null;
   channels: DataChannelWeight[];
+}
+
+/** Bookings of the 30-night window whose own dates contradict the analysis day. */
+export interface DataDateConflicts {
+  booked_after: number;
+  cancelled_after: number;
+  no_show_before_arrival: number;
+  total: number;
 }
 
 export interface DataDistribution {
@@ -488,6 +512,8 @@ export interface DataDistribution {
   insufficient_reasons: string[];
   decision_id: string | null;
   channel_mix: DataChannelMix | null;
+  /** Null when the area was not read. */
+  date_conflicts: DataDateConflicts | null;
 }
 
 export interface DataCostCategory {

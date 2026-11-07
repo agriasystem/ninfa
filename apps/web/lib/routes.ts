@@ -37,6 +37,14 @@ export function strutturaRoute(propertyId?: string): string {
   return propertyId ? `/struttura?${PROPERTY_QUERY_PARAM}=${propertyId}` : "/struttura";
 }
 
+/** The room inventory block of "/struttura" (its section id): where the number of rooms an occupancy
+ * needs is configured. Dati links to it instead of offering a second inventory setting of its own. */
+export const STRUTTURA_INVENTORY_ANCHOR = "struttura-rooms";
+
+export function strutturaInventoryRoute(propertyId?: string): string {
+  return `${strutturaRoute(propertyId)}#${STRUTTURA_INVENTORY_ANCHOR}`;
+}
+
 export const IMPORTA_FILE_REVIEW_PARAM = "review";
 
 /** "/importa-file", optionally scoped to a property - where a file comes into NINFA (Importa file V1). With
