@@ -102,12 +102,55 @@ def test_the_rows_of_one_cell_in_one_file_add_up_as_they_always_did() -> None:
     assert hours_on(both_shifts, MON) == {C.FRONT_OFFICE: 7}
 
 
-def test_a_correction_that_drops_a_department_on_one_day_empties_that_cell() -> None:
-    """The file names Spa (on Monday) and names Tuesday (for Reception): Tuesday has no Spa."""
+def test_a_file_without_a_department_on_one_day_leaves_that_cell_alone() -> None:
+    """The file has Spa (on Monday) and has Tuesday (for Reception), but not Spa on Tuesday: that
+    cell is not in the file, so the file says nothing about it."""
     first = file((MON, C.SPA_WELLNESS, 8), (TUE, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 8))
-    second = file((MON, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 8), revision=2)
+    second = file((MON, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 6), revision=2)
 
-    assert hours_on([*first, *second], TUE) == {C.FRONT_OFFICE: 8}
+    assert hours_on([*first, *second], TUE) == {C.FRONT_OFFICE: 6, C.SPA_WELLNESS: 8}
+
+
+def _diagonal() -> tuple[list[Row], list[Row]]:
+    """Reception and Housekeeping on Monday and Tuesday, then a file with only Reception on Monday
+    and Housekeeping on Tuesday: both days and both departments are in it, two cells are not."""
+    current = file(
+        (MON, C.FRONT_OFFICE, 8), (MON, C.HOUSEKEEPING, 5), (TUE, C.FRONT_OFFICE, 8),
+        (TUE, C.HOUSEKEEPING, 5),
+    )  # fmt: skip
+    new = file((MON, C.FRONT_OFFICE, 6), (TUE, C.HOUSEKEEPING, 3), revision=2)
+    return current, new
+
+
+def test_days_times_departments_of_a_part_are_never_what_it_speaks_for() -> None:
+    current, new = _diagonal()
+    rows = [*current, *new]
+
+    assert hours_on(rows, MON) == {C.FRONT_OFFICE: 6, C.HOUSEKEEPING: 5}
+    assert hours_on(rows, TUE) == {C.FRONT_OFFICE: 8, C.HOUSEKEEPING: 3}
+
+
+def test_the_same_file_said_complete_takes_the_two_missing_cells_away() -> None:
+    current, new = _diagonal()
+    files = {new[0].labor_snapshot_id: _complete(new, first=MON, last=TUE, revision=2)}
+
+    plan = current_rows([*current, *new], files)
+
+    assert [(row.labor_category, row.hours) for row in plan[MON][1]] == [(C.FRONT_OFFICE, 6)]
+    assert [(row.labor_category, row.hours) for row in plan[TUE][1]] == [(C.HOUSEKEEPING, 3)]
+
+
+def test_a_zero_in_a_part_is_a_plan_of_zero_hours_not_a_removal() -> None:
+    """A row of zero hours replaces its cell with a zero: the cell is still there, and counted."""
+    current, _ = _diagonal()
+    zero = file((MON, C.HOUSEKEEPING, 0), revision=2)
+
+    counted = current_rows([*current, *zero])[MON][1]
+
+    assert sorted((row.labor_category, row.hours) for row in counted) == [
+        (C.FRONT_OFFICE, 8),
+        (C.HOUSEKEEPING, 0),
+    ]
 
 
 def test_a_day_a_file_does_not_name_is_left_alone_even_for_a_category_it_names() -> None:
@@ -117,10 +160,10 @@ def test_a_day_a_file_does_not_name_is_left_alone_even_for_a_category_it_names()
     assert hours_on([*first, *second], TUE) == {C.SPA_WELLNESS: 8}
 
 
-def test_what_a_file_names_is_read_from_the_whole_file_not_from_the_rows_asked_for() -> None:
-    """Asked about Tuesday only, the second file still speaks for Spa, which it names on Monday."""
+def test_what_a_part_holds_elsewhere_in_the_file_does_not_reach_the_rows_asked_for() -> None:
+    """Asked about Tuesday only, the second file holds Spa on Monday: nothing of Tuesday."""
     first = file((TUE, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 8))
-    second = file((MON, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 8), revision=2)
+    second = file((MON, C.SPA_WELLNESS, 8), (TUE, C.FRONT_OFFICE, 6), revision=2)
     only_tuesday = [row for row in [*first, *second] if row.work_date == TUE]
     named = frozenset({C.SPA_WELLNESS, C.FRONT_OFFICE})
     files = {
@@ -130,7 +173,10 @@ def test_what_a_file_names_is_read_from_the_whole_file_not_from_the_rows_asked_f
 
     counted = current_rows(only_tuesday, files)[TUE][1]
 
-    assert [(row.labor_category, row.hours) for row in counted] == [(C.FRONT_OFFICE, 8)]
+    assert sorted((row.labor_category, row.hours) for row in counted) == [
+        (C.FRONT_OFFICE, 6),
+        (C.SPA_WELLNESS, 8),
+    ]
 
 
 def _complete(rows: list[Row], *, first: date, last: date, revision: int) -> FileCoverage:

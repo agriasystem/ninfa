@@ -7,7 +7,7 @@ Planned and worked hours are two different facts, and neither stands in for the 
 applied to each on its own (`Basis`). A file of hours worked says nothing about the plan, and a new
 plan says nothing about the hours worked.
 
-    A file speaks for the work dates it names and for the categories it names, together.
+    A file speaks for the cells it holds: each (work date, category) it has a row for.
     Where it speaks, the newest file wins; where it does not, what was there stays.
 
 The unit is (work date, category), the unit every figure of labor is computed on. It is not a person
@@ -17,13 +17,19 @@ The unit is (work date, category), the unit every figure of labor is computed on
     week A, then week A corrected          the same cells: the correction replaces them, no sum
     Mon-Sun, then Thu-Wed                  Thu-Sun from the second, Mon-Wed from the first
     Reception's file, then Housekeeping's  no category in common: both stay, on the same days
-    a correction that drops Spa on Sunday  Spa is named, Sunday is named: Sunday has no Spa any more
+    a file that has no Spa on Sunday       Spa on Sunday stays, even if the file has Spa on Monday
+                                           and Reception on Sunday: that cell is not in the file
     a plan, then the hours worked          each stays what it is, on the same days
 
-A file known to be COMPLETE (`file_scope`) says more: on every day from its first to its last it
-speaks for every category, named or not. What it does not hold there is not current any more, while
-staying in the history. Whether a file is complete is never guessed from the file: a person said so.
-With no such word, a file that drops a category altogether says nothing about it.
+A day the file names and a category it names elsewhere do not make a cell it holds: the days of a
+file times its categories are never read as what it speaks for. Its absence there is no information.
+
+Only a file known to be COMPLETE (`file_scope` FULL) says more: on every day from its first to its
+last it speaks for every category, held or not. What it does not hold there is not current any more,
+while staying in the history. Whether a file is complete is never guessed from the file: a person
+said so. A part (PARTIAL), a list of changes (DELTA) or a file nobody said anything about takes
+nothing away. A row of zero hours is not a removal either: it is a plan of zero hours, which the
+analysis reads as a department scheduled for nothing, not as one with no plan.
 
 "Newest" is (snapshot_local_date, revision), the order the files came in. A file with no entry in
 `files` is judged by the rows given.
@@ -80,19 +86,17 @@ class FileCoverage:
     def _says(self, basis: Basis) -> bool:
         return self.has_planned if basis is Basis.PLANNED else self.has_actual
 
-    def clears(
-        self, basis: Basis, work_date: date, category: LaborCategory, names_the_day: bool
-    ) -> bool:
-        """With no row of its own in this cell, does this file say the cell is empty?"""
-        if not self._says(basis):
-            return False
-        if (
-            self.complete_from is not None
+    def clears(self, basis: Basis, work_date: date) -> bool:
+        """With no row of its own in a cell of this day, does this file say the cell is empty?
+
+        Only a complete file does, and only inside its own days. Any other file is silent on every
+        cell it does not hold, whatever else it holds on that day or for that category."""
+        return (
+            self._says(basis)
+            and self.complete_from is not None
             and self.complete_to is not None
             and self.complete_from <= work_date <= self.complete_to
-        ):
-            return True
-        return names_the_day and category in self.categories
+        )
 
 
 def _value(row: PlanRow, basis: Basis) -> int | None:
@@ -131,9 +135,6 @@ def current_rows[Row: PlanRow](
 
     newest_first = sorted(coverage, key=order, reverse=True)
     days = {row.work_date for row in rows}
-    named_days = {
-        snapshot: {work_date for work_date, _ in in_file} for snapshot, in_file in cells.items()
-    }
     categories = {category for file in coverage.values() for category in file.categories}
 
     plan: dict[date, tuple[UUID, list[Row]]] = {}
@@ -155,8 +156,7 @@ def current_rows[Row: PlanRow](
                         break
                     silent = silent or snapshot
                     continue
-                names_the_day = work_date in named_days.get(snapshot, ())
-                if coverage[snapshot].clears(basis, work_date, category, names_the_day):
+                if coverage[snapshot].clears(basis, work_date):
                     silent = None
                     break
             chosen = winner or silent

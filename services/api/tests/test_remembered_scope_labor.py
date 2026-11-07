@@ -195,21 +195,47 @@ def test_a_day_gone_stays_if_the_file_is_a_part(
     assert _plan(db_session, complete_source, WEEK + timedelta(days=3)) == both
 
 
-def test_a_department_missing_on_a_day_the_file_names_is_replaced_as_it_always_was(
+def test_a_department_missing_on_one_day_asks_first_like_any_other_absence(
     api_client: TestClient, complete_source: SourcesEnv, db_session: Session
 ) -> None:
-    """Not what a memory decides: the rule of V1.2. A file speaks for the days and the departments
-    it names, so this cell is replaced whatever the file is said to be, and nothing is asked. Pinned
-    because it is the one way a shift stops counting without the question."""
+    """The file has that day and has Housekeeping on the other days: that does not make the missing
+    cell something the file removes. Only a complete file can, so the memory asks first."""
     content = staff(without=(3, "Housekeeping"))
 
-    body = understand(api_client, complete_source, LABOR, "c.xlsx", content)
-    assert _kinds(body) == []
-    assert body["understanding"]["scope"]["removal_count"] == 0
+    asked = understand(api_client, complete_source, LABOR, "c.xlsx", content)
 
-    _import(api_client, complete_source, content, A_PART, "c.xlsx")
+    assert _kinds(asked) == ["FILE_SCOPE_CONFIRM"]
+    assert asked["understanding"]["questions"][0]["absent_records"] == 1
+    assert asked["understanding"]["scope"]["removal_count"] == 1
+    done = import_mapped(api_client, complete_source, LABOR, "c.xlsx", content, asked["proposal"])
+    assert done.status_code == 409
+    both = {RECEPTION: 8, HOUSEKEEPING: 8}
+    assert _plan(db_session, complete_source, WEEK + timedelta(days=3)) == both
 
+
+def test_a_department_missing_on_one_day_of_a_part_stays(
+    api_client: TestClient, complete_source: SourcesEnv, db_session: Session
+) -> None:
+    content = staff(without=(3, "Housekeeping"), hours=6)
+
+    done = _import(api_client, complete_source, content, A_PART, "c.xlsx")
+
+    assert done["removed"] == 0
+    thursday = WEEK + timedelta(days=3)
+    assert _plan(db_session, complete_source, thursday) == {RECEPTION: 6, HOUSEKEEPING: 8}
+    assert _plan(db_session, complete_source, WEEK) == {RECEPTION: 6, HOUSEKEEPING: 6}
+
+
+def test_a_department_missing_on_one_day_of_the_whole_plan_stops_counting(
+    api_client: TestClient, complete_source: SourcesEnv, db_session: Session
+) -> None:
+    content = staff(without=(3, "Housekeeping"))
+
+    done = _import(api_client, complete_source, content, COMPLETE, "c.xlsx")
+
+    assert done["removed"] == 1
     assert _plan(db_session, complete_source, WEEK + timedelta(days=3)) == {RECEPTION: 8}
+    assert _plan(db_session, complete_source, WEEK) == {RECEPTION: 8, HOUSEKEEPING: 8}
 
 
 def test_yes_it_is_the_whole_plan_stops_counting_the_department(

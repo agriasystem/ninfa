@@ -207,7 +207,9 @@ def test_separate_files_per_department_on_the_same_week_are_all_kept(hotel: Hote
     assert len(snapshots(hotel)) == 2
 
 
-def test_a_correction_that_drops_a_department_on_a_day_takes_it_off_that_day(hotel: Hotel) -> None:
+def test_a_correction_without_a_department_on_a_day_leaves_it_on_that_day(hotel: Hotel) -> None:
+    """The second file has day 0 and has Spa, but not Spa on day 0: nobody said it is complete, so
+    that absence is no information, and only the cells it holds are replaced."""
     hotel.import_shifts(
         "a.csv",
         [
@@ -221,13 +223,13 @@ def test_a_correction_that_drops_a_department_on_a_day_takes_it_off_that_day(hot
     hotel.import_shifts(
         "b.csv",
         [
-            (day(0), "FRONT_OFFICE", "8", "100.00"),
+            (day(0), "FRONT_OFFICE", "6", "75.00"),
             (day(1), "FRONT_OFFICE", "8", "100.00"),
             (day(1), "SPA_WELLNESS", "4", "50.00"),
         ],
     )
 
-    assert hours_of(hotel, 0) == {LaborCategory.FRONT_OFFICE: 8}
+    assert hours_of(hotel, 0) == {LaborCategory.FRONT_OFFICE: 6, LaborCategory.SPA_WELLNESS: 4}
     assert hours_of(hotel, 1) == {LaborCategory.FRONT_OFFICE: 8, LaborCategory.SPA_WELLNESS: 4}
 
 
