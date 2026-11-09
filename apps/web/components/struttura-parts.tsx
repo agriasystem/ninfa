@@ -7,16 +7,15 @@ import { MoreIcon } from "./icons";
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
 /**
- * What the buttons of the Struttura page do. The profile, the room inventory and the parameters are NOT
- * wired yet (the structure has no write path for them), so those callbacks are optional and the buttons are
- * drawn, real and focusable, ready for the day they get one. "Fonti dati" is fully wired and needs none: it
- * opens its own dialogs (see `struttura-sources.tsx`). No callback here ever fabricates a workflow.
+ * What the buttons of the Struttura page do. The profile and the parameters are NOT wired yet (the structure
+ * has no write path for them), so those callbacks are optional and the buttons are drawn, real and focusable,
+ * ready for the day they get one. The room inventory and "Fonti dati" are fully wired and need none: they open
+ * their own dialogs (`struttura-rooms.tsx`, `struttura-sources.tsx`); `onEditInventory` and `onRoomMenu` are
+ * only for the demo fixture's table of room types. No callback here ever fabricates a workflow.
  */
 export interface StrutturaActions {
   onEditStructure?: () => void;
   onEditInventory?: () => void;
-  /** "Configura inventario": the empty state's way to set the room types up for the first time. */
-  onConfigureInventory?: () => void;
   onEditParameters?: () => void;
   onRoomMenu?: (roomId: string) => void;
 }

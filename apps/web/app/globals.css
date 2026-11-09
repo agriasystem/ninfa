@@ -3211,6 +3211,28 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   color: var(--home-muted);
 }
 
+/* no verdict because the history is short: nothing is wrong, so it is a quiet panel and no severity colour */
+.dati-ota__history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f4f7fc;
+}
+
+.dati-ota__history-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.dati-ota__history-count {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--home-ink);
+}
+
 /* the weights are not a share of the room-nights on the books: said in ink, never in a severity colour */
 .dati-ota__basis--indicative {
   font-weight: 500;
@@ -5043,6 +5065,81 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   padding-right: 2px;
 }
 
+/* the rooms the structure can sell: one figure, and one line saying from when it counts */
+.struttura-inventory {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: var(--struttura-soft);
+}
+
+.struttura-inventory__figure {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.struttura-inventory__label {
+  font-size: 0.78125rem;
+  color: var(--home-greeting);
+}
+
+.struttura-inventory__value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-inventory__saved {
+  margin: 12px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--home-greeting);
+}
+
+.struttura-inventory__saved-title {
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-inventory__link {
+  font-weight: 600;
+  color: var(--color-accent, currentColor);
+  white-space: nowrap;
+}
+
+.struttura-inventory__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.struttura-inventory__field label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--home-ink);
+}
+
+.struttura-inventory__input {
+  width: 100%;
+  max-width: 180px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--struttura-line);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--home-ink);
+}
+
+.struttura-inventory__input[aria-invalid="true"] {
+  border-color: var(--color-danger, #b42318);
+}
+
 /* no room type configured: one soft panel with the message and "Configura inventario" */
 
 .struttura-empty {
@@ -6226,6 +6323,72 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--struttura-line);
+}
+
+.struttura-remembered {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.struttura-remembered__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--struttura-soft);
+}
+
+.struttura-remembered__line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--home-ink);
+  overflow-wrap: anywhere;
+}
+
+.struttura-remembered__said {
+  font-size: 0.78125rem;
+  font-weight: 400;
+  color: var(--home-greeting);
+}
+
+.struttura-remembered__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.struttura-remembered__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.struttura-remembered__choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78125rem;
+  color: var(--home-greeting);
+}
+
+.struttura-remembered__choice select {
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--struttura-line);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+  color: var(--home-ink);
 }
 
 .struttura-manage__columns {

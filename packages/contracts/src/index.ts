@@ -514,6 +514,12 @@ export interface DataDistribution {
   channel_mix: DataChannelMix | null;
   /** Null when the area was not read. */
   date_conflicts: DataDateConflicts | null;
+  /** Why there is no verdict: "DATA_QUALITY" (the current data cannot be read) or "HISTORY" (they are fine,
+   * and only the past periods to compare them with are missing). Null with a verdict. */
+  insufficiency: string | null;
+  /** With "HISTORY" only: how many comparable past periods exist, and how many are needed. */
+  comparable_periods_available: number | null;
+  comparable_periods_required: number | null;
 }
 
 export interface DataCostCategory {
@@ -1208,6 +1214,54 @@ export interface ImportValidationResponse {
 export interface MappedImportResultResponse extends ImportResultResponse {
   /** The way the columns were matched has been remembered for the next file of the same layout. */
   configuration_saved: boolean;
+}
+
+/** How many rooms a property can sell, from the property-local today on (`app/api/v1/inventory`). */
+export interface RoomInventoryResponse {
+  configured: boolean;
+  /** The first known night's. `varies` says the coming nights do not all share it. */
+  rooms_available: number | null;
+  varies: boolean;
+  first_night: string | null;
+  last_night: string | null;
+  /** The backend's own limits: a page repeats none of them. */
+  min_rooms: number;
+  max_rooms: number;
+}
+
+export interface RoomInventorySavedResponse extends RoomInventoryResponse {
+  changed_nights: number;
+  /** A refresh of the analysis was asked for, so the occupancy follows by itself. */
+  analysis_requested: boolean;
+}
+
+/** A word a person taught NINFA about a source: it counts for every file of that source. */
+export interface RememberedWord {
+  /** An opaque handle: the word itself travels in no address. */
+  id: string;
+  document: string;
+  /** "status" | "channel" | "role" | "cost_category". */
+  field: string;
+  label: string;
+  value: string;
+  /** What it may be corrected to. Empty: it can only be forgotten. */
+  choices: string[];
+}
+
+/** One recurring kind of file a person taught NINFA: it can only be forgotten, whole and alone. */
+export interface RememberedFile {
+  id: string;
+  columns: string[];
+  /** "date_order" | "decimal_style" | "amount_basis" | "department_value" -> the answer. */
+  answers: Record<string, string>;
+  /** "FULL" | "PARTIAL" | "DELTA", as a person said it. */
+  file_scope: string | null;
+  column_decisions: number;
+}
+
+export interface RememberedAnswers {
+  words: RememberedWord[];
+  files: RememberedFile[];
 }
 
 /** How a source's files are read, as it was saved. */

@@ -188,6 +188,9 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
         ],
       },
       date_conflicts: { booked_after: 0, cancelled_after: 0, no_show_before_arrival: 0, total: 0 },
+      insufficiency: null,
+      comparable_periods_available: null,
+      comparable_periods_required: null,
     },
     costs: {
       state: "AVAILABLE",

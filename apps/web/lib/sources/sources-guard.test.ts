@@ -136,11 +136,13 @@ describe("Fonti dati sources", () => {
       if (file !== "lib/api/data-sources.ts") expect(code, file).not.toMatch(/\bdataSourceId\b/u);
     }
     // the only mutations are the imports (looking at a file, checking and trying a matching are POSTs that
-    // write nothing - the backend says so and its tests pin it), the removal and forgetting a configuration
+    // write nothing - the backend says so and its tests pin it), the removal, forgetting a configuration,
+    // and correcting or forgetting a remembered answer
     const client = withoutComments(read("lib/api/data-sources.ts"));
     expect([...client.matchAll(/method: "(POST|DELETE|PUT|PATCH)"/gu)].map((match) => match[1]).sort()).toEqual([
       "DELETE",
       "DELETE",
+      "DELETE",
       "POST",
       "POST",
       "POST",
@@ -148,6 +150,7 @@ describe("Fonti dati sources", () => {
       "POST",
       "POST",
       "POST",
+      "PUT",
     ]);
     // opening a dialog and choosing "Importa file" only changes what is shown
     const dialogs = withoutComments(read("components/struttura-source-dialogs.tsx"));

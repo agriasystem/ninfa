@@ -15,6 +15,7 @@ import type { SourceCardView } from "@/lib/sources/view-model";
 
 import { StrutturaModal } from "./struttura-modal";
 import { StrutturaButton, StrutturaLinkButton } from "./struttura-parts";
+import { StrutturaRememberedAnswers } from "./struttura-remembered-answers";
 
 const COPY = sourcesCopy.manage;
 const CONFIG = sourcesCopy.manage.configuration;
@@ -58,7 +59,8 @@ export interface StrutturaManageDialogProps {
  *
  * For a source that reads a file the hotel already had, it also shows "Configurazione import": what each
  * column of that file means, with the ways to look at it again or to forget it. Forgetting asks first and
- * touches nothing that was imported.
+ * touches nothing that was imported. And "Risposte ricordate": what NINFA learned from the person's answers,
+ * and the way to correct it without help.
  */
 export function StrutturaManageDialog({
   propertyId,
@@ -242,6 +244,10 @@ export function StrutturaManageDialog({
               </>
             ) : null}
           </section>
+        ) : null}
+
+        {canUpload && sourceId !== null ? (
+          <StrutturaRememberedAnswers propertyId={propertyId} sourceId={sourceId} />
         ) : null}
 
         <div className="struttura-flow__actions">

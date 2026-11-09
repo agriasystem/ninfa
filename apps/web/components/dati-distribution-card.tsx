@@ -124,6 +124,17 @@ export function DatiDistributionCard({
       ? formatDateRange(distribution.window_start, distribution.window_end)
       : null;
   const outcomeText = otaOutcomeText(distribution.outcome);
+  // Two different things to read (the backend says which): the current data cannot be read, or they are
+  // fine and only the history to compare them with is missing.
+  const history =
+    distribution.insufficiency === "HISTORY" &&
+    distribution.comparable_periods_available !== null &&
+    distribution.comparable_periods_required !== null
+      ? {
+          available: distribution.comparable_periods_available,
+          required: distribution.comparable_periods_required,
+        }
+      : null;
   const insufficient =
     distribution.outcome === "INSUFFICIENT_DATA" && distribution.insufficient_reasons.length > 0;
   const insufficientBecause = insufficient
@@ -186,6 +197,14 @@ export function DatiDistributionCard({
           <span className="dati-ota__attention-dot" aria-hidden="true" />
           <Link href={decisionHref}>{datiCopy.distribution.attention}</Link>
         </p>
+      ) : history !== null ? (
+        <div className="dati-ota__history">
+          <p className="dati-ota__history-title">{datiCopy.distribution.historyTitle}</p>
+          <p className="dati-ota__outcome">{datiCopy.distribution.historyBody(history.required)}</p>
+          <p className="dati-ota__history-count">
+            {datiCopy.distribution.historyCount(history.available, history.required)}
+          </p>
+        </div>
       ) : outcomeText !== null ? (
         <p className="dati-ota__outcome">
           {outcomeText}

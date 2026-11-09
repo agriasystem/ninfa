@@ -59,14 +59,17 @@ describe("the data-source API client", () => {
   it("offers NO call that creates a source: it only comes to exist when an import succeeds", () => {
     expect(Object.keys(dataSourcesApi).sort()).toEqual([
       "checkMapping",
+      "correctRememberedAnswer",
       "dataSourcesPath",
       "downloadTemplate",
       "fileToBase64",
       "forgetImportConfiguration",
+      "forgetRememberedAnswer",
       "getDataSources",
       "getImportConfiguration",
       "getImportLimits",
       "getRecentImports",
+      "getRememberedAnswers",
       "importFile",
       "importMatchedFile",
       "inspectFile",

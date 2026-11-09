@@ -20,6 +20,32 @@ function countText(count: number): string {
  * with a template to download. Nothing here names a vendor: NINFA states what it can really do today
  * (import a file) and, for the rest, only that automatic integrations are "Prossimamente".
  */
+// What a remembered word is, and what it was said to mean, in the words the import's own questions use.
+const REMEMBERED_FIELDS: Readonly<Record<string, string>> = {
+  status: "Stato",
+  channel: "Canale",
+  role: "Reparto",
+  cost_category: "Categoria",
+};
+const REMEMBERED_CHANNELS: Readonly<Record<string, string>> = {
+  OTA: "OTA",
+  DIRECT: "Diretto",
+  TOUR_OPERATOR: "Tour operator",
+  AGENCY: "Agenzia",
+  CORPORATE: "Aziende",
+  OTHER: "Altro",
+};
+const REMEMBERED_ANSWERS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  date_order: { DMY: "Date scritte giorno/mese/anno", MDY: "Date scritte mese/giorno/anno" },
+  decimal_style: { COMMA: "Decimali con la virgola", POINT: "Decimali con il punto" },
+  amount_basis: { NET: "Importi senza IVA", GROSS: "Importi con IVA" },
+};
+const REMEMBERED_SCOPES: Readonly<Record<string, string>> = {
+  FULL: "Il file contiene tutto il periodo che copre",
+  PARTIAL: "Il file contiene solo una parte del periodo",
+  DELTA: "Il file contiene solo le novità",
+};
+
 export const sourcesCopy = {
   sectionIntro:
     "Collega le fonti utilizzate dalla struttura per permettere a NINFA di analizzare prenotazioni, distribuzione, costi e personale.",
@@ -853,5 +879,42 @@ export const sourcesCopy = {
       forgetting: "Operazione in corso…",
       forgotten: "Configurazione dimenticata. I dati già importati sono rimasti in NINFA.",
     },
+    remembered: {
+      title: "Risposte ricordate",
+      intro:
+        "Quello che NINFA ha imparato dalle tue risposte e usa per i prossimi file. Se una risposta è sbagliata puoi correggerla, o farla dimenticare: al prossimo file NINFA te la chiederà di nuovo.",
+      loadError: "Non siamo riusciti a leggere le risposte ricordate.",
+      wordLine: (field: string, label: string, value: string) => `${field} «${label}» → ${value}`,
+      fieldLabel: (field: string) => REMEMBERED_FIELDS[field] ?? "Parola",
+      currentChoice: (label: string) => `${label} (risposta attuale)`,
+      fileLine: (columns: readonly string[]) => `File con le colonne: ${columns.join(", ")}`,
+      answerLabel: (key: string, value: string) => REMEMBERED_ANSWERS[key]?.[value] ?? `${key}: ${value}`,
+      scopeLabel: (scope: string) => REMEMBERED_SCOPES[scope] ?? scope,
+      columnsDecided: (count: number) =>
+        count === 1 ? "1 colonna abbinata da te" : `${count} colonne abbinate da te`,
+      correct: "Correggi",
+      correctLabel: "Che cosa significa",
+      correctConfirm: "Salva correzione",
+      forget: "Dimentica",
+      forgetBody: "Al prossimo file NINFA te lo chiederà di nuovo, se ne ha bisogno.",
+      forgetConfirm: "Dimentica questa risposta",
+      forgotten: "Risposta dimenticata: al prossimo file NINFA te la chiederà di nuovo, se ne ha bisogno.",
+      corrected: "Risposta corretta: vale dal prossimo file.",
+      notRetroactive:
+        "I dati già importati non cambiano: per correggere anche quelli, carica di nuovo il file.",
+    },
   },
 } as const;
+
+/** What a remembered word was said to mean: the same words its question offers. */
+export function rememberedValueLabel(field: string, value: string): string {
+  const labels: Readonly<Record<string, string>> =
+    field === "status"
+      ? sourcesCopy.choices.status
+      : field === "role"
+        ? sourcesCopy.choices.labor_category
+        : field === "cost_category"
+          ? sourcesCopy.choices.cost_category
+          : REMEMBERED_CHANNELS;
+  return labels[value] ?? value;
+}

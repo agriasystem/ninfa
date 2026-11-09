@@ -640,6 +640,75 @@ describe("Panoramica - the OTA card", () => {
   });
 });
 
+describe("Dipendenza OTA - data quality and short history are two different things to read", () => {
+  const history = () => {
+    const data = fullOverview();
+    return {
+      ...data,
+      distribution: {
+        ...data.distribution,
+        outcome: "INSUFFICIENT_DATA",
+        decision_id: null,
+        ota_share_pct: "47.93",
+        direct_share_pct: "52.07",
+        reference_ota_share_pct: null,
+        insufficient_reasons: ["OTA_COMPARABLE_SAMPLE_INSUFFICIENT"],
+        insufficiency: "HISTORY",
+        comparable_periods_available: 0,
+        comparable_periods_required: 5,
+        date_conflicts: { booked_after: 0, cancelled_after: 0, no_show_before_arrival: 0, total: 0 },
+      },
+    };
+  };
+
+  it("a short history says so, with the periods, and the current figures stand", async () => {
+    await renderLoaded(history());
+
+    const text = flat(region("Dipendenza OTA"));
+    expect(text).toContain("Storico ancora insufficiente");
+    expect(text).toContain(
+      "NINFA ha dati sufficienti sulla distribuzione attuale, ma servono almeno 5 periodi confrontabili per valutare se la dipendenza dalle OTA è anomala.",
+    );
+    expect(text).toContain("Periodi confrontabili disponibili: 0 su 5");
+    expect(text).toContain("47,9%");
+    // Nothing is wrong and nothing is to be checked.
+    expect(text).not.toContain("I dati non bastano");
+    expect(text).not.toContain("Controlla queste prenotazioni");
+  });
+
+  it("a data problem never reads as a short history", async () => {
+    await renderLoaded(reconciliationFailedOverview());
+
+    const text = flat(region("Dipendenza OTA"));
+    expect(text).toContain("I dati non bastano per valutare la dipendenza OTA.");
+    expect(text).not.toContain("Storico ancora insufficiente");
+    expect(text).not.toContain("Periodi confrontabili");
+  });
+
+  it("the number of periods is the backend's, never written in the page", async () => {
+    const data = history();
+    await renderLoaded({
+      ...data,
+      distribution: {
+        ...data.distribution,
+        comparable_periods_available: 3,
+        comparable_periods_required: 7,
+      },
+    });
+
+    const text = flat(region("Dipendenza OTA"));
+    expect(text).toContain("servono almeno 7 periodi");
+    expect(text).toContain("Periodi confrontabili disponibili: 3 su 7");
+  });
+
+  it("a verdict shows neither", async () => {
+    const data = fullOverview();
+    await renderLoaded({ ...data, distribution: { ...data.distribution, outcome: "CLEAR", decision_id: null } });
+
+    expect(flat(region("Dipendenza OTA"))).not.toContain("Storico ancora insufficiente");
+  });
+});
+
 describe("Panoramica - the detail table", () => {
   const table = () => within(region("Dettaglio soggiorni")).getByRole("table");
 

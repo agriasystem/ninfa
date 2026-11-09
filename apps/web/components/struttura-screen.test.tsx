@@ -3,7 +3,12 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PropertyAccess, SessionContextResponse } from "@ninfa/contracts";
+import type {
+  PropertyAccess,
+  RoomInventoryResponse,
+  RoomInventorySavedResponse,
+  SessionContextResponse,
+} from "@ninfa/contracts";
 
 import { STRUTTURA_INVENTORY_ANCHOR, strutturaInventoryRoute } from "@/lib/routes";
 import { demoStructureOverview } from "@/lib/structure/demo-structure";
@@ -16,8 +21,20 @@ const useSessionMock = vi.fn();
 const miaMock = vi.fn();
 const fetchMock = vi.fn();
 const getDataSourcesMock = vi.fn();
+const getRoomInventoryMock = vi.fn();
+const saveRoomInventoryMock = vi.fn();
+const getAnalysisStatusMock = vi.fn();
 
 vi.mock("@/lib/session/session-context", () => ({ useSession: () => useSessionMock() }));
+// The inventory block reads and writes its own API: here it answers "nothing configured" until a test says.
+vi.mock("@/lib/api/room-inventory", () => ({
+  getRoomInventory: (...args: unknown[]) => getRoomInventoryMock(...args),
+  saveRoomInventory: (...args: unknown[]) => saveRoomInventoryMock(...args),
+}));
+vi.mock("@/lib/api/analysis", () => ({
+  getAnalysisStatus: (...args: unknown[]) => getAnalysisStatusMock(...args),
+  requestAnalysisRefresh: vi.fn(),
+}));
 // "Fonti dati" is the ONE block that asks the backend something (its own API, deep-tested in
 // `struttura-sources.test.tsx`); here it just answers "nothing configured", like a real property today.
 vi.mock("@/lib/api/data-sources", () => ({
@@ -80,6 +97,43 @@ const renderDemoPage = (options: Omit<RenderOptions, "getOverview"> = {}) =>
   renderPage({ ...options, getOverview: demoOverview });
 
 const region = (name: string) => screen.getByRole("region", { name });
+
+const NOT_CONFIGURED_INVENTORY: RoomInventoryResponse = {
+  configured: false,
+  rooms_available: null,
+  varies: false,
+  first_night: null,
+  last_night: null,
+  min_rooms: 1,
+  max_rooms: 5000,
+};
+const inventoryOf = (rooms: number, varies = false): RoomInventoryResponse => ({
+  configured: true,
+  rooms_available: rooms,
+  varies,
+  first_night: "2026-11-09",
+  last_night: "2036-11-08",
+  min_rooms: 1,
+  max_rooms: 5000,
+});
+const savedOf = (
+  rooms: number,
+  overrides: Partial<RoomInventorySavedResponse> = {},
+): RoomInventorySavedResponse => ({
+  ...inventoryOf(rooms),
+  changed_nights: 3653,
+  analysis_requested: true,
+  ...overrides,
+});
+const analysisIs = (state: string) =>
+  ok({
+    state,
+    imported_domains: ["BOOKINGS"],
+    latest_import_at: null,
+    last_analysis_at: null,
+    next_attempt_at: null,
+    can_retry: state === "FAILED",
+  });
 /** The cards of "Fonti dati" arrive from the backend: wait for them. */
 const sourcesLoaded = () => screen.findByRole("list", { name: "Fonti dati collegate e collegabili" });
 
@@ -92,6 +146,11 @@ beforeEach(() => {
   fetchMock.mockReset();
   getDataSourcesMock.mockReset();
   getDataSourcesMock.mockResolvedValue(ok(nothingConfigured()));
+  getRoomInventoryMock.mockReset();
+  getRoomInventoryMock.mockResolvedValue(ok(NOT_CONFIGURED_INVENTORY));
+  saveRoomInventoryMock.mockReset();
+  getAnalysisStatusMock.mockReset();
+  getAnalysisStatusMock.mockResolvedValue(analysisIs("UP_TO_DATE"));
   vi.stubGlobal("fetch", fetchMock);
   signIn([property("p1", "Residenza Alba")]);
 });
@@ -137,7 +196,7 @@ describe("/struttura - route, shell and header", () => {
     ).not.toBeNull();
     expect(
       within(region("2. Inventario camere")).getByText(
-        "Le tipologie di camere e la loro configurazione operativa.",
+        "Quante camere può vendere la struttura: è il numero su cui NINFA calcola l'occupazione.",
       ),
     ).not.toBeNull();
     expect(
@@ -214,11 +273,11 @@ describe("/struttura - the real route, with no real data: nothing is invented", 
     expect(container.querySelector(".struttura-stars")).toBeNull();
   });
 
-  it("2. Inventario: an empty state with 'Configura inventario', no table, no 'Modifica inventario'", () => {
+  it("2. Inventario: an empty state with 'Configura inventario', no table, no 'Modifica inventario'", async () => {
     renderPage();
 
     const rooms = region("2. Inventario camere");
-    expect(within(rooms).getByText("L'inventario camere non è ancora configurato")).not.toBeNull();
+    expect(await within(rooms).findByText("L'inventario camere non è ancora configurato")).not.toBeNull();
     expect(within(rooms).getByRole("button", { name: "Configura inventario" })).not.toBeNull();
     expect(within(rooms).queryByRole("table")).toBeNull();
     expect(within(rooms).queryByRole("button", { name: "Modifica inventario" })).toBeNull();
@@ -375,16 +434,17 @@ describe("/struttura - the explicit demo fixture (development and tests only)", 
   });
 });
 
-describe("/struttura - the profile, inventory and parameter buttons are ready but not wired", () => {
+describe("/struttura - the profile and parameter buttons are ready but not wired", () => {
   it("clicking them without handlers does nothing and does not throw", async () => {
     const user = userEvent.setup();
     renderPage();
     await sourcesLoaded();
     const sources = region("4. Fonti dati");
+    const inventory = region("2. Inventario camere");
 
     for (const button of screen.getAllByRole("button")) {
-      // the shell's profile menu and the (fully wired) Fonti dati block are not under test here
-      if (button.closest(".app-sidebar") || sources.contains(button)) continue;
+      // the shell's profile menu and the (fully wired) Fonti dati and inventory blocks are not under test here
+      if (button.closest(".app-sidebar") || sources.contains(button) || inventory.contains(button)) continue;
       await user.click(button);
     }
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -396,15 +456,12 @@ describe("/struttura - the profile, inventory and parameter buttons are ready bu
     const actions: StrutturaActions = {
       onEditStructure: vi.fn(),
       onEditInventory: vi.fn(),
-      onConfigureInventory: vi.fn(),
       onEditParameters: vi.fn(),
       onRoomMenu: vi.fn(),
     };
 
-    // the real route: no inventory yet, so "Configura inventario" is the action
     const real = renderPage({ actions });
     await user.click(screen.getByRole("button", { name: "Modifica struttura" }));
-    await user.click(screen.getByRole("button", { name: "Configura inventario" }));
     await user.click(screen.getByRole("button", { name: "Modifica parametri" }));
     real.unmount();
 
@@ -414,7 +471,6 @@ describe("/struttura - the profile, inventory and parameter buttons are ready bu
     await user.click(screen.getByRole("button", { name: "Azioni per Suite" }));
 
     expect(actions.onEditStructure).toHaveBeenCalledTimes(1);
-    expect(actions.onConfigureInventory).toHaveBeenCalledTimes(1);
     expect(actions.onEditInventory).toHaveBeenCalledTimes(1);
     expect(actions.onEditParameters).toHaveBeenCalledTimes(1);
     expect(actions.onRoomMenu).toHaveBeenCalledWith("suite");
@@ -459,5 +515,162 @@ describe("/struttura - the way in from Dati's 'Configura inventario'", () => {
     await sourcesLoaded();
 
     expect(scrolled).toHaveLength(0);
+  });
+});
+
+describe("/struttura - the room inventory, for real", () => {
+  const rooms = () => region("2. Inventario camere");
+  const openForm = async (user: ReturnType<typeof userEvent.setup>, name: string) => {
+    await user.click(await within(rooms()).findByRole("button", { name }));
+    return screen.findByRole("dialog");
+  };
+
+  it("nothing configured: it says so and 'Configura inventario' opens a real form", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const form = await openForm(user, "Configura inventario");
+
+    expect(within(form).getByRole("heading", { name: "Configura inventario" })).not.toBeNull();
+    expect(within(form).getByLabelText("Numero di camere disponibili")).not.toBeNull();
+    expect(flat(form)).toContain("Vale da oggi in poi. Le analisi già fatte non cambiano.");
+    expect(flat(form)).not.toMatch(/RoomInventoryDaily|snapshot|riga|osservazione/iu);
+  });
+
+  it("saving sends one number and the page shows it, in both blocks, with the analysis following", async () => {
+    const user = userEvent.setup();
+    saveRoomInventoryMock.mockResolvedValue(ok(savedOf(24)));
+    getAnalysisStatusMock.mockResolvedValue(analysisIs("IN_PROGRESS"));
+    renderPage();
+    const form = await openForm(user, "Configura inventario");
+
+    await user.type(within(form).getByLabelText("Numero di camere disponibili"), "24");
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(saveRoomInventoryMock).toHaveBeenCalledWith("p1", 24);
+    expect(flat(rooms())).toContain("Camere disponibili 24 camere");
+    expect(flat(rooms())).toContain("Inventario salvato: 24 camere.");
+    expect(flat(await within(rooms()).findByRole("status"))).toContain("sta aggiornando l'occupazione");
+    expect(within(rooms()).getByRole("button", { name: "Modifica inventario" })).not.toBeNull();
+    expect(flat(region("1. Profilo struttura"))).toContain("Numero camere 24");
+  });
+
+  it("the way back to Dati is there, and the page says when the occupancy has followed", async () => {
+    const user = userEvent.setup();
+    saveRoomInventoryMock.mockResolvedValue(ok(savedOf(24)));
+    getAnalysisStatusMock.mockResolvedValue(analysisIs("UP_TO_DATE"));
+    renderPage();
+    const form = await openForm(user, "Configura inventario");
+    await user.type(within(form).getByLabelText("Numero di camere disponibili"), "24");
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    await within(rooms()).findByText(/Occupazione aggiornata/u);
+    expect(within(rooms()).getByRole("link", { name: "Vai a Dati" }).getAttribute("href")).toContain(
+      "property=p1",
+    );
+  });
+
+  it("with no bookings yet it says when the occupancy will come, and asks the analysis nothing", async () => {
+    const user = userEvent.setup();
+    saveRoomInventoryMock.mockResolvedValue(ok(savedOf(24, { analysis_requested: false })));
+    renderPage();
+    const form = await openForm(user, "Configura inventario");
+    await user.type(within(form).getByLabelText("Numero di camere disponibili"), "24");
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    await within(rooms()).findByText(/dopo il primo import dal PMS/u);
+  });
+
+  it.each(["0", "-3", "abc", "2.5", "5001", ""])("refuses %j before asking the backend", async (typed) => {
+    const user = userEvent.setup();
+    renderPage();
+    const form = await openForm(user, "Configura inventario");
+
+    if (typed !== "") await user.type(within(form).getByLabelText("Numero di camere disponibili"), typed);
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    expect(within(form).getByRole("alert").textContent).toBe(
+      "Inserisci un numero intero di camere, da 1 a 5000.",
+    );
+    expect(saveRoomInventoryMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).not.toBeNull();
+  });
+
+  it("the limits it checks are the ones the backend sent", async () => {
+    const user = userEvent.setup();
+    getRoomInventoryMock.mockResolvedValue(ok({ ...NOT_CONFIGURED_INVENTORY, max_rooms: 40 }));
+    renderPage();
+    const form = await openForm(user, "Configura inventario");
+
+    await user.type(within(form).getByLabelText("Numero di camere disponibili"), "41");
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    expect(within(form).getByRole("alert").textContent).toContain("da 1 a 40");
+  });
+
+  it("a save that fails keeps the form open and says so", async () => {
+    const user = userEvent.setup();
+    saveRoomInventoryMock.mockResolvedValue({ ok: false, status: 500, code: "x", message: "x" });
+    renderPage();
+    const form = await openForm(user, "Configura inventario");
+    await user.type(within(form).getByLabelText("Numero di camere disponibili"), "24");
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    expect(await within(form).findByRole("alert")).not.toBeNull();
+    expect(screen.getByRole("dialog")).not.toBeNull();
+    expect(flat(rooms())).not.toContain("Inventario salvato");
+  });
+
+  it("configured: it shows the number and 'Modifica inventario' opens the form with it", async () => {
+    const user = userEvent.setup();
+    getRoomInventoryMock.mockResolvedValue(ok(inventoryOf(24)));
+    saveRoomInventoryMock.mockResolvedValue(ok(savedOf(30)));
+    getAnalysisStatusMock.mockResolvedValue(analysisIs("IN_PROGRESS"));
+    renderPage();
+
+    const form = await openForm(user, "Modifica inventario");
+
+    const input = within(form).getByLabelText<HTMLInputElement>("Numero di camere disponibili");
+    expect(input.value).toBe("24");
+    expect(within(form).getByRole("heading", { name: "Modifica inventario" })).not.toBeNull();
+    await user.clear(input);
+    await user.type(input, "30");
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    await waitFor(() => expect(saveRoomInventoryMock).toHaveBeenCalledWith("p1", 30));
+    expect(await within(rooms()).findByText("30 camere")).not.toBeNull();
+  });
+
+  it("the same number again says nothing changed, and nothing follows", async () => {
+    const user = userEvent.setup();
+    getRoomInventoryMock.mockResolvedValue(ok(inventoryOf(24)));
+    saveRoomInventoryMock.mockResolvedValue(
+      ok(savedOf(24, { changed_nights: 0, analysis_requested: false })),
+    );
+    renderPage();
+    const form = await openForm(user, "Modifica inventario");
+    await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+    await within(rooms()).findByText(/Il numero era già questo/u);
+  });
+
+  it("nights that vary are said to vary, and saving says what it does to them", async () => {
+    const user = userEvent.setup();
+    getRoomInventoryMock.mockResolvedValue(ok(inventoryOf(24, true)));
+    renderPage();
+
+    expect(await within(rooms()).findByText(/Il numero varia nei prossimi mesi/u)).not.toBeNull();
+    const form = await openForm(user, "Modifica inventario");
+    expect(flat(form)).toContain("vale lo stesso numero per tutte le notti da oggi in poi");
+  });
+
+  it("an inventory that cannot be read is not called 'not configured'", async () => {
+    getRoomInventoryMock.mockResolvedValue({ ok: false, status: 500, code: "x", message: "x" });
+    renderPage();
+
+    expect(await within(rooms()).findByRole("alert")).not.toBeNull();
+    expect(within(rooms()).queryByRole("button", { name: "Configura inventario" })).toBeNull();
+    expect(flat(rooms())).not.toContain("non è ancora configurato");
   });
 });

@@ -10,6 +10,7 @@ import type {
   MappedImportResultResponse,
   MappingCheckResponse,
   RecentImportsResponse,
+  RememberedAnswers,
   SavedImportConfiguration,
   UnderstandAnswers,
 } from "@ninfa/contracts";
@@ -292,6 +293,48 @@ export function getImportConfiguration(
   return apiRequest<SavedImportConfiguration>(
     `${dataSourcesPath(propertyId)}/${dataSourceId}/import-configuration`,
     { method: "GET" },
+    fetchImpl,
+  );
+}
+
+/** GET - what this source remembers from a person's answers. */
+export function getRememberedAnswers(
+  propertyId: string,
+  dataSourceId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ApiResult<RememberedAnswers>> {
+  return apiRequest<RememberedAnswers>(
+    `${dataSourcesPath(propertyId)}/${dataSourceId}/remembered-answers`,
+    { method: "GET" },
+    fetchImpl,
+  );
+}
+
+/** PUT - a remembered word means something else. It counts from the next file. */
+export function correctRememberedAnswer(
+  propertyId: string,
+  dataSourceId: string,
+  answerId: string,
+  value: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ApiResult<RememberedAnswers>> {
+  return apiRequest<RememberedAnswers>(
+    `${dataSourcesPath(propertyId)}/${dataSourceId}/remembered-answers/${encodeURIComponent(answerId)}`,
+    { method: "PUT", body: { value } },
+    fetchImpl,
+  );
+}
+
+/** DELETE - forget a remembered answer: the next file asks again where it needs to. */
+export function forgetRememberedAnswer(
+  propertyId: string,
+  dataSourceId: string,
+  answerId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ApiResult<RememberedAnswers>> {
+  return apiRequest<RememberedAnswers>(
+    `${dataSourcesPath(propertyId)}/${dataSourceId}/remembered-answers/${encodeURIComponent(answerId)}`,
+    { method: "DELETE" },
     fetchImpl,
   );
 }

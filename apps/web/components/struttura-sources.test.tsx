@@ -29,6 +29,9 @@ const previewImportMock = vi.fn();
 const importFileMock = vi.fn();
 const getImportConfigurationMock = vi.fn();
 const forgetImportConfigurationMock = vi.fn();
+const getRememberedAnswersMock = vi.fn();
+const correctRememberedAnswerMock = vi.fn();
+const forgetRememberedAnswerMock = vi.fn();
 const downloadTemplateMock = vi.fn();
 const saveBlobMock = vi.fn();
 
@@ -44,6 +47,9 @@ vi.mock("@/lib/api/data-sources", () => ({
   importMatchedFile: vi.fn(),
   getImportConfiguration: (...args: unknown[]) => getImportConfigurationMock(...args),
   forgetImportConfiguration: (...args: unknown[]) => forgetImportConfigurationMock(...args),
+  getRememberedAnswers: (...args: unknown[]) => getRememberedAnswersMock(...args),
+  correctRememberedAnswer: (...args: unknown[]) => correctRememberedAnswerMock(...args),
+  forgetRememberedAnswer: (...args: unknown[]) => forgetRememberedAnswerMock(...args),
   downloadTemplate: (...args: unknown[]) => downloadTemplateMock(...args),
 }));
 vi.mock("@/lib/sources/save-file", async (original) => ({
@@ -83,6 +89,9 @@ beforeEach(() => {
     importFileMock,
     getImportConfigurationMock,
     forgetImportConfigurationMock,
+    getRememberedAnswersMock,
+    correctRememberedAnswerMock,
+    forgetRememberedAnswerMock,
     downloadTemplateMock,
     saveBlobMock,
     onPropertyInvalid,
@@ -91,6 +100,7 @@ beforeEach(() => {
   }
   // a source with no saved configuration: the manage dialog simply has nothing to show
   getImportConfigurationMock.mockResolvedValue(failure("DATA_SOURCE_NOT_FOUND", 404));
+  getRememberedAnswersMock.mockResolvedValue(ok({ words: [], files: [] }));
   // "Oggi" is always the same day: the cards say "Oggi alle 11:31" whatever the real date is
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-23T09:45:00Z"));
@@ -501,6 +511,163 @@ describe("Fonti dati - an invoice (XML), the one file that page does not read", 
     const alert = await within(dialog()).findByRole("alert");
     expect(flat(alert)).toContain("Importazione non riuscita");
     expect(document.body.textContent).not.toMatch(/NETWORK_ERROR|technical message/u);
+  });
+});
+
+// --- "Gestisci": what NINFA remembers from the person's answers ---------------------------------------------------------------
+
+describe("Gestisci > Risposte ricordate", () => {
+  const MODIFICATA = {
+    id: "w-1",
+    document: "status_mapping",
+    field: "status",
+    label: "modificata",
+    value: "NO_SHOW",
+    choices: ["CONFIRMED", "CANCELLED", "NO_SHOW", "CHECKED_IN", "CHECKED_OUT"],
+  };
+  const PMS_EXPORT = {
+    id: "f-1",
+    columns: ["giorno", "ore a", "ore b"],
+    answers: { date_order: "DMY" },
+    file_scope: "PARTIAL",
+    column_decisions: 2,
+  };
+
+  async function openManage(words: unknown[] = [MODIFICATA], files: unknown[] = []) {
+    getRememberedAnswersMock.mockResolvedValue(ok({ words, files }));
+    const user = userEvent.setup({ applyAccept: false });
+    await renderBlock(bookingsViaFile());
+    await user.click(within(cardOf("PMS")).getByRole("button", { name: "Gestisci PMS" }));
+    return user;
+  }
+  const section = () => screen.findByRole("region", { name: "Risposte ricordate" });
+
+  it("says what is remembered in the hotelier's words, reading the source it is open on", async () => {
+    await openManage();
+
+    const shown = await section();
+    expect(getRememberedAnswersMock).toHaveBeenCalledWith(PROPERTY_ID, "src-bookings");
+    expect(flat(shown)).toContain("Stato «modificata» → Non presentato");
+    expect(flat(shown)).not.toMatch(/NO_SHOW|status_mapping|family|famiglia/u);
+    expect(within(shown).getByRole("button", { name: "Correggi" })).not.toBeNull();
+    expect(within(shown).getByRole("button", { name: "Dimentica" })).not.toBeNull();
+  });
+
+  it("with nothing remembered the section is not there", async () => {
+    await openManage([]);
+
+    await waitFor(() => expect(getRememberedAnswersMock).toHaveBeenCalled());
+    expect(screen.queryByRole("region", { name: "Risposte ricordate" })).toBeNull();
+  });
+
+  it("forgetting asks first, then the answer is gone and the page says what happens next", async () => {
+    const user = await openManage();
+    forgetRememberedAnswerMock.mockResolvedValue(ok({ words: [], files: [] }));
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    expect(forgetRememberedAnswerMock).not.toHaveBeenCalled();
+    await user.click(within(shown).getByRole("button", { name: "Dimentica questa risposta" }));
+
+    await waitFor(() =>
+      expect(forgetRememberedAnswerMock).toHaveBeenCalledWith(PROPERTY_ID, "src-bookings", "w-1"),
+    );
+    const note = await within(shown).findByRole("status");
+    expect(flat(note)).toContain("al prossimo file NINFA te la chiederà di nuovo");
+    expect(flat(note)).toContain("I dati già importati non cambiano");
+    expect(flat(shown)).not.toContain("modificata");
+  });
+
+  it("forgetting can be called off", async () => {
+    const user = await openManage();
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    await user.click(within(shown).getByRole("button", { name: "Annulla" }));
+
+    expect(forgetRememberedAnswerMock).not.toHaveBeenCalled();
+    expect(flat(shown)).toContain("modificata");
+  });
+
+  it("correcting offers only what the backend allows, in plain words, and saves the choice", async () => {
+    const user = await openManage();
+    correctRememberedAnswerMock.mockResolvedValue(
+      ok({ words: [{ ...MODIFICATA, value: "CONFIRMED" }], files: [] }),
+    );
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Correggi" }));
+    const select = within(shown).getByLabelText<HTMLSelectElement>("Che cosa significa");
+    expect(Array.from(select.options).map((option) => option.text)).toEqual([
+      "Confermata",
+      "Cancellata",
+      "Non presentato (risposta attuale)",
+      "Arrivato",
+      "Partito",
+    ]);
+    await user.selectOptions(select, "CONFIRMED");
+    await user.click(within(shown).getByRole("button", { name: "Salva correzione" }));
+
+    await waitFor(() =>
+      expect(correctRememberedAnswerMock).toHaveBeenCalledWith(
+        PROPERTY_ID,
+        "src-bookings",
+        "w-1",
+        "CONFIRMED",
+      ),
+    );
+    expect(flat(await section())).toContain("Stato «modificata» → Confermata");
+    expect(flat(await within(shown).findByRole("status"))).toContain("vale dal prossimo file");
+  });
+
+  it("a word with no list can only be forgotten", async () => {
+    await openManage([{ ...MODIFICATA, field: "channel", document: "channel_mapping", value: "OTA", choices: [] }]);
+    const shown = await section();
+
+    expect(within(shown).queryByRole("button", { name: "Correggi" })).toBeNull();
+    expect(within(shown).getByRole("button", { name: "Dimentica" })).not.toBeNull();
+  });
+
+  it("a kind of file is said by its columns, with what was said about it, and can only be forgotten", async () => {
+    const user = await openManage([], [PMS_EXPORT]);
+    forgetRememberedAnswerMock.mockResolvedValue(ok({ words: [], files: [] }));
+    const shown = await section();
+
+    const text = flat(shown);
+    expect(text).toContain("File con le colonne: giorno, ore a, ore b");
+    expect(text).toContain("Date scritte giorno/mese/anno");
+    expect(text).toContain("Il file contiene solo una parte del periodo");
+    expect(text).toContain("2 colonne abbinate da te");
+    expect(within(shown).queryByRole("button", { name: "Correggi" })).toBeNull();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    await user.click(within(shown).getByRole("button", { name: "Dimentica questa risposta" }));
+
+    await waitFor(() =>
+      expect(forgetRememberedAnswerMock).toHaveBeenCalledWith(PROPERTY_ID, "src-bookings", "f-1"),
+    );
+  });
+
+  it("a request that fails says so and keeps the answer", async () => {
+    const user = await openManage();
+    forgetRememberedAnswerMock.mockResolvedValue(failure("X", 500));
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    await user.click(within(shown).getByRole("button", { name: "Dimentica questa risposta" }));
+
+    expect(await within(shown).findByRole("alert")).not.toBeNull();
+    expect(flat(shown)).toContain("modificata");
+  });
+
+  it("an answer that cannot be read is said, and the rest of the dialog works", async () => {
+    getRememberedAnswersMock.mockResolvedValue(failure("X", 500));
+    const user = userEvent.setup({ applyAccept: false });
+    await renderBlock(bookingsViaFile());
+    await user.click(within(cardOf("PMS")).getByRole("button", { name: "Gestisci PMS" }));
+
+    expect(await screen.findByText("Non siamo riusciti a leggere le risposte ricordate.")).not.toBeNull();
+    expect(within(dialog()).getByRole("link", { name: "Carica nuovo file" })).not.toBeNull();
   });
 });
 

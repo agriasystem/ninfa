@@ -143,6 +143,12 @@ export const datiCopy = {
     unavailableTitle: "Distribuzione non disponibile",
     insufficientTitle: "Dati insufficienti",
     insufficientBecause: (reasons: string) => `Perché: ${reasons}.`,
+    // The current data are fine: only the past periods to compare them with are missing. Nothing to fix.
+    historyTitle: "Storico ancora insufficiente",
+    historyBody: (required: number) =>
+      `NINFA ha dati sufficienti sulla distribuzione attuale, ma servono almeno ${required} periodi confrontabili per valutare se la dipendenza dalle OTA è anomala.`,
+    historyCount: (available: number, required: number) =>
+      `Periodi confrontabili disponibili: ${available} su ${required}`,
   },
   table: {
     title: "Dettaglio soggiorni",
