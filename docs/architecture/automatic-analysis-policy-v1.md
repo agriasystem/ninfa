@@ -21,8 +21,8 @@ An import made through the web page, and a room inventory saved, ask for their o
 | A job a dead worker left | Put back by a later tick, at most 3 times. |
 
 Why it runs with no import: Gate 26B skipped because an observation could not be corrected the same day. Same-day revisions lifted
-that: a file arriving later is the day's next revision. What it costs is in [ADR 0044](adr/0044-pilot-autonomy.md): a day's observation
-with no new file says nothing was picked up.
+that: a file arriving later is the day's next revision. A day with no new booking data is told apart
+([ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md)): its pickup is not evaluated, and its observation is no sample of history.
 
 ## How it is asked for
 

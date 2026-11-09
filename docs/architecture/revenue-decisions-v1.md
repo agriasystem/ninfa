@@ -261,6 +261,12 @@ workspace's target, baseline or snapshot does not exist for the service; a forei
 unknown one raise the same error. Sources never mix: a second data source or another property of
 the same workspace, with identical dates and wild values, changes nothing (tests).
 
+## A day with no new booking data
+
+`REV_PICKUP_LOW` is not evaluated on a day whose analysis saw the same import as the previous analysed day: `INSUFFICIENT_DATA`,
+`PICKUP_NO_NEW_BOOKING_DATA`. No curve takes an anchor, a prior or a final from such a day, and a prior from one reads as missing. See
+[ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md).
+
 ## Golden scenario
 
 "MASSERIA NINFA DEMO" extended once more: the Gate 2/3/4 world (golden, addendum, history; 154

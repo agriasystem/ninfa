@@ -117,12 +117,8 @@ holds no value of a file: a word is named by its handle (`answer`), and a meanin
 
 ## Consequences
 
-- **A daily run on bookings that did not arrive looks like bookings that did not come.** NINFA has no notion of how old the bookings
-  are, and the observation of a day with no import says nothing was picked up. `REV_PICKUP_LOW` reads that the way it reads a real
-  absence of bookings once there is enough history (five weeks), and that observation joins the history of later days. A hotel
-  that imports every few days can see a false alarm that clears at the next file. The page shows the fact ("Ultimo import
-  prenotazioni: ..."), and no detector was changed. Until bookings arrive by themselves this is the known cost of a run every day,
-  and it needs a product decision.
+- **A daily run on bookings that did not arrive looked like bookings that did not come.** [ADR 0045](0045-no-new-booking-data-is-not-zero-pickup.md)
+  closed this for `REV_PICKUP_LOW` and for history: a day with no new data is not a pickup of zero and no sample.
 - A property's first run is at its first import or at 10:00, whichever comes first. A day with the worker down all day has no run,
   and is not recovered: an observation cannot be dated in the past.
 - The worker must be running. It is supervised (`deploy/systemd/ninfa-worker.service`), and it is the one thing the daily analysis

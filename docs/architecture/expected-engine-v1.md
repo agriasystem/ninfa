@@ -267,3 +267,9 @@ remaining column; the minimal projection of `REV_OCCUPANCY_RISK` lives only in a
 * No weighting by recency, no outlier removal, no dedicated handling of groups or events.
 * A conflict on re-run (above) means a corrected history needs a new `calculation_version`.
 * No retention policy for baselines yet; no public API, worker task or scheduler.
+
+## A day with no new booking data
+
+No comparable comes from an observation of a day that only repeated what was already known: the absence of new data is not a measured level
+([ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md)). The days are told to the engine by the orchestration, and a past day's status never
+changes, so a target's comparables do not move between two runs of one day.

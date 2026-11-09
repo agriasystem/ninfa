@@ -16,9 +16,9 @@ the policy are in [automatic-analysis-policy-v1.md](../architecture/automatic-an
 | afterwards | hotel | opens Oggi |
 
 The hour is the property's own: `Europe/Rome` for the first pilot, and each property's own named timezone for any other. No file is needed
-that morning: the bookings NINFA holds are analysed, and Oggi says when they last arrived. **A day with no new file says nothing was picked up,
-and with enough history the detectors read that as they read a real lack of bookings** (ADR 0044): bring the file before reading the day's
-decisions as news.
+that morning: the bookings NINFA holds are analysed, and Oggi says when they last arrived. A day with no new booking data has no pickup
+evaluation and is no sample of history ([ADR 0045](../architecture/adr/0045-no-new-booking-data-is-not-zero-pickup.md)). `REV_OCCUPANCY_RISK` and
+labor still read the bookings last known: bring the file before reading those decisions as news.
 
 ## The catch-up wrapper
 
