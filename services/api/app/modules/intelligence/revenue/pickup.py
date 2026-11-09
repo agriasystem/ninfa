@@ -149,7 +149,7 @@ def evaluate_pickup(
 
     # 0. nothing new has arrived: this is not known, and it is not zero
     if not observation_is_fresh:
-        return finish(EvaluationStatus.INSUFFICIENT_DATA, (ReasonCode.PICKUP_NO_NEW_BOOKING_DATA,))
+        return finish(EvaluationStatus.INSUFFICIENT_DATA, (ReasonCode.BOOKING_DATA_STALE,))
 
     # 1. there is nothing to sell: the rule has no meaning (closed BEFORE near sold out)
     if target.rooms_available == 0:

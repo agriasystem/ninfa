@@ -14,7 +14,7 @@ target and `calculation_version` (typically because history arrived in the meant
 """
 
 import logging
-from collections.abc import Callable, Collection, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -42,7 +42,11 @@ from app.modules.intelligence.expected.seasonality import eligible_stay_dates
 from app.modules.intelligence.expected.selection import Candidate, HistoricalTarget
 from app.modules.properties.repository import PropertyRepository
 from app.modules.snapshots.models import BookingSnapshot, SnapshotOrigin
-from app.modules.snapshots.repository import BookingSnapshotRepository, SnapshotKey
+from app.modules.snapshots.repository import (
+    BookingSnapshotRepository,
+    ObservationHistory,
+    SnapshotKey,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +112,7 @@ class BookingExpectedService:
         snapshot_local_date: date,
         stay_date_start: date,
         stay_date_end: date,
-        stale_observation_days: Collection[date] = frozenset(),
+        history: ObservationHistory | None = None,
     ) -> ExpectedRunResult:
         """The baselines of every OBSERVED snapshot of one snapshot day and stay-date range
         (both ends included) of one data source, in one transaction.
@@ -117,10 +121,10 @@ class BookingExpectedService:
         already over) are skipped and counted, not an error. Comparable history is fetched once
         for the whole batch.
 
-        `stale_observation_days` are the days whose observation only repeated what was already
-        known (`analysis/observation.py`): no comparable comes from them, because the absence of
-        new data is not a measured level. The set of a past day never changes, so a target's
-        comparables do not move between two runs of the same day.
+        `history` says which observations count (`analysis/observation.py`): no comparable comes
+        from any other, neither one that only repeated what was already known nor one no finished
+        analysis read. What a past day counts for never changes, so a target's comparables do not
+        move between two runs of the same day.
         """
         for value, name in (
             (snapshot_local_date, "snapshot_local_date"),
@@ -157,7 +161,7 @@ class BookingExpectedService:
                 data_source_id,
                 usable,
                 skipped=len(stored) - len(usable),
-                stale_observation_days=stale_observation_days,
+                history=history,
             )
 
         return self._finish(run)
@@ -243,7 +247,7 @@ class BookingExpectedService:
         targets: Sequence[BookingSnapshot],
         *,
         skipped: int,
-        stale_observation_days: Collection[date] = frozenset(),
+        history: ObservationHistory | None = None,
     ) -> ExpectedRunResult:
         lock_data_source(self._session, data_source_id)
 
@@ -270,11 +274,7 @@ class BookingExpectedService:
                 rooms_on_books=row.rooms_on_books,
                 uncertain_rooms=row.uncertain_rooms,
             )
-            for row in self._snapshots.list_by_keys(data_source_id, wanted)
-            if not (
-                row.origin == SnapshotOrigin.OBSERVED
-                and row.snapshot_local_date in stale_observation_days
-            )
+            for row in self._snapshots.list_by_keys(data_source_id, wanted, history=history)
         }
 
         calculated: list[NewBaseline] = []

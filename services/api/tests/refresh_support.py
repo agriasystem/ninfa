@@ -5,9 +5,9 @@ queue's rows included, because nothing here is rolled back.
 """
 
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -24,6 +24,7 @@ from app.modules.analysis import AnalysisStatusService, enqueue_refresh, run_ref
 from app.modules.bookings.mapping import CanonicalField
 from app.modules.bookings.service import BookingImportService
 from app.modules.decisions.models import Decision, DecisionRun
+from app.modules.decisions.provenance import BookingProvenance, RunInputProvenance
 from app.modules.ingestion.canonical_csv import (
     booking_format_options,
     identity_column_mapping,
@@ -34,13 +35,16 @@ from app.modules.ingestion.models import DataSourceDomain, FileScope
 from app.modules.ingestion.repository import DataSourceRepository
 from app.modules.ingestion.scope import ScopePlan
 from app.modules.intelligence.expected.seasonality import eligible_stay_dates
+from app.modules.intelligence.priority.types import PriorityContext
 from app.modules.labor.mapping import LaborField
 from app.modules.labor.service import LaborImportService
 from app.modules.properties.models import Property
 from app.modules.properties.repository import PropertyRepository
+from app.modules.snapshots.models import SnapshotOrigin
 from app.modules.snapshots.repository import RoomInventoryRepository
 from app.modules.tenancy.models import Workspace
 from app.modules.tenancy.repository import WorkspaceRepository
+from tests.decision_support import sync_run
 from tests.expected_support import add_snapshots, snapshot_row
 from tests.invoice_support import Body, fattura_xml
 from tests.pilot_support import labor_csv
@@ -247,6 +251,33 @@ class Hotel:
                 ).all()
             )
 
+    def runs_today(self) -> list[DecisionRun]:
+        return [run for run in self.runs() if run.as_of_local_date == local_today()]
+
+
+def analysed_on(
+    hotel: Hotel,
+    day: date,
+    *,
+    import_job_id: uuid.UUID | None = None,
+    finished_at: datetime | None = None,
+    revision: int = 1,
+) -> None:
+    """What a finished analysis of an earlier day leaves behind: the import it saw and the
+    observation it read. With no import named, one of its own: the source had something new."""
+    provenance = RunInputProvenance(
+        bookings=BookingProvenance(
+            data_source_id=hotel.bookings_source(),
+            import_job_id=import_job_id or uuid.uuid4(),
+            last_successful_import_finished_at=finished_at or datetime.now(UTC),
+            snapshot_local_date=day,
+            observation_revision=revision,
+        )
+    )
+    context = PriorityContext(hotel.tenant.workspace_id, hotel.property_id, day)
+    with hotel.session() as session:
+        sync_run(session, hotel.tenant, context, [], provenance=provenance)
+
 
 def booking_row(code: str, offset: int, *, revenue: str = "150.00") -> dict[str, Any]:
     stay = local_today() + timedelta(days=offset)
@@ -262,27 +293,75 @@ def booking_row(code: str, offset: int, *, revenue: str = "150.00") -> dict[str,
     }
 
 
-def seed_slow_night(hotel: Hotel) -> date:
-    """A night ten days away whose comparable nights all gained rooms in their last week, and which
-    gained none: what makes the real pickup detector speak, from real snapshots and real engines."""
-    stay = local_today() + timedelta(days=10)
+def slow_stay() -> date:
+    return local_today() + timedelta(days=10)
+
+
+def comparable_nights(stay: date) -> list[date]:
+    return [day for day in eligible_stay_dates(stay) if day < local_today()][:8]
+
+
+def curve_prior_days_keeping_anchors(stay: date) -> set[date]:
+    """Days whose loss takes the seven-days-earlier end from most curve pairs, and still leaves the
+    five comparables a baseline needs: a prior's day is often another night's comparable."""
+    nights = comparable_nights(stay)
+    anchors = {night - timedelta(days=10) for night in nights}
+    days: set[date] = set()
+    for night in nights:
+        prior = night - timedelta(days=17)
+        if len(anchors - days - {prior}) >= 5:
+            days.add(prior)
+    return days
+
+
+def seed_slow_night(
+    hotel: Hotel,
+    *,
+    rooms_a_week_ago: int = 1,
+    unfinished: Collection[date] = frozenset(),
+    repeated: Collection[date] = frozenset(),
+    origin: SnapshotOrigin = SnapshotOrigin.OBSERVED,
+    analysed: bool = True,
+) -> date:
+    """A night ten days away whose comparable nights all gained rooms in their last week: what
+    makes the real detectors speak, from real snapshots and real engines.
+
+    Each day of that history had its finished analysis, with something new in it, as a real one
+    would have. Except `unfinished` days (the job died after the observation: rows and no run) and
+    `repeated` ones (the day only repeated what the day before said). `analysed=False`: none yet.
+    """
+    stay = slow_stay()
     source = hotel.bookings_source()
     tenant = SimpleNamespace(
         workspace=SimpleNamespace(id=hotel.tenant.workspace_id),
         property=SimpleNamespace(id=hotel.property_id),
         data_source=SimpleNamespace(id=source),
     )
-    rows = [snapshot_row(tenant, local_today() - timedelta(days=7), stay, rooms=1)]  # type: ignore[arg-type]
-    for past in [day for day in eligible_stay_dates(stay) if day < local_today()][:8]:
-        rows.append(snapshot_row(tenant, past - timedelta(days=17), past, rooms=10))  # type: ignore[arg-type]
-        rows.append(snapshot_row(tenant, past - timedelta(days=10), past, rooms=20))  # type: ignore[arg-type]
-        rows.append(snapshot_row(tenant, past, past, rooms=30))  # type: ignore[arg-type]
+    week_ago = local_today() - timedelta(days=7)
+    rows = [snapshot_row(tenant, week_ago, stay, rooms=rooms_a_week_ago)]  # type: ignore[arg-type]
+    for past in comparable_nights(stay):
+        for snapshot_day, rooms in (
+            (past - timedelta(days=17), 10),
+            (past - timedelta(days=10), 20),
+            (past, 30),
+        ):
+            rows.append(
+                snapshot_row(tenant, snapshot_day, past, rooms=rooms, origin=origin)  # type: ignore[arg-type]
+            )
     with hotel.session() as session:
         add_snapshots(session, tenant, rows)  # type: ignore[arg-type]
         RoomInventoryRepository(session, hotel.tenant).set_for_date(
             hotel.property_id, stay, rooms_available=40
         )
         session.commit()
+    if analysed:
+        days = sorted({row["snapshot_local_date"] for row in rows})
+        previous = uuid.uuid4()
+        analysed_on(hotel, days[0] - timedelta(days=1), import_job_id=previous)
+        for day in days:
+            if day not in unfinished:
+                previous = previous if day in repeated else uuid.uuid4()
+                analysed_on(hotel, day, import_job_id=previous)
     return stay
 
 

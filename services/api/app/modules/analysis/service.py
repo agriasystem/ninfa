@@ -29,9 +29,10 @@ If one raises, the exception propagates and `DecisionService.sync()` is never re
 COVERAGE (Gate 22) and PROVENANCE (Gate 23B) are built here, from the same booleans that decide
 the optional steps and from the latest import that changed the EXACT booking data source used.
 
-A day with no new booking data is told apart here (`observation.py`, ADR 0045), and said to the two
-engines that read a day's observation as a measure of what was booked: it is no pickup of today, and
-no sample of history. Nothing else about the run changes.
+What a day's observation can be used for is told apart here (`observation.py`, ADR 0045 and 0046),
+and said to the two engines that read one as a measure of what was booked: with no new booking data
+neither revenue detector speaks today, and only what a finished analysis read, with something new in
+it, is a sample of history. Nothing else about the run changes.
 """
 
 import logging
@@ -213,7 +214,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         snapshot_local_date=as_of_local_date,
         stay_date_start=stay_date_start,
         stay_date_end=stay_date_end,
-        stale_observation_days=observation.stale_days,
+        history=observation.history,
     )
 
     evaluations: list[SourceEvaluation] = []
@@ -226,7 +227,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         stay_date_start=stay_date_start,
         stay_date_end=stay_date_end,
         observation_is_fresh=observation.fresh,
-        stale_observation_days=observation.stale_days,
+        history=observation.history,
     )
     for signal in signals:
         evaluations.append(signal.pickup_low)

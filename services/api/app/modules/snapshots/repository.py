@@ -8,16 +8,19 @@ A day may hold several observations (`BookingSnapshot.revision`). Every read by 
 ONE row per (snapshot day, stay night), the newest: that is what a new analysis looks at, and what
 represents that day in the history of any later day, so a day seen three times is still one sample.
 Only `get_by_id` and `list_by_ids` reach an older revision, because a run or a baseline names it.
+
+A comparison with the past says which observations count (`ObservationHistory`): the rule is told
+to this module, which knows nothing of who made them.
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import Date, Table, and_, column, func, select, text, values
+from sqlalchemy import Date, Integer, Table, and_, column, func, or_, select, text, values
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -33,7 +36,8 @@ _INSERT_BLOCK = 2000  # rows per executemany call
 
 # (snapshot_local_date, stay_date): the logical key of a snapshot inside one data source.
 SnapshotKey = tuple[date, date]
-_KEYS_PER_QUERY = 5000  # (date, date) pairs per VALUES join: 10 000 bind parameters
+_KEYS_PER_QUERY = 5000  # (date, date, revision) per VALUES join: 15 000 bind parameters
+_EVERY_REVISION = 2_147_483_647
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +51,33 @@ class SnapshotHistoryRow:
     rooms_on_books: int
     uncertain_rooms: int
     adr_on_books: Decimal | None
+    revision: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class ObservationHistory:
+    """Which observations of earlier days a comparison with the past may read.
+
+    `newest_revision` names, for each earlier day that counts, the newest of its revisions that does
+    (a night reads as its newest row up to it). A day not named has no observation that counts, and
+    a row above its revision is not read: it never existed for history, whatever the current
+    screens show of it. A reconstruction is not an observation of any day, and is always read.
+
+    `reading_day` and the days after it are not history, so nothing is said of them.
+    """
+
+    reading_day: date
+    newest_revision: Mapping[date, int]
+
+    def newest_readable(self, snapshot_local_date: date) -> int:
+        if snapshot_local_date >= self.reading_day:
+            return _EVERY_REVISION
+        return self.newest_revision.get(snapshot_local_date, 0)
+
+    def admits(self, row: SnapshotHistoryRow) -> bool:
+        return row.origin != SnapshotOrigin.OBSERVED or row.revision <= self.newest_readable(
+            row.snapshot_local_date
+        )
 
 
 class RoomInventoryRepository:
@@ -229,20 +260,33 @@ class BookingSnapshotRepository:
         )
 
     def list_by_keys(
-        self, data_source_id: UUID, keys: Collection[SnapshotKey]
+        self,
+        data_source_id: UUID,
+        keys: Collection[SnapshotKey],
+        *,
+        history: ObservationHistory | None = None,
     ) -> list[SnapshotHistoryRow]:
         """The snapshots of ONE data source at exactly these (snapshot day, stay date) keys.
 
         One statement per block of keys (a join with a VALUES list, served by the unique key's
         index): the way a historical comparison fetches a few dozen exact snapshots instead of
-        scanning the history or asking once per date.
+        scanning the history or asking once per date. `history`: only what counts as history.
         """
+
+        def newest(day: date) -> int:
+            return _EVERY_REVISION if history is None else history.newest_readable(day)
+
         ordered = sorted(keys)
         found: list[SnapshotHistoryRow] = []
         for start in range(0, len(ordered), _KEYS_PER_QUERY):
             wanted = values(
-                column("snapshot_local_date", Date), column("stay_date", Date), name="wanted"
-            ).data(ordered[start : start + _KEYS_PER_QUERY])
+                column("snapshot_local_date", Date),
+                column("stay_date", Date),
+                column("newest_revision", Integer),
+                name="wanted",
+            ).data(
+                [(day, stay, newest(day)) for day, stay in ordered[start : start + _KEYS_PER_QUERY]]
+            )
             rows = self._session.execute(
                 select(
                     BookingSnapshot.id,
@@ -252,6 +296,7 @@ class BookingSnapshotRepository:
                     BookingSnapshot.rooms_on_books,
                     BookingSnapshot.uncertain_rooms,
                     BookingSnapshot.adr_on_books,
+                    BookingSnapshot.revision,
                 )
                 .join(
                     wanted,
@@ -263,6 +308,10 @@ class BookingSnapshotRepository:
                 .where(
                     BookingSnapshot.workspace_id == self._tenant.workspace_id,
                     BookingSnapshot.data_source_id == data_source_id,
+                    or_(
+                        BookingSnapshot.origin != SnapshotOrigin.OBSERVED,
+                        BookingSnapshot.revision <= wanted.c.newest_revision,
+                    ),
                 )
                 .distinct(BookingSnapshot.snapshot_local_date, BookingSnapshot.stay_date)
                 .order_by(
@@ -289,6 +338,7 @@ class BookingSnapshotRepository:
                 BookingSnapshot.rooms_on_books,
                 BookingSnapshot.uncertain_rooms,
                 BookingSnapshot.adr_on_books,
+                BookingSnapshot.revision,
             ).where(
                 BookingSnapshot.workspace_id == self._tenant.workspace_id,
                 BookingSnapshot.data_source_id == data_source_id,

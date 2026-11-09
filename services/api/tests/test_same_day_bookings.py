@@ -757,4 +757,8 @@ def test_a_real_signal_is_one_decision_through_every_file_of_the_day(
 
     # three observations of one night in one day, and each run read its own
     assert [row.revision for row in rows_of_today(hotel, offset)] == [1, 2, 3]
-    assert [provenance_of(run).bookings.observation_revision for run in hotel.runs()] == [1, 2, 3]
+    assert [provenance_of(run).bookings.observation_revision for run in hotel.runs_today()] == [
+        1,
+        2,
+        3,
+    ]
