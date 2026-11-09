@@ -14,7 +14,7 @@ raise the same error.
 """
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -74,6 +74,7 @@ class _Prepared:
     anchors: list[SnapshotPoint]
     reference: ReferenceAdr
     endpoints: dict[SnapshotKey, SnapshotPoint]
+    observation_is_fresh: bool = True
 
     def _has_pairs(self) -> bool:
         return self.context.baseline_status == ExpectedStatus.READY and bool(self.anchors)
@@ -90,6 +91,7 @@ class _Prepared:
             prior=self.endpoints.get(prior_key(context.snapshot_local_date, context.stay_date)),
             selection=selection,
             reference=self.reference,
+            observation_is_fresh=self.observation_is_fresh,
         )
 
     def occupancy(self) -> RevenueDecisionEvaluation:
@@ -157,12 +159,18 @@ class RevenueDecisionService:
         snapshot_local_date: date,
         stay_date_start: date,
         stay_date_end: date,
+        observation_is_fresh: bool = True,
+        stale_observation_days: Collection[date] = frozenset(),
     ) -> tuple[RevenueSignals, ...]:
         """Both detectors on every OBSERVED snapshot of one snapshot day and stay-date range
         (both ends included) of one data source, earliest stay date first.
 
         Targets whose stay date precedes their snapshot day (a night already over) are not
         evaluated. The history of the whole batch is read once.
+
+        `observation_is_fresh` False: the source said nothing new since the last day analysed, so
+        the pickup is not evaluated. `stale_observation_days`: the earlier days of which that was
+        true: no endpoint or anchor of a curve comes from them (`analysis/observation.py`).
         """
         for value, name in (
             (snapshot_local_date, "snapshot_local_date"),
@@ -192,7 +200,14 @@ class RevenueDecisionService:
             origin=SnapshotOrigin.OBSERVED,
         )
         signals = tuple(
-            prepared.signals() for prepared in self._prepare(stored, pickup=True, occupancy=True)
+            prepared.signals()
+            for prepared in self._prepare(
+                stored,
+                pickup=True,
+                occupancy=True,
+                observation_is_fresh=observation_is_fresh,
+                stale_observation_days=stale_observation_days,
+            )
         )
         logger.info(
             "revenue signals evaluated workspace_id=%s property_id=%s data_source_id=%s targets=%d",
@@ -255,13 +270,25 @@ class RevenueDecisionService:
     # --- the evaluation -----------------------------------------------------------------------
 
     def _prepare(
-        self, targets: Sequence[BookingSnapshot], *, pickup: bool = False, occupancy: bool = False
+        self,
+        targets: Sequence[BookingSnapshot],
+        *,
+        pickup: bool = False,
+        occupancy: bool = False,
+        observation_is_fresh: bool = True,
+        stale_observation_days: Collection[date] = frozenset(),
     ) -> list[_Prepared]:
         """Read everything the requested detectors need, once, for all the targets."""
         if not targets:
             return []
         data_source_id = targets[0].data_source_id
-        loaded = self._load(targets, data_source_id, pickup=pickup, occupancy=occupancy)
+        loaded = self._load(
+            targets,
+            data_source_id,
+            pickup=pickup,
+            occupancy=occupancy,
+            stale_observation_days=stale_observation_days,
+        )
         prepared: list[_Prepared] = []
         for snapshot in targets:
             baseline = loaded.baselines.get(snapshot.id)
@@ -291,6 +318,7 @@ class RevenueDecisionService:
                         [] if baseline is None else loaded.anchor_adrs.get(baseline.id, []),
                     ),
                     endpoints=loaded.endpoints,
+                    observation_is_fresh=observation_is_fresh,
                 )
             )
         return prepared
@@ -302,7 +330,15 @@ class RevenueDecisionService:
         *,
         pickup: bool,
         occupancy: bool,
+        stale_observation_days: Collection[date] = frozenset(),
     ) -> _Loaded:
+        def usable(point: SnapshotPoint) -> bool:
+            """A day whose observation repeated what was known measures nothing."""
+            return not (
+                point.origin == SnapshotOrigin.OBSERVED
+                and point.snapshot_local_date in stale_observation_days
+            )
+
         # 1. the Gate 4 baselines of the targets, then their comparables (two statements)
         baselines = self._expected.existing_for_targets([target.id for target in targets])
         comparables = self._expected.list_comparables_for_baselines(
@@ -312,8 +348,9 @@ class RevenueDecisionService:
         # 2. the comparable snapshots themselves (the ANCHORS of the curve pairs), one statement
         snapshot_ids = {c.snapshot_id for rows in comparables.values() for c in rows}
         points = {
-            row.snapshot_id: _point(row)
-            for row in self._snapshots.list_by_ids(data_source_id, snapshot_ids)
+            point.snapshot_id: point
+            for point in map(_point, self._snapshots.list_by_ids(data_source_id, snapshot_ids))
+            if usable(point)
         }
         anchors: dict[UUID, list[SnapshotPoint]] = {}
         anchor_adrs: dict[UUID, list[Decimal | None]] = {}
@@ -336,7 +373,8 @@ class RevenueDecisionService:
                 if occupancy:
                     wanted.add(final_key(anchor))
         endpoints = {
-            (row.snapshot_local_date, row.stay_date): _point(row)
-            for row in self._snapshots.list_by_keys(data_source_id, wanted)
+            (point.snapshot_local_date, point.stay_date): point
+            for point in map(_point, self._snapshots.list_by_keys(data_source_id, wanted))
+            if usable(point)
         }
         return _Loaded(baselines, anchors, anchor_adrs, endpoints)

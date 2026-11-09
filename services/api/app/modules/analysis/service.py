@@ -28,8 +28,13 @@ If one raises, the exception propagates and `DecisionService.sync()` is never re
 
 COVERAGE (Gate 22) and PROVENANCE (Gate 23B) are built here, from the same booleans that decide
 the optional steps and from the latest import that changed the EXACT booking data source used.
+
+A day with no new booking data is told apart here (`observation.py`, ADR 0045), and said to the two
+engines that read a day's observation as a measure of what was booked: it is no pickup of today, and
+no sample of history. Nothing else about the run changes.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from http import HTTPStatus
@@ -39,6 +44,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
+from app.modules.analysis.observation import booking_observation_freshness
 from app.modules.decisions.coverage import (
     AnalysisCoverage,
     AnalysisDomain,
@@ -66,6 +72,8 @@ from app.modules.properties.repository import PropertyRepository
 from app.modules.snapshots.models import SnapshotOrigin
 from app.modules.snapshots.observed import ObservedSnapshotService
 from app.modules.snapshots.repository import BookingSnapshotRepository
+
+logger = logging.getLogger(__name__)
 
 
 class AnalysisInputError(AppError):
@@ -153,6 +161,8 @@ class AnalysisRunResult:
     decisions_resolved: int
     decisions_reopened: int
     open_decisions_after_sync: int
+    # False: the booking source said nothing new since the last day analysed (`observation.py`).
+    booking_observation_fresh: bool = True
 
 
 def run_property_analysis(session: Session, request: AnalysisRunRequest) -> AnalysisRunResult:
@@ -178,6 +188,24 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
     )
     as_of_local_date = snapshot_result.snapshot_date_first
 
+    # Has the source said anything new since the last day analysed? (read-only, from the runs)
+    observation = booking_observation_freshness(
+        session,
+        tenant,
+        property_id=prop.id,
+        data_source_id=booking_data_source_id,
+        as_of_local_date=as_of_local_date,
+        import_job_id=snapshot_result.import_job_id,
+    )
+    if not observation.fresh:
+        logger.info(
+            "no new booking data workspace_id=%s property_id=%s data_source_id=%s as_of=%s",
+            tenant.workspace_id,
+            prop.id,
+            booking_data_source_id,
+            as_of_local_date,
+        )
+
     # 2. Expected baselines for those same targets.
     expected_result = BookingExpectedService(session, tenant).calculate_for_snapshot_date(
         property_id=prop.id,
@@ -185,6 +213,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         snapshot_local_date=as_of_local_date,
         stay_date_start=stay_date_start,
         stay_date_end=stay_date_end,
+        stale_observation_days=observation.stale_days,
     )
 
     evaluations: list[SourceEvaluation] = []
@@ -196,6 +225,8 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         snapshot_local_date=as_of_local_date,
         stay_date_start=stay_date_start,
         stay_date_end=stay_date_end,
+        observation_is_fresh=observation.fresh,
+        stale_observation_days=observation.stale_days,
     )
     for signal in signals:
         evaluations.append(signal.pickup_low)
@@ -358,4 +389,5 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         decisions_resolved=sync_result.resolved_count,
         decisions_reopened=sync_result.reopened_count,
         open_decisions_after_sync=sync_result.open_decision_count_after_sync,
+        booking_observation_fresh=observation.fresh,
     )

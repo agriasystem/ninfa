@@ -14,7 +14,7 @@ target and `calculation_version` (typically because history arrived in the meant
 """
 
 import logging
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -108,6 +108,7 @@ class BookingExpectedService:
         snapshot_local_date: date,
         stay_date_start: date,
         stay_date_end: date,
+        stale_observation_days: Collection[date] = frozenset(),
     ) -> ExpectedRunResult:
         """The baselines of every OBSERVED snapshot of one snapshot day and stay-date range
         (both ends included) of one data source, in one transaction.
@@ -115,6 +116,11 @@ class BookingExpectedService:
         Targets whose stay date precedes their snapshot day (a negative lead time: the night was
         already over) are skipped and counted, not an error. Comparable history is fetched once
         for the whole batch.
+
+        `stale_observation_days` are the days whose observation only repeated what was already
+        known (`analysis/observation.py`): no comparable comes from them, because the absence of
+        new data is not a measured level. The set of a past day never changes, so a target's
+        comparables do not move between two runs of the same day.
         """
         for value, name in (
             (snapshot_local_date, "snapshot_local_date"),
@@ -147,7 +153,11 @@ class BookingExpectedService:
             )
             usable = [row for row in stored if row.stay_date >= row.snapshot_local_date]
             return self._process(
-                property_id, data_source_id, usable, skipped=len(stored) - len(usable)
+                property_id,
+                data_source_id,
+                usable,
+                skipped=len(stored) - len(usable),
+                stale_observation_days=stale_observation_days,
             )
 
         return self._finish(run)
@@ -233,6 +243,7 @@ class BookingExpectedService:
         targets: Sequence[BookingSnapshot],
         *,
         skipped: int,
+        stale_observation_days: Collection[date] = frozenset(),
     ) -> ExpectedRunResult:
         lock_data_source(self._session, data_source_id)
 
@@ -260,6 +271,10 @@ class BookingExpectedService:
                 uncertain_rooms=row.uncertain_rooms,
             )
             for row in self._snapshots.list_by_keys(data_source_id, wanted)
+            if not (
+                row.origin == SnapshotOrigin.OBSERVED
+                and row.snapshot_local_date in stale_observation_days
+            )
         }
 
         calculated: list[NewBaseline] = []

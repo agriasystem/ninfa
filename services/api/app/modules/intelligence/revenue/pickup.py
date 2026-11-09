@@ -15,13 +15,16 @@ the facts is for display only and never decides. With the numeric condition true
 confidence (MIN of the baseline and the pattern, the authoritative two-decimal score) must be
 at least 50 to TRIGGER; below it the evaluation is SUPPRESSED_LOW_CONFIDENCE.
 
+With no new booking data since the last day analysed the pickup is not known, which is not a pickup
+of zero: nothing is measured and nothing is said (INSUFFICIENT_DATA, before anything else).
+
 The rule stays silent (NOT_APPLICABLE) when there is nothing to sell: a closed night, or at most 1
 room left. It needs an OBSERVED prior snapshot and at least 5 clean historical pairs, otherwise it
 is INSUFFICIENT_DATA. Expected pickup <= 0 is NOT_APPLICABLE: a percentage of nothing is undefined
 and a night that historically loses rooms is not a pickup shortfall.
 
-Order of the checks (the first that applies decides): closed night, near sold out, baseline,
-prior observation, pair sample, non-positive expectation, then the thresholds.
+Order of the checks (the first that applies decides): no new booking data, closed night, near sold
+out, baseline, prior observation, pair sample, non-positive expectation, then the thresholds.
 """
 
 from dataclasses import replace
@@ -96,11 +99,14 @@ def evaluate_pickup(
     selection: PairSelection,
     reference: ReferenceAdr,
     thresholds: PickupThresholds = PICKUP_THRESHOLDS,
+    observation_is_fresh: bool = True,
 ) -> RevenueDecisionEvaluation:
     """REV_PICKUP_LOW for one OBSERVED target.
 
     `prior` is the snapshot of the same stay date exactly 7 snapshot days earlier (None when it
-    does not exist); `selection` are the historical pickup pairs of the target's Gate 4 baseline.
+    does not exist, or when that day had no new data); `selection` are the historical pickup pairs
+    of the target's Gate 4 baseline. `observation_is_fresh` says the target's day has new booking
+    data.
     """
     remaining = (
         None if target.rooms_available is None else target.rooms_available - target.rooms_on_books
@@ -140,6 +146,10 @@ def evaluate_pickup(
             reference=reference,
             revenue_gap_proxy=proxy,
         )
+
+    # 0. nothing new has arrived: this is not known, and it is not zero
+    if not observation_is_fresh:
+        return finish(EvaluationStatus.INSUFFICIENT_DATA, (ReasonCode.PICKUP_NO_NEW_BOOKING_DATA,))
 
     # 1. there is nothing to sell: the rule has no meaning (closed BEFORE near sold out)
     if target.rooms_available == 0:
