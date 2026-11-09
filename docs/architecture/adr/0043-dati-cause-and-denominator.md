@@ -24,6 +24,8 @@ inventory) found four problems.
      - 9 confirmed bookings have a booking date after the analysis day (8 to 22 November).
      - 4 no-shows are for stays that start after the analysis day. The file says "Modificata" for 5 rows, and that
        value was answered "Non presentato" at import.
+     - The two totals are bridged exactly, in room-nights: 133 observed, minus 21 of the 9 confirmed bookings, plus 9 of
+       the 4 no-shows, is 121.
    - The 3 cancellations have no cancellation date. They are on the books under neither rule, so they are not a cause.
      Every booking has a channel, and every booking is for one room, so neither is a cause either. Both readings use
      the same 30 nights and room-nights, never a booking count.
@@ -75,16 +77,30 @@ inventory) found four problems.
 5. **The nights table fits a desktop card.** Cells have 8 px of horizontal padding. The night's status, a word, may
    wrap under its mark, while a figure never wraps. The status header asks for a share of the table (22 %, or 16 % on
    the ten-column Prenotazioni table), so the status stays on one line when there is room. A share never raises the
-   width below which the table must scroll. No column is removed. Measured in Chrome at 1440 and 1280 px on the real
-   data and on a large hotel's figures, the tables keep 85 to 326 px to spare, enough for two scrollbars. Below 1280 px
-   a wide table scrolls inside its own region, and the page never does.
+   width below which the table must scroll. No column is removed. Measured in Chrome from 1024 to 1920 px on the real
+   data and on a large hotel's figures. The overview card is narrowest at 1440 px, where the grid gives it 8 of 12 columns
+   (103 px to spare on the real data, 85 on a large hotel's). From 1280 px up, every table keeps at least 43 px, enough
+   for two scrollbars (about 28 px). Below 1280 px the ten-column Prenotazioni table may scroll inside its own region, and
+   the page never does. "Riepilogo per periodo" loses its own `min-width: 720px`: it has 567 px of content, and the rule
+   made it scroll at 1024 px for nothing.
 
 ## Consequences
 
 - Struttura's own "Configura inventario" button is still not wired: Struttura UI V1 has no inventory endpoint. The link
   brings the person to the right block, but for the pilot the inventory is still set with
   `python -m app.cli.pilot set-room-inventory`. Dati then reads `AWAITING_ANALYSIS` until the next analysis.
-- The demo file keeps its dates. With booking dates up to the import day, and "Modificata" answered as the hotel means
-  it, the check would get past reconciliation and go on to its next conditions (coverage, volume, comparable history).
+- The demo file keeps its dates. Run in memory through the real detector on those bookings, nothing written:
+  - Correcting only the booking dates still fails reconciliation (133 observed, 142 certain), and so does correcting only
+    "Modificata" (142 observed, 121 certain).
+  - Correcting both reconciles at 142 room-nights. The check then stops on the missing history
+    (`OTA_COMPARABLE_SAMPLE_INSUFFICIENT`): none of the 24 candidate past days has a whole 30-night window. At that point
+    the coverage is 84,51 % and the OTA share 60,00 %.
+- "Telefono / Email" is not in Gate 9's closed dictionary, so it stays unclassified: 20 of the 121 room-nights. It does not
+  cause the refusal, and the coverage rule (at least 80 %) would pass. If it counted as direct, the same corrected data
+  would give 100 % coverage and a 50,70 % OTA share. That is a product decision, left open here.
+- The page reads the analysis of the property's current day, and NINFA registers no periodic job: an external scheduler
+  runs the dispatcher. With no analysis for the day, occupancy, revenue and the OTA block are not available ("L'analisi
+  di oggi non è ancora disponibile"), whatever the last analysis said. On the demo property that is the state on 9
+  November.
 - `GET /data/overview` gains fields only: `capacity` on each period, the denominator fields of `channel_mix`, and
   `date_conflicts`. No field is removed or renamed.
