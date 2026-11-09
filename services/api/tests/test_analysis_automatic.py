@@ -1,10 +1,10 @@
-"""Gate 26B: the FROZEN automatic-analysis rules, evaluated at an injected instant.
+"""Gate 26B + Pilot Autonomy Gate: the automatic-analysis rules, evaluated at an injected instant.
 
 Property-local "today" and local midnight come from `Property.timezone` (never the server's), the
-window is exactly 30 dates, today's import must have SUCCEEDED for the EXACT configured source with
-`local midnight <= finished_at <= now`, and a DecisionRun for today (manual or automatic) means
-skip. The policy runner re-evaluates all of it at execution time and calls the Gate 25 shared
-orchestration with Revenue + Distribution only.
+window is exactly 30 dates, the EXACT configured source must have delivered at least once (today's
+import is a fact the evaluation reports, not a condition), and a DecisionRun for today (manual or
+automatic) means skip. The policy runner re-evaluates all of it at execution time and calls the
+Gate 25 shared orchestration. The daily hour and the enrolment are in `test_daily_analysis.py`.
 """
 
 from datetime import date, datetime, timedelta
@@ -53,10 +53,10 @@ def test_01_the_window_is_exactly_30_inclusive_dates_from_the_local_today() -> N
     assert (end - start).days + 1 == 30
 
 
-# --- the import gate ----------------------------------------------------------------------------
+# --- today's import: a fact, no longer a condition -----------------------------------------------
 
 
-def test_02_an_import_one_minute_after_local_midnight_qualifies(
+def test_02_an_import_one_minute_after_local_midnight_is_todays(
     db_session: Session, factory: BookingFactory
 ) -> None:
     tenant = factory.tenant()
@@ -69,29 +69,30 @@ def test_02_an_import_one_minute_after_local_midnight_qualifies(
     assert evaluation.qualifying_import_today is True
 
 
-def test_03_an_import_just_before_the_dispatch_qualifies_and_one_after_it_does_not(
+def test_03_an_import_counts_only_once_it_has_ended(
     db_session: Session, factory: BookingFactory
 ) -> None:
     tenant = factory.tenant()
     policy = _policy(db_session, tenant)
 
-    import_at(factory, tenant.data_source, NOW + timedelta(minutes=1))  # after the dispatch
-    assert _reason(db_session, policy) is AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT
+    import_at(factory, tenant.data_source, NOW + timedelta(minutes=1))  # after this instant
+    assert _reason(db_session, policy) is AutomaticSkipReason.NO_BOOKING_IMPORT
 
     import_at(factory, tenant.data_source, utc(2026, 10, 5, 7, 59))  # 09:59 local, before 10:00
     assert _reason(db_session, policy) is None
 
 
-def test_04_an_import_the_previous_local_evening_does_not_qualify(
+def test_04_the_analysis_is_due_with_no_import_today(
     db_session: Session, factory: BookingFactory
 ) -> None:
+    """The bookings NINFA holds are analysed: nobody has to bring a file that morning."""
     tenant = factory.tenant()
     policy = _policy(db_session, tenant)
     import_at(factory, tenant.data_source, utc(2026, 10, 4, 21, 59))  # 23:59 local on 4 October
 
     evaluation = evaluate_policy(db_session, policy, NOW)
 
-    assert evaluation.skip_reason is AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT
+    assert evaluation.eligible
     assert evaluation.qualifying_import_today is False
     assert evaluation.run_exists_today is False
 
@@ -101,18 +102,20 @@ def test_05_local_midnight_is_inclusive(db_session: Session, factory: BookingFac
     policy = _policy(db_session, tenant)
     import_at(factory, tenant.data_source, LOCAL_MIDNIGHT)
 
-    assert _reason(db_session, policy) is None
+    assert evaluate_policy(db_session, policy, NOW).qualifying_import_today is True
 
 
-def test_06_a_failed_import_today_does_not_qualify_even_with_an_older_success(
+def test_06_a_failed_import_is_no_import_at_all(
     db_session: Session, factory: BookingFactory
 ) -> None:
     tenant = factory.tenant()
     policy = _policy(db_session, tenant)
-    import_at(factory, tenant.data_source, utc(2026, 10, 3, 9, 0))  # an older SUCCEEDED import
     import_at(factory, tenant.data_source, utc(2026, 10, 5, 7, 0), ImportJobStatus.FAILED)
+    assert _reason(db_session, policy) is AutomaticSkipReason.NO_BOOKING_IMPORT
 
-    assert _reason(db_session, policy) is AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT
+    import_at(factory, tenant.data_source, utc(2026, 10, 3, 9, 0))  # an older SUCCEEDED import
+    evaluation = evaluate_policy(db_session, policy, NOW)
+    assert evaluation.eligible and evaluation.qualifying_import_today is False
 
 
 def test_07_another_sources_fresh_import_does_not_qualify_the_configured_one(
@@ -123,7 +126,7 @@ def test_07_another_sources_fresh_import_does_not_qualify_the_configured_one(
     policy = _policy(db_session, tenant)
     import_at(factory, other_source, utc(2026, 10, 5, 7, 0))
 
-    assert _reason(db_session, policy) is AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT
+    assert _reason(db_session, policy) is AutomaticSkipReason.NO_BOOKING_IMPORT
 
     import_at(factory, tenant.data_source, utc(2026, 10, 5, 7, 0))
     assert _reason(db_session, policy) is None
@@ -139,10 +142,11 @@ def test_08_local_midnight_is_dst_safe_when_clocks_go_back(
     now = utc(2026, 10, 25, 9, 0)  # 10:00 CET
 
     import_at(factory, tenant.data_source, utc(2026, 10, 24, 21, 59))  # 23:59 local on the 24th
-    assert _reason(db_session, policy, now) is AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT
+    assert evaluate_policy(db_session, policy, now).qualifying_import_today is False
 
     import_at(factory, tenant.data_source, utc(2026, 10, 24, 22, 30))  # 00:30 local on the 25th
     evaluation = evaluate_policy(db_session, policy, now)
+    assert evaluation.qualifying_import_today is True
     assert evaluation.eligible and evaluation.local_date == date(2026, 10, 25)
 
 
@@ -156,10 +160,10 @@ def test_09_local_midnight_is_dst_safe_when_clocks_go_forward(
     now = utc(2026, 3, 29, 8, 0)  # 10:00 CEST
 
     import_at(factory, tenant.data_source, utc(2026, 3, 28, 22, 59))  # 23:59 local on the 28th
-    assert _reason(db_session, policy, now) is AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT
+    assert evaluate_policy(db_session, policy, now).qualifying_import_today is False
 
     import_at(factory, tenant.data_source, utc(2026, 3, 28, 23, 0))  # exactly local midnight
-    assert _reason(db_session, policy, now) is None
+    assert evaluate_policy(db_session, policy, now).qualifying_import_today is True
 
 
 def test_10_the_local_date_follows_the_property_timezone_not_utc(
@@ -211,13 +215,13 @@ def test_12_a_previous_day_run_alone_does_not_block_today(
     assert evaluation.latest_analysis_date == date(2026, 10, 4)
 
 
-def test_13_no_run_and_no_import_skips_for_the_import_not_the_run(
+def test_13_a_source_that_has_never_delivered_has_nothing_to_analyse(
     db_session: Session, factory: BookingFactory
 ) -> None:
     tenant = factory.tenant()
     policy = _policy(db_session, tenant)
 
-    assert _reason(db_session, policy) is AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT
+    assert _reason(db_session, policy) is AutomaticSkipReason.NO_BOOKING_IMPORT
 
 
 # --- dispatch-time revalidation (typed skip, never a fallback) ----------------------------------
@@ -347,7 +351,7 @@ class _Capture:
         return object()
 
 
-def test_21_the_runner_computes_the_window_at_execution_and_requests_only_revenue_and_distribution(
+def test_21_the_runner_computes_the_window_at_execution_on_what_the_property_holds(
     db_session: Session, factory: BookingFactory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     tenant = factory.tenant()
@@ -367,8 +371,8 @@ def test_21_the_runner_computes_the_window_at_execution_and_requests_only_revenu
         date(2026, 10, 5),
         date(2026, 11, 3),
     )
-    # Costs and Labor are never requested: SKIPPED / NOT_REQUESTED in coverage.
-    assert request.cost_year is None and request.cost_month is None
+    # This property holds no labor and no invoice: nothing to look at (their coverage says so).
+    assert request.cost_months == ()
     assert request.labor_data_source_id is None and request.currency is None
     assert (outcome.stay_date_start, outcome.stay_date_end) == (
         date(2026, 10, 5),
@@ -398,7 +402,7 @@ def test_22_the_same_job_run_on_the_next_local_day_gets_the_next_days_window(
 @pytest.mark.parametrize(
     "setup, reason",
     [
-        ("no_import", AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT),
+        ("no_import", AutomaticSkipReason.NO_BOOKING_IMPORT),
         ("already", AutomaticSkipReason.ALREADY_ANALYZED_TODAY),
         ("source_inactive", AutomaticSkipReason.BOOKING_SOURCE_INACTIVE),
     ],

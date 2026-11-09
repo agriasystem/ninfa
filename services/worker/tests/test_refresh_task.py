@@ -14,7 +14,12 @@ from uuid import uuid4
 import pytest
 from procrastinate import testing
 
-from app.modules.analysis import ANALYSIS_QUEUE, ANALYSIS_REFRESH_TASK, RefreshOutcomeKind
+from app.modules.analysis import (
+    ANALYSIS_QUEUE,
+    ANALYSIS_REFRESH_TASK,
+    DAILY_TICK_TASK,
+    RefreshOutcomeKind,
+)
 from app.modules.analysis.refresh import RefreshOutcome, RefreshSkipReason
 from worker import runtime, tasks
 from worker.app import DEFAULT_QUEUE, app
@@ -137,5 +142,6 @@ def test_a_failed_job_is_not_retried_by_the_queue(use: Any) -> None:
 
     runtime.run(scenario())
 
-    assert [str(job["status"]) for job in connector.jobs.values()] == ["failed"]
-    assert [job["attempts"] for job in connector.jobs.values()] == [1]
+    jobs = [job for job in connector.jobs.values() if job["task_name"] != DAILY_TICK_TASK]
+    assert [str(job["status"]) for job in jobs] == ["failed"]
+    assert [job["attempts"] for job in jobs] == [1]

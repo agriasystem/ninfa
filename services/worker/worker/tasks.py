@@ -3,17 +3,16 @@
 * `system.heartbeat` (Gate 0): smoke task proving that the worker starts, connects and executes.
 * `analysis.run_property` (Gate 25B): runs the shared production analysis for ONE property, every
   choice explicit.
-* `analysis.run_policy` (Gate 26B): one AUTOMATIC opportunity for ONE property: it re-validates the
-  policy and computes the 30-date window at execution time (Revenue + Distribution only).
+* `analysis.run_policy` (Gate 26B): the day's analysis of ONE property: it re-validates the policy
+  and works out what to analyse at execution time.
+* `analysis.refresh_property`: the refresh after a successful import of the web API, or after the
+  room inventory was saved, for ONE property: what it analyses is decided at execution time, from
+  what is really stored.
 
-* `analysis.refresh_property`: the refresh after a successful import of the web API, for ONE
-  property: what it analyses is decided at execution time, from what is really stored.
-
-There is no periodic job and no startup hook. `analysis.run_property` runs only when an operator
-enqueues it explicitly (`python -m worker enqueue-analysis ...`); `analysis.run_policy` is enqueued
-only by the dispatcher command (`python -m worker dispatch-analysis`), which an EXTERNAL scheduler
-invokes; `analysis.refresh_property` is enqueued only by the API, once an import has succeeded
-(`app.modules.analysis.queue`). The operator's own import commands trigger nothing.
+`analysis.run_property` runs only when an operator enqueues it explicitly (`python -m worker
+enqueue-analysis ...`); `analysis.run_policy` is enqueued by the worker's own tick (`worker.daily`)
+or by an operator's catch-up (`python -m worker dispatch-analysis`); `analysis.refresh_property`
+only by the API (`app.modules.analysis.queue`). The operator's own import commands trigger nothing.
 """
 
 import logging
@@ -24,6 +23,7 @@ from uuid import UUID
 from app.core.tenant import TenantContext
 from app.db.session import get_sessionmaker
 from app.modules.analysis import (
+    ANALYSIS_POLICY_TASK,
     ANALYSIS_REFRESH_TASK,
     AnalysisRunRequest,
     RefreshOutcomeKind,
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 HEARTBEAT_TASK = "system.heartbeat"
 ANALYSIS_RUN_PROPERTY_TASK = "analysis.run_property"
-ANALYSIS_RUN_POLICY_TASK = "analysis.run_policy"
+ANALYSIS_RUN_POLICY_TASK = ANALYSIS_POLICY_TASK
 
 
 @app.task(name=HEARTBEAT_TASK, queue=DEFAULT_QUEUE)
@@ -100,9 +100,10 @@ def run_property_analysis_task(
     )
 
 
-# Sync `def` for the same reason as above. Only the policy's identity is an argument: the stay
-# dates are computed here, at EXECUTION time, so a job that waited in the queue past local midnight
-# still analyses the right window - or skips, if the day's rules no longer hold. No retry.
+# Sync `def` for the same reason as above. Only the policy's identity is an argument: the stay dates
+# are computed here, at EXECUTION time, so a job that waited in the queue past local midnight still
+# analyses the right window - or skips, if the day's rules no longer hold. No retry here: asking
+# again is the tick's (`worker.daily`), a bounded number of times a day.
 @app.task(name=ANALYSIS_RUN_POLICY_TASK, queue=DEFAULT_QUEUE)
 def run_policy_analysis_task(*, workspace_id: str, property_id: str) -> None:
     ids = f"workspace_id={workspace_id} property_id={property_id}"

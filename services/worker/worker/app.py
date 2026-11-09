@@ -9,5 +9,5 @@ DEFAULT_QUEUE = "default"
 app = procrastinate.App(
     connector=procrastinate.PsycopgConnector(conninfo=get_settings().libpq_conninfo),
     # Task modules are imported when the worker starts; new gates add their modules here.
-    import_paths=["worker.tasks"],
+    import_paths=["worker.tasks", "worker.daily"],
 )

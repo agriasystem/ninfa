@@ -26,6 +26,10 @@ strict = true
 plugins = ["pydantic.mypy"]
 explicit_package_bases = true
 mypy_path = "services/api:services/worker"
+# Each test root owns a `tests/conftest.py`; both resolve to the module `tests.conftest`, which mypy
+# cannot tell apart under one run. pytest loads each by path (never by import), so the worker one is
+# excluded here to keep a single `tests.conftest` for the type checker. Its fixture stays typed.
+exclude = ['services[\\/]worker[\\/]tests[\\/]conftest\.py$']
 
 [[tool.mypy.overrides]]
 # openpyxl ships no type information and no stubs are installed (no dependency added for them).

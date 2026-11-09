@@ -1,6 +1,7 @@
 """Worker entrypoint.
 
-python -m worker run              start the worker (Ctrl+C to stop)
+python -m worker run              start the worker (Ctrl+C to stop); it also asks for the day's
+                                  analysis of every property by itself (see daily.py)
 python -m worker run --once       process the jobs currently queued, then exit
 python -m worker heartbeat        enqueue the smoke job
 python -m worker enqueue-analysis enqueue ONE explicit analysis.run_property job (see enqueue.py)

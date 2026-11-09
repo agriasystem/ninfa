@@ -15,7 +15,7 @@ forward, instead of leaving new data waiting behind it.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import StrEnum
 from json import dumps
 from uuid import UUID
@@ -26,7 +26,12 @@ from sqlalchemy.orm import Session
 from app.core.tenant import TenantContext
 
 ANALYSIS_REFRESH_TASK = "analysis.refresh_property"
+ANALYSIS_POLICY_TASK = "analysis.run_policy"
+DAILY_TICK_TASK = "analysis.daily_tick"
 ANALYSIS_QUEUE = "default"
+# How long a finished tick stays in the queue's tables. It happens every few minutes, says nothing
+# that outlives it, and would otherwise add a hundred thousand rows a year.
+_TICK_KEPT = timedelta(hours=24)
 
 
 class QueuedJobStatus(StrEnum):
@@ -51,8 +56,9 @@ class QueuedRefresh:
     last_event_at: datetime | None
 
 
-def _lock_of(property_id: UUID) -> str:
-    """One refresh of a property runs at a time, and one waits; other properties never wait."""
+def analysis_lock_of(property_id: UUID) -> str:
+    """One analysis of a property runs at a time, whichever asked for it (an import, an inventory
+    saved, the day's own), and other properties never wait."""
     return f"{ANALYSIS_REFRESH_TASK}:{property_id}"
 
 
@@ -65,7 +71,7 @@ def enqueue_refresh(
 ) -> int | None:
     """Queue a refresh in the caller's transaction (the caller commits). Returns the job id, or None
     when one is already waiting to run: it will read whatever is there then, so that is enough."""
-    lock = _lock_of(property_id)
+    lock = analysis_lock_of(property_id)
     args = {"workspace_id": str(tenant.workspace_id), "property_id": str(property_id)}
     job_id: int | None = session.scalar(
         text(
@@ -95,8 +101,9 @@ def enqueue_refresh(
 def latest_refresh(
     session: Session, tenant: TenantContext, property_id: UUID
 ) -> QueuedRefresh | None:
-    """The newest refresh job of this property. The queue knows no tenant, so the workspace is read
-    from the job's own arguments: a property of another workspace has no job here."""
+    """The newest analysis job of this property: a refresh, or the day's own, which a page follows
+    the same way. The queue knows no tenant, so the workspace is read from the job's own arguments:
+    a property of another workspace has no job here."""
     row = session.execute(
         text(
             """
@@ -106,7 +113,7 @@ def latest_refresh(
                    (SELECT max(event.at) FROM procrastinate_events event
                      WHERE event.job_id = job.id) AS last_event_at
               FROM procrastinate_jobs job
-             WHERE job.task_name = :task
+             WHERE job.task_name IN (:refresh, :policy)
                AND job.lock = :lock
                AND job.args ->> 'workspace_id' = :workspace_id
              ORDER BY job.id DESC
@@ -114,8 +121,9 @@ def latest_refresh(
             """
         ),
         {
-            "task": ANALYSIS_REFRESH_TASK,
-            "lock": _lock_of(property_id),
+            "refresh": ANALYSIS_REFRESH_TASK,
+            "policy": ANALYSIS_POLICY_TASK,
+            "lock": analysis_lock_of(property_id),
             "workspace_id": str(tenant.workspace_id),
         },
     ).first()
@@ -124,11 +132,65 @@ def latest_refresh(
     return QueuedRefresh(row[0], QueuedJobStatus(row[1]), row[2], row[3], row[4])
 
 
+def failed_policy_runs_since(
+    session: Session, tenant: TenantContext, property_id: UUID, since: datetime
+) -> tuple[int, datetime | None]:
+    """How many of the day's own analysis jobs of this property ended in failure since `since`, and
+    when the last of them did. The queue's own record: nothing is kept for it."""
+    row = session.execute(
+        text(
+            """
+            SELECT count(*), max(ended.at)
+              FROM procrastinate_jobs job
+              JOIN LATERAL (SELECT max(event.at) AS at FROM procrastinate_events event
+                             WHERE event.job_id = job.id) ended ON TRUE
+             WHERE job.task_name = :task
+               AND job.lock = :lock
+               AND job.args ->> 'workspace_id' = :workspace_id
+               AND job.status IN ('failed', 'aborted')
+               AND ended.at >= :since
+            """
+        ),
+        {
+            "task": ANALYSIS_POLICY_TASK,
+            "lock": analysis_lock_of(property_id),
+            "workspace_id": str(tenant.workspace_id),
+            "since": since,
+        },
+    ).one()
+    return int(row[0]), row[1]
+
+
+def prune_finished_ticks(session: Session, now: datetime) -> int:
+    """Delete the old ticks that succeeded (the caller commits). Only those: a failed tick is left
+    to be read, and the job a periodic defer still names is left to the queue. Returns how many."""
+    deleted = session.execute(
+        text(
+            """
+            DELETE FROM procrastinate_jobs job
+             WHERE job.task_name = :task
+               AND job.status = 'succeeded'
+               AND NOT EXISTS (SELECT 1 FROM procrastinate_periodic_defers defer
+                                WHERE defer.job_id = job.id)
+               AND NOT EXISTS (SELECT 1 FROM procrastinate_events event
+                                WHERE event.job_id = job.id AND event.at >= :before)
+            """
+        ),
+        {"task": DAILY_TICK_TASK, "before": now - _TICK_KEPT},
+    )
+    return int(deleted.rowcount)  # type: ignore[attr-defined]
+
+
 __all__ = [
+    "ANALYSIS_POLICY_TASK",
     "ANALYSIS_QUEUE",
     "ANALYSIS_REFRESH_TASK",
+    "DAILY_TICK_TASK",
     "QueuedJobStatus",
     "QueuedRefresh",
+    "analysis_lock_of",
     "enqueue_refresh",
+    "failed_policy_runs_since",
     "latest_refresh",
+    "prune_finished_ticks",
 ]

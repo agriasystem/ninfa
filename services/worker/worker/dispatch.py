@@ -1,15 +1,15 @@
-"""Operator commands of the Automatic Analysis Policy V1 (Gate 26B).
+"""Operator commands of the Automatic Analysis Policy (Gate 26B).
 
     python -m worker dispatch-analysis   evaluate every enabled policy; enqueue ONE
                                          `analysis.run_policy` job per eligible property
     python -m worker analysis-status     read-only: which enabled properties have no run today
 
-`dispatch-analysis` is meant to be invoked ONCE a day at 10:00 property-local time by an EXTERNAL
-scheduler (see docs/architecture/automatic-analysis-policy-v1.md), followed by the normal worker
-(`python -m worker run --once`). Nothing here registers a periodic job. It performs no analysis and
-no detector logic: it evaluates the frozen policy through `app.modules.analysis`, skips visibly
-with a typed reason, and defers jobs. A skip is a normal outcome (exit 0); only a failure to
-enqueue exits non-zero.
+Nobody has to run these for the day's analysis to happen: the worker does it by itself
+(`worker.daily`, see docs/architecture/automatic-analysis-policy-v1.md). `dispatch-analysis` is an
+operator's catch-up, at any hour, and it shares this module's way of queueing a job with the worker.
+It performs no analysis and no detector logic: it evaluates the policy through
+`app.modules.analysis`, skips visibly with a typed reason, and defers jobs. A skip is a normal
+outcome (exit 0); only a failure to enqueue exits non-zero.
 
 `analysis-status` deliberately does NOT report the latest worker job status: Procrastinate stores a
 job's arguments as JSON, so mapping a property to its jobs would couple this command to
@@ -26,6 +26,7 @@ from app.db.session import get_sessionmaker
 from app.modules.analysis import (
     AutomaticSkipReason,
     PolicyEvaluation,
+    analysis_lock_of,
     evaluate_enabled_policies,
 )
 from worker import runtime
@@ -61,29 +62,34 @@ def _evaluate(now: datetime) -> list[PolicyEvaluation]:
         return evaluate_enabled_policies(session, now)
 
 
-async def _enqueue(evaluations: list[PolicyEvaluation]) -> list[DispatchRecord]:
+async def defer_policy_jobs(evaluations: list[PolicyEvaluation]) -> list[DispatchRecord]:
+    """One `analysis.run_policy` job per eligible evaluation. The app must be open."""
     records: list[DispatchRecord] = []
-    async with app.open_async():
-        for evaluation in evaluations:
-            if not evaluation.eligible:
-                records.append(DispatchRecord(evaluation, None, evaluation.skip_reason))
-                continue
-            try:
-                # One pending job per property at most: invoking the dispatcher twice before the
-                # worker ran must not queue the same property twice.
-                job_id = await run_policy_analysis_task.configure(
-                    queueing_lock=f"{ANALYSIS_RUN_POLICY_TASK}:{evaluation.property_id}"
-                ).defer_async(
-                    workspace_id=str(evaluation.workspace_id),
-                    property_id=str(evaluation.property_id),
-                )
-            except procrastinate_exceptions.AlreadyEnqueued:
-                records.append(
-                    DispatchRecord(evaluation, None, AutomaticSkipReason.JOB_ALREADY_QUEUED)
-                )
-            else:
-                records.append(DispatchRecord(evaluation, job_id, None))
+    for evaluation in evaluations:
+        if not evaluation.eligible:
+            records.append(DispatchRecord(evaluation, None, evaluation.skip_reason))
+            continue
+        try:
+            # One pending job per property at most: asking twice before the worker ran must not
+            # queue the same property twice. And one analysis of a property at a time, whoever
+            # asked.
+            job_id = await run_policy_analysis_task.configure(
+                queueing_lock=f"{ANALYSIS_RUN_POLICY_TASK}:{evaluation.property_id}",
+                lock=analysis_lock_of(evaluation.property_id),
+            ).defer_async(
+                workspace_id=str(evaluation.workspace_id),
+                property_id=str(evaluation.property_id),
+            )
+        except procrastinate_exceptions.AlreadyEnqueued:
+            records.append(DispatchRecord(evaluation, None, AutomaticSkipReason.JOB_ALREADY_QUEUED))
+        else:
+            records.append(DispatchRecord(evaluation, job_id, None))
     return records
+
+
+async def _enqueue(evaluations: list[PolicyEvaluation]) -> list[DispatchRecord]:
+    async with app.open_async():
+        return await defer_policy_jobs(evaluations)
 
 
 def dispatch_analysis(now: datetime | None = None) -> int:

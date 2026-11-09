@@ -1,8 +1,8 @@
 """Gate 26B: the automatic-analysis acceptance scenario on the REAL test database with REAL commits:
 
     policy disabled -> dispatcher enqueues nothing
-    enabled, no import today -> SKIPPED NO_TODAY_BOOKING_IMPORT (no snapshot, no run)
-    valid import today -> dispatcher enqueues exactly ONE `analysis.run_policy` job
+    enabled, nothing ever imported -> SKIPPED NO_BOOKING_IMPORT (no snapshot, no run)
+    an import -> dispatcher enqueues exactly ONE `analysis.run_policy` job
     worker -> shared orchestration -> DecisionRun for today's property-local date
     coverage: Revenue + Distribution EVALUATED, Costs + Labor SKIPPED / NOT_REQUESTED
     second dispatch the same day -> SKIPPED ALREADY_ANALYZED_TODAY
@@ -107,10 +107,10 @@ def test_01_the_full_automatic_day_from_disabled_to_already_analyzed(
     out = _dispatch(connector, capsys)
     assert hotel.slug not in out and _jobs_for(connector, hotel) == []
 
-    # 3-4. Enabled with the exact source, but no import today: skipped, nothing is persisted.
+    # 3-4. Enabled with the exact source, but nothing to analyse: skipped, nothing is persisted.
     _enable(hotel)
     out = _dispatch(connector, capsys)
-    assert "result=SKIPPED reason=NO_TODAY_BOOKING_IMPORT" in _line_of(out, hotel)
+    assert "result=SKIPPED reason=NO_BOOKING_IMPORT" in _line_of(out, hotel)
     assert _jobs_for(connector, hotel) == []
     assert hotel.runs() == []
     with Session(db_engine) as session:
@@ -199,7 +199,7 @@ def test_02_one_dispatch_across_workspaces_with_mixed_outcomes(
     out = _dispatch(connector, capsys)
 
     assert "result=ENQUEUED" in _line_of(out, ready)
-    assert "reason=NO_TODAY_BOOKING_IMPORT" in _line_of(out, no_import)
+    assert "reason=NO_BOOKING_IMPORT" in _line_of(out, no_import)
     assert disabled.slug not in out  # a disabled policy is not even listed
     assert "reason=PROPERTY_INACTIVE" in _line_of(out, archived)
     assert [len(_jobs_for(connector, h)) for h in (ready, no_import, disabled, archived)] == [
@@ -250,7 +250,7 @@ def test_04_status_shows_enabled_properties_without_a_run_today(
     assert dispatch.analysis_status() == 0
     before = _line_of(capsys.readouterr().out, hotel)
     assert "run_today=NO today_import=NO latest_analysis=NONE" in before
-    assert "next_dispatch=SKIPPED:NO_TODAY_BOOKING_IMPORT" in before
+    assert "next_dispatch=SKIPPED:NO_BOOKING_IMPORT" in before
 
     hotel.import_bookings(tmp_path)
     capsys.readouterr()
