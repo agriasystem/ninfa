@@ -131,7 +131,9 @@ exact; it is deferred, and the table says "Lo stato riflette solo le decisioni d
   revenue of another; what cannot be compared is absent with a reason (`LaborRevenueGap`), never a zero. By
   role: hours, cost, hourly cost, share of the labor cost, incidence on revenue, days with data. A role never
   has revenue of its own, and no FTE is defined. How many people are planned is not known: the labor model
-  holds no person, on purpose.
+  holds no person, on purpose. **Coverage** ([ADR 0047](adr/0047-final-pilot-product-ux.md)): the ratios are about the days that
+  have a plan, and the page says it next to the figures - "Piano disponibile per 1 giorno su 7" (`economics.period_days` of
+  `window_days`), and in "In sintesi" "Sui giorni coperti dal piano, ..." - because 72,4 % of one day must not read as the week's.
 
 ## Provenance and the rules that keep numbers honest
 
@@ -171,6 +173,8 @@ exact; it is deferred, and the table says "Lo stato riflette solo le decisioni d
 | Area not analysed | "Distribuzione non analizzata" / "Non analizzati" - never read as clear |
 | No room inventory | "Inventario camere da configurare" (card), "Occupazione non calcolabile" + "Configura inventario" (chart), a note under the table; room-nights, revenue and ADR stay. An inventory set after the observation: "Occupazione non ancora calcolata", no link |
 | No costs / labor | "Non ci sono dati di costo sufficienti per questo periodo." / the reason; never 0 |
+| Bookings above the inventory | "Prenotazioni superiori all'inventario" (Panoramica and Prenotazioni): the count of nights (of the 30 observed, whatever period is shown) and "Controlla inventario" -> Struttura. The chart keeps the true bar (hatched, outlined, a dashed 100 % line), the table marks the row "Sopra l'inventario" ("11 prenotate / 10 disponibili"). Never clamped, never a decision (ADR 0047) |
+| Cost per occupied room not calculable | the row says "Non calcolabile"; under the table the exact cause, one line per kind of missing day (no inventory - from which day -, the bookings do not cover it, rooms uncertain, waits for the next analysis) from `costs.occupancy`; "Occupazione del mese incompleta" only when the backend sent no basis |
 
 ## Accessibility
 

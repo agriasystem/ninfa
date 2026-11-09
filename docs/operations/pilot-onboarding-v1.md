@@ -44,7 +44,8 @@ day 1. See [pilot expectations](pilot-expectations-v1.md).
    `ninfa-py -m app.cli.pilot create-data-source --workspace-slug <workspace-slug> --property-slug <property-slug> --domain BOOKINGS --name "Bookings"`
    — **record the printed data source id in AGRIA's own records** (there is no list command).
 7. **[HOTEL] Room inventory.** In **Struttura → Inventario camere**, "Configura inventario": one number, the rooms the
-   structure can sell. It counts from today on, and nobody has to extend it. Only a capacity that changes by season still
+   structure can sell, and "Valido dal" (today by default; an earlier day when the structure already had these rooms, so the costs of last month can be divided by its
+   occupied rooms - the bookings file must cover those days too). It counts from that day on, and nobody has to extend it. Only a capacity that changes by season still
    needs an operator: `ninfa-py -m app.cli.pilot set-room-inventory --workspace-slug <workspace-slug> --property-slug <property-slug> --stay-date-start <from> --stay-date-end <to> --rooms-available <N>`,
    one range per season.
 8. **[OPERATOR] Initial canonical booking import**, following the file-intake procedure in

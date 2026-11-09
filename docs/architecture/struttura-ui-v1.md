@@ -67,6 +67,11 @@ first, so neither the browser nor the router can).
 number, saved through `GET`/`PUT .../room-inventory`. The occupancy follows by itself, and the profile's "Numero camere" says the same
 number. The table of room types is only the demo fixture's: the model has a capacity per night, not room types.
 
+**"Valido dal"** ([ADR 0047](adr/0047-final-pilot-product-ux.md)): the form also asks the day the number starts to be true, today by default, so a hotel that begins
+with last month's costs can say it had these rooms then. The limits (today, and the oldest day) are the backend's (`today`, `earliest_valid_from`); a day outside them is
+refused before the request, with the limits in words. A plain save sends the number alone. Saved from an earlier day, the block says "Vale dal 1 ottobre 2026 in poi" and
+the refresh that follows rebuilds, from the bookings, the history those nights make possible. What was analysed does not change.
+
 Wording lives in `lib/structure/copy.ts` (the "Fonti dati" wording is in `lib/sources/copy.ts`); month ranges, the zone
 label ("Europe/Rome (CET)", the standard-time abbreviation), the currency label ("Euro (€)") and "2 adulti + 1 bambino"
 are built in `lib/structure/format.ts`.
