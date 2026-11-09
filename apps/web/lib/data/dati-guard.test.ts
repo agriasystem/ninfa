@@ -119,6 +119,11 @@ describe("responsive-critical CSS (jsdom cannot lay out, so the rules are pinned
     expect(dati).toMatch(/\.dati-table--nights-wide th\.dati-table__status \{\s*width: 16%;/u);
   });
 
+  it("asks no table for more width than the common minimum: 720 px made the summary scroll at 1024 with 567 px of content", () => {
+    expect(dati).toMatch(/\.dati-table \{[^}]*min-width: 600px;/u);
+    expect(dati).not.toMatch(/\.dati-table--summary/u);
+  });
+
   it("respects reduced motion", () => {
     expect(dati).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.dati-skeleton__card \{\s*animation: none;/u);
   });

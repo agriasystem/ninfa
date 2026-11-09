@@ -125,7 +125,7 @@ export function DatiBookingsPanel({
         {occupancy.state === "AVAILABLE" ? (
           <>
             <div className="dati-table__scroll" role="region" aria-label={datiCopy.scrollable(datiCopy.summary.title)} tabIndex={0}>
-              <table className="dati-table dati-table--summary">
+              <table className="dati-table">
                 <caption className="visually-hidden">{datiCopy.summary.caption}</caption>
                 <thead>
                   <tr>
