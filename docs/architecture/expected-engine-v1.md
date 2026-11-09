@@ -268,8 +268,10 @@ remaining column; the minimal projection of `REV_OCCUPANCY_RISK` lives only in a
 * A conflict on re-run (above) means a corrected history needs a new `calculation_version`.
 * No retention policy for baselines yet; no public API, worker task or scheduler.
 
-## A day with no new booking data
+## Which observations count
 
-No comparable comes from an observation of a day that only repeated what was already known: the absence of new data is not a measured level
-([ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md)). The days are told to the engine by the orchestration, and a past day's status never
-changes, so a target's comparables do not move between two runs of one day.
+No comparable comes from an observation that only repeated what was already known (the absence of new data is not a measured level:
+[ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md)), or that no finished analysis read
+([ADR 0046](adr/0046-a-sample-of-history-is-what-a-finished-analysis-read.md)). The orchestration tells the engine (`ObservationHistory`), and what a past day
+counts for never changes, so a target's comparables do not move between two runs of one day. A reconstruction always counts. Called with none, the engine reads what is
+stored.

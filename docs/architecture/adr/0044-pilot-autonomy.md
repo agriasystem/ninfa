@@ -118,7 +118,8 @@ holds no value of a file: a word is named by its handle (`answer`), and a meanin
 ## Consequences
 
 - **A daily run on bookings that did not arrive looked like bookings that did not come.** [ADR 0045](0045-no-new-booking-data-is-not-zero-pickup.md)
-  closed this for `REV_PICKUP_LOW` and for history: a day with no new data is not a pickup of zero and no sample.
+  closed this for `REV_PICKUP_LOW` and for history, and [ADR 0046](0046-a-sample-of-history-is-what-a-finished-analysis-read.md) for
+  `REV_OCCUPANCY_RISK`: a day with no new data opens no revenue decision and is no sample.
 - A property's first run is at its first import or at 10:00, whichever comes first. A day with the worker down all day has no run,
   and is not recovered: an observation cannot be dated in the past.
 - The worker must be running. It is supervised (`deploy/systemd/ninfa-worker.service`), and it is the one thing the daily analysis

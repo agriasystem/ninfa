@@ -16,9 +16,12 @@ the policy are in [automatic-analysis-policy-v1.md](../architecture/automatic-an
 | afterwards | hotel | opens Oggi |
 
 The hour is the property's own: `Europe/Rome` for the first pilot, and each property's own named timezone for any other. No file is needed
-that morning: the bookings NINFA holds are analysed, and Oggi says when they last arrived. A day with no new booking data has no pickup
-evaluation and is no sample of history ([ADR 0045](../architecture/adr/0045-no-new-booking-data-is-not-zero-pickup.md)). `REV_OCCUPANCY_RISK` and
-labor still read the bookings last known: bring the file before reading those decisions as news.
+that morning: the bookings NINFA holds are analysed, and Oggi says when they last arrived. A day with no new booking data has no new revenue
+decision (`REV_PICKUP_LOW`, `REV_OCCUPANCY_RISK`) and is no sample of history; Dati still shows what was last known, and when
+([ADR 0045](../architecture/adr/0045-no-new-booking-data-is-not-zero-pickup.md), [ADR 0046](../architecture/adr/0046-a-sample-of-history-is-what-a-finished-analysis-read.md)).
+OTA, labor and costs are still evaluated, and labor's demand side reads the bookings last known: bring the file before reading that as news.
+
+A job that fails leaves no run and no sample of history, whatever observation it had written. The next attempt finishes the same day's analysis, once.
 
 ## The catch-up wrapper
 

@@ -22,7 +22,8 @@ An import made through the web page, and a room inventory saved, ask for their o
 
 Why it runs with no import: Gate 26B skipped because an observation could not be corrected the same day. Same-day revisions lifted
 that: a file arriving later is the day's next revision. A day with no new booking data is told apart
-([ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md)): its pickup is not evaluated, and its observation is no sample of history.
+([ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md), [ADR 0046](adr/0046-a-sample-of-history-is-what-a-finished-analysis-read.md)): neither revenue detector is
+evaluated, and its observation is no sample of history. Neither is the observation of a job that failed before its run was stored.
 
 ## How it is asked for
 
