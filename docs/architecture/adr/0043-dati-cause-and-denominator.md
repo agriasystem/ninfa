@@ -21,7 +21,7 @@ inventory) found four problems.
      day (`booking_certainty_at`), and count 121. That rule also asks whether the booking already existed
      (`booked_at`), when it was cancelled (`cancelled_at`), and whether a no-show could be known yet (its arrival).
    - The two disagree on 11 of the 30 nights, because of 13 bookings of the window:
-     - 9 confirmed bookings have a booking date after the analysis day (8 to 22 November).
+     - 9 confirmed bookings have a booking date after the analysis day (8 to 23 November, property time).
      - 4 no-shows are for stays that start after the analysis day. The file says "Modificata" for 5 rows, and that
        value was answered "Non presentato" at import.
      - The two totals are bridged exactly, in room-nights: 133 observed, minus 21 of the 9 confirmed bookings, plus 9 of
