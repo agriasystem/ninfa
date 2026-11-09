@@ -37,6 +37,7 @@ from app.modules.data_overview.types import (
     ChannelWeight,
     DistributionOverview,
     DomainState,
+    OtaInsufficiency,
     OtaOutcome,
     UnavailableReason,
 )
@@ -56,6 +57,7 @@ from app.modules.intelligence.distribution.types import (
     ChannelGroup,
     EvaluationStatus,
     OtaDependencyEvaluation,
+    ReasonCode,
 )
 from app.modules.snapshots.localtime import end_of_local_day
 
@@ -207,6 +209,9 @@ class DistributionReader:
             decision_id=overview.decision_id,
             channel_mix=mix,
             date_conflicts=conflicts,
+            insufficiency=overview.insufficiency,
+            comparable_periods_available=overview.comparable_periods_available,
+            comparable_periods_required=overview.comparable_periods_required,
         )
 
     # --- the OTA share -----------------------------------------------------------------------
@@ -279,6 +284,10 @@ class DistributionReader:
             if status is EvaluationStatus.INSUFFICIENT_DATA
             else ()
         )
+        # The check reaches the history only after the current data passed every other condition.
+        only_history = status is EvaluationStatus.INSUFFICIENT_DATA and evaluation.reason_codes == (
+            ReasonCode.OTA_COMPARABLE_SAMPLE_INSUFFICIENT,
+        )
         return DistributionOverview(
             state=Availability.AVAILABLE,
             reason=None,
@@ -297,6 +306,17 @@ class DistributionReader:
             decision_id=None,
             channel_mix=None,
             date_conflicts=None,
+            insufficiency=(
+                OtaInsufficiency.HISTORY
+                if only_history
+                else OtaInsufficiency.DATA_QUALITY
+                if status is EvaluationStatus.INSUFFICIENT_DATA
+                else None
+            ),
+            comparable_periods_available=evaluation.sample_count if only_history else None,
+            comparable_periods_required=(
+                evaluation.thresholds.min_comparables if only_history else None
+            ),
         )
 
     def _live_evaluation(

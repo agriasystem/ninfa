@@ -21,6 +21,7 @@ from app.modules.data_overview.types import (
     Availability,
     BookingDateConflicts,
     ChannelGroupName,
+    OtaInsufficiency,
     OtaOutcome,
     UnavailableReason,
 )
@@ -32,6 +33,7 @@ from app.modules.decisions.coverage import (
     DomainSkipReason,
 )
 from app.modules.intelligence.distribution.types import (
+    MIN_COMPARABLES,
     EvaluationStatus,
     OtaDependencyEvaluation,
     ReasonCode,
@@ -578,7 +580,7 @@ def test_unclassified_channels_stay_in_the_total_and_are_counted_apart(
     world.booking(world.channel("Booking.com"), AS_OF, _end())
     world.booking(world.channel("Sito diretto"), AS_OF, _end())
     world.booking(world.channel("Agency"), AS_OF, _end())
-    world.booking(world.channel("Telefono / Email"), AS_OF, _end())
+    world.booking(world.channel("Canale misterioso"), AS_OF, _end())
 
     mix = overview_of(
         db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
@@ -595,7 +597,7 @@ def test_unclassified_channels_stay_in_the_total_and_are_counted_apart(
         "Booking.com": ChannelGroupName.OTA,
         "Sito diretto": ChannelGroupName.DIRECT,
         "Agency": ChannelGroupName.OTHER,
-        "Telefono / Email": ChannelGroupName.UNKNOWN,
+        "Canale misterioso": ChannelGroupName.UNKNOWN,
     }
     assert all(channel.share_pct == D("25.00") for channel in mix.channels)
     assert mix.matches_on_books is True
@@ -720,3 +722,91 @@ def test_an_area_that_was_not_read_has_no_date_conflicts(
     ).distribution
 
     assert distribution.date_conflicts is None
+
+
+# --- no verdict: the current data, or only the history
+# ----------------------------------------------
+
+
+def test_a_telephone_booking_is_direct_and_leaves_nothing_unclassified(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=2)
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end())
+    world.booking(world.channel("Telefono / Email"), AS_OF, _end())
+
+    mix = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    ).distribution.channel_mix
+
+    assert mix is not None
+    assert (mix.classified_room_nights, mix.unclassified_room_nights) == (60, 0)
+    assert {channel.name: channel.group for channel in mix.channels} == {
+        "Booking.com": ChannelGroupName.OTA,
+        "Telefono / Email": ChannelGroupName.DIRECT,
+    }
+
+
+def test_only_the_history_missing_is_told_apart_with_the_periods_it_has_and_needs(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=2)
+    evaluation = _evaluation(
+        tenant,
+        INSUFFICIENT,
+        reason_codes=(ReasonCode.OTA_COMPARABLE_SAMPLE_INSUFFICIENT,),
+        sample_count=2,
+        ota_share_exact=D("47.93"),
+    )
+
+    distribution = overview_of(db_session, tenant, ota_evaluator=Evaluator(evaluation)).distribution
+
+    assert distribution.outcome is OtaOutcome.INSUFFICIENT_DATA
+    assert distribution.insufficiency is OtaInsufficiency.HISTORY
+    assert distribution.comparable_periods_available == 2
+    assert (
+        distribution.comparable_periods_required == 5
+    )  # the policy's, never lowered to get a verdict
+    assert distribution.ota_share_pct == D("47.93")  # the current figures stand
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        ReasonCode.OTA_CHANNEL_MIX_RECONCILIATION_FAILED,
+        ReasonCode.OTA_CHANNEL_CLASSIFICATION_COVERAGE_LOW,
+        ReasonCode.OTA_SNAPSHOT_WINDOW_INCOMPLETE,
+        ReasonCode.OTA_SNAPSHOT_WINDOW_UNCERTAIN,
+        ReasonCode.OTA_BOOKING_VOLUME_LOW,
+        ReasonCode.OTA_NO_ON_BOOKS_DEMAND,
+    ],
+)
+def test_anything_else_is_about_the_current_data_and_says_nothing_of_periods(
+    db_session: Session, factory: BookingFactory, tenant: Tenant, code: ReasonCode
+) -> None:
+    _observed(db_session, tenant, rooms=2)
+    evaluation = _evaluation(tenant, INSUFFICIENT, reason_codes=(code,))
+
+    distribution = overview_of(db_session, tenant, ota_evaluator=Evaluator(evaluation)).distribution
+
+    assert distribution.insufficiency is OtaInsufficiency.DATA_QUALITY
+    assert distribution.comparable_periods_available is None
+    assert distribution.comparable_periods_required is None
+
+
+def test_a_verdict_has_no_insufficiency(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=2)
+
+    distribution = overview_of(
+        db_session, tenant, ota_evaluator=Evaluator(_evaluation(tenant, CLEAR))
+    ).distribution
+
+    assert distribution.insufficiency is None
+    assert distribution.comparable_periods_required is None
+
+
+def test_the_rule_of_five_periods_is_the_detectors_and_was_not_touched() -> None:
+    assert MIN_COMPARABLES == 5

@@ -107,6 +107,19 @@ class OtaOutcome(StrEnum):
     CHANGED_AFTER_ANALYSIS = "CHANGED_AFTER_ANALYSIS"
 
 
+class OtaInsufficiency(StrEnum):
+    """Why the OTA check gave no verdict, for the person reading it: two different things to do.
+
+    DATA_QUALITY  the current data cannot be read (dates or statuses that contradict each other, too
+                  many channels unclassified, too few bookings): something can be looked at
+    HISTORY       the current data are fine: only the past periods to compare them with are missing,
+                  and they come by themselves, one analysis at a time
+    """
+
+    DATA_QUALITY = "DATA_QUALITY"
+    HISTORY = "HISTORY"
+
+
 class ChannelGroupName(StrEnum):
     OTA = "OTA"
     DIRECT = "DIRECT"
@@ -286,6 +299,11 @@ class DistributionOverview:
     channel_mix: ChannelMix | None
     # Read beside the channel mix, from the same bookings; `None` when the area was not read.
     date_conflicts: BookingDateConflicts | None
+    # Why there is no verdict: the current data, or only the history they are compared with. With
+    # `HISTORY` the current figures stand and these say how many past periods exist and are needed.
+    insufficiency: OtaInsufficiency | None = None
+    comparable_periods_available: int | None = None
+    comparable_periods_required: int | None = None
 
 
 # --- costs ----------------------------------------------------------------------------------------

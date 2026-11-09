@@ -152,6 +152,11 @@ def _distribution(distribution: DistributionOverview) -> DistributionResponse:
             )
         ),
         date_conflicts=_date_conflicts(distribution.date_conflicts),
+        insufficiency=None
+        if distribution.insufficiency is None
+        else distribution.insufficiency.value,
+        comparable_periods_available=distribution.comparable_periods_available,
+        comparable_periods_required=distribution.comparable_periods_required,
     )
 
 

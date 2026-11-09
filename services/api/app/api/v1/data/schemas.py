@@ -113,6 +113,10 @@ class DistributionResponse(BaseModel):
     decision_id: UUID | None
     channel_mix: ChannelMixResponse | None
     date_conflicts: DateConflictsResponse | None
+    # "DATA_QUALITY" | "HISTORY" | null: why there is no verdict, and so what the page says.
+    insufficiency: str | None
+    comparable_periods_available: int | None
+    comparable_periods_required: int | None
 
 
 # --- costs -------------------------------------------------------------------------------------
