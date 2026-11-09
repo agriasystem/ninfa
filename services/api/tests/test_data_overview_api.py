@@ -278,6 +278,7 @@ def test_a_night_row_exposes_the_stay_date_figures_and_its_status(
         "rooms_delta_7d",
         "status",
         "decision_id",
+        "over_capacity",
     }
     assert first["status"] == "REGULAR"
     flagged = [night for night in nights if night["status"] == "ATTENTION"]
@@ -341,6 +342,7 @@ def test_not_processed_is_a_designed_response_with_reasons_not_an_error(
         "days_30": None,
         "selected": None,
         "nights": [],
+        "inventory_consistency": {"over_capacity_nights": 0, "first_night": None},
     }
     assert body["distribution"]["reason"] == "NO_ANALYSIS"
     assert {item["state"] for item in body["analysis"]["domain_states"]} == {"UNKNOWN"}

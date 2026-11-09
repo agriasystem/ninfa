@@ -15,7 +15,7 @@ to this module, which knows nothing of who made them.
 
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import cast
 from uuid import UUID
@@ -557,3 +557,20 @@ class BookingStayRepository:
         if statuses is not None:
             query = query.where(Booking.status.in_(sorted(statuses)))
         return [StayRecord(*row) for row in self._session.execute(query)]
+
+    def stay_span(self, property_id: UUID, data_source_id: UUID) -> tuple[date, date] | None:
+        """The first and the last NIGHT any current booking of this source covers (every status:
+        a cancelled booking still says the file spoke about those dates), or `None` with none.
+
+        What lies outside it is not "zero rooms", it is a period the file says nothing about."""
+        first, last_check_out = self._session.execute(
+            select(func.min(Booking.check_in), func.max(Booking.check_out)).where(
+                Booking.workspace_id == self._tenant.workspace_id,
+                Booking.property_id == property_id,
+                Booking.data_source_id == data_source_id,
+                is_current_booking(),
+            )
+        ).one()
+        if first is None or last_check_out is None or last_check_out <= first:
+            return None
+        return first, last_check_out - timedelta(days=1)

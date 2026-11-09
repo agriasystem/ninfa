@@ -336,6 +336,7 @@ class DataOverviewService:
             days_30=days_30,
             selected=selected,
             nights=nights,
+            inventory_consistency=metrics.inventory_consistency(rows),
         )
 
 

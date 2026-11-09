@@ -317,3 +317,73 @@ def test_another_tenants_labor_and_revenue_are_invisible(
     assert labor.economics.planned_hours is None
     assert labor.economics.reference_revenue is None
     assert overview_of(db_session, other).labor.economics.reference_revenue == D("1000.00")
+
+
+# --- a plan that covers only some of the days -------------------------------------------------
+
+
+def test_a_plan_of_one_day_in_a_week_is_compared_with_that_day_alone_and_says_so(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    """The real pilot case: the labor file covers one day of the seven. Every figure is what it has
+    always been (hours, cost, ratios, the revenue of that day alone), and the response says how many
+    days they are about, out of how many."""
+    source, job, file = _labor_world(factory, tenant)
+    snapshot = labor_snapshot(factory, source, job, file, snapshot_local_date=AS_OF)
+    _shift(factory, snapshot, AS_OF, LaborCategory.HOUSEKEEPING, 480, "120.00", 1)
+    _shift(factory, snapshot, AS_OF, LaborCategory.FRONT_OFFICE, 360, "100.00", 2)
+    # revenue is stored for every night of the week: the six days with no plan must not enter it
+    seed_run(db_session, tenant, nights=_nights({AS_OF + timedelta(days=n): 10 for n in range(7)}))
+
+    labor = overview_of(db_session, tenant).labor
+
+    assert labor.window_days == 7
+    assert labor.days_with_data == 1
+    economics = labor.economics
+    assert economics.period_days == 1
+    assert (economics.period_start, economics.period_end) == (AS_OF, AS_OF)
+    assert economics.planned_hours == D("14.00")
+    assert economics.planned_cost == D("220.00")
+    assert economics.reference_revenue == D("1000.00")  # that day's 10 rooms, not the week's 7000
+    assert economics.cost_to_revenue_pct == D("22.00")  # 220 / 1000, as ever
+    assert economics.revenue_per_hour == D("71.43")  # 1000 / 14, as ever
+
+
+def test_a_plan_of_the_whole_week_covers_every_day_of_the_window(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    source, job, file = _labor_world(factory, tenant)
+    snapshot = labor_snapshot(factory, source, job, file, snapshot_local_date=AS_OF)
+    for number in range(7):
+        _shift(
+            factory,
+            snapshot,
+            AS_OF + timedelta(days=number),
+            LaborCategory.HOUSEKEEPING,
+            480,
+            "120.00",
+            number + 1,
+        )
+    seed_run(db_session, tenant, nights=_nights({AS_OF + timedelta(days=n): 10 for n in range(7)}))
+
+    labor = overview_of(db_session, tenant).labor
+
+    assert labor.economics.period_days == labor.window_days == 7
+    assert labor.economics.reference_revenue == D("7000.00")
+
+
+def test_a_day_with_an_incomplete_plan_is_data_but_not_a_covered_day(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    """Two days have entries, only one has hours: the figures are about one day, and it says so."""
+    source, job, file = _labor_world(factory, tenant)
+    snapshot = labor_snapshot(factory, source, job, file, snapshot_local_date=AS_OF)
+    _shift(factory, snapshot, AS_OF, LaborCategory.HOUSEKEEPING, 480, "120.00", 1)
+    # worked hours with no planned ones: the day has data, and no plan to count
+    _shift(factory, snapshot, DAY_2, LaborCategory.HOUSEKEEPING, None, None, 2, actual=60)
+    seed_run(db_session, tenant, nights=_nights({AS_OF: 10, DAY_2: 10}))
+
+    labor = overview_of(db_session, tenant).labor
+
+    assert labor.days_with_data == 2
+    assert labor.economics.period_days == 1

@@ -8,6 +8,7 @@ from app.api.v1.data.schemas import (
     ChannelWeightResponse,
     CostCategoryResponse,
     CostDecisionResponse,
+    CostOccupancyResponse,
     CostsResponse,
     DataOverviewResponse,
     DateConflictsResponse,
@@ -16,6 +17,7 @@ from app.api.v1.data.schemas import (
     DomainFreshnessResponse,
     DomainStateResponse,
     FreshnessResponse,
+    InventoryConsistencyResponse,
     LaborCategoryResponse,
     LaborDecisionResponse,
     LaborEconomicsResponse,
@@ -91,6 +93,7 @@ def _night(night: NightRow) -> NightRowResponse:
         rooms_delta_7d=night.rooms_delta_7d,
         status=night.status.value,
         decision_id=night.decision_id,
+        over_capacity=night.over_capacity,
     )
 
 
@@ -103,6 +106,10 @@ def _occupancy(occupancy: OccupancyOverview) -> OccupancyResponse:
         days_30=_period(occupancy.days_30),
         selected=_period(occupancy.selected),
         nights=[_night(night) for night in occupancy.nights],
+        inventory_consistency=InventoryConsistencyResponse(
+            over_capacity_nights=occupancy.inventory_consistency.over_capacity_nights,
+            first_night=occupancy.inventory_consistency.first_night,
+        ),
     )
 
 
@@ -162,6 +169,7 @@ def _distribution(distribution: DistributionOverview) -> DistributionResponse:
 
 def _costs(costs: CostOverview) -> CostsResponse:
     decision = costs.decision
+    basis = costs.occupancy_basis
     return CostsResponse(
         state=costs.state.value,
         reason=None if costs.reason is None else costs.reason.value,
@@ -196,6 +204,21 @@ def _costs(costs: CostOverview) -> CostsResponse:
                 expected_cpor=_text(decision.expected_cpor),
             )
         ),
+        occupancy=(
+            None
+            if basis is None
+            else CostOccupancyResponse(
+                total_days=basis.total_days,
+                known_days=basis.known_days,
+                observed_days=basis.observed_days,
+                reconstructed_days=basis.reconstructed_days,
+                uncertain_days=basis.uncertain_days,
+                days_outside_bookings=basis.days_outside_bookings,
+                days_without_inventory=basis.days_without_inventory,
+                days_awaiting_rebuild=basis.days_awaiting_rebuild,
+                first_day_without_inventory=basis.first_day_without_inventory,
+            )
+        ),
     )
 
 
@@ -207,6 +230,7 @@ def _labor(labor: LaborOverview) -> LaborResponse:
         reason=None if labor.reason is None else labor.reason.value,
         window_start=labor.window_start,
         window_end=labor.window_end,
+        window_days=labor.window_days,
         currency=labor.currency,
         days_with_data=labor.days_with_data,
         categories=[

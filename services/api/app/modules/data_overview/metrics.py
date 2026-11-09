@@ -21,6 +21,7 @@ from app.modules.data_overview.types import (
     CapacityState,
     DecisionRef,
     DomainState,
+    InventoryConsistency,
     NightRow,
     NightStatus,
     PeriodMetrics,
@@ -49,6 +50,23 @@ def percent_of(part: int, whole: int) -> Decimal | None:
     if whole <= 0:
         return None
     return to_cents(Decimal(part) * _HUNDRED / Decimal(whole))
+
+
+def is_over_capacity(rooms_on_books: int, rooms_available: int | None) -> bool:
+    """More rooms on the books than the inventory says exist. A night with no known capacity is
+    never over it (nothing to compare with); a closed night (0 rooms) with bookings is."""
+    return rooms_available is not None and rooms_on_books > rooms_available
+
+
+def inventory_consistency(rows: Sequence[BookingSnapshot]) -> InventoryConsistency:
+    """How many of these stored nights hold more rooms than the inventory has, and the first. The
+    figures themselves are never touched: this only says that two things NINFA stores disagree."""
+    over = sorted(
+        row.stay_date for row in rows if is_over_capacity(row.rooms_on_books, row.rooms_available)
+    )
+    return InventoryConsistency(
+        over_capacity_nights=len(over), first_night=over[0] if over else None
+    )
 
 
 def capacity_state(
@@ -223,6 +241,7 @@ def night_rows(
                 rooms_delta_7d=None if previous is None else row.rooms_on_books - previous,
                 status=status,
                 decision_id=None if decision is None else decision.decision_id,
+                over_capacity=is_over_capacity(row.rooms_on_books, row.rooms_available),
             )
         )
     return tuple(out)
@@ -293,6 +312,8 @@ __all__ = [
     "domain_states",
     "first_decision_id",
     "index_decisions_by_night",
+    "inventory_consistency",
+    "is_over_capacity",
     "night_rows",
     "night_status",
     "percent_of",

@@ -14,12 +14,23 @@ operator would make by hand are made here, and only from what is really stored:
   a date it says nothing about is not evaluated, and so is not reported as "not enough data";
 * costs: the concluded months the invoices really touch, however many a file spans - never the
   month in progress (invoices arrive after the fact) and never a month assumed from the calendar.
+  The days of those months that have no snapshot yet are rebuilt from the bookings, where the room
+  inventory says how many rooms there were (`history.py`): a refresh asked for by an inventory saved
+  from an earlier date is what lets a past month's cost per occupied room be calculated.
+
+History is never added under a day that has already been analysed. A stored baseline names the
+comparables it was made from and is never rewritten, so a past night appearing after today's
+analysis would make today's next analysis disagree with the one before it. With no analysis yet
+today the history is rebuilt first and today's analysis reads it; with one, today's analysis is made
+first (the same history, the same result) and the history is rebuilt after it, for the days that
+follow.
 
 A failure propagates and fails the job (fail loud: nothing is synced, the imported data stay as they
 are, the status says so). Bookings changed since today's observation are simply observed again: the
 day's next revision, analysed now. What is left of `DEFERRED` is a stored row NINFA cannot observe
 over on today's key, a reconstruction (the property's time zone was changed, so today is a day that
-already ended elsewhere): that clears by itself on the next local day, so it is not a failure.
+already ended elsewhere), or a baseline that today's history would now change after the analysis of
+the day: both clear by themselves on the next local day, so they are not failures.
 """
 
 from dataclasses import dataclass
@@ -27,9 +38,11 @@ from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
+from app.modules.analysis.history import HistoryBackfill, backfill_lead_zero_history
 from app.modules.analysis.policy import check_configuration
 from app.modules.analysis.scope import MAX_COST_MONTHS, active_sources, analysis_request
 from app.modules.analysis.service import (
@@ -37,8 +50,10 @@ from app.modules.analysis.service import (
     AnalysisRunResult,
     run_property_analysis,
 )
+from app.modules.decisions.models import DecisionRun
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.ingestion.repository import ImportJobRepository
+from app.modules.intelligence.expected.errors import ExpectedError, ExpectedErrorCode
 from app.modules.snapshots.errors import SnapshotError, SnapshotErrorCode
 from app.modules.snapshots.localtime import local_date_of, local_day_start
 
@@ -72,6 +87,8 @@ class RefreshOutcome:
     skip_reason: RefreshSkipReason | None = None
     retry_at: datetime | None = None
     result: AnalysisRunResult | None = None
+    # Days of past months stored from the bookings before this analysis (see `history.py`).
+    history_days_rebuilt: int = 0
 
 
 def plan_refresh(
@@ -108,14 +125,71 @@ def run_refresh(
     plan = plan_refresh(session, tenant, property_id, now)
     if isinstance(plan, RefreshSkipReason):
         return RefreshOutcome(RefreshOutcomeKind.SKIPPED, skip_reason=plan)
+    # History is never added under a day that has already been analysed (see the module doc).
+    analysed_today = _analysed(session, tenant, property_id, plan.local_today)
+    history = (
+        HistoryBackfill(0, 0)
+        if analysed_today
+        else _rebuild_history(session, tenant, property_id, plan, now)
+    )
     try:
         result = run_property_analysis(session, plan.request)
-    except SnapshotError as error:
-        if error.code != SnapshotErrorCode.CONFLICT:
+    except (SnapshotError, ExpectedError) as error:
+        if not _clears_by_itself(error):
             raise
         session.rollback()
-        return RefreshOutcome(RefreshOutcomeKind.DEFERRED, retry_at=plan.retry_at)
-    return RefreshOutcome(RefreshOutcomeKind.RAN, result=result)
+        return RefreshOutcome(
+            RefreshOutcomeKind.DEFERRED,
+            retry_at=plan.retry_at,
+            history_days_rebuilt=history.rebuilt,
+        )
+    if analysed_today:
+        history = _rebuild_history(session, tenant, property_id, plan, now)
+    return RefreshOutcome(
+        RefreshOutcomeKind.RAN, result=result, history_days_rebuilt=history.rebuilt
+    )
+
+
+def _analysed(session: Session, tenant: TenantContext, property_id: UUID, day: date) -> bool:
+    """Whether a finished analysis of this property already exists for the property-local `day`."""
+    return (
+        session.scalar(
+            select(DecisionRun.id)
+            .where(
+                DecisionRun.workspace_id == tenant.workspace_id,
+                DecisionRun.property_id == property_id,
+                DecisionRun.as_of_local_date == day,
+            )
+            .limit(1)
+        )
+        is not None
+    )
+
+
+def _rebuild_history(
+    session: Session,
+    tenant: TenantContext,
+    property_id: UUID,
+    plan: RefreshPlan,
+    now: datetime,
+) -> HistoryBackfill:
+    return backfill_lead_zero_history(
+        session,
+        tenant,
+        property_id=property_id,
+        data_source_id=plan.request.booking_data_source_id,
+        cost_months=plan.request.cost_months,
+        local_today=plan.local_today,
+        now=now,
+    )
+
+
+def _clears_by_itself(error: SnapshotError | ExpectedError) -> bool:
+    """A stored row or baseline that today's key cannot be written over: due again tomorrow, which
+    is not a failure. Anything else is one."""
+    if isinstance(error, SnapshotError):
+        return error.code == SnapshotErrorCode.CONFLICT
+    return error.error_code is ExpectedErrorCode.BASELINE_CONFLICT
 
 
 __all__ = [

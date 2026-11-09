@@ -213,6 +213,26 @@ class NightRow:
     rooms_delta_7d: int | None
     status: NightStatus
     decision_id: UUID | None
+    # More rooms on the books than the inventory says exist. The figures above stay as stored:
+    # an occupancy over 100 % is shown, never cut.
+    over_capacity: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class InventoryConsistency:
+    """Whether the bookings and the room inventory tell the same story, over the 30 nights the
+    analysis day observed (the same nights whatever period the page shows).
+
+    `over_capacity_nights` are the nights with more rooms on the books than the inventory has. It
+    is a question about the data, not a verdict: the inventory may be too low, the hotel may really
+    be overbooked, or a booking may be wrong, and NINFA cannot tell which. It is never a decision,
+    and nothing is clamped or corrected."""
+
+    over_capacity_nights: int
+    first_night: date | None
+
+
+NO_INVENTORY_INCONSISTENCY = InventoryConsistency(over_capacity_nights=0, first_night=None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,6 +244,7 @@ class OccupancyOverview:
     days_30: PeriodMetrics | None
     selected: PeriodMetrics | None
     nights: tuple[NightRow, ...]
+    inventory_consistency: InventoryConsistency = NO_INVENTORY_INCONSISTENCY
 
 
 # --- distribution ---------------------------------------------------------------------------------
@@ -329,6 +350,36 @@ class CostDecisionFacts:
 
 
 @dataclass(frozen=True, slots=True)
+class CostOccupancyBasis:
+    """What the cost per occupied room of the month rests on, day by day, and - when it cannot be
+    calculated - exactly which days lack what.
+
+    A month's denominator is the rooms on the books of every one of its days (Cost CPOR V1). Of the
+    `total_days`, `known_days` have a usable snapshot (observed or reconstructed from the bookings).
+    The others are, each one in ONE of these groups:
+
+    uncertain_days            a snapshot exists but how many rooms were occupied is not known (a
+                              booking cancelled or marked no-show without a date)
+    days_outside_bookings     the bookings imported say nothing about that night (before the first
+                              or after the last night they cover): it is unknown, not zero
+    days_without_inventory    the bookings cover it but NINFA does not know how many rooms the
+                              property had: a snapshot is only rebuilt once the inventory says so
+    days_awaiting_rebuild     the bookings and the inventory are there: the next analysis stores it
+
+    `first_day_without_inventory` is the day an inventory should be valid from to close that gap."""
+
+    total_days: int
+    known_days: int
+    observed_days: int
+    reconstructed_days: int
+    uncertain_days: int
+    days_outside_bookings: int
+    days_without_inventory: int
+    days_awaiting_rebuild: int
+    first_day_without_inventory: date | None
+
+
+@dataclass(frozen=True, slots=True)
 class CostOverview:
     """The last CONCLUDED calendar month's costs, by invoice date (Cost CPOR V1's own attribution).
 
@@ -348,6 +399,8 @@ class CostOverview:
     classification_coverage_pct: Decimal | None
     categories: tuple[CostCategoryRow, ...]
     decision: CostDecisionFacts | None
+    # `None` with no booking source to take the denominator from, or no cost in the month.
+    occupancy_basis: CostOccupancyBasis | None = None
 
 
 # --- labor ----------------------------------------------------------------------------------------
@@ -426,6 +479,12 @@ class LaborOverview:
     decision: LaborDecisionFacts | None
     economics: LaborEconomics
 
+    @property
+    def window_days(self) -> int:
+        """How many days the window has: what `economics.period_days` (the days the plan has hours
+        for, and so the days every ratio is calculated on) is read against."""
+        return (self.window_end - self.window_start).days + 1
+
 
 # --- freshness / coverage -------------------------------------------------------------------------
 
@@ -470,6 +529,7 @@ __all__ = [
     "ALLOWED_PERIOD_DAYS",
     "COMPARISON_LOOKBACK_DAYS",
     "DATA_OVERVIEW_VERSION",
+    "NO_INVENTORY_INCONSISTENCY",
     "PERIOD_DAYS_LONG",
     "PERIOD_DAYS_SHORT",
     "Availability",
@@ -480,6 +540,7 @@ __all__ = [
     "ChannelWeight",
     "CostCategoryRow",
     "CostDecisionFacts",
+    "CostOccupancyBasis",
     "CostOverview",
     "CporStatus",
     "DataOverview",
@@ -488,6 +549,7 @@ __all__ = [
     "DomainFreshness",
     "DomainState",
     "FreshnessReason",
+    "InventoryConsistency",
     "LaborCategoryRow",
     "LaborDecisionFacts",
     "LaborEconomics",

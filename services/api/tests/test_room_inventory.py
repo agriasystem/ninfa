@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.modules.analysis.queue import ANALYSIS_REFRESH_TASK
 from app.modules.analysis.room_inventory import (
     INVENTORY_HORIZON_DAYS,
+    MAX_BACKFILL_DAYS,
     MAX_ROOMS,
     MIN_ROOMS,
     RoomInventoryService,
@@ -83,12 +85,22 @@ def test_a_property_with_no_inventory_says_so_and_gives_the_limits(
 
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
-    assert response.json() == {
+    body = response.json()
+    # the limits of the next save are the property's own days: the page works none of them out
+    assert body.pop("today") == datetime.now(ZoneInfo("Europe/Rome")).date().isoformat()
+    assert (
+        body.pop("earliest_valid_from")
+        == (
+            datetime.now(ZoneInfo("Europe/Rome")).date() - timedelta(days=MAX_BACKFILL_DAYS)
+        ).isoformat()
+    )
+    assert body == {
         "configured": False,
         "rooms_available": None,
         "varies": False,
         "first_night": None,
         "last_night": None,
+        "known_since": None,
         "min_rooms": MIN_ROOMS,
         "max_rooms": MAX_ROOMS,
     }
