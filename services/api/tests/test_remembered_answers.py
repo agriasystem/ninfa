@@ -7,6 +7,7 @@ Real files through the real API and database (rolled back). `Modificata` is the 
 this, and nothing here knows it by name in production code: any word behaves the same.
 """
 
+import json
 from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -482,11 +483,47 @@ def test_a_correction_leaves_a_line_saying_what_when_and_who(
 
     first, second = _trail(db_session, env)
     assert first["action"] == "CORRECTED" and second["action"] == "FORGOTTEN"
-    assert first["document"] == "status_mapping" and first["label"] == "modificata"
+    assert first["document"] == "status_mapping" and first["answer"] == word["id"]
     assert (first["before"], first["after"]) == ("NO_SHOW", "CONFIRMED")
     assert (second["before"], second["after"]) == ("CONFIRMED", None)
     assert first["by"] == str(env.user.id)
     assert datetime.fromisoformat(first["at"]).tzinfo is not None
+
+
+def test_the_line_holds_no_value_of_a_file(
+    api_client: TestClient, env: SourcesEnv, taught: UUID, db_session: Session
+) -> None:
+    """The section it lives in promises closed keys, headers and numbers: a word is named by its
+    handle."""
+    word = _word(_remembered(api_client, env, taught), "modificata")
+
+    api_client.delete(_url(env, taught, word["id"]))
+
+    [line] = _trail(db_session, env)
+    assert set(line) == {"action", "document", "answer", "before", "after", "at", "by"}
+    assert "modificata" not in json.dumps(line).casefold()
+
+
+def test_a_meaning_someone_typed_is_not_kept_in_the_line(
+    db_session: Session, factory: BookingFactory
+) -> None:
+    tenant = factory.tenant()
+    source = tenant.data_source
+    factory.profile(source, channel_mapping={"partner": {"name": "Mario Rossi Viaggi"}})
+    service = RememberedAnswersService(db_session, TenantContext(tenant.workspace.id))
+    [word] = service.read(source).words
+    assert word.choices == ()
+
+    service.forget(source, word.id, by=None)
+
+    db_session.expire_all()
+    profile = db_session.scalar(
+        select(BookingMappingProfile).where(BookingMappingProfile.data_source_id == source.id)
+    )
+    assert profile is not None
+    assert profile.channel_mapping == {}
+    stored = json.dumps(profile.format_options["learning"]["corrections"]).casefold()
+    assert "rossi" not in stored and "partner" not in stored
 
 
 def test_the_line_survives_the_next_import(

@@ -77,8 +77,12 @@ def test_the_only_public_endpoint_is_still_the_health_check(client: TestClient) 
     paths = list(client.get("/openapi.json").json()["paths"])
 
     assert "/api/v1/health" in paths
-    for word in ("snapshot", "inventory", "metric", "curve"):
+    for word in ("snapshot", "metric", "curve"):
         assert not [p for p in paths if word in p]
+    # The one way to the inventory is the number a person says (ADR 0044): never a row or a night.
+    assert [p for p in paths if "inventory" in p] == [
+        "/api/v1/properties/{property_id}/room-inventory"
+    ]
 
 
 def test_no_worker_task_and_no_scheduler_was_added() -> None:

@@ -22,7 +22,9 @@ already imported stays as it was read; a correction counts from the next import.
 word never changes meaning by itself.
 
 Each change leaves a line in `Learning.corrections`, next to what it changed: when, what, from what
-to what, and who. The row itself says which source, property and workspace.
+to what, and who. The row itself says which source, property and workspace. Like everything else in
+that section it holds no value of a file: a word is named by its handle, never written out, and a
+meaning is kept only when it comes from the closed list.
 """
 
 import hashlib
@@ -84,6 +86,12 @@ def _choices_of(document: str) -> tuple[str, ...]:
     if document == "category_mapping":
         return tuple(category.value for category in CostCategory)
     return ()
+
+
+def _closed(document: str, value: str) -> str | None:
+    """A meaning, as the audit line may keep it: only one of the closed list. A channel word's
+    meaning can be a name someone typed, and that is a value of a file."""
+    return value if value in _choices_of(document) else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,8 +227,8 @@ class RememberedAnswersService:
                 {
                     "action": "CORRECTED",
                     "document": document,
-                    "label": label,
-                    "before": before,
+                    "answer": answer_id,
+                    "before": _closed(document, before),
                     "after": value,
                 },
             )
@@ -246,8 +254,8 @@ class RememberedAnswersService:
                 {
                     "action": "FORGOTTEN",
                     "document": document,
-                    "label": label,
-                    "before": before,
+                    "answer": answer_id,
+                    "before": _closed(document, before),
                     "after": None,
                 },
             )
@@ -302,9 +310,10 @@ class RememberedAnswersService:
             {
                 "action": "FORGOTTEN",
                 "document": "family",
-                "label": family_id,
-                "before": f"revision {target.revision}",
+                "answer": answer_id,
+                "before": None,
                 "after": None,
+                "revision": target.revision,
             },
             learning=remaining,
         )
@@ -325,7 +334,6 @@ class RememberedAnswersService:
         store = learning or parse_learning(options.get("learning")) or Learning()
         entry = {
             **entry,
-            "label": PersonalDataGuard().clean(str(entry["label"])),
             "at": (datetime.now(UTC) if now is None else now).isoformat(),
             "by": None if by is None else str(by),
         }

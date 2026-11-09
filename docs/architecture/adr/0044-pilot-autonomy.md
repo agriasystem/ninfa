@@ -112,7 +112,8 @@ data already imported are to change too: bring the file again. No word changes m
 
 **Audit.** A short trail in `format_options.learning.corrections` (the last 20: when, what, from what to what, who), next to what it
 changed, plus a structured log line. The row says which source, property and workspace. It survives later imports, and goes
-with the profile if "Dimentica configurazione" removes it.
+with the profile if "Dimentica configurazione" removes it. That section promises closed keys, headers and numbers, so the trail
+holds no value of a file: a word is named by its handle (`answer`), and a meaning is kept only when it comes from the closed list.
 
 ## Consequences
 

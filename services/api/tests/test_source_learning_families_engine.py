@@ -758,7 +758,8 @@ def test_the_stored_section_holds_only_closed_keys_headers_and_numbers() -> None
 
     blob = stored_learning(learning)
 
-    assert set(blob) <= {"v", "seq", "current", "families"}
+    assert set(blob) <= {"v", "seq", "current", "families", "corrections"}
+    assert blob["corrections"] == []  # (what a person corrected: `test_remembered_answers.py`)
     for entry in blob["families"]:
         assert set(entry) <= ALLOWED_FAMILY_KEYS
         parse_memory(entry)  # and each one is a readable family
