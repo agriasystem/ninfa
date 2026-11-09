@@ -86,21 +86,19 @@ inventory) found four problems.
 
 ## Consequences
 
-- Struttura's own "Configura inventario" button is still not wired: Struttura UI V1 has no inventory endpoint. The link
-  brings the person to the right block, but for the pilot the inventory is still set with
-  `python -m app.cli.pilot set-room-inventory`. Dati then reads `AWAITING_ANALYSIS` until the next analysis.
+- Struttura's own "Configura inventario" button was not wired by this decision. [ADR 0044](0044-pilot-autonomy.md) wired it: the
+  person says the number there, and the occupancy follows. Dati reads `AWAITING_ANALYSIS` until that analysis has run.
 - The demo file keeps its dates. Run in memory through the real detector on those bookings, nothing written:
   - Correcting only the booking dates still fails reconciliation (133 observed, 142 certain), and so does correcting only
     "Modificata" (142 observed, 121 certain).
   - Correcting both reconciles at 142 room-nights. The check then stops on the missing history
     (`OTA_COMPARABLE_SAMPLE_INSUFFICIENT`): none of the 24 candidate past days has a whole 30-night window. At that point
     the coverage is 84,51 % and the OTA share 60,00 %.
-- "Telefono / Email" is not in Gate 9's closed dictionary, so it stays unclassified: 20 of the 121 room-nights. It does not
-  cause the refusal, and the coverage rule (at least 80 %) would pass. If it counted as direct, the same corrected data
-  would give 100 % coverage and a 50,70 % OTA share. That is a product decision, left open here.
-- The page reads the analysis of the property's current day, and NINFA registers no periodic job: an external scheduler
-  runs the dispatcher. With no analysis for the day, occupancy, revenue and the OTA block are not available ("L'analisi
-  di oggi non è ancora disponibile"), whatever the last analysis said. On the demo property that is the state on 9
-  November.
+- "Telefono / Email" was not in Gate 9's closed dictionary, so it was unclassified: 20 of the 121 room-nights. It did not
+  cause the refusal. [ADR 0044](0044-pilot-autonomy.md) took the product decision: it is direct. The same corrected data give
+  100 % coverage and a 50,70 % OTA share.
+- The page reads the analysis of the property's current day. With no analysis for the day, occupancy, revenue and the OTA block
+  are not available ("L'analisi di oggi non è ancora disponibile"), whatever the last analysis said. On the demo property
+  that was the state on 9 November. [ADR 0044](0044-pilot-autonomy.md): the worker now asks for the day's analysis by itself.
 - `GET /data/overview` gains fields only: `capacity` on each period, the denominator fields of `channel_mix`, and
   `date_conflicts`. No field is removed or renamed.

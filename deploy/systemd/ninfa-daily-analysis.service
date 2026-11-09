@@ -1,11 +1,9 @@
-# NINFA daily analysis - the INVOCATION unit for the external scheduler. EXAMPLE: adjust the paths
-# and install it as /etc/systemd/system/ninfa-daily-analysis.service.
+# NINFA daily analysis - an operator's CATCH-UP. EXAMPLE: adjust the paths and install it as
+# /etc/systemd/system/ninfa-daily-analysis.service.
 #
-# This repository ships NO timer and does NOT configure a scheduler. Something external must start
-# this unit (or run scripts/run-daily-analysis.sh directly) at 10:00 in the NAMED timezone
-# Europe/Rome every day. A fixed UTC time is NOT equivalent: it is off by an hour for half of the
-# year when daylight saving changes. Whatever scheduler AGRIA picks must support a named timezone,
-# or handle the change explicitly. See docs/operations/pilot-daily-operations-v1.md.
+# Nothing has to start this unit: the worker (ninfa-worker.service) asks for the day's analysis by
+# itself, from 10:00 on each property's own clock (Europe/Rome for the first pilot). This repository
+# ships NO timer because none is needed. See docs/operations/pilot-daily-operations-v1.md.
 #
 # Deliberately no [Install] section: nothing enables this unit by itself.
 # /opt/ninfa/app is a PLACEHOLDER for the repository checkout. No secrets in this file.

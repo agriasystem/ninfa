@@ -20,7 +20,7 @@ day 1. See [pilot expectations](pilot-expectations-v1.md).
 
 - [ ] The deployment is complete and the [smoke checklist](pilot-smoke-checklist-v1.md) passed.
 - [ ] A **backup restore has been tested successfully** ([backup and restore](pilot-backup-restore-v1.md)).
-- [ ] The **daily scheduler** is configured for 10:00 `Europe/Rome` and its DST behaviour verified.
+- [ ] The **worker** (`ninfa-worker`) is running and supervised: it asks for the daily analysis by itself, from 10:00 on each property's own clock.
 - [ ] If Ask NINFA is to be on: all five conditions of the policy are met (otherwise it stays off).
 - [ ] The hotel's export format is understood and can be normalized to the canonical CSV.
 
@@ -43,20 +43,18 @@ day 1. See [pilot expectations](pilot-expectations-v1.md).
 6. **[OPERATOR] BOOKINGS data source.**
    `ninfa-py -m app.cli.pilot create-data-source --workspace-slug <workspace-slug> --property-slug <property-slug> --domain BOOKINGS --name "Bookings"`
    — **record the printed data source id in AGRIA's own records** (there is no list command).
-7. **[OPERATOR] Room inventory.**
-   `ninfa-py -m app.cli.pilot set-room-inventory --workspace-slug <workspace-slug> --property-slug <property-slug> --stay-date-start <today> --stay-date-end <far date> --rooms-available <N> [--rooms-out-of-order <M>]`
-   Cover **well beyond** the rolling 30-date window and put the extension in AGRIA's calendar:
-   nothing extends it automatically. Use several ranges if capacity changes by season.
+7. **[HOTEL] Room inventory.** In **Struttura → Inventario camere**, "Configura inventario": one number, the rooms the
+   structure can sell. It counts from today on, and nobody has to extend it. Only a capacity that changes by season still
+   needs an operator: `ninfa-py -m app.cli.pilot set-room-inventory --workspace-slug <workspace-slug> --property-slug <property-slug> --stay-date-start <from> --stay-date-end <to> --rooms-available <N>`,
+   one range per season.
 8. **[OPERATOR] Initial canonical booking import**, following the file-intake procedure in
    [daily operations](pilot-daily-operations-v1.md). Include the bookings with stay dates in the
    coming 30 days; historical rows are accepted but, as above, do not create the observed history.
    Confirm `status=SUCCEEDED`.
-9. **[OPERATOR] Enable automatic analysis** with the exact data source id:
-   `ninfa-py -m app.cli.analysis_policy enable --workspace-slug <workspace-slug> --property-slug <property-slug> --booking-data-source-id <id>`
-   then `ninfa-py -m app.cli.analysis_policy show …` must say `configuration=VALID`. Enabling never
-   runs anything by itself.
-10. **[OPERATOR] First run, or the next scheduled opportunity.** After the import (a same-day catch-up
-    is supported), run the wrapper as in daily operations, or let the next 10:00 run do it. Then
+9. **Automatic analysis switches itself on** at the worker's next tick after the first booking import, within 5 minutes. Check it with
+   `ninfa-py -m app.cli.analysis_policy show …`, which must say `configuration=VALID`. `disable` switches it off, and it stays off.
+10. **First run.** An import from the web page brings its own refresh. After a CLI import the worker asks for it from 10:00 on the
+    property's clock, or at once if it is already past: nothing to run by hand. Then
     `ninfa-py -m worker analysis-status` must show `run_today=YES` for the property. If today's
     import was not done, the property is skipped until it is.
 11. **[CUSTOMER] Login verification.** The hotel opens `https://<origin>`, logs in with the email and

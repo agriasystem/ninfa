@@ -171,7 +171,7 @@ def test_07_web_unit_never_receives_the_api_environment_and_no_timer_is_shipped(
 
     assert not any("api.env" in line for line in web)
     assert not any("DATABASE_URL" in line or "ANTHROPIC" in line for line in web)
-    assert not list(DEPLOY.rglob("*.timer"))  # the scheduler is external and not configured here
+    assert not list(DEPLOY.rglob("*.timer"))  # none is needed: the worker asks by itself
     assert "[Install]" not in _directives(_unit("ninfa-daily-analysis.service"))
 
 
@@ -350,11 +350,11 @@ def test_15_the_documented_migration_head_is_the_real_head() -> None:
         assert head in _read(OPERATIONS / name)
 
 
-def test_16_the_scheduler_is_documented_as_ten_oclock_europe_rome_never_fixed_utc() -> None:
+def test_16_the_daily_hour_is_ten_oclock_on_the_propertys_clock_never_fixed_utc() -> None:
     for name in ("pilot-daily-operations-v1.md",):
         text = _read(OPERATIONS / name)
         assert "10:00" in text and "Europe/Rome" in text and "named timezone" in text
-        assert "10:15" in text  # the mandatory operator check
+        assert "10:15" in text  # the operator's supervision
     for path in _package_files():
         assert not re.search(r"\b0?[89]:00\s*UTC\b", _read(path)), f"{path.name}: fixed UTC time"
 

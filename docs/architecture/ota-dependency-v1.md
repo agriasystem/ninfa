@@ -44,7 +44,7 @@ into one of four coarser groups — `OTA`, `DIRECT`, `OTHER`, `UNKNOWN` — with
    against a small, high-precision, **exact** dictionary (`app.modules.intelligence.distribution.
    channels`): `booking com`, `booking`, `expedia`, `hotels com`, `agoda`, `airbnb`, `vrbo`,
    `hostelworld` → OTA; `direct`, `diretto`, `website direct`, `sito diretto`, `phone direct`,
-   `walk in` → DIRECT; `wholesaler`, `tour operator`, `corporate`, `agency` → OTHER. Never a
+   the hotel's own site, the telephone, the e-mail, `telefono email`, `walk in` → DIRECT ([ADR 0044](adr/0044-pilot-autonomy.md)); `wholesaler`, `tour operator`, `corporate`, `agency` → OTHER. Never a
    substring, never a fuzzy/edit-distance match: "Booking Engine" is never "Booking.com", and a
    generic label ("web", "online", "reservation") is deliberately absent, so it stays UNKNOWN.
 3. **UNCLASSIFIED** (confidence 0) — anything else: `UNKNOWN`. A generic or ambiguous name is

@@ -172,6 +172,23 @@ Property: the profile belongs to a source of **one property** (composite foreign
 even with the same headers (workspace too). Kind of data: a profile belongs to the source of one kind of data, and a memory that says it
 belongs to another is ignored. Tested explicitly; the benchmark measures cross-property and cross-domain contamination: 0.
 
+## Correcting what is remembered
+
+A person can correct what NINFA learned, with no help: "Gestisci" of a source, "Risposte ricordate"
+(`data_sources/remembered_answers.py`, [ADR 0044](adr/0044-pilot-autonomy.md)).
+
+| What | Where it is kept | What the person can do | What the next file does |
+|---|---|---|---|
+| A word ("Stato «modificata» → Non presentato") | the profile's `status_mapping`, `role_mapping`, `category_mapping`: of the whole source | correct it, within the list its question offers | uses the new meaning, asking nothing |
+| | | forget it | asks again, if the engine does not know the word |
+| A channel word | `channel_mapping` | forget it | reads the channel by the dictionary |
+| A kind of file a person taught, or said what it holds | one `Memory` of `learning.families` | forget it, whole and alone | is read like one nobody taught; the other families do not change |
+
+Nothing already imported is read again, and no analysis is asked for: the correction counts from the next file. To change the data too, the
+person brings the file again. Each correction leaves a line in `learning.corrections` (the last 20), which later imports keep. Forgetting
+one format of a family is not offered: a family recognised by its saved matching reads the formats from the profile, so the question would
+not come back.
+
 ## Known limits
 
 * A family keeps its current structure only: an earlier revision of a family is kept in its history for audit, but a file that goes back to it is read through the current one (what is still there is reused, what is not is asked).

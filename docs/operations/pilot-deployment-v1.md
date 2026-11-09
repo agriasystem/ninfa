@@ -21,7 +21,7 @@ Customer browser ── HTTPS ──►  reverse proxy  (ONE public origin, TLS 
                                   ▼                                (FastAPI only)
                             Managed PostgreSQL  ◄── worker (python -m worker run, no public port)
 
-External timezone-aware scheduler ──► scripts/run-daily-analysis.sh
+(the worker asks for the daily analysis by itself; scripts/run-daily-analysis.sh is an operator's catch-up)
 ```
 
 - **One public origin**, for example `https://ninfa.example.com`. The proxy sends `/api/` to the API

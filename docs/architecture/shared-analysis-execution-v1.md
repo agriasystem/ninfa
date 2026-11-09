@@ -73,8 +73,8 @@ arguments or when enqueueing fails.
 
 ## What is NOT solved
 
-- **There is no scheduler.** Nothing enqueues this task automatically: no periodic task, cron,
-  startup hook or dispatcher. It is inert until an operator enqueues it. (An import made through the
+- **Nothing enqueues this task automatically**: no periodic task, cron, startup hook or dispatcher. It is inert until an operator
+  enqueues it. (The day's own analysis is another task: see [automatic-analysis-policy-v1.md](automatic-analysis-policy-v1.md). An import made through the
   web page queues a task of its own: see [post-import-analysis-v1.md](post-import-analysis-v1.md).)
 - No property discovery, "analysis enabled" flag, primary booking source, stay-window default, run
   time or timezone-aware dispatch. These are product decisions listed in the Gate 25A audit.

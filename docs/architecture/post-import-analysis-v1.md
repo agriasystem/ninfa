@@ -5,6 +5,9 @@ FILE -> understanding -> validation -> import -> server-side dispatch -> worker 
      -> decision sync -> Home / Dati
 ```
 
+The same job follows a room inventory saved ([ADR 0044](adr/0044-pilot-autonomy.md)), and a page follows the day's own analysis the same
+way ([automatic-analysis-policy-v1.md](automatic-analysis-policy-v1.md)).
+
 The person brings a file; nobody starts an analysis. **No migration and no new dependency.** The
 detectors, the priority ranking and the decision sync are untouched: this is orchestration, and every
 number is still computed by the engines (`analysis.service.run_property_analysis`).
