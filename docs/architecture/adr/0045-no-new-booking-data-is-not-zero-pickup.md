@@ -16,7 +16,7 @@ repeats what was already known. Read as a measure, that says nothing was booked:
 ## Decision
 
 **A day is new when what it saw differs from what the previous analysed day saw** (`analysis/observation.py`). Each run already
-records the latest import that had changed the source when it looked (`input_provenance.bookings.import_job_id`), and that is
+records the latest import that had changed the source when it looked (`input_provenance.bookings.last_successful_import_job_id`), and that is
 the only thing read. No table, no column, no clock.
 
 | What happens | What the day saw | Result |
