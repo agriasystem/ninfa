@@ -38,6 +38,10 @@ _ANALYSIS_METHODS = {
     "/api/v1/properties/{property_id}/analysis/status": {"get"},
     "/api/v1/properties/{property_id}/analysis/refresh": {"post"},
 }
+# How many rooms a property can sell: the person says it, and the analysis follows.
+_ROOM_INVENTORY_METHODS = {
+    "/api/v1/properties/{property_id}/room-inventory": {"get", "put"},
+}
 
 _EXPECTED_PATHS = {
     "/api/v1/health",
@@ -53,6 +57,7 @@ _EXPECTED_PATHS = {
     _DATA_OVERVIEW_PATH,
     *_SOURCES_METHODS,
     *_ANALYSIS_METHODS,
+    *_ROOM_INVENTORY_METHODS,
 }
 
 
@@ -85,6 +90,8 @@ def test_decision_routes_remain_get_only_except_the_two_ask_posts(client: TestCl
             assert set(methods) == _SOURCES_METHODS[path], path
         elif path in _ANALYSIS_METHODS:
             assert set(methods) == _ANALYSIS_METHODS[path], path
+        elif path in _ROOM_INVENTORY_METHODS:
+            assert set(methods) == _ROOM_INVENTORY_METHODS[path], path
         elif path in (_ASK_PATH, _HOME_ASK_PATH):
             assert set(methods) == {"post"}, path
         else:

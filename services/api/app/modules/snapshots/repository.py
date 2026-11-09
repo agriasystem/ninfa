@@ -17,7 +17,7 @@ from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import Date, Table, and_, column, func, select, values
+from sqlalchemy import Date, Table, and_, column, func, select, text, values
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -119,6 +119,40 @@ class RoomInventoryRepository:
         row = self._session.scalars(statement, execution_options={"populate_existing": True}).one()
         self._session.flush()
         return row
+
+    def set_for_range(
+        self, property_id: UUID, first: date, last: date, *, rooms_available: int
+    ) -> int:
+        """Create or replace the capacity of every night `first..last` (both included), in one
+        statement. A night that already has this number is not touched, and `rooms_out_of_order` of
+        an existing night stays. Returns how many nights really changed."""
+        if rooms_available < 0:
+            raise ValueError("room counts cannot be negative")
+        if PropertyRepository(self._session, self._tenant).get(property_id) is None:
+            raise NotFoundError("Property")
+        result = self._session.execute(
+            text(
+                """
+                INSERT INTO room_inventory_daily
+                    (workspace_id, property_id, stay_date, rooms_available)
+                SELECT :workspace_id, :property_id, night::date, :rooms
+                  FROM generate_series(CAST(:first AS date), CAST(:last AS date), '1 day') AS night
+                ON CONFLICT (workspace_id, property_id, stay_date) DO UPDATE
+                   SET rooms_available = EXCLUDED.rooms_available, updated_at = now()
+                 WHERE room_inventory_daily.rooms_available <> EXCLUDED.rooms_available
+                """
+            ),
+            {
+                "workspace_id": self._tenant.workspace_id,
+                "property_id": property_id,
+                "rooms": rooms_available,
+                "first": first,
+                "last": last,
+            },
+        )
+        self._session.flush()
+        self._session.expire_all()
+        return int(result.rowcount)  # type: ignore[attr-defined]
 
 
 @dataclass(frozen=True, slots=True)
