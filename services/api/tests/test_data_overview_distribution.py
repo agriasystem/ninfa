@@ -601,6 +601,78 @@ def test_unclassified_channels_stay_in_the_total_and_are_counted_apart(
     assert mix.matches_on_books is True
 
 
+def test_a_multi_room_booking_reads_the_same_in_the_weights_and_on_the_books(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=3)
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end(), rooms=2)
+    world.booking(world.channel("Diretto"), AS_OF, _end())
+
+    distribution = overview_of(db_session, tenant).distribution  # the REAL OTA check
+
+    # rooms x nights in both readings: several rooms on one booking never break the reconciliation
+    assert distribution.insufficient_reasons == ("OTA_COMPARABLE_SAMPLE_INSUFFICIENT",)
+    assert distribution.date_conflicts == BookingDateConflicts(0, 0, 0)
+    mix = distribution.channel_mix
+    assert mix is not None
+    assert (mix.total_room_nights, mix.on_books_room_nights, mix.matches_on_books) == (90, 90, True)
+    assert {channel.name: channel.room_nights for channel in mix.channels} == {
+        "Booking.com": 60,
+        "Diretto": 30,
+    }
+
+
+def test_a_multi_room_booking_dated_after_the_day_is_one_booking_and_all_its_room_nights(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    _observed(db_session, tenant, rooms=3)
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end())
+    world.booking(world.channel("Diretto"), AS_OF, _end(), rooms=2, booked_at=_LATER)
+
+    distribution = overview_of(db_session, tenant).distribution
+
+    assert distribution.insufficient_reasons == ("OTA_CHANNEL_MIX_RECONCILIATION_FAILED",)
+    # the card counts bookings ("1 prenotazione"), the two totals count room-nights
+    assert distribution.date_conflicts == BookingDateConflicts(
+        booked_after=1, cancelled_after=0, no_show_before_arrival=0
+    )
+    mix = distribution.channel_mix
+    assert mix is not None
+    assert (mix.total_room_nights, mix.on_books_room_nights, mix.matches_on_books) == (
+        30,
+        90,
+        False,
+    )
+
+
+def test_the_two_totals_differ_by_exactly_the_room_nights_of_the_conflicting_bookings(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    # The demo property's bridge in small: 133 observed - 21 (booked later) + 9 (no-shows) = 121.
+    _observed(db_session, tenant, rooms=2)
+    world = _world(db_session, factory, tenant)
+    world.booking(world.channel("Booking.com"), AS_OF, _end())
+    world.booking(world.channel("Diretto"), AS_OF, _end(), booked_at=_LATER)  # observed, 30 nights
+    world.booking(  # not observed: certain for 3 nights, since a no-show cannot be known yet
+        world.channel("Expedia"),
+        AS_OF + timedelta(days=10),
+        AS_OF + timedelta(days=13),
+        status=NO_SHOW,
+    )
+
+    distribution = overview_of(db_session, tenant).distribution
+
+    assert distribution.insufficient_reasons == ("OTA_CHANNEL_MIX_RECONCILIATION_FAILED",)
+    assert distribution.date_conflicts == BookingDateConflicts(
+        booked_after=1, cancelled_after=0, no_show_before_arrival=1
+    )
+    mix = distribution.channel_mix
+    assert mix is not None
+    assert (mix.on_books_room_nights, mix.total_room_nights) == (60, 60 - 30 + 3)
+
+
 def test_the_weights_and_the_room_nights_on_the_books_cover_the_same_thirty_nights(
     db_session: Session, factory: BookingFactory, tenant: Tenant
 ) -> None:
