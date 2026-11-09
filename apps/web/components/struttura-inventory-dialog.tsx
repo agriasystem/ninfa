@@ -5,6 +5,7 @@ import { useId, useState, type FormEvent } from "react";
 import type { RoomInventoryResponse, RoomInventorySavedResponse } from "@ninfa/contracts";
 
 import { saveRoomInventory } from "@/lib/api/room-inventory";
+import { formatDayMonthYear } from "@/lib/data/dates";
 import { strutturaCopy } from "@/lib/structure/copy";
 
 import { StrutturaModal } from "./struttura-modal";
@@ -20,6 +21,13 @@ function roomsFrom(text: string, min: number, max: number): number | null {
   return rooms >= min && rooms <= max ? rooms : null;
 }
 
+/** The day as the person typed it, if it is a real day within the backend's own limits (the property's
+ * today, and the oldest day a save may be valid from). ISO dates sort as text, so there is no date arithmetic
+ * here: the limits are the backend's. */
+function validFromOf(text: string, earliest: string, latest: string): string | null {
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) && text >= earliest && text <= latest ? text : null;
+}
+
 export interface StrutturaInventoryDialogProps {
   propertyId: string;
   inventory: RoomInventoryResponse;
@@ -28,9 +36,10 @@ export interface StrutturaInventoryDialogProps {
 }
 
 /**
- * "Configura inventario" / "Modifica inventario": one number, the rooms the structure can sell. The nights it
- * is written on, the limits and what happens next are the backend's; the page says only what the person needs
- * to know: it counts from today, and what was already analysed does not change.
+ * "Configura inventario" / "Modifica inventario": one number, the rooms the structure can sell, and the day it is
+ * valid from (today unless the person says otherwise: a hotel that begins with last month's costs needs last
+ * month's rooms too). The nights it is written on, the limits and what happens next are the backend's; the page
+ * says only what the person needs to know: what was already analysed does not change, and a new analysis is made.
  */
 export function StrutturaInventoryDialog({
   propertyId,
@@ -40,7 +49,10 @@ export function StrutturaInventoryDialog({
 }: StrutturaInventoryDialogProps) {
   const inputId = useId();
   const hintId = useId();
+  const dateId = useId();
+  const dateHintId = useId();
   const [text, setText] = useState(inventory.rooms_available?.toString() ?? "");
+  const [validFrom, setValidFrom] = useState(inventory.today);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const limits = COPY.limits(inventory.min_rooms, inventory.max_rooms);
@@ -52,9 +64,23 @@ export function StrutturaInventoryDialog({
       setProblem(limits);
       return;
     }
+    const day = validFromOf(validFrom, inventory.earliest_valid_from, inventory.today);
+    if (day === null) {
+      setProblem(
+        COPY.validFromRefused(
+          formatDayMonthYear(inventory.earliest_valid_from),
+          formatDayMonthYear(inventory.today),
+        ),
+      );
+      return;
+    }
     setProblem(null);
     setSaving(true);
-    const result = await saveRoomInventory(propertyId, rooms);
+    // a plain save (today) sends what it always sent
+    const result =
+      day === inventory.today
+        ? await saveRoomInventory(propertyId, rooms)
+        : await saveRoomInventory(propertyId, rooms, day);
     setSaving(false);
     if (result.ok) {
       onSaved(result.data);
@@ -81,12 +107,33 @@ export function StrutturaInventoryDialog({
             autoComplete="off"
             value={text}
             disabled={saving}
-            aria-describedby={hintId}
+            aria-describedby={validFrom === inventory.today ? hintId : undefined}
             aria-invalid={problem !== null}
             onChange={(event) => setText(event.target.value)}
           />
-          <p id={hintId} className="struttura-flow__note">
-            {COPY.fromToday}
+          {/* "from today on" only while the day is today: an earlier day says its own thing below */}
+          {validFrom === inventory.today ? (
+            <p id={hintId} className="struttura-flow__note">
+              {COPY.fromToday}
+            </p>
+          ) : null}
+        </div>
+        <div className="struttura-inventory__field">
+          <label htmlFor={dateId}>{COPY.validFromLabel}</label>
+          <input
+            id={dateId}
+            className="struttura-inventory__input struttura-inventory__input--date"
+            type="date"
+            value={validFrom}
+            min={inventory.earliest_valid_from}
+            max={inventory.today}
+            disabled={saving}
+            aria-describedby={dateHintId}
+            aria-invalid={problem !== null && validFromOf(validFrom, inventory.earliest_valid_from, inventory.today) === null}
+            onChange={(event) => setValidFrom(event.target.value)}
+          />
+          <p id={dateHintId} className="struttura-flow__note">
+            {validFrom !== inventory.today ? COPY.validFromPast : COPY.validFromToday}
           </p>
         </div>
         {inventory.varies ? <p className="struttura-flow__note">{COPY.variesWarning}</p> : null}

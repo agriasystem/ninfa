@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import type {
   AnalysisDomain,
-  DataLaborEconomics,
+  DataLabor,
   DataOverviewResponse,
   DataPeriod,
   DataPeriodMetrics,
@@ -19,6 +19,7 @@ import {
   laborCategoryLabel,
   unavailableReasonText,
 } from "@/lib/data/copy";
+import { costOccupancyGap } from "@/lib/data/cpor-gap";
 import { formatDateRange, formatMonthName } from "@/lib/data/dates";
 import {
   formatMoneyCents,
@@ -32,8 +33,9 @@ import { formatCount, formatHours } from "@/lib/decisions/format";
 import { decisionDetailRoute } from "@/lib/routes";
 
 import { DatiDistributionCard } from "./dati-distribution-card";
+import { DatiInventoryNotice } from "./dati-inventory-notice";
 import { Kpi } from "./dati-kpi-grid";
-import { DatiCard, DatiEmpty, DeltaChip } from "./dati-parts";
+import { ConfigureInventoryLink, DatiCard, DatiEmpty, DeltaChip } from "./dati-parts";
 import { DatiNightsTable } from "./dati-nights-table";
 import { DatiOccupancyChart } from "./dati-occupancy-chart";
 import type { DatiPanelProps } from "./dati-overview-panel";
@@ -116,6 +118,7 @@ export function DatiBookingsPanel({
   const freshness = bookingsFreshnessLine(overview.freshness.bookings, overview.as_of_local_date, timeZone);
   return (
     <div className="dati-stack" aria-busy={busy}>
+      <DatiInventoryNotice overview={overview} propertyId={propertyId} />
       <DatiCard
         id="dati-summary"
         title={datiCopy.summary.title}
@@ -217,6 +220,11 @@ export function DatiCostsPanel({ overview, propertyId, timeZone }: DatiPanelProp
   );
   const state = overview.analysis.domain_states.find((item) => item.domain === "COSTS")?.state;
   const available = costs.state === "AVAILABLE" && costs.total_net_cost !== null;
+  // The one thing each missing day lacks, when a cost per occupied room cannot be calculated: said exactly,
+  // never as a generic "incomplete month" when the backend knows more.
+  const gap = costs.categories.some((row) => row.cpor_status === "INCOMPLETE")
+    ? costOccupancyGap(costs.occupancy, month)
+    : null;
 
   return (
     <div className="dati-grid dati-grid--costs">
@@ -283,7 +291,11 @@ export function DatiCostsPanel({ overview, propertyId, timeZone }: DatiPanelProp
                         {row.cpor !== null ? (
                           formatMoneyCents(row.cpor, costs.currency)
                         ) : (
-                          <span className="dati-na-text">{cporStatusText(row.cpor_status)}</span>
+                          <span className="dati-na-text">
+                            {row.cpor_status === "INCOMPLETE" && gap !== null
+                              ? datiCopy.costs.cporNotComputable
+                              : cporStatusText(row.cpor_status)}
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -294,6 +306,19 @@ export function DatiCostsPanel({ overview, propertyId, timeZone }: DatiPanelProp
           ) : (
             <DatiEmpty title={datiCopy.costs.emptyTitle} body={datiCopy.costs.emptyBody} />
           )}
+          {gap !== null ? (
+            <section className="dati-cpor-gap" aria-labelledby="dati-cpor-gap-title">
+              <h3 id="dati-cpor-gap-title" className="dati-cpor-gap__title">
+                {datiCopy.costs.cporTitle(month)}
+              </h3>
+              <ul className="dati-cpor-gap__list">
+                {gap.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              {gap.inventoryHelps ? <ConfigureInventoryLink propertyId={propertyId} /> : null}
+            </section>
+          ) : null}
         </DatiCard>
 
         {costs.decision !== null ? (
@@ -332,16 +357,42 @@ function hourly(amount: string | null, currency: string): string | null {
   return amount === null ? null : `${formatMoneyCents(amount, currency)}/h`;
 }
 
-/** The sentence under the labor figures: only figures the backend sent, and the same words each time. */
-function laborSynthesis(economics: DataLaborEconomics, currency: string): string {
+/** Whether the plan covers every day of the window or only some: a ratio of one day must not be read as
+ * the week's. Counted by the backend (`economics.period_days` of `window_days`). */
+function laborCoverage(labor: DataLabor): { covered: number; window: number; partial: boolean } {
+  const covered = labor.economics.period_days;
+  const window = labor.window_days;
+  return { covered, window, partial: covered < window };
+}
+
+/** The sentence under the labor figures: only figures the backend sent, and the same words each time.
+ * When the plan covers only some of the days it says so: the ratio is about those days alone. */
+function laborSynthesis(labor: DataLabor, currency: string): string {
   const copy = datiCopy.labor.synthesis;
+  const { economics } = labor;
   if (economics.cost_to_revenue_pct !== null && economics.average_hourly_cost !== null) {
-    return copy.complete(
+    const make = laborCoverage(labor).partial ? copy.completePartial : copy.complete;
+    return make(
       formatPercent(economics.cost_to_revenue_pct, 1),
       formatMoneyCents(economics.average_hourly_cost, currency),
     );
   }
   return economics.planned_cost !== null ? copy.hoursAndCosts : copy.noCost;
+}
+
+/** "Piano disponibile per 1 giorno su 7": the first thing next to the figures. Evident when partial, and
+ * calm - the same place, the same words - when the plan covers the whole window. */
+function LaborCoverage({ labor }: { labor: DataLabor }) {
+  const copy = datiCopy.labor.coverage;
+  const { covered, window, partial } = laborCoverage(labor);
+  return (
+    <div className="dati-labor__coverage" data-partial={partial} role="group" aria-label={copy.groupLabel}>
+      <p className="dati-labor__coverage-main">
+        {partial ? copy.partial(covered, window) : copy.full(window)}
+      </p>
+      {partial ? <p className="dati-labor__coverage-explain">{copy.partialExplain}</p> : null}
+    </div>
+  );
 }
 
 function NoFigure() {
@@ -367,6 +418,7 @@ export function DatiLaborPanel({ overview, propertyId, timeZone }: DatiPanelProp
   const available = labor.state === "AVAILABLE" && labor.categories.length > 0;
   const revenueGap = economics.revenue_gap === null ? undefined : copy.revenueGap[economics.revenue_gap];
   const withIncidence = labor.categories.some((row) => row.revenue_incidence_pct !== null);
+  const coverage = laborCoverage(labor);
 
   return (
     <div className="dati-labor">
@@ -375,13 +427,19 @@ export function DatiLaborPanel({ overview, propertyId, timeZone }: DatiPanelProp
         <p className="dati-note">{copy.subtitle}</p>
       </header>
 
+      {available ? <LaborCoverage labor={labor} /> : null}
+
       {available ? (
         <div className="dati-kpis dati-kpis--labor" role="group" aria-label={copy.kpiGroupLabel}>
           <Kpi
             id="dati-labor-hours"
             label={copy.kpi.hours}
             value={economics.planned_hours === null ? null : formatHours(economics.planned_hours, 1)}
-            note={copy.kpi.hoursNote(range)}
+            note={
+              coverage.partial
+                ? copy.kpi.hoursNotePartial(coverage.covered, coverage.window)
+                : copy.kpi.hoursNote(range)
+            }
             unavailableNote={copy.kpi.noHours}
             highlight
           />
@@ -403,7 +461,7 @@ export function DatiLaborPanel({ overview, propertyId, timeZone }: DatiPanelProp
             id="dati-labor-incidence"
             label={copy.kpi.incidence}
             value={economics.cost_to_revenue_pct === null ? null : formatPercent(economics.cost_to_revenue_pct, 1)}
-            note={copy.kpi.incidenceNote}
+            note={coverage.partial ? copy.kpi.incidenceNotePartial : copy.kpi.incidenceNote}
             unavailableNote={revenueGap ?? copy.kpi.noCost}
           />
           <Kpi
@@ -454,7 +512,11 @@ export function DatiLaborPanel({ overview, propertyId, timeZone }: DatiPanelProp
                     </dd>
                   </div>
                 </dl>
-                <p className="dati-labor-summary__days">{copy.daysWithData(labor.days_with_data)}</p>
+                <p className="dati-labor-summary__days">
+                  {coverage.partial
+                    ? copy.coverage.partial(coverage.covered, coverage.window)
+                    : copy.coverage.full(coverage.window)}
+                </p>
                 {economics.reference_revenue !== null &&
                 economics.period_start !== null &&
                 economics.period_end !== null ? (
@@ -464,7 +526,10 @@ export function DatiLaborPanel({ overview, propertyId, timeZone }: DatiPanelProp
                 ) : null}
                 <section className="dati-labor__synthesis" aria-labelledby="dati-labor-synthesis">
                   <h3 id="dati-labor-synthesis">{copy.synthesisTitle}</h3>
-                  <p>{laborSynthesis(economics, currency)}</p>
+                  <p>{laborSynthesis(labor, currency)}</p>
+                  {coverage.partial && economics.cost_to_revenue_pct !== null ? (
+                    <p className="dati-note">{copy.synthesis.partialScope(coverage.covered, coverage.window)}</p>
+                  ) : null}
                 </section>
               </>
             ) : (

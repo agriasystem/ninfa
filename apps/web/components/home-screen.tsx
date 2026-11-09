@@ -85,14 +85,13 @@ function heroOf(
       return { fragments: [{ text: copy.today.noActionTitle, tone: "strong" }], supporting };
     }
     case "DATA_QUALITY_LIMITED": {
-      const supporting: string[] = [copy.today.dataQualityBody];
-      if (feed.insufficient_count !== null && feed.insufficient_count > 0) {
-        supporting.push(copy.today.dataQualityInsufficientCount(feed.insufficient_count));
-      }
+      // Not "all clear" and not a headline about a partial analysis: no reliable decision today, and why.
+      // The number of checks left inconclusive is an internal count and is never said here.
+      const supporting: string[] = [copy.today.buildingHistoryBody];
       if (feed.suppressed_count !== null && feed.suppressed_count > 0) {
-        supporting.push(copy.today.dataQualitySuppressedCount(feed.suppressed_count));
+        supporting.push(copy.today.lowConfidenceNote);
       }
-      return { fragments: [{ text: copy.today.dataQualityTitle, tone: "strong" }], supporting };
+      return { fragments: [{ text: copy.today.noReliableDecisionTitle, tone: "strong" }], supporting };
     }
     case "NOT_PROCESSED": {
       // No run for today says nothing about WHY: the analysis status does, when it has something to say.

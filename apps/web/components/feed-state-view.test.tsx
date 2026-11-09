@@ -103,10 +103,13 @@ describe("FeedStateView", () => {
       />,
     );
 
-    expect(screen.getByText("Analisi parziale")).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" })).not.toBeNull();
     expect(container.textContent).not.toContain("Tutto sotto controllo");
-    expect(container.textContent).toContain("2 in attesa di dati sufficienti");
-    expect(container.textContent).toContain("1 con confidenza troppo bassa");
+    // the counts are a folded technical detail, not part of the message
+    const detail = container.querySelector("details.feed-state__technical");
+    expect(detail?.textContent).toContain("2 controlli in attesa di dati sufficienti");
+    expect(detail?.textContent).toContain("1 risultato con confidenza troppo bassa");
+    expect((detail as HTMLDetailsElement).open).toBe(false);
     // "suppressed" must never be translated as a technical error.
     expect(container.textContent?.toLowerCase()).not.toContain("error");
     expect(renderedStates(container)).toEqual(["DATA_QUALITY_LIMITED"]);
@@ -202,7 +205,7 @@ describe("FeedStateView", () => {
       />,
     );
 
-    expect(container.textContent).toContain("2 in attesa di dati sufficienti");
+    expect(screen.getByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" })).not.toBeNull();
     expect(container.textContent).toContain("Non analizzati: Costi, Personale.");
   });
 
@@ -308,7 +311,7 @@ describe("FeedStateView", () => {
       />,
     );
 
-    expect(container.textContent).toContain("2 in attesa di dati sufficienti");
+    expect(screen.getByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" })).not.toBeNull();
     expect(container.textContent).toContain("Non analizzati: Costi, Personale.");
     expect(container.textContent).toContain("Ultimo import prenotazioni:");
     expect(container.querySelector(".feed-state__coverage")).not.toBeNull();

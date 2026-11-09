@@ -71,6 +71,7 @@ export function night(index: number, overrides: Partial<DataNightRow> = {}): Dat
     rooms_delta_7d: 2,
     status: "REGULAR",
     decision_id: null,
+    over_capacity: false,
     ...overrides,
   };
 }
@@ -161,6 +162,7 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
       days_30: month,
       selected: month,
       nights: nightRows,
+      inventory_consistency: { over_capacity_nights: 0, first_night: null },
     },
     distribution: {
       state: "AVAILABLE",
@@ -218,12 +220,25 @@ export function fullOverview(overrides: Partial<DataOverviewResponse> = {}): Dat
         actual_cpor: "7.68",
         expected_cpor: "6.10",
       },
+      // The denominator of February, day by day: 3 days of the month have no usable snapshot.
+      occupancy: {
+        total_days: 28,
+        known_days: 25,
+        observed_days: 25,
+        reconstructed_days: 0,
+        uncertain_days: 3,
+        days_outside_bookings: 0,
+        days_without_inventory: 0,
+        days_awaiting_rebuild: 0,
+        first_day_without_inventory: null,
+      },
     },
     labor: {
       state: "AVAILABLE",
       reason: null,
       window_start: AS_OF,
       window_end: addDays(AS_OF, 6),
+      window_days: 7,
       currency: "EUR",
       days_with_data: 7,
       categories: [
@@ -310,7 +325,16 @@ export function notProcessedOverview(lastAnalysisDate: string | null = "2026-03-
         lastAnalysisDate === null ? null : { as_of_local_date: lastAnalysisDate, completed_at: "2026-03-12T07:00:00Z" },
     },
     freshness: { bookings: { ...unknown, reason: "NO_SOURCE" }, costs: unknown, labor: unknown },
-    occupancy: { state: "NOT_AVAILABLE", reason: "NO_ANALYSIS", today: null, days_7: null, days_30: null, selected: null, nights: [] },
+    occupancy: {
+      state: "NOT_AVAILABLE",
+      reason: "NO_ANALYSIS",
+      today: null,
+      days_7: null,
+      days_30: null,
+      selected: null,
+      nights: [],
+      inventory_consistency: { over_capacity_nights: 0, first_night: null },
+    },
     distribution: {
       ...full.distribution,
       state: "NOT_AVAILABLE",

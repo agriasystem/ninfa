@@ -454,6 +454,16 @@ export interface DataNightRow {
   rooms_delta_7d: number | null;
   status: NightStatus;
   decision_id: string | null;
+  /** More rooms on the books than the inventory has. The figures stay as stored (an occupancy over 100 %
+   * is shown, never cut). */
+  over_capacity: boolean;
+}
+
+/** How many of the 30 observed nights hold more rooms than the inventory has. A question about the data
+ * (an inventory too low, a real overbooking, a wrong booking), never a decision. */
+export interface DataInventoryConsistency {
+  over_capacity_nights: number;
+  first_night: string | null;
 }
 
 export interface DataOccupancy {
@@ -464,6 +474,7 @@ export interface DataOccupancy {
   days_30: DataPeriodMetrics | null;
   selected: DataPeriodMetrics | null;
   nights: DataNightRow[];
+  inventory_consistency: DataInventoryConsistency;
 }
 
 export interface DataChannelWeight {
@@ -541,6 +552,27 @@ export interface DataCostDecision {
   expected_cpor: DecimalString | null;
 }
 
+/** The days a month's cost per occupied room rests on and, for each day it lacks, the one thing it lacks:
+ * `total_days` = `known_days` + the four counts below. */
+export interface DataCostOccupancy {
+  total_days: number;
+  /** Days with a usable snapshot: observed or reconstructed from the bookings. */
+  known_days: number;
+  observed_days: number;
+  reconstructed_days: number;
+  /** A snapshot exists but how many rooms were occupied is not known (a booking cancelled or marked
+   * no-show without a date). */
+  uncertain_days: number;
+  /** The bookings imported say nothing about that night. */
+  days_outside_bookings: number;
+  /** The bookings cover it but the property's number of rooms is not known. */
+  days_without_inventory: number;
+  /** Bookings and inventory are there: the next analysis stores it. */
+  days_awaiting_rebuild: number;
+  /** The day an inventory should be valid from to close the gap above. */
+  first_day_without_inventory: string | null;
+}
+
 export interface DataCosts {
   state: DataAvailability;
   reason: string | null;
@@ -555,6 +587,8 @@ export interface DataCosts {
   classification_coverage_pct: DecimalString | null;
   categories: DataCostCategory[];
   decision: DataCostDecision | null;
+  /** Null with no booking source to take the denominator from. */
+  occupancy: DataCostOccupancy | null;
 }
 
 export interface DataLaborCategory {
@@ -609,6 +643,9 @@ export interface DataLabor {
   reason: string | null;
   window_start: string;
   window_end: string;
+  /** The days in the window: `economics.period_days` of them have a plan with hours, and every ratio is
+   * calculated on those days alone. */
+  window_days: number;
   currency: string;
   days_with_data: number;
   categories: DataLaborCategory[];
@@ -1224,6 +1261,11 @@ export interface RoomInventoryResponse {
   varies: boolean;
   first_night: string | null;
   last_night: string | null;
+  /** The first night the inventory holds at all (a past one when it was saved from a past day). */
+  known_since: string | null;
+  /** The property's own today and the oldest day a save may be valid from: the form's limits. */
+  today: string;
+  earliest_valid_from: string;
   /** The backend's own limits: a page repeats none of them. */
   min_rooms: number;
   max_rooms: number;

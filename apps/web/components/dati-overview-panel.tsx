@@ -8,6 +8,7 @@ import { domainFreshnessLine } from "@/lib/data/freshness";
 import { formatBusinessDateItalian } from "@/lib/date/property-date";
 
 import { DatiDistributionCard } from "./dati-distribution-card";
+import { DatiInventoryNotice } from "./dati-inventory-notice";
 import { DatiKpiGrid } from "./dati-kpi-grid";
 import { DatiNightsTable } from "./dati-nights-table";
 import { DatiOccupancyCard } from "./dati-occupancy-card";
@@ -81,6 +82,7 @@ export function DatiOverviewPanel({
 }: DatiOverviewPanelProps) {
   return (
     <>
+      <DatiInventoryNotice overview={overview} propertyId={propertyId} />
       <div className="dati-grid dati-grid--overview" aria-busy={busy}>
         <div className="dati-cell dati-cell--occupancy">
           <DatiOccupancyCard

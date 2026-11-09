@@ -973,8 +973,123 @@ describe("Costi tab", () => {
 
     const rows = within(region("Costi per categoria")).getAllByRole("row").slice(1).map((row) => flat(row));
     expect(rows[0]).toContain("7,68 €");
-    expect(rows[2]).toContain("Occupazione del mese incompleta");
+    expect(rows[2]).toContain("Non calcolabile");
     expect(rows[3]).toContain("Non applicabile");
+  });
+
+  it("says exactly what is missing under the cost per occupied room, not 'month incomplete'", async () => {
+    await renderLoaded(fullOverview(), { initialTab: "costs" });
+
+    const gap = screen.getByRole("region", { name: "Costo per camera occupata di febbraio" });
+    expect(flat(gap)).toContain(
+      "Per 3 giorni di febbraio non è certo quante camere fossero occupate: ci sono prenotazioni annullate o non presentate senza data.",
+    );
+    expect(document.body.textContent).not.toContain("Occupazione del mese incompleta");
+    // nothing the inventory can fix: no way to the inventory
+    expect(within(gap).queryByRole("link", { name: "Configura inventario" })).toBeNull();
+  });
+
+  it("with no inventory for the month it names the day to start from and links to the inventory", async () => {
+    const data = fullOverview();
+    await renderLoaded(
+      {
+        ...data,
+        costs: {
+          ...data.costs,
+          occupancy: {
+            total_days: 28,
+            known_days: 0,
+            observed_days: 0,
+            reconstructed_days: 0,
+            uncertain_days: 0,
+            days_outside_bookings: 0,
+            days_without_inventory: 28,
+            days_awaiting_rebuild: 0,
+            first_day_without_inventory: "2026-02-01",
+          },
+        },
+      },
+      { initialTab: "costs" },
+    );
+
+    const gap = screen.getByRole("region", { name: "Costo per camera occupata di febbraio" });
+    expect(flat(gap)).toContain(
+      "Per 28 giorni di febbraio NINFA non conosce quante camere aveva la struttura. Configura l'inventario valido dal 1 febbraio",
+    );
+    expect(within(gap).getByRole("link", { name: "Configura inventario" }).getAttribute("href")).toBe(
+      "/struttura?property=p1#struttura-rooms",
+    );
+  });
+
+  it("names every different cause on its own line, with the backend's counts", async () => {
+    const data = fullOverview();
+    await renderLoaded(
+      {
+        ...data,
+        costs: {
+          ...data.costs,
+          occupancy: {
+            total_days: 28,
+            known_days: 10,
+            observed_days: 0,
+            reconstructed_days: 10,
+            uncertain_days: 2,
+            days_outside_bookings: 9,
+            days_without_inventory: 4,
+            days_awaiting_rebuild: 3,
+            first_day_without_inventory: "2026-02-03",
+          },
+        },
+      },
+      { initialTab: "costs" },
+    );
+
+    const gap = screen.getByRole("region", { name: "Costo per camera occupata di febbraio" });
+    expect(within(gap).getAllByRole("listitem")).toHaveLength(4);
+    const text = flat(gap);
+    expect(text).toContain("Per 4 giorni di febbraio NINFA non conosce quante camere aveva la struttura");
+    expect(text).toContain("Le prenotazioni importate non coprono 9 giorni di febbraio");
+    expect(text).toContain("Per 2 giorni di febbraio non è certo quante camere fossero occupate");
+    expect(text).toContain("Per 3 giorni di febbraio NINFA completerà il calcolo con la prossima analisi.");
+  });
+
+  it("falls back to the generic words only when the backend sent no basis", async () => {
+    const data = fullOverview();
+    await renderLoaded({ ...data, costs: { ...data.costs, occupancy: null } }, { initialTab: "costs" });
+
+    const rows = within(region("Costi per categoria")).getAllByRole("row").slice(1).map((row) => flat(row));
+    expect(rows[2]).toContain("Occupazione del mese incompleta");
+    expect(screen.queryByRole("region", { name: "Costo per camera occupata di febbraio" })).toBeNull();
+  });
+
+  it("says nothing about a missing denominator once the cost per occupied room is calculable", async () => {
+    const data = fullOverview();
+    await renderLoaded(
+      {
+        ...data,
+        costs: {
+          ...data.costs,
+          categories: data.costs.categories.map((row) =>
+            row.cpor_status === "INCOMPLETE" ? { ...row, cpor: "4.10", cpor_status: "READY" } : row,
+          ),
+          occupancy: {
+            total_days: 28,
+            known_days: 28,
+            observed_days: 0,
+            reconstructed_days: 28,
+            uncertain_days: 0,
+            days_outside_bookings: 0,
+            days_without_inventory: 0,
+            days_awaiting_rebuild: 0,
+            first_day_without_inventory: null,
+          },
+        },
+      },
+      { initialTab: "costs" },
+    );
+
+    expect(screen.queryByRole("region", { name: "Costo per camera occupata di febbraio" })).toBeNull();
+    expect(flat(within(region("Costi per categoria")).getAllByRole("row")[3] as HTMLElement)).toContain("4,10 €");
   });
 
   it("links a cost decision to its category and shows its own figures", async () => {
@@ -1224,6 +1339,79 @@ describe("Personale tab", () => {
     expect(screen.queryByRole("article", { name: "Incidenza sui ricavi" })).toBeNull();
     expect(screen.queryByRole("article", { name: "Ricavo per ora" })).toBeNull();
     expect(within(region("Ore e performance per ruolo")).getByRole("columnheader", { name: "Incidenza sui ricavi on-books" })).not.toBeNull();
+  });
+
+  /** The real pilot case: the labor plan covers only the first of the seven days. Every figure is the
+   * backend's and unchanged; only how much of the week they are about is new. */
+  function oneDayOfSeven(): DataOverviewResponse {
+    const overview = compared();
+    const day = overview.labor.window_start;
+    return {
+      ...overview,
+      labor: {
+        ...overview.labor,
+        days_with_data: 1,
+        economics: {
+          planned_hours: "34.00",
+          planned_cost: "492.60",
+          average_hourly_cost: "14.49",
+          period_start: day,
+          period_end: day,
+          period_days: 1,
+          reference_revenue: "680.00",
+          revenue_gap: null,
+          cost_to_revenue_pct: "72.44",
+          revenue_per_hour: "20.00",
+        },
+      },
+    };
+  }
+
+  it("says how many days of the seven the plan covers, next to the figures", async () => {
+    await renderLoaded(oneDayOfSeven(), { initialTab: "labor" });
+
+    const coverage = screen.getByRole("group", { name: "Copertura del piano" });
+    expect(flat(coverage)).toContain("Piano disponibile per 1 giorno su 7");
+    expect(flat(coverage)).toContain("calcolati esclusivamente sui giorni coperti dal piano");
+    // the figures are what the backend sent, untouched
+    expect(flat(kpi("Ore pianificate"))).toContain("34,0 h");
+    expect(flat(kpi("Costo pianificato"))).toContain("492,60 €");
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).toContain("72,4%");
+    expect(flat(kpi("Ricavo on-books per ora"))).toContain("20,00 €/h");
+    // and the old, weaker line is gone
+    expect(document.body.textContent).not.toContain("1 giorno con dati");
+  });
+
+  it("says in 'In sintesi' that incidence and revenue per hour are about the covered days only", async () => {
+    await renderLoaded(oneDayOfSeven(), { initialTab: "labor" });
+
+    const synthesis = flat(screen.getByRole("region", { name: "In sintesi" }));
+    expect(synthesis).toContain(
+      "Sui giorni coperti dal piano, il costo del personale incide per il 72,4% sui ricavi on-books",
+    );
+    expect(synthesis).toContain("Incidenza e ricavo on-books per ora riguardano 1 giorno su 7");
+    expect(synthesis).not.toContain("del periodo");
+  });
+
+  it("does not describe the hours as the whole week, and names only the covered day for the revenue", async () => {
+    await renderLoaded(oneDayOfSeven(), { initialTab: "labor" });
+
+    expect(flat(kpi("Ore pianificate"))).toContain("Solo i giorni coperti dal piano: 1 su 7");
+    expect(flat(kpi("Ore pianificate"))).not.toContain("Prossimi 7 giorni");
+    expect(flat(kpi("Incidenza sui ricavi on-books"))).toContain("dei soli giorni coperti dal piano");
+    const day = oneDayOfSeven().labor.window_start;
+    expect(day).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
+    expect(flat(region("Ore e costi del personale"))).toMatch(/Ricavi delle camere già prenotate, il \d+ \w+/u);
+  });
+
+  it("when the plan covers every day it says so calmly and keeps the week's own words", async () => {
+    await renderLoaded(compared(), { initialTab: "labor" });
+
+    const coverage = screen.getByRole("group", { name: "Copertura del piano" });
+    expect(flat(coverage)).toContain("Piano disponibile per tutti i 7 giorni");
+    expect(coverage.getAttribute("data-partial")).toBe("false");
+    expect(flat(coverage)).not.toContain("esclusivamente");
+    expect(flat(kpi("Ore pianificate"))).toContain("Prossimi 7 giorni");
   });
 
   it("says plainly when no labor source or no data exists", async () => {
@@ -1590,6 +1778,128 @@ describe("Dipendenza OTA - the real cause, and what the weights are a share of",
     await renderLoaded(reconciliationFailedOverview());
 
     expect(flat(region("Dipendenza OTA"))).toContain("+ 1 altro canale");
+  });
+});
+
+describe("Prenotazioni superiori all'inventario - the bookings and the inventory disagree", () => {
+  const title = "Prenotazioni superiori all'inventario";
+
+  /** Two nights hold more rooms than the inventory has: 11 on 10, and 45 on 40. */
+  function overCapacityOverview(count = 2): DataOverviewResponse {
+    const data = fullOverview();
+    const rows = nights(30, {
+      1: { rooms_on_books: 11, rooms_available: 10, occupancy_pct: "110.00", over_capacity: true },
+      3: { rooms_on_books: 45, rooms_available: 40, occupancy_pct: "112.50", over_capacity: true },
+    });
+    return {
+      ...data,
+      occupancy: {
+        ...data.occupancy,
+        nights: rows,
+        inventory_consistency: { over_capacity_nights: count, first_night: rows[1]?.stay_date ?? null },
+      },
+    };
+  }
+
+  it("says so on Panoramica, with the count, and a way to the inventory", async () => {
+    await renderLoaded(overCapacityOverview());
+
+    const notice = screen.getByRole("region", { name: title });
+    expect(flat(notice)).toContain(
+      "In 2 date risultano prenotate più camere di quelle configurate come disponibili. Verifica l'inventario della struttura oppure controlla eventuali overbooking.",
+    );
+    expect(within(notice).getByRole("link", { name: "Controlla inventario" }).getAttribute("href")).toBe(
+      "/struttura?property=p1#struttura-rooms",
+    );
+  });
+
+  it("says it on Prenotazioni too", async () => {
+    await renderLoaded(overCapacityOverview(), { initialTab: "bookings" });
+
+    expect(within(screen.getByRole("region", { name: title })).getByRole("link", { name: "Controlla inventario" })).not.toBeNull();
+  });
+
+  it("counts in the singular when it is one night", async () => {
+    await renderLoaded(overCapacityOverview(1));
+
+    expect(flat(screen.getByRole("region", { name: title }))).toContain("In 1 data risultano prenotate più camere");
+  });
+
+  it("is about the property, not about the rows on screen: a 7-day table with no such night still says it", async () => {
+    const data = overCapacityOverview();
+    await renderLoaded({ ...data, occupancy: { ...data.occupancy, nights: nights(7) } });
+
+    expect(screen.getByRole("region", { name: title })).not.toBeNull();
+  });
+
+  it("says nothing when the bookings fit the inventory, or when there is no analysis", async () => {
+    const { unmount } = await renderLoaded();
+    expect(screen.queryByRole("region", { name: title })).toBeNull();
+    unmount();
+
+    await renderLoaded(notProcessedOverview());
+    expect(screen.queryByRole("region", { name: title })).toBeNull();
+  });
+
+  it("is a question about the data, not a decision: no decision link, no 'attenzione', one way out", async () => {
+    await renderLoaded(overCapacityOverview());
+
+    const notice = screen.getByRole("region", { name: title });
+    expect(notice.querySelectorAll("a")).toHaveLength(1);
+    expect(flat(notice)).not.toMatch(/decisione|attenzione|critic|urgent/iu);
+  });
+
+  it("keeps the occupancy over 100 % in the chart - the bar is as tall as the figure, the axis grows", async () => {
+    const { container } = await renderLoaded(overCapacityOverview());
+
+    const axis = Array.from(container.querySelectorAll(".dati-chart__axis li")).map((li) => li.textContent);
+    expect(axis[0]).toBe("125%");
+    const bars = Array.from(container.querySelectorAll<HTMLElement>(".dati-chart__bar"));
+    expect(bars[1]?.style.height).toBe("88%"); // 110 / 125
+    expect(bars[3]?.style.height).toBe("90%"); // 112.5 / 125
+  });
+
+  it("highlights the nights over the inventory, with a word and the inventory's own line", async () => {
+    const { container } = await renderLoaded(overCapacityOverview());
+
+    const over = Array.from(container.querySelectorAll(".dati-chart__col--over"));
+    expect(over).toHaveLength(2);
+    expect(over[0]?.getAttribute("title")).toContain("110,0%"); // the figure, never cut to 100
+    expect(over[0]?.getAttribute("title")).toContain("11 prenotate / 10 disponibili");
+    expect(over[1]?.getAttribute("title")).toContain("45 prenotate / 40 disponibili");
+    expect(container.querySelectorAll(".dati-chart__col--bar:not(.dati-chart__col--over)").length).toBeGreaterThan(0);
+    expect(flat(region("Occupazione prossimi 30 giorni"))).toContain("Sopra l'inventario");
+    expect(container.querySelector(".dati-chart__capacity")).not.toBeNull();
+  });
+
+  it("draws no inventory line, and no legend for it, when no night is over", async () => {
+    const { container } = await renderLoaded();
+
+    expect(container.querySelector(".dati-chart__capacity")).toBeNull();
+    expect(container.querySelector(".dati-chart__col--over")).toBeNull();
+    expect(flat(region("Occupazione prossimi 30 giorni"))).not.toContain("Sopra l'inventario");
+  });
+
+  it("gives a text equivalent of the chart that says it too", async () => {
+    await renderLoaded(overCapacityOverview());
+
+    const table = within(region("Occupazione prossimi 30 giorni")).getByRole("table", { name: /equivalente testuale/u });
+    expect(flat(table)).toContain("11 prenotate / 10 disponibili");
+  });
+
+  it("shows 11 booked of 10 in the detail table, marks the row and never shows it as 100 %", async () => {
+    const { container } = await renderLoaded(overCapacityOverview());
+
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('tr[data-over="true"]'));
+    expect(rows).toHaveLength(2);
+    const first = flat(rows[0] as HTMLElement);
+    expect(first).toContain("11");
+    expect(first).toContain("10");
+    expect(first).toContain("110");
+    expect(first).not.toContain("100%");
+    expect(first).toContain("Sopra l'inventario");
+    expect(rows[0]?.querySelector(".dati-table__over")?.getAttribute("title")).toBe("11 prenotate / 10 disponibili");
+    expect(container.querySelectorAll('tr[data-status]:not([data-over="true"])').length).toBeGreaterThan(0);
   });
 });
 

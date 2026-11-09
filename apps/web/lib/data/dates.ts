@@ -86,6 +86,13 @@ export function formatDayMonthShort(isoDate: string): string {
   return `${parts.day} ${MONTHS_SHORT[parts.month - 1]}`;
 }
 
+/** "1 ottobre 2026" - a day that may be of another year (the day an inventory is valid from). */
+export function formatDayMonthYear(isoDate: string): string {
+  const parts = partsOf(isoDate);
+  if (!parts) return isoDate;
+  return `${parts.day} ${MONTHS[parts.month - 1]} ${parts.year}`;
+}
+
 /** "luglio" - the month a monthly figure belongs to. */
 export function formatMonthName(isoDate: string): string {
   const parts = partsOf(isoDate);
@@ -93,12 +100,14 @@ export function formatMonthName(isoDate: string): string {
   return MONTHS[parts.month - 1] ?? isoDate;
 }
 
-/** "dal 1 al 30 agosto", or "dal 25 luglio al 23 agosto" across a month boundary. */
+/** "dal 1 al 30 agosto", "dal 25 luglio al 23 agosto" across a month boundary, or "il 9 novembre" for a
+ * single day. */
 export function formatDateRange(startIso: string, endIso: string): string {
   const start = partsOf(startIso);
   const end = partsOf(endIso);
   if (!start || !end) return `${startIso} - ${endIso}`;
   const endMonth = MONTHS[end.month - 1];
+  if (startIso === endIso) return `il ${end.day} ${endMonth}`;
   if (start.month === end.month && start.year === end.year) {
     return `dal ${start.day} al ${end.day} ${endMonth}`;
   }

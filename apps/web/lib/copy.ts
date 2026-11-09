@@ -56,11 +56,29 @@ export const copy = {
     importFirstFile: "Importa un file",
     lastSuccessfulAnalysis: (businessDate: string) =>
       `L'ultima analisi completata risale al ${businessDate}.`,
-    dataQualityTitle: "Analisi parziale",
-    dataQualityBody:
-      "Alcuni controlli non dispongono ancora di dati sufficienti. NINFA non mostra conclusioni incerte.",
-    dataQualityInsufficientCount: (count: number) => `${count} in attesa di dati sufficienti`,
-    dataQualitySuppressedCount: (count: number) => `${count} con confidenza troppo bassa`,
+    // Final Pilot Product UX Fix: "no decision" is not "all clear", and it is not a big "partial analysis"
+    // either. When some checks could not conclude, the hero says what is true - NINFA has no reliable
+    // decision today and is still building the history it compares the structure's data with. "Analisi
+    // parziale" stays a SECONDARY state (the area tiles, a small badge). How many checks were left
+    // inconclusive is an internal count: never the message, only a discreet technical detail.
+    noReliableDecisionTitle: "Nessuna decisione affidabile oggi",
+    buildingHistoryBody:
+      "NINFA sta costruendo lo storico necessario per confrontare i dati della struttura. Quando emergerà uno scostamento affidabile, lo troverai qui.",
+    // On /decisioni, where the title above already says there is nothing reliable today.
+    noReliableDecisionBody:
+      "I dati disponibili non indicano ancora un intervento sufficientemente affidabile.",
+    buildingHistoryShort: "NINFA sta ancora costruendo lo storico di confronto.",
+    lowConfidenceNote: "Alcuni risultati non sono abbastanza affidabili per essere mostrati.",
+    partialAnalysisBadge: "Analisi parziale",
+    technicalDetailTitle: "Dettagli dell'analisi",
+    technicalInsufficientCount: (count: number) =>
+      count === 1
+        ? "1 controllo in attesa di dati sufficienti"
+        : `${count} controlli in attesa di dati sufficienti`,
+    technicalSuppressedCount: (count: number) =>
+      count === 1
+        ? "1 risultato con confidenza troppo bassa"
+        : `${count} risultati con confidenza troppo bassa`,
     noActionTitle: "Tutto sotto controllo",
     noActionBody: "Nessuna decisione richiede la tua attenzione in questo momento.",
     // Gate 22: additive to every state above - qualifies "Tutto sotto controllo"/"Analisi

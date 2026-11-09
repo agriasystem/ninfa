@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -104,6 +104,9 @@ const NOT_CONFIGURED_INVENTORY: RoomInventoryResponse = {
   varies: false,
   first_night: null,
   last_night: null,
+  known_since: null,
+  today: "2026-11-09",
+  earliest_valid_from: "2016-11-08",
   min_rooms: 1,
   max_rooms: 5000,
 };
@@ -113,6 +116,9 @@ const inventoryOf = (rooms: number, varies = false): RoomInventoryResponse => ({
   varies,
   first_night: "2026-11-09",
   last_night: "2036-11-08",
+  known_since: "2026-11-09",
+  today: "2026-11-09",
+  earliest_valid_from: "2016-11-08",
   min_rooms: 1,
   max_rooms: 5000,
 });
@@ -663,6 +669,91 @@ describe("/struttura - the room inventory, for real", () => {
     expect(await within(rooms()).findByText(/Il numero varia nei prossimi mesi/u)).not.toBeNull();
     const form = await openForm(user, "Modifica inventario");
     expect(flat(form)).toContain("vale lo stesso numero per tutte le notti da oggi in poi");
+  });
+
+  describe("valid from", () => {
+    const dateOf = (form: HTMLElement) => within(form).getByLabelText<HTMLInputElement>("Valido dal");
+
+    it("is today by default, between the limits the backend sent, and says what that means", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const form = await openForm(user, "Configura inventario");
+
+      const field = dateOf(form);
+      expect(field.type).toBe("date");
+      expect(field.value).toBe("2026-11-09");
+      expect(field.max).toBe("2026-11-09");
+      expect(field.min).toBe("2016-11-08");
+      expect(flat(form)).toContain("Di default è oggi.");
+    });
+
+    it("a plain save, with the day left as it is, sends the number alone", async () => {
+      const user = userEvent.setup();
+      saveRoomInventoryMock.mockResolvedValue(ok(savedOf(10)));
+      renderPage();
+      const form = await openForm(user, "Configura inventario");
+
+      await user.type(within(form).getByLabelText("Numero di camere disponibili"), "10");
+      await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+      await waitFor(() => expect(saveRoomInventoryMock).toHaveBeenCalledWith("p1", 10));
+    });
+
+    it("an earlier day is sent with the number, and the page says what happens to what was analysed", async () => {
+      const user = userEvent.setup();
+      saveRoomInventoryMock.mockResolvedValue(
+        ok(savedOf(10, { known_since: "2026-10-01", changed_nights: 3692 })),
+      );
+      getAnalysisStatusMock.mockResolvedValue(analysisIs("IN_PROGRESS"));
+      renderPage();
+      const form = await openForm(user, "Configura inventario");
+      await user.type(within(form).getByLabelText("Numero di camere disponibili"), "10");
+
+      fireEvent.change(dateOf(form), { target: { value: "2026-10-01" } });
+
+      expect(flat(form)).toContain("Le analisi già fatte non cambiano: NINFA ne farà una nuova");
+      // the number's own "from today on" would now contradict the day chosen
+      expect(flat(form)).not.toContain("Vale da oggi in poi");
+      await user.click(within(form).getByRole("button", { name: "Salva" }));
+      await waitFor(() => expect(saveRoomInventoryMock).toHaveBeenCalledWith("p1", 10, "2026-10-01"));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(flat(rooms())).toContain("Vale dal 1 ottobre 2026 in poi. Le analisi già fatte non cambiano.");
+    });
+
+    it("a day after today is refused before asking the backend, with the limits in words", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      const form = await openForm(user, "Configura inventario");
+      await user.type(within(form).getByLabelText("Numero di camere disponibili"), "10");
+
+      fireEvent.change(dateOf(form), { target: { value: "2026-11-10" } });
+      await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+      expect(within(form).getByRole("alert").textContent).toBe(
+        "Scegli un giorno tra il 8 novembre 2016 e il 9 novembre 2026: un inventario non può valere da un giorno futuro.",
+      );
+      expect(saveRoomInventoryMock).not.toHaveBeenCalled();
+    });
+
+    it.each(["2016-11-07", ""])("a day outside the limits (%j) is refused too", async (typed) => {
+      const user = userEvent.setup();
+      renderPage();
+      const form = await openForm(user, "Configura inventario");
+      await user.type(within(form).getByLabelText("Numero di camere disponibili"), "10");
+
+      fireEvent.change(dateOf(form), { target: { value: typed } });
+      await user.click(within(form).getByRole("button", { name: "Salva" }));
+
+      expect(within(form).getByRole("alert").textContent).toContain("Scegli un giorno tra il");
+      expect(saveRoomInventoryMock).not.toHaveBeenCalled();
+    });
+
+    it("once saved from an earlier day, the block says since when the number holds", async () => {
+      getRoomInventoryMock.mockResolvedValue(ok({ ...inventoryOf(10), known_since: "2026-10-01" }));
+      renderPage();
+
+      expect(await within(rooms()).findByText(/Vale dal 1 ottobre 2026 in poi/u)).not.toBeNull();
+    });
   });
 
   it("an inventory that cannot be read is not called 'not configured'", async () => {

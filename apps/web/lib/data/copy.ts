@@ -71,6 +71,18 @@ export const datiCopy = {
     configureInventory: "Configura inventario",
     notComputable: "Non calcolabile",
   },
+  // The bookings and the room inventory disagree. A question about the data, never a decision, and never
+  // a figure cut to 100 %: the occupancy stays what it is.
+  consistency: {
+    title: "Prenotazioni superiori all'inventario",
+    body: (nights: number) =>
+      `In ${nights === 1 ? "1 data" : `${formatCount(nights)} date`} risultano prenotate più camere di quelle configurate come disponibili. Verifica l'inventario della struttura oppure controlla eventuali overbooking.`,
+    action: "Controlla inventario",
+    legend: "Sopra l'inventario",
+    nightLabel: "Sopra l'inventario",
+    detail: (booked: number, available: number) =>
+      `${formatCount(booked)} prenotate / ${formatCount(available)} disponibili`,
+  },
   kpi: {
     groupLabel: "Indicatori del periodo",
     roomRevenue: "Ricavi camera",
@@ -218,6 +230,20 @@ export const datiCopy = {
     decisionLink: "Apri la decisione",
     attentionRow: "Richiede attenzione",
     notAnalyzedNote: "I costi non fanno parte dell'analisi di oggi: qui sono mostrati i dati registrati.",
+    // Why a cost per occupied room cannot be calculated: the one thing each missing day lacks.
+    cporTitle: (month: string) => `Costo per camera occupata di ${month}`,
+    cporNotComputable: "Non calcolabile",
+    cporGap: {
+      withoutInventory: (days: number, month: string, from: string) =>
+        `Per ${days === 1 ? "1 giorno" : `${days} giorni`} di ${month} NINFA non conosce quante camere aveva la struttura. Configura l'inventario valido dal ${from}: NINFA ricostruirà da sola le camere occupate di quei giorni.`,
+      outsideBookings: (days: number, month: string) =>
+        `Le prenotazioni importate non coprono ${days === 1 ? "1 giorno" : `${days} giorni`} di ${month}: per quei giorni NINFA non sa quante camere fossero occupate.`,
+      uncertain: (days: number, month: string) =>
+        `Per ${days === 1 ? "1 giorno" : `${days} giorni`} di ${month} non è certo quante camere fossero occupate: ci sono prenotazioni annullate o non presentate senza data.`,
+      awaiting: (days: number, month: string) =>
+        `Per ${days === 1 ? "1 giorno" : `${days} giorni`} di ${month} NINFA completerà il calcolo con la prossima analisi.`,
+      action: "Configura inventario",
+    },
   },
   labor: {
     heading: "Personale",
@@ -231,6 +257,10 @@ export const datiCopy = {
       incidence: "Incidenza sui ricavi on-books",
       revenuePerHour: "Ricavo on-books per ora",
       hoursNote: (range: string) => `Prossimi 7 giorni (${range})`,
+      // The plan covers only some of the days: the figures are about those, and the card says so.
+      hoursNotePartial: (covered: number, window: number) =>
+        `Solo i giorni coperti dal piano: ${covered} su ${window}`,
+      incidenceNotePartial: "Sui ricavi on-books dei soli giorni coperti dal piano",
       samePeriod: "Stesso periodo delle ore",
       hourlyCostNote: "Costo pianificato diviso le ore pianificate",
       incidenceNote: "Sui ricavi on-books degli stessi giorni",
@@ -258,7 +288,15 @@ export const datiCopy = {
     daysComplete: (complete: number) => `${complete}`,
     daysIncomplete: (incomplete: number) =>
       incomplete === 1 ? "1 giorno incompleto" : `${incomplete} giorni incompleti`,
-    daysWithData: (count: number) => (count === 1 ? "1 giorno con dati" : `${count} giorni con dati`),
+    // How much of the window the plan covers: the first thing to read next to any figure of this page.
+    coverage: {
+      partial: (covered: number, window: number) =>
+        `Piano disponibile per ${covered === 1 ? "1 giorno" : `${covered} giorni`} su ${window}`,
+      full: (window: number) => `Piano disponibile per tutti i ${window} giorni`,
+      partialExplain:
+        "Costo, incidenza e ricavo on-books per ora sono calcolati esclusivamente sui giorni coperti dal piano, non su tutto il periodo.",
+      groupLabel: "Copertura del piano",
+    },
     emptyTitle: "Personale non disponibile",
     emptyBody: "Non ci sono ore pianificate disponibili per questo periodo.",
     decisionTitle: "Possibile sovradimensionamento del personale",
@@ -280,6 +318,10 @@ export const datiCopy = {
     synthesis: {
       complete: (incidence: string, hourlyCost: string) =>
         `Il costo del personale incide per il ${incidence} sui ricavi on-books del periodo, con un costo medio di ${hourlyCost} per ora pianificata.`,
+      completePartial: (incidence: string, hourlyCost: string) =>
+        `Sui giorni coperti dal piano, il costo del personale incide per il ${incidence} sui ricavi on-books, con un costo medio di ${hourlyCost} per ora pianificata.`,
+      partialScope: (covered: number, window: number) =>
+        `Incidenza e ricavo on-books per ora riguardano ${covered === 1 ? "1 giorno" : `${covered} giorni`} su ${window}: negli altri giorni il piano non c'è.`,
       hoursAndCosts:
         "Sono disponibili ore e costi del personale. Le metriche legate ai ricavi on-books saranno calcolate quando NINFA avrà ricavi on-books confrontabili sullo stesso periodo.",
       noCost:
@@ -455,6 +497,7 @@ export function otaInsufficientReasonsText(codes: readonly string[], facts: OtaR
 
 const CPOR_STATUSES: Record<string, string> = {
   NO_OCCUPANCY_SOURCE: "Occupazione non disponibile",
+  // Said in full only when the backend knows nothing more: the cause is stated next to the table.
   INCOMPLETE: "Occupazione del mese incompleta",
   ZERO_OCCUPANCY: "Nessuna camera occupata nel mese",
   LOW_CLASSIFICATION_COVERAGE: "Troppe spese non classificate",

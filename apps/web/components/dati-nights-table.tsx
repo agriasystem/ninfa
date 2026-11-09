@@ -21,6 +21,12 @@ export interface DatiNightsTableProps {
   variant?: "overview" | "bookings";
 }
 
+/** "11 prenotate / 10 disponibili": what a night over the inventory holds, in the backend's own numbers. */
+function overDetail(night: DataNightRow): string {
+  if (night.rooms_on_books === null || night.rooms_available === null) return "";
+  return datiCopy.consistency.detail(night.rooms_on_books, night.rooms_available);
+}
+
 /** A figure the backend could not calculate is a dash with a spoken "non disponibile" - never 0. */
 function Cell({ children, missing = false }: { children: string; missing?: boolean }) {
   return missing ? (
@@ -45,7 +51,7 @@ function Row({
 }) {
   const status = <StatusMark status={night.status} />;
   return (
-    <tr data-status={night.status.toLowerCase()}>
+    <tr data-status={night.status.toLowerCase()} data-over={night.over_capacity ? "true" : undefined}>
       <th scope="row" className="dati-table__date">
         {formatNightShort(night.stay_date)}
       </th>
@@ -93,6 +99,11 @@ function Row({
         ) : (
           status
         )}
+        {night.over_capacity ? (
+          <span className="dati-table__over" title={overDetail(night)}>
+            {datiCopy.consistency.nightLabel}
+          </span>
+        ) : null}
       </td>
     </tr>
   );

@@ -405,27 +405,61 @@ describe("Home - DATA_QUALITY_LIMITED", () => {
       ...overrides,
     });
 
-  it("reads 'Analisi parziale' and NEVER 'Tutto sotto controllo' nor a made-up main decision", async () => {
+  it("reads 'Nessuna decisione affidabile oggi' - never 'Tutto sotto controllo', never a made-up decision", async () => {
     resolveFeed(limited());
     const { container } = renderHome();
 
     const h1 = await heroHeading();
-    expect(h1.textContent).toBe("Analisi parziale");
+    expect(h1.textContent).toBe("Nessuna decisione affidabile oggi");
     expect(container.textContent).not.toContain("Tutto sotto controllo");
-    expect(container.textContent).not.toMatch(/stanno arrivando|sopra il livello|sotto il livello/u);
+    expect(container.textContent).not.toMatch(/tutto bene|nessun problema|stanno arrivando|sopra il livello|sotto il livello/iu);
   });
 
-  it("keeps the existing honest body and counts", async () => {
+  it("does not make 'Analisi parziale' the headline: it stays a secondary state, in the areas below", async () => {
+    resolveFeed(limited());
+    renderHome();
+
+    const h1 = await heroHeading();
+    expect(h1.textContent).not.toContain("Analisi parziale");
+    const strip = await screen.findByRole("list", { name: "Riepilogo per area" });
+    expect(within(strip).getAllByText("Analisi parziale")).toHaveLength(4);
+  });
+
+  it("says that NINFA is building the history it compares with, and where a reliable difference will show", async () => {
     resolveFeed(limited());
     renderHome();
 
     expect(
       await screen.findByText(
-        "Alcuni controlli non dispongono ancora di dati sufficienti. NINFA non mostra conclusioni incerte.",
+        "NINFA sta costruendo lo storico necessario per confrontare i dati della struttura. Quando emergerà uno scostamento affidabile, lo troverai qui.",
       ),
     ).not.toBeNull();
-    expect(screen.getByText("3 in attesa di dati sufficienti")).not.toBeNull();
-    expect(screen.getByText("1 con confidenza troppo bassa")).not.toBeNull();
+  });
+
+  it("never puts the internal count of checks in the message", async () => {
+    resolveFeed(limited({ insufficient_count: 66, suppressed_count: 0 }));
+    const { container } = renderHome();
+    await heroHeading();
+
+    expect(container.textContent).not.toContain("66");
+    expect(container.textContent).not.toMatch(/in attesa di dati sufficienti|controlli in attesa/u);
+  });
+
+  it("says a low-confidence result was held back, without a count", async () => {
+    resolveFeed(limited({ insufficient_count: 3, suppressed_count: 2 }));
+    const { container } = renderHome();
+
+    expect(await screen.findByText("Alcuni risultati non sono abbastanza affidabili per essere mostrati.")).not.toBeNull();
+    expect(container.textContent).not.toMatch(/confidenza troppo bassa/u);
+  });
+
+  it("keeps the last booking import and the state of the four areas", async () => {
+    resolveFeed(limited({ input_freshness: knownFreshness("2026-10-08T10:42:00Z") }));
+    const { container } = renderHome();
+    await heroHeading();
+
+    expect(container.querySelector("[data-freshness='known']")?.textContent).toContain("Ultimo import prenotazioni");
+    expect(await screen.findByRole("list", { name: "Riepilogo per area" })).not.toBeNull();
   });
 
   it("shows coverage prudently: evaluated areas are 'Analisi parziale', never 'Nessuna attenzione'", async () => {

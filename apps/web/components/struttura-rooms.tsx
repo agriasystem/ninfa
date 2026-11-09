@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { RoomInventorySavedResponse } from "@ninfa/contracts";
 
 import { useAnalysisStatus } from "@/lib/analysis/use-analysis-status";
+import { formatDayMonthYear } from "@/lib/data/dates";
 import { datiRoute } from "@/lib/routes";
 import { strutturaCopy } from "@/lib/structure/copy";
 import { formatMaxOccupancy } from "@/lib/structure/format";
@@ -185,7 +186,13 @@ export function StrutturaRooms({
             <span className="struttura-inventory__label">{COPY.availableLabel}</span>
             <span className="struttura-inventory__value">{COPY.available(known.rooms_available ?? 0)}</span>
           </p>
-          <p className="struttura-flow__note">{known.varies ? COPY.varies : COPY.fromToday}</p>
+          <p className="struttura-flow__note">
+            {known.varies
+              ? COPY.varies
+              : known.known_since !== null && known.known_since < known.today
+                ? COPY.validSince(formatDayMonthYear(known.known_since))
+                : COPY.fromToday}
+          </p>
         </div>
       ) : null}
       {saved !== null ? <SavedNote propertyId={propertyId} saved={saved} /> : null}

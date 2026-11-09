@@ -38,6 +38,8 @@ export const strutturaCopy = {
     availableLabel: "Camere disponibili",
     available: (count: number) => (count === 1 ? "1 camera" : `${count} camere`),
     fromToday: "Vale da oggi in poi. Le analisi già fatte non cambiano.",
+    // Saved from an earlier day: the number holds for those nights too.
+    validSince: (date: string) => `Vale dal ${date} in poi. Le analisi già fatte non cambiano.`,
     varies: "Il numero varia nei prossimi mesi: qui è indicato quello della prima notte.",
     savedTitle: (count: number) => `Inventario salvato: ${count === 1 ? "1 camera" : `${count} camere`}.`,
     savedUnchanged: "Il numero era già questo: non è cambiato nulla.",
@@ -53,6 +55,12 @@ export const strutturaCopy = {
       intro: "Quante camere può vendere la struttura ogni notte.",
       label: "Numero di camere disponibili",
       fromToday: "Vale da oggi in poi. Le analisi già fatte non cambiano.",
+      validFromLabel: "Valido dal",
+      validFromToday: "Di default è oggi. Scegli una data precedente se la struttura aveva già queste camere.",
+      validFromPast:
+        "Le analisi già fatte non cambiano: NINFA ne farà una nuova con questo inventario, anche per i giorni già passati.",
+      validFromRefused: (earliest: string, latest: string) =>
+        `Scegli un giorno tra il ${earliest} e il ${latest}: un inventario non può valere da un giorno futuro.`,
       variesWarning:
         "Oggi il numero varia nei prossimi mesi. Salvando, vale lo stesso numero per tutte le notti da oggi in poi.",
       limits: (min: number, max: number) => `Inserisci un numero intero di camere, da ${min} a ${max}.`,
