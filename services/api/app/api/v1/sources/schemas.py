@@ -59,6 +59,35 @@ class ImportPreviewResponse(BaseModel):
     already_imported: bool
 
 
+class RememberedWordResponse(BaseModel):
+    id: str
+    document: str
+    field: str
+    label: str
+    value: str
+    # What it may be corrected to. Empty: it can only be forgotten.
+    choices: list[str]
+
+
+class RememberedFileResponse(BaseModel):
+    id: str
+    columns: list[str]
+    answers: dict[str, str]
+    file_scope: str | None
+    column_decisions: int
+
+
+class RememberedAnswersResponse(BaseModel):
+    words: list[RememberedWordResponse]
+    files: list[RememberedFileResponse]
+
+
+class CorrectRememberedAnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(min_length=1, max_length=64)
+
+
 class RecentImportResponse(BaseModel):
     file_name: str | None
     domain: str

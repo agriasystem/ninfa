@@ -18,6 +18,12 @@ Smart Import - the hotel's own CSV / Excel file, with the person's matching of i
     GET    .../data-sources/{id}/import-configuration   how this source's files are read
     DELETE .../data-sources/{id}/import-configuration   forget it (imported data stays)
 
+What the person taught NINFA about a source, and the way to correct it (imported data stays):
+
+    GET    .../data-sources/{id}/remembered-answers             what is remembered
+    PUT    .../data-sources/{id}/remembered-answers/{answer}    give a word another meaning
+    DELETE .../data-sources/{id}/remembered-answers/{answer}    forget it: the next file asks again
+
 There is NO route that creates a source on its own: a source comes to exist only when an import
 succeeds (see `DataSourcesService.import_file`), so an abandoned flow never leaves one "configured".
 
@@ -44,6 +50,7 @@ from app.api.v1.sources.schemas import (
     CapabilityResponse,
     ColumnInfoResponse,
     ConstantSpecResponse,
+    CorrectRememberedAnswerRequest,
     DryRunResponse,
     DryRunSummaryResponse,
     FieldSpecResponse,
@@ -63,6 +70,9 @@ from app.api.v1.sources.schemas import (
     QuestionResponse,
     RecentImportResponse,
     RecentImportsResponse,
+    RememberedAnswersResponse,
+    RememberedFileResponse,
+    RememberedWordResponse,
     RowIssueResponse,
     RowProblemResponse,
     SavedColumnResponse,
@@ -73,6 +83,7 @@ from app.api.v1.sources.schemas import (
     UnderstandingResponse,
     UnderstandRequest,
 )
+from app.core.auth import AuthenticatedPrincipal, get_current_principal
 from app.db.session import get_session
 from app.modules.bookings.parsers import MAX_COLUMNS as PARSER_MAX_COLUMNS
 from app.modules.bookings.parsers import MAX_ROWS as PARSER_MAX_ROWS
@@ -90,6 +101,7 @@ from app.modules.data_sources.mapping_types import (
     MappingCheck,
     SavedConfiguration,
 )
+from app.modules.data_sources.remembered_answers import RememberedAnswers
 from app.modules.data_sources.service import DataSourcesService, MappedImport
 from app.modules.data_sources.types import SourcesOverview
 from app.modules.data_sources.understanding_redaction import redact_inspection
@@ -275,6 +287,32 @@ def _configuration_response(configuration: SavedConfiguration) -> SavedConfigura
         constants=[SavedConstantResponse(field=f, value=v) for f, v in configuration.constants],
         last_used_at=configuration.last_used_at,
         schema_current=configuration.schema_current,
+    )
+
+
+def _remembered_response(answers: RememberedAnswers) -> RememberedAnswersResponse:
+    return RememberedAnswersResponse(
+        words=[
+            RememberedWordResponse(
+                id=word.id,
+                document=word.document,
+                field=word.field,
+                label=word.label,
+                value=word.value,
+                choices=list(word.choices),
+            )
+            for word in answers.words
+        ],
+        files=[
+            RememberedFileResponse(
+                id=item.id,
+                columns=list(item.columns),
+                answers=dict(item.answers),
+                file_scope=None if item.file_scope is None else item.file_scope.value,
+                column_decisions=item.column_decisions,
+            )
+            for item in answers.files
+        ],
     )
 
 
@@ -583,6 +621,61 @@ def forget_import_configuration(
         scope.property_id, data_source_id
     )
     return Response(status_code=204)
+
+
+@router.get(
+    "/{data_source_id}/remembered-answers",
+    response_model=RememberedAnswersResponse,
+    summary="What this source remembers from a person's answers",
+)
+def get_remembered_answers(
+    data_source_id: UUID,
+    response: Response,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    session: Session = Depends(get_session),
+) -> RememberedAnswersResponse:
+    response.headers["Cache-Control"] = "no-store"
+    answers = DataSourcesService(session, scope.tenant).remembered_answers(
+        scope.property_id, data_source_id
+    )
+    return _remembered_response(answers)
+
+
+@router.put(
+    "/{data_source_id}/remembered-answers/{answer_id}",
+    response_model=RememberedAnswersResponse,
+    summary="Correct a remembered answer: it counts from the next file (imported data stays)",
+)
+def correct_remembered_answer(
+    data_source_id: UUID,
+    answer_id: str,
+    body: CorrectRememberedAnswerRequest,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    principal: AuthenticatedPrincipal = Depends(get_current_principal),
+    session: Session = Depends(get_session),
+) -> RememberedAnswersResponse:
+    answers = DataSourcesService(session, scope.tenant).correct_remembered_answer(
+        scope.property_id, data_source_id, answer_id, body.value, by=principal.user_id
+    )
+    return _remembered_response(answers)
+
+
+@router.delete(
+    "/{data_source_id}/remembered-answers/{answer_id}",
+    response_model=RememberedAnswersResponse,
+    summary="Forget a remembered answer: the next file asks again (imported data stays)",
+)
+def forget_remembered_answer(
+    data_source_id: UUID,
+    answer_id: str,
+    scope: PropertyScope = Depends(resolve_property_scope),
+    principal: AuthenticatedPrincipal = Depends(get_current_principal),
+    session: Session = Depends(get_session),
+) -> RememberedAnswersResponse:
+    answers = DataSourcesService(session, scope.tenant).forget_remembered_answer(
+        scope.property_id, data_source_id, answer_id, by=principal.user_id
+    )
+    return _remembered_response(answers)
 
 
 @router.get("/templates/{domain}", summary="The column row of the canonical CSV of a domain")

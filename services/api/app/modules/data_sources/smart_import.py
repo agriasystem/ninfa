@@ -920,7 +920,13 @@ class SmartImportService:
             if families is None and origin != Via.REUSE:
                 # the engine alone never replaces what a person confirmed
                 return False
-            learning = existing_raw if families is None else stored_learning(families)
+            if families is None:
+                learning = existing_raw
+            else:
+                # (what a person corrected stays on record, whatever this import remembers)
+                known = parse_learning(existing_raw)
+                trail = [] if known is None else known.corrections
+                learning = stored_learning(families.model_copy(update={"corrections": trail}))
         else:
             # The saved matching is rewritten without saying which family it belongs to.
             known = parse_learning(existing_raw)

@@ -13,6 +13,7 @@ property's source answers the same `DataSourceNotFoundError` as an id that does 
 
 import hashlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from uuid import UUID
@@ -56,6 +57,7 @@ from app.modules.data_sources.mapping_types import (
     MappingInput,
     SavedConfiguration,
 )
+from app.modules.data_sources.remembered_answers import RememberedAnswers, RememberedAnswersService
 from app.modules.data_sources.smart_import import (
     Resolved,
     SmartImportService,
@@ -517,6 +519,64 @@ class DataSourcesService:
                 source.id,
             )
         return forgotten
+
+    # --- what the person taught, and the way to correct it ---------------------------------------
+
+    def remembered_answers(self, property_id: UUID, data_source_id: UUID) -> RememberedAnswers:
+        """What this source remembers from a person's answers, as far as it changes the next
+        import."""
+        return RememberedAnswersService(self._session, self._tenant).read(
+            self._load(property_id, data_source_id)
+        )
+
+    def correct_remembered_answer(
+        self,
+        property_id: UUID,
+        data_source_id: UUID,
+        answer_id: str,
+        value: str,
+        *,
+        by: UUID | None = None,
+    ) -> RememberedAnswers:
+        """Give a remembered word another meaning. It counts from the next import: nothing already
+        imported is read again."""
+        source = self._load(property_id, data_source_id)
+        service = RememberedAnswersService(self._session, self._tenant)
+        return self._under_import_lock(
+            source, lambda: service.correct(source, answer_id, value, by=by)
+        )
+
+    def forget_remembered_answer(
+        self, property_id: UUID, data_source_id: UUID, answer_id: str, *, by: UUID | None = None
+    ) -> RememberedAnswers:
+        """Forget one remembered answer: the next file asks again where it needs to. Nothing already
+        imported is read again."""
+        source = self._load(property_id, data_source_id)
+        service = RememberedAnswersService(self._session, self._tenant)
+        return self._under_import_lock(source, lambda: service.forget(source, answer_id, by=by))
+
+    def _under_import_lock(
+        self, source: DataSource, change: Callable[[], RememberedAnswers]
+    ) -> RememberedAnswers:
+        """An import saves the profile when it ends: a correction takes the same lock, so neither
+        can overwrite the other."""
+        try:
+            with hold_source_import_lock(
+                self._session,
+                self._tenant.workspace_id,
+                source.property_id,
+                source.domain.value,
+                wait_ms=IMPORT_LOCK_WAIT_MS,
+            ):
+                try:
+                    answers: RememberedAnswers = change()
+                    self._session.commit()
+                except Exception:
+                    self._session.rollback()
+                    raise
+        except LockWaitTimeoutError as error:
+            raise ImportInProgressError() from error
+        return answers
 
     def _already_imported(
         self, property_id: UUID, domain: DataSourceDomain, content: bytes

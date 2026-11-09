@@ -128,6 +128,20 @@ class FileDomain(ABC):
         self._session = session
         self._tenant = tenant
 
+    def update_profile_documents(
+        self, data_source_id: UUID, documents: dict[str, dict[str, Any]]
+    ) -> None:
+        """Replace some stored documents of a saved profile, and nothing else: the columns it reads
+        and the signature of the file it was saved from stay. The caller checked that the profile
+        exists."""
+        row = self._profile_row(data_source_id)
+        for name, document in documents.items():
+            setattr(row, name, document)
+        self._session.flush()
+
+    @abstractmethod
+    def _profile_row(self, data_source_id: UUID) -> Any: ...
+
     # --- what a column probably means ---------------------------------------------------------
 
     @abstractmethod
@@ -281,10 +295,13 @@ class BookingsDomain(FileDomain):
             options.learning,
         )
 
-    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
-        profile = BookingMappingProfileRepository(self._session, self._tenant).get_for_data_source(
+    def _profile_row(self, data_source_id: UUID) -> Any:
+        return BookingMappingProfileRepository(self._session, self._tenant).get_for_data_source(
             data_source_id
         )
+
+    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
+        profile = self._profile_row(data_source_id)
         if profile is None:
             return None
         return StoredProfile(
@@ -451,10 +468,13 @@ class LaborDomain(FileDomain):
             options.learning,
         )
 
-    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
-        profile = LaborMappingProfileRepository(self._session, self._tenant).get_for_data_source(
+    def _profile_row(self, data_source_id: UUID) -> Any:
+        return LaborMappingProfileRepository(self._session, self._tenant).get_for_data_source(
             data_source_id
         )
+
+    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
+        profile = self._profile_row(data_source_id)
         if profile is None:
             return None
         return StoredProfile(
@@ -622,10 +642,13 @@ class CostsDomain(FileDomain):
             options.learning,
         )
 
-    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
-        profile = InvoiceMappingProfileRepository(self._session, self._tenant).get_for_data_source(
+    def _profile_row(self, data_source_id: UUID) -> Any:
+        return InvoiceMappingProfileRepository(self._session, self._tenant).get_for_data_source(
             data_source_id
         )
+
+    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
+        profile = self._profile_row(data_source_id)
         if profile is None:
             return None
         return StoredProfile(

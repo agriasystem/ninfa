@@ -31,6 +31,8 @@ _SOURCES_METHODS = {
     f"{_SOURCES}/import-mapping-check": {"post"},
     f"{_SOURCES}/import-validation": {"post"},
     f"{_SOURCES}/{{data_source_id}}/import-configuration": {"get", "delete"},
+    f"{_SOURCES}/{{data_source_id}}/remembered-answers": {"get"},
+    f"{_SOURCES}/{{data_source_id}}/remembered-answers/{{answer_id}}": {"put", "delete"},
     f"{_SOURCES}/templates/{{domain}}": {"get"},
 }
 # Where the analysis stands against the data, and the recovery when a refresh did not happen.

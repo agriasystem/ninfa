@@ -213,6 +213,8 @@ class Learning(BaseModel):
     # matching is only ever applied to a file of the same family.
     current: str = ""
     families: list[Memory] = []
+    # What a person corrected or made NINFA forget, newest last (`remembered_answers`).
+    corrections: list[dict[str, Any]] = []
 
     def family(self, family_id: str | None) -> Memory | None:
         return next((m for m in self.families if family_id and m.id == family_id), None)
@@ -250,10 +252,16 @@ def parse_learning(raw: Mapping[str, Any] | None) -> Learning | None:
         families.append(memory)
     seq = raw.get("seq")
     current = raw.get("current")
+    corrections = raw.get("corrections")
     return Learning(
         seq=max([seq if isinstance(seq, int) else 0, *(m.touched for m in families)]),
         current=current if isinstance(current, str) and current in seen else "",
         families=families,
+        corrections=(
+            [entry for entry in corrections if isinstance(entry, dict)]
+            if isinstance(corrections, list)
+            else []
+        ),
     )
 
 
