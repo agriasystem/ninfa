@@ -54,6 +54,8 @@ Manual run, as the service account:
   10:00 on the last Sunday of March and of October. A fixed UTC time would be an hour off for half of the year, which is why none is used.
 - It asks only for what is missing. A worker that was down asks at its first tick after coming back, the **same local day**. A day with the worker
   down all day is not recovered: an observation cannot be dated in the past. **So the one thing to keep alive is `ninfa-worker`.**
+  A tick asked for while one still waits (it happens at a restart) is skipped, on a PostgreSQL that speaks any language: it no longer stops the worker
+  ([ADR 0049](../architecture/adr/0049-a-taken-queueing-lock-is-the-same-in-every-language.md)).
 - **Manual catch-up is supported:** running the wrapper at any hour is safe. It skips a property that already has a run today and one that has never
   imported anything (`NO_BOOKING_IMPORT`).
 

@@ -41,6 +41,7 @@ what is still missing. A day with the worker down all day is not recovered, beca
 |---|---|
 | A restart, or two workers | the queue's own table holds one tick per moment |
 | Asked twice before the worker ran | `queueing_lock`: one job waits per property |
+| A tick asked for while one waits, on a server whose messages are not English | the worker's connector recognises the lock by SQLSTATE and constraint name, never by a message ([ADR 0049](adr/0049-a-taken-queueing-lock-is-the-same-in-every-language.md)): it is a skip, not a stopped worker |
 | A job run twice | the policy task evaluates again when it runs, and a run today means skip |
 | A refresh at the same time | the same `lock`: one analysis of a property runs at a time |
 | Another property's failure | every count is per property |
