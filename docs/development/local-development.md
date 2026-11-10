@@ -156,7 +156,8 @@ Gate 3 adds no dependency.
 
 Also a Python service, with no public API, worker task or scheduler yet. It needs OBSERVED snapshots
 (see above) and, to get more than `INSUFFICIENT_DATA`, history: at least 5 comparable snapshots at the
-same lead time, weekday and season (observed, or clean reconstructions).
+same lead time, weekday and season (observed; clean reconstructions complete a thin sample only in a
+direct call that names no history, never in the analysis: [ADR 0048](../architecture/adr/0048-reconstructed-is-not-observed-as-of.md)).
 
 ```python
 from datetime import date

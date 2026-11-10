@@ -57,7 +57,7 @@ resolution 0/1/N, shell).
 | --- | --- | --- |
 | `ACTION_REQUIRED` | the **first** item of the feed, as a sentence (below) | "N decisioni richiedono attenzione →" + freshness + area strip |
 | `NO_ACTION_REQUIRED` | "Tutto sotto controllo" + the existing body | freshness + area strip; the Gate 22 coverage note ("Non analizzati: ...") |
-| `DATA_QUALITY_LIMITED` | "Nessuna decisione affidabile oggi" + "NINFA sta costruendo lo storico necessario per confrontare i dati della struttura. Quando emergerà uno scostamento affidabile, lo troverai qui." ([ADR 0047](adr/0047-final-pilot-product-ux.md)); no count of inconclusive checks | freshness + area strip (prudent, below), where "Analisi parziale" stays as the secondary state |
+| `DATA_QUALITY_LIMITED` | "Nessuna decisione affidabile oggi" + "NINFA non ha ancora elementi sufficienti per formulare nuove decisioni affidabili. Quando emergerà qualcosa che merita attenzione, lo troverai qui." ([ADR 0047](adr/0047-final-pilot-product-ux.md), wording by [ADR 0048](adr/0048-reconstructed-is-not-observed-as-of.md): no reason is named, the feed has none); no count of inconclusive checks | freshness + area strip (prudent, below), where "Analisi parziale" stays as the secondary state |
 | `NOT_PROCESSED` | "Analisi non ancora disponibile" (never analysed / last successful analysis) | **no** freshness, **no** area strip |
 
 Loading is a skeleton (with a visually hidden `<h1>Oggi</h1>`, the logo and Mia already present);

@@ -46,8 +46,8 @@ of a day, and are always read. A baseline names its rows by id, so Revenue check
 **Retry.** A retry reaches the same rows and the same revision, and computes the same baseline for the same target: nothing is written twice, and no conflict.
 Before it finishes that day is no sample. After, it is one sample.
 
-**The first run.** Nothing to compare with is not "nothing new": the first valid observation is fresh, so the detectors are evaluated on what history there is (a
-reconstruction counts), and it is the first sample for the days after it. There is no block waiting for a previous run.
+**The first run.** Nothing to compare with is not "nothing new": the first valid observation is fresh, so the detectors are evaluated on what history there is (only
+observations: a reconstruction is no history, ADR 0048), and it is the first sample for the days after it. There is no block waiting for a previous run.
 
 **A file later the same day.** The morning's stale run holds nothing back: the day's last finished run decides, and the afternoon's refresh evaluates normally.
 

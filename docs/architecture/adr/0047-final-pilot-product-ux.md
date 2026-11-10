@@ -3,6 +3,9 @@
 Status: accepted (Final Pilot Product UX Fix). No migration, no new dependency, no formula, threshold, detector, Decision Memory or Mia change. Builds on
 [ADR 0043](0043-dati-cause-and-denominator.md), [ADR 0044](0044-pilot-autonomy.md) and [ADR 0046](0046-a-sample-of-history-is-what-a-finished-analysis-read.md).
 
+**Amended by [ADR 0048](0048-reconstructed-is-not-observed-as-of.md):** the rebuilt nights are readable for the cost but are never a sample of history, so the ordering of history and
+analysis (section 3), the consequence "Reconstructed lead-time-0 nights are history" and the wording of the empty state (section 4) below no longer hold; each is marked where it appears.
+
 ## Context
 
 A real review of the pilot in the browser found four places where the numbers were right and the page let them be misread:
@@ -51,7 +54,8 @@ can be stored as a reconstruction, which copies the capacity and is never rewrit
 
 It is idempotent: a second call writes nothing.
 
-**History is never added under a day that has already been analysed.** A stored baseline names its comparables and is never rewritten; a past night appearing after
+**History is never added under a day that has already been analysed.** *(Superseded by ADR 0048: a reconstruction is no comparable, so the order no longer matters and the refresh
+rebuilds the history and then analyses; a baseline conflict fails the job again.)* A stored baseline names its comparables and is never rewritten; a past night appearing after
 today's analysis made today's next analysis fail (`EXPECTED_BASELINE_CONFLICT`, measured on the real demo, not predicted). With no analysis yet today the history is rebuilt
 first and today's analysis reads it; with one, today's analysis is made first (same history, same result) and the history is added after it. A refresh later the same day,
 on bookings that did not change, would now read a different history: like the existing snapshot conflict it ends `DEFERRED` to the next local day, which is not a failure.
@@ -63,6 +67,7 @@ guesses), or it waits for the next analysis. "Occupazione del mese incompleta" i
 
 ### 4. Home and Decisioni: no reliable decision is neither all clear nor an alarm
 
+*(Wording superseded by ADR 0048: the feed has no reason for "limited", so the copy no longer names the history and the folded count is gone.)*
 `DATA_QUALITY_LIMITED` now reads **"Nessuna decisione affidabile oggi"**: on Home "NINFA sta costruendo lo storico necessario per confrontare i dati della struttura. Quando
 emergerà uno scostamento affidabile, lo troverai qui."; on Decisioni "I dati disponibili non indicano ancora un intervento sufficientemente affidabile." and "NINFA sta ancora
 costruendo lo storico di confronto." The last booking import and the four areas stay; "Analisi parziale" is secondary (the area tiles, a small badge). The count of checks left
@@ -78,7 +83,7 @@ Distribuzione, the cost total, the categories and the period of Costi, the detec
 - **The demo's October will not have a cost per occupied room**, with or without the inventory: its bookings file begins on the 25th, so 24 days of October are outside what the
   bookings say. Saved from 1 October, the 7 days from the 25th are rebuilt and the page says "Le prenotazioni importate non coprono 24 giorni di ottobre". A file with the
   whole month is what is missing, not a setting.
-- **Reconstructed lead-time-0 nights are history.** The Expected engine admits clean reconstructions when it has fewer than five observed comparables, so tomorrow's baseline for
+- **Reconstructed lead-time-0 nights are history.** *(Reversed by ADR 0048: they are readable, never a sample.)* The Expected engine admits clean reconstructions when it has fewer than five observed comparables, so tomorrow's baseline for
   the night "today" may find them. That is the engine's own rule, not changed here.
 - **Every refresh now rebuilds the missing, inventoried nights of the cost months**, not only the one an inventory save asks for. Nothing is written for a property with no inventory
   for those nights.

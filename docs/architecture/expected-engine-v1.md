@@ -66,7 +66,10 @@ Then the provenance policy, ordering and caps:
   RECONSTRUCTED_APPROXIMATE** snapshots (`uncertain_rooms = 0`), newest first, **up to the
   24-comparable sample limit** (not merely up to 5). A reconstruction fills the sample; it never
   displaces an observed one, and the confidence pays for it (provenance 60 instead of 100, caps
-  85 and 65).
+  85 and 65). This is the engine's own rule and it is unchanged. In the product the history it is
+  given (`ObservationHistory`, [ADR 0048](adr/0048-reconstructed-is-not-observed-as-of.md)) admits
+  OBSERVATIONS only, so no reconstruction reaches it from the analysis: the completion applies to a
+  direct call that names no history.
 * A reconstruction **with uncertainty** never enters the numbers. Every calendar-eligible
   candidate of that kind is counted in `rejected_uncertain_count` (informative about the quality
   of the history, also when the observed sample was sufficient and no reconstruction was needed).

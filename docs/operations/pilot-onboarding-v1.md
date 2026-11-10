@@ -12,7 +12,8 @@ roughly the **first five weeks** Oggi will mostly show a **limited-data-quality*
 (`DATA_QUALITY_LIMITED`), not full decision coverage. This is derived from the detectors' minimum
 of five comparable same-weekday observed snapshots (≈ 35 days of uninterrupted daily analysis).
 **Importing historical bookings does not by itself create that history**: observed snapshots exist
-only for the days NINFA actually analysed, and there is no supported command that reconstructs them.
+only for the days NINFA actually analysed, and there is no supported command that reconstructs them. (The days NINFA
+rebuilds from an export so that a past month's cost per occupied room can be calculated are readable for that figure only: they never count as this history.)
 Every missed day delays the moment decisions become meaningful. Do **not** promise full coverage on
 day 1. See [pilot expectations](pilot-expectations-v1.md).
 

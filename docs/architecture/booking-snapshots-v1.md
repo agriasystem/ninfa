@@ -342,7 +342,9 @@ The Expected Engine ([expected-engine-v1.md](expected-engine-v1.md)) reads these
 why the origin distinction matters: an Expected baseline must start from an **OBSERVED** target
 (the database refuses a reconstruction as a target), prefers OBSERVED comparables, uses a
 RECONSTRUCTED_APPROXIMATE one only to complete a small observed sample, penalises it in the
-confidence, and never uses one with `uncertain_rooms > 0`. It needs exactly one snapshot per
+confidence, and never uses one with `uncertain_rooms > 0`. (The analysis names a history that admits
+observations only, [ADR 0048](adr/0048-reconstructed-is-not-observed-as-of.md): a reconstruction is
+readable, for how a day ended, and is never a sample of what NINFA knew then.) It needs exactly one snapshot per
 (stay date, lead time) in a data source, which the unique key guarantees, and it reads them by exact
 `(snapshot day, stay date)` keys through `BookingSnapshotRepository.list_by_keys` (the unique key's
 index). Migration `0006` adds one unique constraint to `booking_snapshots`,
