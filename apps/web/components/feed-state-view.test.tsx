@@ -105,11 +105,9 @@ describe("FeedStateView", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" })).not.toBeNull();
     expect(container.textContent).not.toContain("Tutto sotto controllo");
-    // the counts are a folded technical detail, not part of the message
-    const detail = container.querySelector("details.feed-state__technical");
-    expect(detail?.textContent).toContain("2 controlli in attesa di dati sufficienti");
-    expect(detail?.textContent).toContain("1 risultato con confidenza troppo bassa");
-    expect((detail as HTMLDetailsElement).open).toBe(false);
+    // the counts of the detectors are not shown anywhere, folded or not
+    expect(container.querySelector("details")).toBeNull();
+    expect(container.textContent).not.toMatch(/\d+ controll|in attesa di dati sufficienti|confidenza troppo bassa/u);
     // "suppressed" must never be translated as a technical error.
     expect(container.textContent?.toLowerCase()).not.toContain("error");
     expect(renderedStates(container)).toEqual(["DATA_QUALITY_LIMITED"]);

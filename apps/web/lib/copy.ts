@@ -56,29 +56,20 @@ export const copy = {
     importFirstFile: "Importa un file",
     lastSuccessfulAnalysis: (businessDate: string) =>
       `L'ultima analisi completata risale al ${businessDate}.`,
-    // Final Pilot Product UX Fix: "no decision" is not "all clear", and it is not a big "partial analysis"
-    // either. When some checks could not conclude, the hero says what is true - NINFA has no reliable
-    // decision today and is still building the history it compares the structure's data with. "Analisi
-    // parziale" stays a SECONDARY state (the area tiles, a small badge). How many checks were left
-    // inconclusive is an internal count: never the message, only a discreet technical detail.
+    // Final Pilot Product UX Fix / Historical Integrity: "no decision" is not "all clear", and it is not a big
+    // "partial analysis" either. When some checks could not conclude, the message says only what is always
+    // true: NINFA has no reliable decision today. The feed carries no REASON for it (history still being
+    // built, no new bookings, a low confidence), so the copy never names one - above all never "the history".
+    // "Analisi parziale" stays a SECONDARY state (the area tiles, a small badge). How many checks were left
+    // inconclusive is an internal count: it is not shown at all.
     noReliableDecisionTitle: "Nessuna decisione affidabile oggi",
-    buildingHistoryBody:
-      "NINFA sta costruendo lo storico necessario per confrontare i dati della struttura. Quando emergerà uno scostamento affidabile, lo troverai qui.",
+    noReliableDecisionHomeBody:
+      "NINFA non ha ancora elementi sufficienti per formulare nuove decisioni affidabili. Quando emergerà qualcosa che merita attenzione, lo troverai qui.",
     // On /decisioni, where the title above already says there is nothing reliable today.
     noReliableDecisionBody:
-      "I dati disponibili non indicano ancora un intervento sufficientemente affidabile.",
-    buildingHistoryShort: "NINFA sta ancora costruendo lo storico di confronto.",
+      "I dati disponibili non consentono ancora una nuova conclusione sufficientemente affidabile.",
     lowConfidenceNote: "Alcuni risultati non sono abbastanza affidabili per essere mostrati.",
     partialAnalysisBadge: "Analisi parziale",
-    technicalDetailTitle: "Dettagli dell'analisi",
-    technicalInsufficientCount: (count: number) =>
-      count === 1
-        ? "1 controllo in attesa di dati sufficienti"
-        : `${count} controlli in attesa di dati sufficienti`,
-    technicalSuppressedCount: (count: number) =>
-      count === 1
-        ? "1 risultato con confidenza troppo bassa"
-        : `${count} risultati con confidenza troppo bassa`,
     noActionTitle: "Tutto sotto controllo",
     noActionBody: "Nessuna decisione richiede la tua attenzione in questo momento.",
     // Gate 22: additive to every state above - qualifies "Tutto sotto controllo"/"Analisi

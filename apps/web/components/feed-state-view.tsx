@@ -76,9 +76,9 @@ export function FeedStateView({ feed, timeZone, showAllDecisions = false }: Feed
 
     case "DATA_QUALITY_LIMITED": {
       // A real empty state: no reliable decision today - which is neither "nothing to worry about" (that is
-      // `NO_ACTION_REQUIRED`) nor "NINFA has not analysed" (`NOT_PROCESSED`). The count of checks left
-      // inconclusive is an internal detail, kept out of the message and folded away.
-      const insufficient = feed.insufficient_count ?? 0;
+      // `NO_ACTION_REQUIRED`) nor "NINFA has not analysed" (`NOT_PROCESSED`). It says no more than is always
+      // true: the feed has no reason for it, so none is named, and the count of checks left inconclusive is
+      // an internal detail that is not shown.
       const suppressed = feed.suppressed_count ?? 0;
       return (
         <section
@@ -88,19 +88,9 @@ export function FeedStateView({ feed, timeZone, showAllDecisions = false }: Feed
           <p className="feed-state__badge">{copy.today.partialAnalysisBadge}</p>
           <h2>{copy.today.noReliableDecisionTitle}</h2>
           <p>{copy.today.noReliableDecisionBody}</p>
-          <p className="feed-state__detail">{copy.today.buildingHistoryShort}</p>
           {suppressed > 0 ? <p className="feed-state__detail">{copy.today.lowConfidenceNote}</p> : null}
           {coverage !== null ? <p className="feed-state__coverage">{coverage}</p> : null}
           <p className="feed-state__freshness">{freshness}</p>
-          {insufficient > 0 || suppressed > 0 ? (
-            <details className="feed-state__technical">
-              <summary>{copy.today.technicalDetailTitle}</summary>
-              <ul>
-                {insufficient > 0 ? <li>{copy.today.technicalInsufficientCount(insufficient)}</li> : null}
-                {suppressed > 0 ? <li>{copy.today.technicalSuppressedCount(suppressed)}</li> : null}
-              </ul>
-            </details>
-          ) : null}
         </section>
       );
     }

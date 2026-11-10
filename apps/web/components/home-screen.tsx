@@ -85,9 +85,10 @@ function heroOf(
       return { fragments: [{ text: copy.today.noActionTitle, tone: "strong" }], supporting };
     }
     case "DATA_QUALITY_LIMITED": {
-      // Not "all clear" and not a headline about a partial analysis: no reliable decision today, and why.
-      // The number of checks left inconclusive is an internal count and is never said here.
-      const supporting: string[] = [copy.today.buildingHistoryBody];
+      // Not "all clear" and not a headline about a partial analysis: no reliable decision today, in terms that
+      // are always true (the feed has no reason, so none is named). The number of checks left inconclusive is
+      // an internal count and is never said here.
+      const supporting: string[] = [copy.today.noReliableDecisionHomeBody];
       if (feed.suppressed_count !== null && feed.suppressed_count > 0) {
         supporting.push(copy.today.lowConfidenceNote);
       }

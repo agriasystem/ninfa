@@ -425,15 +425,24 @@ describe("Home - DATA_QUALITY_LIMITED", () => {
     expect(within(strip).getAllByText("Analisi parziale")).toHaveLength(4);
   });
 
-  it("says that NINFA is building the history it compares with, and where a reliable difference will show", async () => {
+  it("says that NINFA has not enough to decide yet, and where a reliable difference will show", async () => {
     resolveFeed(limited());
     renderHome();
 
     expect(
       await screen.findByText(
-        "NINFA sta costruendo lo storico necessario per confrontare i dati della struttura. Quando emergerà uno scostamento affidabile, lo troverai qui.",
+        "NINFA non ha ancora elementi sufficienti per formulare nuove decisioni affidabili. Quando emergerà qualcosa che merita attenzione, lo troverai qui.",
       ),
     ).not.toBeNull();
+  });
+
+  it("never says the cause is the history: the feed carries no reason, so none is named", async () => {
+    resolveFeed(limited({ insufficient_count: 66, suppressed_count: 0 }));
+    const { container } = renderHome();
+    await heroHeading();
+
+    const hero = container.querySelector("h1")?.closest("section") ?? container;
+    expect(hero.textContent).not.toMatch(/storico|costruendo|cronologia/iu);
   });
 
   it("never puts the internal count of checks in the message", async () => {

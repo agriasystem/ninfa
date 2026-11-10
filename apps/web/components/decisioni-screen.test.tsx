@@ -426,27 +426,24 @@ describe("/decisioni - the other feed states keep their semantics", () => {
     const { container } = renderScreen();
 
     expect(await screen.findByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" })).not.toBeNull();
-    expect(screen.getByText("I dati disponibili non indicano ancora un intervento sufficientemente affidabile.")).not.toBeNull();
-    expect(screen.getByText("NINFA sta ancora costruendo lo storico di confronto.")).not.toBeNull();
+    expect(
+      screen.getByText("I dati disponibili non consentono ancora una nuova conclusione sufficientemente affidabile."),
+    ).not.toBeNull();
     expect(screen.queryByText("Tutto sotto controllo")).toBeNull();
     // "Analisi parziale" is a small secondary badge, not the headline
     expect(container.querySelector(".feed-state__badge")?.textContent).toBe("Analisi parziale");
     expect(container.querySelector("h2")?.textContent).not.toContain("Analisi parziale");
   });
 
-  it("DATA_QUALITY_LIMITED: the number of inconclusive checks is not the message, only a folded detail", async () => {
+  it("DATA_QUALITY_LIMITED: general terms - no reason is named and the count of checks is not shown", async () => {
     resolve(feed({ feed_state: "DATA_QUALITY_LIMITED", insufficient_count: 66, suppressed_count: 0 }));
     const { container } = renderScreen();
     await screen.findByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" });
 
-    const detail = container.querySelector("details.feed-state__technical");
-    expect(detail).not.toBeNull();
-    expect((detail as HTMLDetailsElement).open).toBe(false);
-    expect(detail?.textContent).toContain("66 controlli in attesa di dati sufficienti");
-    const visible = Array.from(container.querySelectorAll(".feed-state > h2, .feed-state > p"))
-      .map((node) => node.textContent)
-      .join(" ");
-    expect(visible).not.toMatch(/\b66\b|in attesa di dati sufficienti/u);
+    // the feed has no reason for it, so the page never says it is the history (or anything else)
+    expect(container.textContent).not.toMatch(/storico|costruendo|cronologia/iu);
+    expect(container.querySelector("details")).toBeNull();
+    expect(container.textContent).not.toMatch(/\b66\b|in attesa di dati sufficienti|controlli in attesa/u);
   });
 
   it("the three states stay different: nothing found, nothing reliable, nothing analysed", async () => {
