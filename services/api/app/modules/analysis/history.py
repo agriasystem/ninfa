@@ -8,6 +8,12 @@ is what the bookings imported today say about them: a RECONSTRUCTION, stored as 
 (`RECONSTRUCTED_APPROXIMATE`, never an observation of that day), which the cost engine admits at a
 lower quality than an observed day and which tells the two apart in its provenance.
 
+RECONSTRUCTED IS NOT OBSERVED AS-OF. What the bookings say today about the 25th of October is not
+what NINFA knew on the 25th of October, so these rows are readable for how a day ended (the cost
+per occupied room, the rooms of a month, the distribution) and are never a sample of history: the
+Expected value, the pickup and the curves read observations only (`observation.py`). Storing them
+changes nothing that was, or will be, compared with the past.
+
 This is the one place that asks for it, and it asks as little as it can:
 
 * only the concluded months the invoices really touch (the months a cost is evaluated for), only

@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import Engine, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.modules.analysis.history import HistoryBackfill, backfill_lead_zero_history
@@ -26,10 +27,16 @@ from app.modules.bookings.models import BookingStatus
 from app.modules.data_overview.types import CostOccupancyBasis, CostOverview, CporStatus
 from app.modules.decisions.models import DecisionRun
 from app.modules.intelligence.costs.periods import CalendarMonth
+from app.modules.intelligence.expected.models import (
+    BookingExpectedBaseline,
+    BookingExpectedComparable,
+)
 from app.modules.invoices.cost_categories import CostCategory
 from app.modules.snapshots.models import BookingSnapshot, SnapshotOrigin
+from app.modules.snapshots.repository import BookingSnapshotRepository, ObservationHistory
 from tests.cost_support import CostWorld, month
 from tests.data_overview_support import AS_OF, overview_of, seed_run
+from tests.expected_support import add_snapshots, snapshot_row
 from tests.refresh_support import Hotel, booking_row, local_today, make_hotel
 from tests.refresh_support import purge as purge_hotel
 from tests.support import BookingFactory
@@ -230,6 +237,49 @@ def test_an_observed_day_is_never_replaced_by_a_reconstruction(
     assert kept.origin is SnapshotOrigin.OBSERVED and kept.rooms_on_books == 7
 
 
+def test_a_night_seen_and_reconstructed_is_one_row_and_the_observation_is_the_one_that_counts(
+    db_session: Session, stay: StayMaker, world: CostWorld
+) -> None:
+    """An observed night and 30 reconstructed ones. For the cost every night is read, one row each
+    and the observed one as it was; as history only the observed night is a sample."""
+    stay(oct_day(1), oct_day(31))
+    _inventory(db_session, world, valid_from=OCT)
+    world.snapshot(oct_day(5), oct_day(5), 7)
+    _rebuild(db_session, world)
+    keys = {(oct_day(number), oct_day(number)) for number in range(1, 32)}
+    repository = BookingSnapshotRepository(db_session, world.context)
+    source = world.booking_source.id
+
+    readable = repository.list_by_keys(source, keys)
+    assert sorted(row.stay_date for row in readable) == sorted(day for _, day in keys)  # one each
+    assert {row.stay_date: row.origin for row in readable}[oct_day(5)] is SnapshotOrigin.OBSERVED
+    assert [row.origin for row in readable].count(SnapshotOrigin.RECONSTRUCTED_APPROXIMATE) == 30
+
+    history = ObservationHistory(TODAY, {oct_day(5): 1})
+    as_samples = repository.list_by_keys(source, keys, history=history)
+    assert [(row.stay_date, row.origin, row.rooms_on_books) for row in as_samples] == [
+        (oct_day(5), SnapshotOrigin.OBSERVED, 7)
+    ]
+
+
+def test_the_database_keeps_a_reconstruction_off_the_key_of_an_observed_night(
+    db_session: Session, world: CostWorld
+) -> None:
+    """No duplicate can be stored by hand either: the key has no origin, so they compete for it."""
+    world.snapshot(oct_day(5), oct_day(5), 7)
+    row = snapshot_row(
+        world.tenant,
+        oct_day(5),
+        oct_day(5),
+        rooms=2,
+        origin=SnapshotOrigin.RECONSTRUCTED_APPROXIMATE,
+    )
+
+    with pytest.raises(IntegrityError, match="uq_booking_snapshots_source_snapshot_stay_revision"):
+        add_snapshots(db_session, world.tenant, [row])
+    db_session.rollback()
+
+
 def test_a_stored_reconstruction_is_history_that_is_not_revised(
     db_session: Session, stay: StayMaker, world: CostWorld
 ) -> None:
@@ -268,6 +318,27 @@ def test_nights_the_bookings_say_nothing_about_are_unknown_not_zero(
     assert (basis.days_without_inventory, basis.days_awaiting_rebuild) == (0, 0)
     assert costs.categories[0].cpor_status is CporStatus.INCOMPLETE
     assert costs.categories[0].cpor is None
+
+
+def test_a_bookings_file_that_begins_on_the_25th_leaves_the_month_without_a_cost_per_room(
+    db_session: Session, stay: StayMaker, world: CostWorld
+) -> None:
+    """The demo: the file begins on 25 October, the inventory is valid from the 1st. The seven
+    nights it covers are rebuilt, the other 24 are unknown, and the cost is not calculated."""
+    stay(oct_day(25), oct_day(31))
+    _october_costs(world)
+    _run_of_today(db_session, world)
+    _inventory(db_session, world, valid_from=OCT)
+
+    assert _rebuild(db_session, world) == HistoryBackfill(considered=31, rebuilt=7)
+
+    costs = _costs(db_session, world)
+    basis = _basis(costs)
+    assert (basis.known_days, basis.days_outside_bookings) == (7, 24)
+    assert (basis.days_without_inventory, basis.days_awaiting_rebuild) == (0, 0)
+    assert min(_stored(db_session, world)) == oct_day(25)
+    assert costs.categories[0].cpor_status is CporStatus.INCOMPLETE
+    assert costs.categories[0].cpor is None  # never a figure on 7 days of 31
 
 
 def test_nights_before_the_inventory_began_are_not_rebuilt_and_the_first_is_named(
@@ -424,15 +495,68 @@ def test_the_refresh_after_a_retroactive_inventory_rebuilds_the_month_and_leaves
     third = hotel.refresh()
     assert third.history_days_rebuilt == 0
     assert all(isinstance(run, DecisionRun) for run in hotel.runs())
+    # the month is readable for its cost and is no comparable of anything
+    assert SnapshotOrigin.RECONSTRUCTED_APPROXIMATE not in _named_origins(hotel)
 
 
-def test_history_is_never_added_under_a_day_already_analysed_so_a_refresh_never_disagrees_with_it(
+def _named_origins(hotel: Hotel) -> set[SnapshotOrigin]:
+    """The origin of every snapshot any baseline of this hotel names as a comparable."""
+    with hotel.session() as session:
+        return set(
+            session.scalars(
+                select(BookingSnapshot.origin)
+                .join(
+                    BookingExpectedComparable,
+                    BookingExpectedComparable.snapshot_id == BookingSnapshot.id,
+                )
+                .where(BookingSnapshot.workspace_id == hotel.tenant.workspace_id)
+            ).all()
+        )
+
+
+def _baselines(hotel: Hotel) -> list[tuple[Any, ...]]:
+    """(id, status, sample size) of every baseline of this hotel, oldest first."""
+    with hotel.session() as session:
+        return [
+            tuple(row)
+            for row in session.execute(
+                select(
+                    BookingExpectedBaseline.id,
+                    BookingExpectedBaseline.status,
+                    BookingExpectedBaseline.sample_size,
+                )
+                .join(
+                    BookingSnapshot,
+                    BookingSnapshot.id == BookingExpectedBaseline.target_snapshot_id,
+                )
+                .where(BookingSnapshot.workspace_id == hotel.tenant.workspace_id)
+                .order_by(BookingSnapshot.stay_date, BookingSnapshot.revision)
+            ).all()
+        ]
+
+
+def _lead_zero_sample_of_today(hotel: Hotel) -> int:
+    """How many comparables the baseline of the night of today, seen today, was made of."""
+    with hotel.session() as session:
+        size = session.scalar(
+            select(BookingExpectedBaseline.sample_size)
+            .join(BookingSnapshot, BookingSnapshot.id == BookingExpectedBaseline.target_snapshot_id)
+            .where(
+                BookingSnapshot.workspace_id == hotel.tenant.workspace_id,
+                BookingSnapshot.snapshot_local_date == local_today(),
+                BookingSnapshot.stay_date == local_today(),
+            )
+        )
+    assert size is not None
+    return int(size)
+
+
+def test_history_added_after_the_analysis_of_the_day_changes_nothing_that_was_compared(
     hotel: Hotel,
 ) -> None:
-    """A stored baseline names its comparables and is never rewritten. With an analysis of today
-    already there, the refresh makes today's analysis first - on the same history, so it agrees -
-    and only then adds the history. A refresh made later the same day, on bookings that did not
-    change, would now read a different history: it waits for tomorrow instead of failing."""
+    """The reconstruction is what makes October's cost per occupied room possible, and it is never a
+    comparable: a refresh made after it finds the same baselines, so it is a replay and never a
+    conflict, and no baseline names a reconstructed night."""
     last = CalendarMonth.of(local_today()).shifted(-1)
     hotel.import_bookings(
         "b.csv",
@@ -441,6 +565,7 @@ def test_history_is_never_added_under_a_day_already_analysed_so_a_refresh_never_
     hotel.import_invoices([last.start + timedelta(days=9)])
     assert hotel.refresh().result is not None  # the analysis of today, with no inventory yet
     runs_before = [(run.id, run.run_sequence) for run in hotel.runs()]
+    baselines_before = _baselines(hotel)
 
     with hotel.session() as session:
         RoomInventoryService(session, hotel.tenant).save(
@@ -448,21 +573,25 @@ def test_history_is_never_added_under_a_day_already_analysed_so_a_refresh_never_
         )
     second = hotel.refresh()
 
-    assert second.kind is RefreshOutcomeKind.RAN  # today's analysis did not move
-    assert second.history_days_rebuilt == last.days  # and the history came after it
+    assert second.kind is RefreshOutcomeKind.RAN
+    assert second.history_days_rebuilt == last.days
     assert [(run.id, run.run_sequence) for run in hotel.runs()][: len(runs_before)] == runs_before
+    assert SnapshotOrigin.RECONSTRUCTED_APPROXIMATE not in _named_origins(hotel)
+    # every baseline made before is still there, with the same status and sample: none rewritten
+    assert set(baselines_before) <= set(_baselines(hotel))
 
-    third = hotel.refresh()  # the same day, the same bookings, a history that is not the same
+    third = hotel.refresh()  # the same day, the same bookings, a history that is already complete
 
-    assert third.kind is RefreshOutcomeKind.DEFERRED
-    assert third.retry_at is not None and third.result is None
+    assert third.kind is RefreshOutcomeKind.RAN
+    assert third.result is not None and third.result.is_idempotent_replay is True
     assert third.history_days_rebuilt == 0
-    assert [(run.id, run.run_sequence) for run in hotel.runs()][: len(runs_before)] == runs_before
 
 
-def test_a_baseline_that_history_would_change_waits_for_tomorrow_it_is_not_a_failure(
+def test_a_baseline_conflict_is_a_failure_it_is_not_waited_out(
     hotel: Hotel, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """It was deferred while a reconstruction could cause it. Nothing that is stored by the
+    refresh can cause it now, so one is a real disagreement and stops the job."""
     from app.modules.analysis import refresh as module
     from app.modules.intelligence.expected.errors import ExpectedError, ExpectedErrorCode
 
@@ -474,35 +603,19 @@ def test_a_baseline_that_history_would_change_waits_for_tomorrow_it_is_not_a_fai
 
     monkeypatch.setattr(module, "run_property_analysis", conflicting)
 
-    outcome = hotel.refresh()
-
-    assert outcome.kind is RefreshOutcomeKind.DEFERRED
-    assert outcome.result is None and outcome.retry_at is not None
-
-
-def test_any_other_expected_failure_still_fails_the_job(
-    hotel: Hotel, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from app.modules.analysis import refresh as module
-    from app.modules.intelligence.expected.errors import ExpectedError, ExpectedErrorCode
-
-    hotel.import_bookings("b.csv", [booking_row("SOON", 3)])
-    hotel.refresh()
-
-    def broken(*args: Any, **kwargs: Any) -> None:
-        raise ExpectedError(ExpectedErrorCode.INVALID_RANGE, "not a conflict")
-
-    monkeypatch.setattr(module, "run_property_analysis", broken)
-
     with pytest.raises(ExpectedError):
         hotel.refresh()
 
 
-def test_with_no_analysis_yet_today_the_history_comes_first_and_today_reads_it(
+def test_the_history_comes_first_and_the_night_of_today_never_compares_with_it(
     hotel: Hotel,
 ) -> None:
+    """The night of today seen today has the nights of last month, same weekday, same lead time 0,
+    as its natural comparables: the rooms they ended with. They are reconstructions: it has none."""
     last = CalendarMonth.of(local_today()).shifted(-1)
-    hotel.import_bookings("b.csv", [_last_month_stay("MONTH", last), booking_row("SOON", 3)])
+    hotel.import_bookings(
+        "b.csv", [_last_month_stay("MONTH", last), booking_row("NOW", 0), booking_row("SOON", 3)]
+    )
     hotel.import_invoices([last.start + timedelta(days=9)])
     with hotel.session() as session:
         RoomInventoryService(session, hotel.tenant).save(
@@ -514,3 +627,6 @@ def test_with_no_analysis_yet_today_the_history_comes_first_and_today_reads_it(
 
     assert outcome.kind is RefreshOutcomeKind.RAN and outcome.history_days_rebuilt == last.days
     assert len(hotel.runs_today()) == 1
+    assert _lead_zero_sample_of_today(hotel) == 0  # four or five such nights were stored
+    assert SnapshotOrigin.RECONSTRUCTED_APPROXIMATE not in _named_origins(hotel)
+    assert _basis(_costs_of(hotel)).reconstructed_days == last.days  # and the cost reads them

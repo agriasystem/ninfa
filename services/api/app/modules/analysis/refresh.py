@@ -18,19 +18,16 @@ operator would make by hand are made here, and only from what is really stored:
   inventory says how many rooms there were (`history.py`): a refresh asked for by an inventory saved
   from an earlier date is what lets a past month's cost per occupied room be calculated.
 
-History is never added under a day that has already been analysed. A stored baseline names the
-comparables it was made from and is never rewritten, so a past night appearing after today's
-analysis would make today's next analysis disagree with the one before it. With no analysis yet
-today the history is rebuilt first and today's analysis reads it; with one, today's analysis is made
-first (the same history, the same result) and the history is rebuilt after it, for the days that
-follow.
+The history rebuilt is READABLE, never a sample: it is what the bookings say today about days that
+are over, kept for the figures that want how a day ended. Expected, the pickup and the curves read
+only what NINFA observed (`observation.py`), so adding a past night changes no stored baseline and
+no comparable, and the order of the history and of the day's analysis does not matter for them.
 
 A failure propagates and fails the job (fail loud: nothing is synced, the imported data stay as they
 are, the status says so). Bookings changed since today's observation are simply observed again: the
 day's next revision, analysed now. What is left of `DEFERRED` is a stored row NINFA cannot observe
 over on today's key, a reconstruction (the property's time zone was changed, so today is a day that
-already ended elsewhere), or a baseline that today's history would now change after the analysis of
-the day: both clear by themselves on the next local day, so they are not failures.
+already ended elsewhere): that clears by itself on the next local day, so it is not a failure.
 """
 
 from dataclasses import dataclass
@@ -38,7 +35,6 @@ from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
@@ -50,10 +46,8 @@ from app.modules.analysis.service import (
     AnalysisRunResult,
     run_property_analysis,
 )
-from app.modules.decisions.models import DecisionRun
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.ingestion.repository import ImportJobRepository
-from app.modules.intelligence.expected.errors import ExpectedError, ExpectedErrorCode
 from app.modules.snapshots.errors import SnapshotError, SnapshotErrorCode
 from app.modules.snapshots.localtime import local_date_of, local_day_start
 
@@ -125,17 +119,11 @@ def run_refresh(
     plan = plan_refresh(session, tenant, property_id, now)
     if isinstance(plan, RefreshSkipReason):
         return RefreshOutcome(RefreshOutcomeKind.SKIPPED, skip_reason=plan)
-    # History is never added under a day that has already been analysed (see the module doc).
-    analysed_today = _analysed(session, tenant, property_id, plan.local_today)
-    history = (
-        HistoryBackfill(0, 0)
-        if analysed_today
-        else _rebuild_history(session, tenant, property_id, plan, now)
-    )
+    history = _rebuild_history(session, tenant, property_id, plan, now)
     try:
         result = run_property_analysis(session, plan.request)
-    except (SnapshotError, ExpectedError) as error:
-        if not _clears_by_itself(error):
+    except SnapshotError as error:
+        if error.code != SnapshotErrorCode.CONFLICT:
             raise
         session.rollback()
         return RefreshOutcome(
@@ -143,26 +131,8 @@ def run_refresh(
             retry_at=plan.retry_at,
             history_days_rebuilt=history.rebuilt,
         )
-    if analysed_today:
-        history = _rebuild_history(session, tenant, property_id, plan, now)
     return RefreshOutcome(
         RefreshOutcomeKind.RAN, result=result, history_days_rebuilt=history.rebuilt
-    )
-
-
-def _analysed(session: Session, tenant: TenantContext, property_id: UUID, day: date) -> bool:
-    """Whether a finished analysis of this property already exists for the property-local `day`."""
-    return (
-        session.scalar(
-            select(DecisionRun.id)
-            .where(
-                DecisionRun.workspace_id == tenant.workspace_id,
-                DecisionRun.property_id == property_id,
-                DecisionRun.as_of_local_date == day,
-            )
-            .limit(1)
-        )
-        is not None
     )
 
 
@@ -182,14 +152,6 @@ def _rebuild_history(
         local_today=plan.local_today,
         now=now,
     )
-
-
-def _clears_by_itself(error: SnapshotError | ExpectedError) -> bool:
-    """A stored row or baseline that today's key cannot be written over: due again tomorrow, which
-    is not a failure. Anything else is one."""
-    if isinstance(error, SnapshotError):
-        return error.code == SnapshotErrorCode.CONFLICT
-    return error.error_code is ExpectedErrorCode.BASELINE_CONFLICT
 
 
 __all__ = [

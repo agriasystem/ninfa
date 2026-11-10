@@ -17,10 +17,22 @@ from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import Date, Integer, Table, and_, column, func, or_, select, text, values
+from sqlalchemy import (
+    ColumnElement,
+    Date,
+    Integer,
+    Table,
+    and_,
+    column,
+    func,
+    or_,
+    select,
+    text,
+    values,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -56,12 +68,20 @@ class SnapshotHistoryRow:
 
 @dataclass(frozen=True, slots=True)
 class ObservationHistory:
-    """Which observations of earlier days a comparison with the past may read.
+    """Which snapshots a comparison with the past may take as a SAMPLE of history.
+
+    Readable is not eligible. A reconstruction is inferred TODAY about an earlier day: it can be
+    read wherever a final figure is wanted (the rooms a month ended with, the cost per occupied
+    room, the distribution), but it is not what NINFA knew on that day, and a comparison whose
+    meaning is "what was known then" (the Expected value, the pickup, the curves) must not be built
+    on it. So this admits an OBSERVATION and nothing else. A read that names no history
+    (`list_by_keys` with `history=None`) is the readable one: it hands out what is stored,
+    whatever its origin.
 
     `newest_revision` names, for each earlier day that counts, the newest of its revisions that does
     (a night reads as its newest row up to it). A day not named has no observation that counts, and
     a row above its revision is not read: it never existed for history, whatever the current
-    screens show of it. A reconstruction is not an observation of any day, and is always read.
+    screens show of it.
 
     `reading_day` and the days after it are not history, so nothing is said of them.
     """
@@ -75,7 +95,7 @@ class ObservationHistory:
         return self.newest_revision.get(snapshot_local_date, 0)
 
     def admits(self, row: SnapshotHistoryRow) -> bool:
-        return row.origin != SnapshotOrigin.OBSERVED or row.revision <= self.newest_readable(
+        return row.origin == SnapshotOrigin.OBSERVED and row.revision <= self.newest_readable(
             row.snapshot_local_date
         )
 
@@ -270,11 +290,21 @@ class BookingSnapshotRepository:
 
         One statement per block of keys (a join with a VALUES list, served by the unique key's
         index): the way a historical comparison fetches a few dozen exact snapshots instead of
-        scanning the history or asking once per date. `history`: only what counts as history.
+        scanning the history or asking once per date. `history`: only what counts as a sample of
+        history (an observation a finished analysis read, never a reconstruction); with none, what
+        is stored is read, whatever its origin.
         """
 
         def newest(day: date) -> int:
             return _EVERY_REVISION if history is None else history.newest_readable(day)
+
+        def readable(wanted: Any) -> ColumnElement[bool]:
+            # The same rule as `ObservationHistory.admits`, in the statement: with a history only an
+            # observation is a sample; with none, everything stored is read.
+            within = BookingSnapshot.revision <= wanted.c.newest_revision
+            if history is None:
+                return or_(BookingSnapshot.origin != SnapshotOrigin.OBSERVED, within)
+            return and_(BookingSnapshot.origin == SnapshotOrigin.OBSERVED, within)
 
         ordered = sorted(keys)
         found: list[SnapshotHistoryRow] = []
@@ -308,10 +338,7 @@ class BookingSnapshotRepository:
                 .where(
                     BookingSnapshot.workspace_id == self._tenant.workspace_id,
                     BookingSnapshot.data_source_id == data_source_id,
-                    or_(
-                        BookingSnapshot.origin != SnapshotOrigin.OBSERVED,
-                        BookingSnapshot.revision <= wanted.c.newest_revision,
-                    ),
+                    readable(wanted),
                 )
                 .distinct(BookingSnapshot.snapshot_local_date, BookingSnapshot.stay_date)
                 .order_by(

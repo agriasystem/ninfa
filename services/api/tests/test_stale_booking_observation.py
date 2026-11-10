@@ -368,7 +368,10 @@ def test_the_first_run_is_not_blocked_and_is_the_first_sample(hotel: Hotel) -> N
     assert samples(freshness_on(hotel, tomorrow())) == {local_today()}
 
 
-def test_the_first_run_can_already_speak_from_a_reconstructed_history(hotel: Hotel) -> None:
+def test_the_first_run_cannot_speak_from_a_reconstructed_history(hotel: Hotel) -> None:
+    """It could, before: a reconstruction filled the sample. What NINFA infers today about an
+    earlier day is not what it knew then (`RECONSTRUCTED IS NOT OBSERVED AS-OF`), so the first
+    run is new and fresh and has no history to compare with: it says nothing it did not know."""
     stay = seed_slow_night(hotel, origin=SnapshotOrigin.RECONSTRUCTED_APPROXIMATE, analysed=False)
     assert hotel.runs() == []
 
@@ -376,10 +379,10 @@ def test_the_first_run_can_already_speak_from_a_reconstructed_history(hotel: Hot
     result = hotel.refresh().result
 
     assert result is not None and result.booking_observation_fresh is True
-    assert occupancy_of(hotel, stay).status is EvaluationStatus.TRIGGERED
-    assert len(occupancy_decisions(hotel)) == 1
-    # the pickup still needs two OBSERVED ends, as it always did
-    assert pickup_of(hotel, stay).reason_codes == (ReasonCode.PICKUP_PRIOR_OBSERVATION_MISSING,)
+    occupancy = occupancy_of(hotel, stay)
+    assert occupancy.reason_codes == (ReasonCode.EXPECTED_BASELINE_INSUFFICIENT,)
+    assert occupancy_decisions(hotel) == []
+    assert pickup_of(hotel, stay).reason_codes == (ReasonCode.EXPECTED_BASELINE_INSUFFICIENT,)
 
 
 # --- B: a new day, new data: what the night really did in its week ----------------------------

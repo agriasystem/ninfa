@@ -570,7 +570,7 @@ def _row(*, origin: SnapshotOrigin, day: date, revision: int) -> SnapshotHistory
     return SnapshotHistoryRow(uuid4(), day, day, origin, 1, 0, None, revision)
 
 
-def test_the_filter_counts_revisions_days_and_leaves_reconstructions_alone() -> None:
+def test_the_filter_counts_revisions_and_days_and_admits_no_reconstruction() -> None:
     history = ObservationHistory(date(2026, 11, 9), {DAY: 2})
     observed = SnapshotOrigin.OBSERVED
 
@@ -578,11 +578,10 @@ def test_the_filter_counts_revisions_days_and_leaves_reconstructions_alone() -> 
     assert history.admits(_row(origin=observed, day=DAY, revision=2)) is True
     assert history.admits(_row(origin=observed, day=DAY, revision=3)) is False  # nobody read it
     assert history.admits(_row(origin=observed, day=date(2026, 11, 4), revision=1)) is False
-    assert (
-        history.admits(
-            _row(origin=SnapshotOrigin.RECONSTRUCTED_APPROXIMATE, day=date(2026, 11, 4), revision=1)
-        )
-        is True
-    )
+    # readable is not eligible: a reconstruction is what is inferred today, never a sample
+    # (test_reconstructed_is_not_observed.py pins it on the reads and on the real Expected)
+    for day in (DAY, date(2026, 11, 4)):
+        reconstructed = _row(origin=SnapshotOrigin.RECONSTRUCTED_APPROXIMATE, day=day, revision=1)
+        assert history.admits(reconstructed) is False
     # the day being read and after it are not history
     assert history.admits(_row(origin=observed, day=date(2026, 11, 9), revision=7)) is True

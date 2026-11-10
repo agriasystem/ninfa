@@ -6,6 +6,14 @@
     A SAMPLE        a later day may compare with it, because a finished analysis read it and it had
                     something new in it
 
+READABLE IS NOT ELIGIBLE. A sample is what NINFA KNEW on that day, so it is an OBSERVATION that a
+finished analysis read, and nothing else. A reconstruction (`RECONSTRUCTED_APPROXIMATE`) is what
+NINFA can infer today about an earlier day: it stays readable for the figures that want how the day
+ended (the rooms of a month, the cost per occupied room, the distribution), and it is never a sample
+of the Expected value, the pickup or the curves, however it came to be stored. The two halves of the
+rule are `historical_sample_is_eligible` (the run) and `ObservationHistory.admits` (the row); every
+comparison with the past goes through both, and one that names no history reads what is stored.
+
 NO NEW DATA IS NOT NO NEW BOOKINGS. An analysis runs every day, so every day has an observation. On
 a day with no new data it repeats what was already known: it says nothing of what happened since,
 so no revenue detector speaks on it, and it is no sample of history. When the source does deliver,
@@ -25,8 +33,8 @@ the same way. A source whose import changed nothing, an automatic one included, 
 say.
 
 THE FIRST RUN. With no earlier analysis there is nothing to compare with, and that blocks nothing:
-the first valid observation is new, so the detectors are evaluated on what history there is (a
-reconstruction counts), and it is the first sample for the days after it.
+the first valid observation is new, so the detectors are evaluated on what history there is (only
+observations: a reconstruction is no history), and it is the first sample for the days after it.
 
 A FAILED RUN IS NOT HISTORY. Observation, baselines and the final sync are separate commits, so a
 job can die leaving an observation no analysis finished reading. `historical_sample_is_eligible` is
@@ -86,7 +94,8 @@ def historical_sample_is_eligible(run: DecisionRun, data_source_id: UUID) -> boo
 
     A `DecisionRun` row exists only once `DecisionService.sync()` has committed: a job that failed
     leaves none, and the table has no other state. So the run finished; what is left to ask is
-    whether it says what it read: this source, a known import, this day.
+    whether it says what it read: this source, a known import, this day. That is the run's half;
+    the row's half (only an observation is a sample) is `ObservationHistory.admits`.
     """
     return _seen_by(run, data_source_id) is not None
 
