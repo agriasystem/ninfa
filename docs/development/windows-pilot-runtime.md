@@ -66,10 +66,18 @@ Ports and hosts come from `API_HOST`, `API_PORT`, `WEB_HOST`, `WEB_PORT` (enviro
 everywhere else). Order: PostgreSQL first (it waits up to 3 minutes for `DATABASE_URL`'s host and port, then
 starts anyway and lets each process retry), then api, worker, web, a few seconds apart.
 
-**Session cookie.** The API is started with `SESSION_COOKIE_SECURE=false` (API only) *unless* that variable is
-already set in the environment or in `.env`, or `APP_ENV` is `production`. This is what the manually started stack
-did: without it a browser drops the cookie over plain `http://127.0.0.1`
-([local-development.md](local-development.md), "Cookie `Secure` flag"). The worker still uses `QueueConnector`.
+**Session cookie.** Without it a browser drops the cookie over plain `http://127.0.0.1`
+([local-development.md](local-development.md), "Cookie `Secure` flag"), so the API (only the API) is started with
+`SESSION_COOKIE_SECURE=false`, as the manually started stack was. The supervisor does this **only if all of these
+hold**, and otherwise leaves the default (Secure) alone:
+
+- the operator has not decided it: `SESSION_COOKIE_SECURE` is in neither the environment nor `.env`;
+- `APP_ENV` is exactly `development` (case and spaces ignored). `production` in **either** the environment or `.env`
+  rules it out for good, and so does `test`, any typo, or any value it does not know;
+- `API_HOST` is loopback (`127.0.0.1`, `localhost`, `::1`).
+
+Every start writes the decision and its reason to `supervisor.log`. The API itself also refuses to start in
+production with the flag off. The worker still uses `QueueConnector`.
 
 ## Recovery policy
 
@@ -117,10 +125,11 @@ Windows refuses a boot trigger, and a task that runs while nobody is signed in, 
 not as SYSTEM, so the files it creates are yours, with "run whether signed in or not" and no password stored
 (S4U). This PC has no auto-login: with the default mode, after a reboot nothing runs until someone signs in.
 
-**Status of `-Startup`:** the logon mode is the one that was exercised end to end (below). `-Startup` registers the
-same task with a boot trigger and the S4U principal, but it could not be run on 2026-11-11 (no administrator
-rights in that session). The first time: run it, check that `status` shows `triggers=Startup + Time` and `(S4U)`,
-then restart Windows once and check `status` before anyone signs in.
+**First time on a machine** (`-Startup` registers the same task with a boot trigger and the S4U principal): run
+`install -Startup`, confirm the Windows prompt, check that `status` shows `triggers=Startup + Time` and `(S4U)`, then
+restart Windows once and, before signing in anywhere or starting anything by hand, check `status` (or, from another
+PC, the two URLs). A task that runs while nobody is signed in has no desktop: that is why every process is started
+hidden and why the runtime folder is found from the script's own location, not from the user's profile variables.
 
 ## Behaviours worth knowing (measured on Windows 11, 2026-11-11)
 

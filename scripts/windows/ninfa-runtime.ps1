@@ -182,6 +182,7 @@ function Get-RepoSettings {
     $settings.WebHost = [string](Get-Setting $Root 'WEB_HOST' '127.0.0.1')
     $settings.WebPort = [int](Get-Setting $Root 'WEB_PORT' 3100)
     $settings.AppEnv = [string](Get-Setting $Root 'APP_ENV' 'development')
+    $settings.AppEnvFile = [string](Get-EnvFileValue (Join-Path $Root '.env') 'APP_ENV')    # kept apart: production in EITHER place wins
     $settings.CookieConfigured = ($null -ne (Get-Setting $Root 'SESSION_COOKIE_SECURE' $null))
     $settings.DbHost = '127.0.0.1'
     $settings.DbPort = 5432
@@ -308,6 +309,36 @@ function Limit-Text {
 }
 
 # ---- the three components --------------------------------------------------------------------------
+# The API's session cookie carries the Secure flag, which a browser drops over plain http://127.0.0.1
+# (docs/development/local-development.md). The pilot PC is such an environment, so its API is started with
+# SESSION_COOKIE_SECURE=false. That is allowed ONLY when every one of these holds, and in every other case the
+# default (Secure) is left alone:
+#   - the operator has not decided it (not in the environment, not in .env);
+#   - APP_ENV is exactly "development" (never production, and not "test", a typo or anything unknown);
+#   - the API listens on loopback only.
+# The API itself also refuses to start in production with the flag off (Settings._check_production_safety).
+function Get-CookieDecision {
+    param($Settings)
+    if ($Settings.CookieConfigured) {
+        return [pscustomobject]@{ Disable = $false; Reason = 'SESSION_COOKIE_SECURE is set by the operator (environment or .env): left as set' }
+    }
+    # "production" in the environment OR in .env is enough: whichever one the API ends up reading, it is never overridden.
+    foreach ($candidate in @($Settings.AppEnv, $Settings.AppEnvFile)) {
+        if (([string]$candidate).Trim().ToLowerInvariant() -eq 'production') {
+            return [pscustomobject]@{ Disable = $false; Reason = "APP_ENV is 'production' (environment or .env): the Secure flag is never disabled" }
+        }
+    }
+    $appEnv = ([string]$Settings.AppEnv).Trim().ToLowerInvariant()
+    if ($appEnv -ne 'development') {
+        return [pscustomobject]@{ Disable = $false; Reason = ("APP_ENV is '{0}', not 'development': the Secure flag is never disabled" -f $appEnv) }
+    }
+    $apiHost = ([string]$Settings.ApiHost).Trim().ToLowerInvariant()
+    if (@('127.0.0.1', 'localhost', '::1') -notcontains $apiHost) {
+        return [pscustomobject]@{ Disable = $false; Reason = ("API_HOST is '{0}', not loopback: the Secure flag is never disabled" -f $apiHost) }
+    }
+    return [pscustomobject]@{ Disable = $true; Reason = 'APP_ENV=development and the API listens on loopback only: Secure flag disabled for plain HTTP' }
+}
+
 function New-Components {
     param($Settings)
     $root = $Settings.RepoRoot
@@ -317,14 +348,12 @@ function New-Components {
     $apiHost = ConvertTo-ProbeHost $Settings.ApiHost
     $webHost = ConvertTo-ProbeHost $Settings.WebHost
 
-    # A plain-HTTP loopback dev server needs the session cookie without the Secure flag, or the
-    # browser drops it (docs/development/local-development.md). Only for the API, only when the
-    # operator has not decided it (environment or .env), and never when APP_ENV is production.
     $apiEnv = @{ PYTHONUNBUFFERED = '1' }
-    if (-not $Settings.CookieConfigured -and $Settings.AppEnv -ne 'production') { $apiEnv['SESSION_COOKIE_SECURE'] = 'false' }
+    $cookie = Get-CookieDecision $Settings
+    if ($cookie.Disable) { $apiEnv['SESSION_COOKIE_SECURE'] = 'false' }
 
     $list = @(
-        @{ Name = 'api'; Exe = $venvPython; Args = '-m app'; Env = $apiEnv; ProbeHost = $apiHost; Port = $Settings.ApiPort; Url = ('http://{0}:{1}/api/v1/health' -f $apiHost, $Settings.ApiPort) },
+        @{ Name = 'api'; Exe = $venvPython; Args = '-m app'; Env = $apiEnv; Note = ('session cookie: ' + $cookie.Reason); ProbeHost = $apiHost; Port = $Settings.ApiPort; Url = ('http://{0}:{1}/api/v1/health' -f $apiHost, $Settings.ApiPort) },
         @{ Name = 'worker'; Exe = $venvPython; Args = '-m worker run'; Env = @{ PYTHONUNBUFFERED = '1' }; ProbeHost = ''; Port = 0; Url = '' },
         @{ Name = 'web'; Exe = $node; Args = ('"{0}" dev' -f $runNext); Env = @{}; ProbeHost = $webHost; Port = $Settings.WebPort; Url = ('http://{0}:{1}/' -f $webHost, $Settings.WebPort) }
     )
@@ -533,6 +562,7 @@ function Invoke-Supervisor {
         Write-Log INFO ('supervisor started: pid {0}, checkout {1}, PowerShell {2}' -f $PID, $settings.RepoRoot, $PSVersionTable.PSVersion)
         Remove-LeftoversFromPreviousRun
         $components = New-Components $settings
+        foreach ($c in $components) { if ($c.Note) { Write-Log INFO ('{0}: {1}' -f $c.Name, $c.Note) } }
         Wait-ForDatabase $settings
         $startedAt = Get-Date
         $lastSave = [datetime]::MinValue
@@ -697,7 +727,7 @@ function Show-Status {
         $ok = $false
     } else {
         $info = Get-ScheduledTaskInfo -TaskName $TaskName
-        $triggers = if ($task.Triggers.Count -gt 0) { (@($task.Triggers | ForEach-Object { $_.CimClass.CimClassName -replace '^MSFT_Task', '' -replace 'Trigger$', '' }) -join ' + ') } else { 'none' }
+        $triggers = if ($task.Triggers.Count -gt 0) { (@($task.Triggers | ForEach-Object { $_.CimClass.CimClassName -replace '^MSFT_Task', '' -replace 'Trigger$', '' -replace '^Boot$', 'Startup' }) -join ' + ') } else { 'none' }
         $result = [uint32]$info.LastTaskResult
         $resultText = switch ($result) {
             0 { 'ok' }
