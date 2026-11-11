@@ -50,6 +50,11 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\ninfa-runtime.ps1 unins
 
 `status` exits 0 only when the supervisor, the three processes and both health URLs are up.
 
+`stop` and `restart <process>` are **requests the supervisor carries out**: the command leaves a small flag file and
+the supervisor, which owns the processes, stops or restarts them (`stop` waits up to 20 s for it, then forces what
+it is allowed to force, and says plainly if something is left that this shell cannot stop). `start` goes through
+Task Scheduler. All of it works from a normal PowerShell, also when the supervisor runs "whether signed in or not".
+
 **After you pull new code, restart what changed.** The API runs without auto-reload (`DEBUG=false`), so it keeps
 the code it started with: `restart api` (and `restart worker` for worker code). The web app is `next dev` and
 reloads by itself.
@@ -130,6 +135,20 @@ not as SYSTEM, so the files it creates are yours, with "run whether signed in or
 restart Windows once and, before signing in anywhere or starting anything by hand, check `status` (or, from another
 PC, the two URLs). A task that runs while nobody is signed in has no desktop: that is why every process is started
 hidden and why the runtime folder is found from the script's own location, not from the user's profile variables.
+
+## What `-Startup` changes when you look at it (measured)
+
+With `install -Startup` the supervisor and its three processes run in **session 0** (no desktop), as your account
+through an S4U logon. A normal PowerShell then cannot open those processes at all (not even to read their start time:
+access denied), and Windows hides their command lines from it. So the control script does not depend on either:
+
+- who is who comes from `state.json` plus WMI (PID, parent, creation time), and a PID counts only if its creation
+  time matches the recorded one (PIDs are reused within seconds);
+- `stop` and `restart <process>` are flag-file requests (above); `start` is `Start-ScheduledTask`, which a normal
+  user may do; `status` reads the same facts and probes the two URLs;
+- registering the task (`install -Startup`) needs an administrator. The supervisor can see a worker you started by
+  hand in your own session (it does not start a second one), but you cannot kill the supervisor's processes from your
+  own shell: use `stop` / `restart`.
 
 ## Behaviours worth knowing (measured on Windows 11, 2026-11-11)
 

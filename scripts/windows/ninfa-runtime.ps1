@@ -66,6 +66,7 @@ $LoopSeconds = 2
 $StateRefreshSeconds = 15
 $DbWaitSeconds = 180
 $StartSpacingSeconds = 3
+$StopGraceSeconds = 20       # how long `stop` waits for the supervisor to leave by itself before forcing
 $KeepAliveMinutes = 5        # Windows tries to start the task this often (ignored while it runs)
 $ArchiveKeep = 30            # archived logs kept per process
 $SupervisorLogMaxBytes = 5MB
@@ -221,12 +222,28 @@ function Get-HttpStatus {
 }
 
 # ---- processes: identity is PID + start time, never a name or a command-line pattern -----------------
+# When the supervisor runs "whether signed in or not" (-Startup) its processes belong to another logon session:
+# a normal PowerShell cannot open them at all (not even for reading), so .NET's StartTime is denied. WMI still
+# tells the creation time, which is all the identity check needs. Returns $null when there is no such process.
+function Get-ProcessStart {
+    param([int]$ProcessId)
+    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if (-not $process) { return $null }
+    # For a process it may not open, PowerShell 5.1 returns $null here instead of throwing: test the value.
+    $start = $null
+    try { $start = $process.StartTime } catch { }
+    if ($start) { return $start }
+    $cim = Get-CimInstance Win32_Process -Filter ('ProcessId={0}' -f $ProcessId) -ErrorAction SilentlyContinue
+    if ($cim -and $cim.CreationDate) { return [datetime]$cim.CreationDate }
+    return $null
+}
+
 function Test-ProcessIdentity {
     param($ProcessId, $StartIso)
     if (-not $ProcessId -or -not $StartIso) { return $false }
-    $process = Get-Process -Id ([int]$ProcessId) -ErrorAction SilentlyContinue
-    if (-not $process) { return $false }
-    try { return ([math]::Abs(($process.StartTime - (ConvertFrom-IsoDate $StartIso)).TotalSeconds) -lt 2) } catch { return $false }
+    $start = Get-ProcessStart ([int]$ProcessId)
+    if ($null -eq $start) { return $false }
+    try { return ([math]::Abs(($start - (ConvertFrom-IsoDate $StartIso)).TotalSeconds) -lt 2) } catch { return $false }
 }
 
 # Stops a process we started and everything it started (the venv python and `node run-next.mjs`
@@ -234,10 +251,10 @@ function Test-ProcessIdentity {
 # so they are found even after the launcher is gone. Returns how many processes were stopped.
 function Stop-ProcessTree {
     param([int]$RootPid, [datetime]$RootStart)
-    $root = Get-Process -Id $RootPid -ErrorAction SilentlyContinue
+    $rootStartNow = Get-ProcessStart $RootPid
     $rootAlive = $false
-    if ($root) {
-        try { if ([math]::Abs(($root.StartTime - $RootStart).TotalSeconds) -ge 2) { return 0 } } catch { return 0 }  # PID reused by a stranger
+    if ($null -ne $rootStartNow) {
+        if ([math]::Abs(($rootStartNow - $RootStart).TotalSeconds) -ge 2) { return 0 }  # PID reused by a stranger
         $rootAlive = $true
     }
     $table = @(Get-CimInstance Win32_Process | Select-Object ProcessId, ParentProcessId, CreationDate)
@@ -426,6 +443,8 @@ function Update-Component {
         $C.ManualRestart = $true
         Write-Log INFO ('{0}: restart requested by an operator' -f $C.Name)
         if (-not $C.Proc) { $C.Failures = 0; $C.NextStartAt = Get-Date }
+        # The supervisor stops it itself: an operator's shell cannot touch processes of another logon session.
+        elseif (-not $C.Proc.HasExited) { $null = Stop-ProcessTree -RootPid $C.Proc.Id -RootStart $C.LauncherStart }
     }
 
     if ($C.Proc) {
@@ -541,17 +560,24 @@ function Invoke-Supervisor {
     if ((Test-Path -LiteralPath $SupervisorLog) -and (Get-Item -LiteralPath $SupervisorLog).Length -gt $SupervisorLogMaxBytes) {
         Move-LogToArchive $SupervisorLog
     }
-    $mutex = New-Object System.Threading.Mutex($false, $MutexName)
     $owned = $false
-    try { $owned = $mutex.WaitOne(0) }
-    catch {
-        if ($_.Exception -is [System.Threading.AbandonedMutexException] -or $_.Exception.InnerException -is [System.Threading.AbandonedMutexException]) { $owned = $true }
+    $mutex = $null
+    try {
+        $mutex = New-Object System.Threading.Mutex($false, $MutexName)
+        $owned = $mutex.WaitOne(0)
+    } catch {
+        $e = $_.Exception
+        if ($e -is [System.Threading.AbandonedMutexException] -or $e.InnerException -is [System.Threading.AbandonedMutexException]) { $owned = $true }
+        # A supervisor of another logon session (the boot-time one) owns the mutex and this session may not open it:
+        # that is "already running", not an error.
+        elseif ($e -is [UnauthorizedAccessException] -or $e.InnerException -is [UnauthorizedAccessException]) { $owned = $false }
         else { throw }
     }
     if (-not $owned) {
         $other = Read-JsonFile $StateFile
         $otherPid = if ($other -and $other.supervisor) { $other.supervisor.pid } else { 'unknown' }
         Write-Log WARN ('another supervisor is already running (pid {0}): this one exits, nothing is started twice' -f $otherPid)
+        if ($mutex) { $mutex.Dispose() }
         return 0
     }
 
@@ -569,6 +595,9 @@ function Invoke-Supervisor {
         $lastDigest = ''
         try {
             while ($true) {
+                # `stop` asks by file (an operator's shell cannot touch these processes): leave the loop, and the
+                # finally below stops what this supervisor started. `start` removes the flag again.
+                if (Test-Path -LiteralPath $StopFlagFile) { Write-Log INFO 'stop requested by an operator'; break }
                 foreach ($c in $components) {
                     try { Update-Component $c $settings }
                     catch {
@@ -595,6 +624,7 @@ function Invoke-Supervisor {
         $mutex.ReleaseMutex()
         $mutex.Dispose()
     }
+    return 0
 }
 
 # ---- control commands ------------------------------------------------------------------------------
@@ -652,14 +682,20 @@ function Register-RuntimeTask {
         -Description 'Keeps the NINFA API, web app and worker running (supervisor: restarts them if they exit). Remove with: ninfa-runtime.ps1 uninstall'
 }
 
+# Returns $true when nothing of the runtime is left running, $false when it could not be stopped from this session.
 function Invoke-Stop {
     if (Test-Path -LiteralPath $RuntimeDir) {
         [IO.File]::WriteAllText($StopFlagFile, (Get-Date).ToString('o'), $Utf8NoBom)    # first, so the keep-alive cannot race the stop
     }
+    # 1. Ask. A supervisor that sees the flag stops what it started and exits. This is the only way that works
+    #    from a normal shell on a supervisor running "whether signed in or not": those processes cannot be opened.
+    $deadline = (Get-Date).AddSeconds($StopGraceSeconds)
+    while ((Get-LiveState) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
+    # 2. Force: a supervisor that does not look for the flag (an older install) or is stuck.
     $task = Get-InstalledTask
     if ($task -and $task.State -eq 'Running') {
-        Stop-ScheduledTask -TaskName $TaskName
-        Write-Log INFO 'stop: the task was stopped' 'control'
+        try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop; Write-Log INFO 'stop: the task was stopped' 'control' }
+        catch { Write-Log WARN ('stop: the task could not be stopped from this session: ' + $_.Exception.Message) 'control' }
     }
     $state = Read-JsonFile $StateFile
     if ($state) {
@@ -678,8 +714,22 @@ function Invoke-Stop {
                 }
             }
         }
-        Remove-Item -LiteralPath $StateFile -Force -ErrorAction SilentlyContinue
     }
+    # Is anything of it still there? (PID + start time, from WMI)
+    $left = $false
+    $state = Read-JsonFile $StateFile
+    if ($state) {
+        if ($state.supervisor -and (Test-ProcessIdentity $state.supervisor.pid $state.supervisor.start)) { $left = $true }
+        if ($state.components) {
+            foreach ($name in @($state.components.PSObject.Properties.Name)) {
+                $c = $state.components.$name
+                if ($c.launcherPid -and (Test-ProcessIdentity $c.launcherPid $c.launcherStart)) { $left = $true }
+            }
+        }
+    }
+    if (-not $left) { Remove-Item -LiteralPath $StateFile -Force -ErrorAction SilentlyContinue }
+    else { Write-Log WARN 'stop: something is still running and this session cannot stop it: run again from an elevated PowerShell' 'control' }
+    return (-not $left)
 }
 
 function Invoke-Start {
@@ -702,12 +752,9 @@ function Invoke-RestartComponent {
     $state = Get-LiveState
     if (-not $state) { throw "The supervisor is not running: use 'start' (or 'restart' without a name)." }
     $before = $state.components.$Name.launcherPid
-    # The flag first: the supervisor then restarts at once, without counting this as a failure.
+    # Ask by file: the supervisor stops that process tree itself and restarts it at once, without counting this as a
+    # failure. (An operator's shell cannot touch processes of another logon session.)
     [IO.File]::WriteAllText((Join-Path $RuntimeDir ('restart-{0}.flag' -f $Name)), (Get-Date).ToString('o'), $Utf8NoBom)
-    $c = $state.components.$Name
-    if ($c.launcherPid -and $c.launcherStart) {
-        $null = Stop-ProcessTree -RootPid ([int]$c.launcherPid) -RootStart (ConvertFrom-IsoDate $c.launcherStart)
-    }
     Write-Log INFO ('restart {0}: requested (launcher pid was {1})' -f $Name, $before) 'control'
     $deadline = (Get-Date).AddSeconds(60)
     while ((Get-Date) -lt $deadline) {
@@ -804,14 +851,18 @@ function Invoke-Install {
     Register-RuntimeTask
     Write-Log INFO ('install: task registered, trigger={0}, checkout={1}' -f $(if ($Startup) { 'startup' } else { 'logon' }), $root) 'control'
     Write-Host ('Installed. Trigger: {0}. Supervised checkout: {1}' -f $(if ($Startup) { 'Windows start (runs whether anyone is logged on or not)' } else { 'user logon' }), $root)
-    Invoke-Stop
+    if (-not (Invoke-Stop)) {
+        Write-Host 'WARNING: the running supervisor could not be stopped from this session, so it keeps the old copy until it is restarted from an elevated PowerShell (or at the next Windows boot).'
+        return
+    }
     Invoke-Start
 }
 
 function Invoke-Uninstall {
-    Invoke-Stop
+    if (-not (Invoke-Stop)) { throw 'Nothing was removed: the running supervisor could not be stopped from this session. Run uninstall from an elevated PowerShell.' }
     if (Get-InstalledTask) {
-        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+        try { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction Stop }
+        catch { throw "The task could not be removed from this session ($($_.Exception.Message.Trim())). A task installed with -Startup needs an elevated PowerShell to be removed." }
         Write-Host "Task '$TaskName' removed."
     } else {
         Write-Host "Task '$TaskName' was not installed."
@@ -838,11 +889,13 @@ switch ($Command) {
     'uninstall' { Invoke-Uninstall }
     'start' { Invoke-Start }
     'stop' {
-        Invoke-Stop
-        Write-Host 'Stopped: supervisor and the processes it started.'
+        if (Invoke-Stop) { Write-Host 'Stopped: supervisor and the processes it started.' }
+        else { Write-Host 'NOT stopped: something is still running and this session cannot stop it. Run stop again from an elevated PowerShell.'; exit 1 }
     }
     'restart' {
-        if ($Component -eq 'all') { Invoke-Stop; Invoke-Start } else { Invoke-RestartComponent $Component }
+        if ($Component -ne 'all') { Invoke-RestartComponent $Component }
+        elseif (Invoke-Stop) { Invoke-Start }
+        else { Write-Host 'NOT restarted: the running supervisor could not be stopped from this session. Run restart again from an elevated PowerShell.'; exit 1 }
     }
     'status' { if (-not (Show-Status)) { exit 1 } }
 }
