@@ -76,6 +76,9 @@ Ports and hosts are configurable through `API_HOST`, `API_PORT`, `WEB_HOST`, `WE
 port defaults to 3100 because 3000 is often taken). The web app reaches the API at
 `NEXT_PUBLIC_API_BASE_URL`; that origin must be listed in `CORS_ORIGINS`.
 
+On the Windows pilot PC, [windows-pilot-runtime.md](windows-pilot-runtime.md) starts these three after a
+reboot and starts them again if they exit.
+
 Worker smoke test (proves queue, worker and database work together):
 
 ```bash
