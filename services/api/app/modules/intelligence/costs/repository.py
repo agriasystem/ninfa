@@ -4,7 +4,8 @@ One statement returns the whole history a target needs: the canonical invoice li
 property between two dates, summed by (month of the invoice date, currency, category). The sums
 are done by PostgreSQL on exact NUMERIC values, so no float and no per-invoice or per-line read
 exists. It reads `invoices` and `invoice_lines` only: never the staging rows, never a file, never
-the data source of an invoice (the Gate 6 identity is cross-source: a document counts ONCE).
+the data source of an invoice (the Gate 6 identity is cross-source: a document counts ONCE), and
+of a document corrected by a later file only its newest version (`is_current_invoice`).
 
 Every query carries the workspace_id of the TenantContext. The repository never writes.
 """
@@ -18,7 +19,12 @@ from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
 from app.modules.intelligence.costs.types import MonthlyCostAggregate
-from app.modules.invoices.models import DocumentKind, Invoice, InvoiceLine
+from app.modules.invoices.models import (
+    DocumentKind,
+    Invoice,
+    InvoiceLine,
+    is_current_invoice,
+)
 
 
 class CostLineRepository:
@@ -27,6 +33,33 @@ class CostLineRepository:
     def __init__(self, session: Session, tenant: TenantContext) -> None:
         self._session = session
         self._tenant = tenant
+
+    def months_with_lines(self, property_id: UUID, *, before: date, limit: int) -> list[date]:
+        """The first day of each calendar month that has an invoice line dated before `before`, the
+        newest `limit` of them, newest first: the months the invoices really touch."""
+        month = cast(func.date_trunc("month", Invoice.invoice_date), Date)
+        return list(
+            self._session.scalars(
+                select(month)
+                .select_from(InvoiceLine)
+                .join(
+                    Invoice,
+                    and_(
+                        Invoice.workspace_id == InvoiceLine.workspace_id,
+                        Invoice.id == InvoiceLine.invoice_id,
+                    ),
+                )
+                .where(
+                    Invoice.workspace_id == self._tenant.workspace_id,
+                    Invoice.property_id == property_id,
+                    Invoice.invoice_date < before,
+                    is_current_invoice(),
+                )
+                .group_by(month)
+                .order_by(month.desc())
+                .limit(limit)
+            ).all()
+        )
 
     def monthly_aggregates(
         self, property_id: UUID, first: date, last: date
@@ -65,6 +98,7 @@ class CostLineRepository:
                 Invoice.property_id == property_id,
                 Invoice.invoice_date >= first,
                 Invoice.invoice_date <= last,
+                is_current_invoice(),
             )
             .group_by(month, Invoice.currency, InvoiceLine.cost_category)
             .order_by(month, Invoice.currency, InvoiceLine.cost_category)

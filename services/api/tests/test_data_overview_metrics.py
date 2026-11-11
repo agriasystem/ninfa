@@ -13,7 +13,7 @@ import pytest
 
 from app.modules.data_overview import metrics
 from app.modules.data_overview.service import DOMAIN_OF_DECISION_TYPE
-from app.modules.data_overview.types import DecisionRef, DomainState, NightStatus
+from app.modules.data_overview.types import CapacityState, DecisionRef, DomainState, NightStatus
 from app.modules.decision_memory.types import FeedState
 from app.modules.decisions.coverage import (
     AnalysisCoverage,
@@ -122,6 +122,84 @@ def test_nights_outside_the_window_are_ignored() -> None:
 
     assert result.nights_with_data == 3
     assert result.room_nights == 30
+
+
+# --- capacity: can the occupancy be calculated at all? -------------------------------------------
+
+
+def test_every_night_with_a_capacity_is_a_known_capacity() -> None:
+    result = metrics.period_metrics([snap(day, 10, 40) for day in days(3)], START, days(3)[-1])
+
+    assert result.capacity is CapacityState.KNOWN
+    assert result.occupancy_pct == D("25.00")
+
+
+def test_without_any_capacity_and_no_inventory_the_capacity_is_missing_and_the_bookings_stay() -> (
+    None
+):
+    rows = [snap(day, 12, None) for day in days(3)]
+
+    result = metrics.period_metrics(rows, START, days(3)[-1])
+
+    assert result.capacity is CapacityState.MISSING
+    assert result.occupancy_pct is None and result.rooms_available is None
+    # only what needs a capacity is missing: room-nights, revenue and ADR are real figures
+    assert result.room_nights == 36
+    assert result.room_revenue == D("3600.00")
+    assert result.adr == D("100.00")
+
+
+def test_capacity_is_never_inferred_from_the_bookings() -> None:
+    # 30 rooms booked on the busiest night: that is not an inventory of 30, nor of anything
+    rows = [snap(START, 30, None), snap(START + timedelta(1), 12, None)]
+
+    result = metrics.period_metrics(rows, START, START + timedelta(1))
+
+    assert result.capacity is CapacityState.MISSING
+    assert result.rooms_available is None
+    assert result.occupancy_pct is None
+
+
+def test_an_inventory_set_after_the_observation_is_awaiting_the_next_analysis() -> None:
+    rows = [snap(day, 12, None) for day in days(3)]
+
+    result = metrics.period_metrics(
+        rows, START, days(3)[-1], configured_nights=frozenset({START + timedelta(1)})
+    )
+
+    assert result.capacity is CapacityState.AWAITING_ANALYSIS
+    assert result.occupancy_pct is None  # the inventory never enters a figure until observed
+
+
+def test_an_inventory_for_nights_without_bookings_says_nothing_about_these_nights() -> None:
+    rows = [snap(day, 12, None) for day in days(2)]
+
+    result = metrics.period_metrics(
+        rows, START, START + timedelta(6), configured_nights=frozenset({START + timedelta(5)})
+    )
+
+    assert result.capacity is CapacityState.MISSING
+
+
+def test_some_nights_with_a_capacity_is_partial() -> None:
+    rows = [snap(START, 10, 40), snap(START + timedelta(1), 20, None)]
+
+    assert metrics.period_metrics(rows, START, START + timedelta(1)).capacity is (
+        CapacityState.PARTIAL
+    )
+
+
+def test_a_closed_night_is_a_known_capacity_not_a_missing_inventory() -> None:
+    rows = [snap(day, 0, 0) for day in days(2)]
+
+    result = metrics.period_metrics(rows, START, START + timedelta(1))
+
+    assert result.capacity is CapacityState.KNOWN
+    assert result.occupancy_pct is None  # nothing to divide by, and never a made-up 0 %
+
+
+def test_a_window_without_bookings_has_no_capacity_state() -> None:
+    assert metrics.period_metrics([], START, START + timedelta(6)).capacity is None
 
 
 @pytest.mark.parametrize(

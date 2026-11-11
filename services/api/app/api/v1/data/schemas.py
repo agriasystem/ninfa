@@ -33,6 +33,8 @@ class PeriodMetricsResponse(BaseModel):
     nights_requested: int
     nights_with_data: int
     nights_with_capacity: int
+    # "KNOWN" | "PARTIAL" | "MISSING" | "AWAITING_ANALYSIS"; null with no night of bookings.
+    capacity: str | None
     room_nights: int | None
     rooms_on_books_with_capacity: int | None
     rooms_available: int | None
@@ -56,6 +58,16 @@ class NightRowResponse(BaseModel):
     rooms_delta_7d: int | None
     status: str
     decision_id: UUID | None
+    # More rooms on the books than the inventory has: the figures above stay as stored.
+    over_capacity: bool
+
+
+class InventoryConsistencyResponse(BaseModel):
+    """How many of the 30 observed nights hold more rooms than the inventory has. A question about
+    the data (inventory, overbooking or a wrong booking), never a decision."""
+
+    over_capacity_nights: int
+    first_night: date | None
 
 
 class OccupancyResponse(BaseModel):
@@ -66,6 +78,7 @@ class OccupancyResponse(BaseModel):
     days_30: PeriodMetricsResponse | None
     selected: PeriodMetricsResponse | None
     nights: list[NightRowResponse]
+    inventory_consistency: InventoryConsistencyResponse
 
 
 # --- distribution ------------------------------------------------------------------------------
@@ -79,8 +92,22 @@ class ChannelWeightResponse(BaseModel):
 
 
 class ChannelMixResponse(BaseModel):
+    # The denominator of every weight, and what is in it (see `ChannelMix`).
     total_room_nights: int
+    classified_room_nights: int
+    unclassified_room_nights: int
+    on_books_room_nights: int | None
+    matches_on_books: bool | None
     channels: list[ChannelWeightResponse]
+
+
+class DateConflictsResponse(BaseModel):
+    """Bookings of the 30-night window whose own dates contradict the analysis day (counts)."""
+
+    booked_after: int
+    cancelled_after: int
+    no_show_before_arrival: int
+    total: int
 
 
 class DistributionResponse(BaseModel):
@@ -96,6 +123,11 @@ class DistributionResponse(BaseModel):
     insufficient_reasons: list[str]
     decision_id: UUID | None
     channel_mix: ChannelMixResponse | None
+    date_conflicts: DateConflictsResponse | None
+    # "DATA_QUALITY" | "HISTORY" | null: why there is no verdict, and so what the page says.
+    insufficiency: str | None
+    comparable_periods_available: int | None
+    comparable_periods_required: int | None
 
 
 # --- costs -------------------------------------------------------------------------------------
@@ -118,6 +150,21 @@ class CostDecisionResponse(BaseModel):
     expected_cpor: str | None
 
 
+class CostOccupancyResponse(BaseModel):
+    """The days the month's cost per occupied room rests on, and for each day it lacks, the one
+    thing it lacks (see `CostOccupancyBasis`)."""
+
+    total_days: int
+    known_days: int
+    observed_days: int
+    reconstructed_days: int
+    uncertain_days: int
+    days_outside_bookings: int
+    days_without_inventory: int
+    days_awaiting_rebuild: int
+    first_day_without_inventory: date | None
+
+
 class CostsResponse(BaseModel):
     state: str
     reason: str | None
@@ -132,6 +179,7 @@ class CostsResponse(BaseModel):
     classification_coverage_pct: str | None
     categories: list[CostCategoryResponse]
     decision: CostDecisionResponse | None
+    occupancy: CostOccupancyResponse | None
 
 
 # --- labor -------------------------------------------------------------------------------------
@@ -143,6 +191,22 @@ class LaborCategoryResponse(BaseModel):
     days_complete: int
     days_incomplete: int
     planned_cost: str | None
+    average_hourly_cost: str | None
+    cost_share_pct: str | None
+    revenue_incidence_pct: str | None
+
+
+class LaborEconomicsResponse(BaseModel):
+    planned_hours: str | None
+    planned_cost: str | None
+    average_hourly_cost: str | None
+    period_start: date | None
+    period_end: date | None
+    period_days: int
+    reference_revenue: str | None
+    revenue_gap: str | None
+    cost_to_revenue_pct: str | None
+    revenue_per_hour: str | None
 
 
 class LaborDecisionResponse(BaseModel):
@@ -159,10 +223,14 @@ class LaborResponse(BaseModel):
     reason: str | None
     window_start: date
     window_end: date
+    # The days in the window: `economics.period_days` of them have a plan with hours, and every
+    # ratio is calculated on those days alone.
+    window_days: int
     currency: str
     days_with_data: int
     categories: list[LaborCategoryResponse]
     decision: LaborDecisionResponse | None
+    economics: LaborEconomicsResponse
 
 
 # --- freshness / analysis ----------------------------------------------------------------------

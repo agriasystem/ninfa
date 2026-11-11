@@ -66,8 +66,8 @@ def _provenance(anchor: SnapshotPoint, other: SnapshotPoint) -> PairProvenance:
 
 
 def _newest_first(pairs: Iterable[HistoricalPair]) -> list[HistoricalPair]:
-    # A data source has one snapshot per (snapshot day, stay date): the stay date makes the order
-    # total for stored data; the anchor id only makes it total for hand-built inputs.
+    # A read gives one snapshot per (snapshot day, stay date), the last revision: the stay date
+    # makes the order total for stored data; the anchor id only for hand-built inputs.
     return sorted(pairs, key=lambda p: (p.stay_date, str(p.anchor.snapshot_id)), reverse=True)
 
 

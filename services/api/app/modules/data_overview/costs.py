@@ -25,6 +25,7 @@ from app.modules.data_overview.types import (
     Availability,
     CostCategoryRow,
     CostDecisionFacts,
+    CostOccupancyBasis,
     CostOverview,
     CporStatus,
     UnavailableReason,
@@ -40,7 +41,12 @@ from app.modules.intelligence.costs.periods import CalendarMonth
 from app.modules.intelligence.costs.repository import CostLineRepository
 from app.modules.intelligence.costs.types import MonthlyCostAggregate, OccupancyDenominator
 from app.modules.invoices.cost_categories import CostCategory
-from app.modules.snapshots.repository import BookingSnapshotRepository
+from app.modules.snapshots.repository import (
+    BookingSnapshotRepository,
+    BookingStayRepository,
+    RoomInventoryRepository,
+    SnapshotHistoryRow,
+)
 
 _HUNDRED = Decimal(100)
 
@@ -75,6 +81,8 @@ class CostOverviewReader:
         self._tenant = tenant
         self._costs = CostLineRepository(session, tenant)
         self._snapshots = BookingSnapshotRepository(session, tenant)
+        self._stays = BookingStayRepository(session, tenant)
+        self._inventory = RoomInventoryRepository(session, tenant)
 
     def read(
         self,
@@ -117,9 +125,12 @@ class CostOverviewReader:
         previous_total = _sum_net(previous_rows.values()) if previous_rows else None
 
         denominator: OccupancyDenominator | None = None
+        basis: CostOccupancyBasis | None = None
         if source_id is not None:
             snapshot_rows = self._snapshots.list_by_keys(source_id, lead_zero_keys(month))
-            denominator = build_denominator(month, index_lead_zero(snapshot_rows))
+            lead_zero = index_lead_zero(snapshot_rows)
+            denominator = build_denominator(month, lead_zero)
+            basis = self._occupancy_basis(property_id, source_id, month, lead_zero, denominator)
 
         categories = tuple(
             self._category_row(
@@ -151,6 +162,46 @@ class CostOverviewReader:
             classification_coverage_pct=_coverage(in_month.values()),
             categories=categories,
             decision=decision,
+            occupancy_basis=basis,
+        )
+
+    def _occupancy_basis(
+        self,
+        property_id: UUID,
+        source_id: UUID,
+        month: CalendarMonth,
+        lead_zero: dict[date, SnapshotHistoryRow],
+        denominator: OccupancyDenominator,
+    ) -> CostOccupancyBasis:
+        """Which days of the month the denominator has, and for each one that is missing, the one
+        thing it lacks. Read from the same snapshots the denominator is made of."""
+        span = self._stays.stay_span(property_id, source_id)
+        configured = {
+            row.stay_date
+            for row in self._inventory.list_for_range(property_id, month.start, month.end)
+        }
+        outside = without_inventory = awaiting = 0
+        first_without_inventory: date | None = None
+        for day in month.day_list():
+            if day in lead_zero:
+                continue
+            if span is None or not span[0] <= day <= span[1]:
+                outside += 1
+            elif day not in configured:
+                without_inventory += 1
+                first_without_inventory = first_without_inventory or day
+            else:
+                awaiting += 1
+        return CostOccupancyBasis(
+            total_days=month.days,
+            known_days=denominator.observed_day_count + denominator.reconstructed_day_count,
+            observed_days=denominator.observed_day_count,
+            reconstructed_days=denominator.reconstructed_day_count,
+            uncertain_days=denominator.uncertain_day_count,
+            days_outside_bookings=outside,
+            days_without_inventory=without_inventory,
+            days_awaiting_rebuild=awaiting,
+            first_day_without_inventory=first_without_inventory,
         )
 
     def _category_row(

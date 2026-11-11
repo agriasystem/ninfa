@@ -2,9 +2,10 @@
 # it as /etc/systemd/system/ninfa-worker.service.
 #
 # ONE supervised process, no public port. Concurrency is 1 (one job at a time). Jobs live in
-# PostgreSQL: queued jobs survive a restart of this service. A job that is killed while running
-# stays in state "doing" (a zombie): nothing recovers it automatically and nothing retries failed
-# jobs. See docs/operations/pilot-daily-operations-v1.md.
+# PostgreSQL: queued jobs survive a restart of this service. It also asks for the daily analysis of
+# every property by itself, so this is the one service the daily analysis depends on. A job killed
+# while running stays in state "doing": a later tick puts it back, a bounded number of times. See
+# docs/operations/pilot-daily-operations-v1.md.
 # /opt/ninfa/app is a PLACEHOLDER for the repository checkout. No secrets in this file.
 [Unit]
 Description=NINFA worker

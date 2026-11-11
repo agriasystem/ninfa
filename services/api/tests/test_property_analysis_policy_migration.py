@@ -16,6 +16,9 @@ from tests.support import alembic_config
 
 HEAD = "0013_property_analysis_policy"
 PREVIOUS_HEAD = "0012_input_provenance"
+# "Which is the global head" belongs to the newest migration's own file; this one only needs to know
+# where an upgrade to head ends (`test_same_day_revisions_migration.py`).
+CURRENT_GLOBAL_HEAD = "0016_remembered_scope"
 TABLE = "property_analysis_policies"
 
 
@@ -31,10 +34,9 @@ def _revision(engine: Engine) -> str:
         return str(connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one())
 
 
-def test_01_there_is_exactly_one_head_and_it_sits_on_0012(test_database_url: str) -> None:
+def test_01_it_sits_on_0012(test_database_url: str) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
-    assert scripts.get_heads() == [HEAD]
     assert scripts.get_revision(HEAD).down_revision == PREVIOUS_HEAD
 
 
@@ -61,7 +63,7 @@ def test_02_downgrade_removes_only_the_new_table_and_upgrade_restores_it(
     )
 
     command.upgrade(config, "head")
-    assert _revision(db_engine) == HEAD
+    assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert {c["name"] for c in inspect(db_engine).get_columns(TABLE)} == columns
 
 
@@ -112,5 +114,5 @@ def test_04_a_fresh_database_goes_from_base_to_head(
 
     command.upgrade(config, "head")
 
-    assert _revision(db_engine) == HEAD
+    assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert TABLE in inspect(db_engine).get_table_names()

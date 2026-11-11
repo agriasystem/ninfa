@@ -70,6 +70,7 @@ from app.modules.ingestion.models import (
     DataSource,
     DataSourceDomain,
     DataSourceType,
+    FileScope,
     ImportJobStatus,
 )
 from app.modules.ingestion.repository import (
@@ -78,6 +79,7 @@ from app.modules.ingestion.repository import (
     ImportJobRepository,
 )
 from app.modules.ingestion.schemas import ImportFileCreate, ImportJobCreate
+from app.modules.ingestion.scope import NO_SCOPE, ScopePlan
 from app.modules.properties.models import Property
 from app.modules.properties.repository import PropertyRepository
 
@@ -122,6 +124,7 @@ class BookingImportResult:
     bookings_created: int = 0
     bookings_updated: int = 0
     bookings_unchanged: int = 0
+    bookings_removed: int = 0
     row_error_summary: dict[str, int] = field(default_factory=dict)
     details: dict[str, Any] = field(default_factory=dict)
     # Informational: this exact file content was already imported successfully by this data
@@ -131,6 +134,11 @@ class BookingImportResult:
     @property
     def succeeded(self) -> bool:
         return self.status == ImportJobStatus.SUCCEEDED
+
+    @property
+    def changed_data(self) -> bool:
+        """Did any booking change? Read from the bookings, never from the file's name or bytes."""
+        return self.bookings_created + self.bookings_updated + self.bookings_removed > 0
 
 
 @dataclass(frozen=True)
@@ -331,6 +339,36 @@ class BookingImportService:
             summary=_dry_run_summary(valid),
         )
 
+    def bookings_a_complete_file_would_remove(
+        self,
+        data_source_id: UUID,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: MappingConfig,
+    ) -> int:
+        """How many bookings on the books would stop being current if THIS file holds everything of
+        its period. Read-only. The period is the file's own, from its first check-in to its last: a
+        booking outside it is not this file's business. 0 for a file that cannot be read cleanly:
+        what is wrong with it is said when it is tried, not here."""
+        prop = self._properties.get(property_id)
+        if prop is None:
+            return 0
+        table = open_table(content, filename, mapping.format_options)
+        extracted = self._extract(table, mapping)
+        context = NormalizationContext(self._timezone(prop), mapping)
+        staged, _ = self._validate(extracted, context)
+        if not staged or any(row.validation_status != ImportRowStatus.VALID for row in staged):
+            return 0
+        bookings = [NormalizedBooking.from_payload(row.normalized_payload or {}) for row in staged]
+        return self._bookings.count_absent_from(
+            data_source_id,
+            [booking.source_record_id for booking in bookings],
+            min(booking.check_in for booking in bookings),
+            max(booking.check_in for booking in bookings),
+        )
+
     # --- import -------------------------------------------------------------------------------
 
     def import_file(
@@ -342,6 +380,7 @@ class BookingImportService:
         mime_type: str | None = None,
         property_id: UUID | None = None,
         mapping_override: MappingConfig | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> BookingImportResult:
         """Import one booking file into the canonical model, atomically and idempotently.
 
@@ -351,6 +390,10 @@ class BookingImportService:
         `mapping_override` reads THIS file with a mapping the caller has just built from it,
         instead of the data source's saved profile, and saves nothing: the caller decides whether
         to keep it, once the import has succeeded.
+
+        `scope` is what the caller knows this file to be. Only `FileScope.FULL` makes the absence of
+        a booking mean anything; with anything else, or nothing, bookings the file does not hold are
+        left alone.
 
         Raises BookingImportError(BOOKING_INVALID_DATA_SOURCE) when the data source cannot be
         used (nothing is created). Every later problem ends as a FAILED ImportJob and a returned
@@ -379,7 +422,9 @@ class BookingImportService:
         self._log("booking import started", ids)
 
         try:
-            result = self._run(ids, filename, content, timezone, duplicate_of, mapping_override)
+            result = self._run(
+                ids, filename, content, timezone, duplicate_of, mapping_override, scope
+            )
         except BookingImportError as error:
             result = self._fail(ids, error.error_code, error.message, error.details, duplicate_of)
         except Exception as error:  # a bug or infrastructure problem: never leave the job RUNNING
@@ -416,6 +461,7 @@ class BookingImportService:
         timezone: ZoneInfo,
         duplicate_of: UUID | None,
         mapping_override: MappingConfig | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> BookingImportResult:
         detect_file_type(filename, content)  # unsupported types first, before anything else
         stored_signature: str | None = None
@@ -475,7 +521,9 @@ class BookingImportService:
                 summary=summary,
                 counts=counts,
             )
-        return self._canonicalize(ids, timezone, duplicate_of, schema.signature_matches, counts)
+        return self._canonicalize(
+            ids, timezone, duplicate_of, schema.signature_matches, counts, scope
+        )
 
     def _extract(self, table: SourceTable, config: MappingConfig) -> list[_ExtractedRow]:
         """Read the file, keeping ONLY the mapped columns of each row.
@@ -580,8 +628,12 @@ class BookingImportService:
         duplicate_of: UUID | None,
         signature_matches: bool,
         counts: _RowCounts,
+        scope: ScopePlan = NO_SCOPE,
     ) -> BookingImportResult:
-        """T4: every valid row becomes a canonical booking, or none does."""
+        """T4: every valid row becomes a canonical booking, or none does. An explicit status is
+        always what counts: only a complete file makes a booking it does not hold no longer
+        current, and only inside the period the file itself covers. What it takes away is computed
+        here, under the lock: if that is not what the person was shown, nothing is imported."""
         try:
             # One canonicalisation per data source at a time: a concurrent import of the same
             # source waits, then sees these bookings and treats them as known.
@@ -590,6 +642,22 @@ class BookingImportService:
             bookings = [
                 NormalizedBooking.from_payload(row.normalized_payload or {}) for row in staged
             ]
+            complete = scope.file_scope is FileScope.FULL and bool(bookings)
+            held = [booking.source_record_id for booking in bookings]
+            first = min((booking.check_in for booking in bookings), default=None)
+            last = max((booking.check_in for booking in bookings), default=None)
+            if complete and first is not None and last is not None:
+                absent = self._bookings.count_absent_from(ids.data_source, held, first, last)
+                if scope.is_stale(absent):
+                    return self._fail(
+                        ids,
+                        BookingErrorCode.IMPORT_PLAN_CHANGED,
+                        "What this file would take away changed after it was read: "
+                        "nothing was imported",
+                        {"schema_signature_matches": signature_matches},
+                        duplicate_of,
+                        counts=counts,
+                    )
 
             channel_ids: dict[str, UUID] = {}
             for booking in bookings:
@@ -606,8 +674,18 @@ class BookingImportService:
                     for b in bookings
                 ],
             )
+            removed = 0
+            if complete and first is not None and last is not None:
+                removed = self._bookings.remove_absent_from(
+                    ids.data_source, ids.job, held, first, last
+                )
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job)
+            self._jobs.succeed(
+                ids.job,
+                changed_data=outcome.created + outcome.updated + removed > 0,
+                file_scope=scope.file_scope,
+                remembered_file_scope=scope.remembered_file_scope,
+            )
             self._session.commit()
         except Exception as error:
             self._session.rollback()  # nothing of this batch survives
@@ -637,6 +715,7 @@ class BookingImportService:
             bookings_created=outcome.created,
             bookings_updated=outcome.updated,
             bookings_unchanged=outcome.unchanged,
+            bookings_removed=removed,
             details={"schema_signature_matches": signature_matches},
             duplicate_of_import_file_id=duplicate_of,
             rows_total=counts.total,

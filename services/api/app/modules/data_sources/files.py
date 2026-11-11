@@ -32,6 +32,8 @@ from app.modules.labor.mapping import (
 )
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
+# What the import-file page accepts: what the readers read (`bookings.parsers.detect_file_type`).
+IMPORTABLE_EXTENSIONS = (".csv", ".xlsx")
 SAMPLE_ROWS = 3
 SAMPLE_COLUMNS = 6
 
@@ -49,12 +51,13 @@ class ImportProblem(StrEnum):
     DUPLICATE_COLUMNS = "DUPLICATE_COLUMNS"
     INVALID_ROWS = "INVALID_ROWS"
     UNSUPPORTED_FORMAT = "UNSUPPORTED_FORMAT"
-    SAME_DAY_CONFLICT = "SAME_DAY_CONFLICT"
     # Smart Import: matching the columns of a file the person already has.
     MAPPING_INCOMPLETE = "MAPPING_INCOMPLETE"  # the matching misses something or contradicts itself
     FORMAT_UNCLEAR = "FORMAT_UNCLEAR"  # dates or numbers are written in a way NINFA cannot tell
     PROFILE_NOT_USABLE = "PROFILE_NOT_USABLE"  # the saved configuration cannot read this file
     SHEET_REQUIRED = "SHEET_REQUIRED"  # an Excel file with several sheets: one must be chosen
+    # What the file would take away changed after it was read: it must be read again.
+    DATA_CHANGED = "DATA_CHANGED"
     GENERIC = "GENERIC"
 
 
@@ -71,11 +74,11 @@ _PROBLEM_BY_CODE: dict[str, ImportProblem] = {
     "AMBIGUOUS_DATE_FORMAT": ImportProblem.INVALID_ROWS,
     "AMBIGUOUS_NUMBER_FORMAT": ImportProblem.INVALID_ROWS,
     "VALIDATION_FAILED": ImportProblem.INVALID_ROWS,
+    "IMPORT_PLAN_CHANGED": ImportProblem.DATA_CHANGED,
     "CANONICALIZATION_FAILED": ImportProblem.INVALID_ROWS,
     "DOCUMENT_CONFLICT": ImportProblem.INVALID_ROWS,
     "UNSUPPORTED_FATTURAPA": ImportProblem.UNSUPPORTED_FORMAT,
     "XML_SECURITY_REJECTED": ImportProblem.UNSUPPORTED_FORMAT,
-    "SNAPSHOT_CONFLICT": ImportProblem.SAME_DAY_CONFLICT,
 }
 
 

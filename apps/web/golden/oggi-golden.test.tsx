@@ -32,14 +32,19 @@ describe("Golden A: NOT_PROCESSED", () => {
 });
 
 describe("Golden B: DATA_QUALITY_LIMITED", () => {
-  it("renders the partial-analysis copy with the real insufficient/suppressed counts", () => {
+  it("renders 'no reliable decision today' in general terms: no reason named, no count of checks", () => {
     const { container } = render(
       <FeedStateView feed={GOLDEN_DATA_QUALITY_LIMITED} timeZone={TIME_ZONE} />,
     );
 
-    expect(screen.getByText("Analisi parziale")).not.toBeNull();
-    expect(container.textContent).toContain("3 in attesa di dati sufficienti");
-    expect(container.textContent).toContain("1 con confidenza troppo bassa");
+    expect(screen.getByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" })).not.toBeNull();
+    expect(
+      screen.getByText("I dati disponibili non consentono ancora una nuova conclusione sufficientemente affidabile."),
+    ).not.toBeNull();
+    // "Analisi parziale" is the small secondary state, never the headline
+    expect(container.querySelector(".feed-state__badge")?.textContent).toBe("Analisi parziale");
+    expect(container.querySelector("details")).toBeNull();
+    expect(container.textContent).not.toMatch(/\d+ controll|in attesa di dati sufficienti|confidenza troppo bassa|storico/u);
     expect(container.textContent).not.toContain("Tutto sotto controllo");
   });
 });

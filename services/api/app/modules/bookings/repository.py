@@ -4,9 +4,9 @@ Every class takes a TenantContext and puts its workspace_id in every query. Repo
 `flush()` but never `commit()`: transaction boundaries belong to BookingImportService.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -24,9 +24,10 @@ from app.modules.bookings.models import (
     BookingMappingProfile,
     BookingStatus,
     ImportRowStatus,
+    is_current_booking,
 )
 from app.modules.bookings.normalization import NormalizedBooking
-from app.modules.ingestion.models import DataSource
+from app.modules.ingestion.models import DataSource, ImportJob, ImportJobStatus
 
 _CHUNK = 1000
 CHANNEL_UNIQUE = "uq_booking_channels_workspace_id_property_id_normalized_name"
@@ -245,6 +246,11 @@ class UpsertResult:
     unchanged: int
 
 
+# The statuses that are on the books in some form: a booking already cancelled or a no-show that an
+# export leaves out has nothing left to lose, so its absence neither asks nor removes anything.
+_NOT_ON_THE_BOOKS = (BookingStatus.CANCELLED, BookingStatus.NO_SHOW)
+
+
 class BookingRepository:
     """Bookings of ONE workspace."""
 
@@ -279,7 +285,9 @@ class BookingRepository:
         check_in_until: date | None = None,
     ) -> Sequence[Booking]:
         query = select(Booking).where(
-            Booking.workspace_id == self._tenant.workspace_id, Booking.property_id == property_id
+            Booking.workspace_id == self._tenant.workspace_id,
+            Booking.property_id == property_id,
+            is_current_booking(),
         )
         if status is not None:
             query = query.where(Booking.status == status)
@@ -319,7 +327,8 @@ class BookingRepository:
 
         A booking is identified by (data source, source_record_id). Equal fingerprint = no-op
         (nothing is written, not even updated_at/last_import_job_id); a different fingerprint
-        updates the same row and its last_import_job_id, never first_import_job_id.
+        updates the same row and its last_import_job_id, never first_import_job_id. A booking a
+        complete file had taken away and this file holds again is back: that is a change too.
         """
         ids = [item.booking.source_record_id for item in items]
         if len(ids) != len(set(ids)):
@@ -343,15 +352,105 @@ class BookingRepository:
                     )
                 )
                 created += 1
-            elif current.source_fingerprint == item.fingerprint:
+            elif current.source_fingerprint == item.fingerprint and current.removed_at is None:
                 unchanged += 1
             else:
                 for column, value in _business_columns(item).items():
                     setattr(current, column, value)
                 current.last_import_job_id = import_job_id
+                current.removed_by_import_job_id = None
+                current.removed_at = None
+                current.last_seen_import_job_id = None
                 updated += 1
         self._session.flush()
         return UpsertResult(created, updated, unchanged)
+
+    def _on_the_books_between(
+        self, data_source_id: UUID, first_check_in: date, last_check_in: date
+    ) -> Sequence[Booking]:
+        return self._session.scalars(
+            select(Booking).where(
+                Booking.workspace_id == self._tenant.workspace_id,
+                Booking.data_source_id == data_source_id,
+                Booking.check_in >= first_check_in,
+                Booking.check_in <= last_check_in,
+                Booking.status.not_in(_NOT_ON_THE_BOOKS),
+                is_current_booking(),
+            )
+        ).all()
+
+    def count_absent_from(
+        self,
+        data_source_id: UUID,
+        source_record_ids: Collection[str],
+        first_check_in: date,
+        last_check_in: date,
+    ) -> int:
+        """How many bookings on the books in this period a file holding these ids does not hold."""
+        held = set(source_record_ids)
+        return sum(
+            booking.source_record_id not in held
+            for booking in self._on_the_books_between(data_source_id, first_check_in, last_check_in)
+        )
+
+    def remove_absent_from(
+        self,
+        data_source_id: UUID,
+        import_job_id: UUID,
+        source_record_ids: Collection[str],
+        first_check_in: date,
+        last_check_in: date,
+    ) -> int:
+        """A complete file: the bookings of its period it no longer holds are no longer current.
+        Marked, never deleted, with the import that held each of them last. Returns how many."""
+        held = set(source_record_ids)
+        absent = [
+            booking
+            for booking in self._on_the_books_between(data_source_id, first_check_in, last_check_in)
+            if booking.source_record_id not in held
+        ]
+        if not absent:
+            return 0
+        last_seen = self._last_imports_holding(
+            data_source_id, [booking.source_record_id for booking in absent]
+        )
+        now = datetime.now(UTC)
+        for booking in absent:
+            booking.removed_by_import_job_id = import_job_id
+            booking.removed_at = now
+            booking.last_seen_import_job_id = last_seen.get(
+                booking.source_record_id, booking.last_import_job_id
+            )
+        self._session.flush()
+        return len(absent)
+
+    def _last_imports_holding(
+        self, data_source_id: UUID, source_record_ids: Sequence[str]
+    ) -> dict[str, UUID]:
+        """The latest SUCCEEDED import of this source that held each booking, from its own staged
+        rows: an import that changed nothing about a booking did not write on the booking itself."""
+        record = BookingImportRow.normalized_payload["source_record_id"].astext
+        found: dict[str, UUID] = {}
+        for start in range(0, len(source_record_ids), _CHUNK):
+            chunk = source_record_ids[start : start + _CHUNK]
+            rows = self._session.execute(
+                select(record, ImportJob.id)
+                .join(
+                    ImportJob,
+                    (ImportJob.workspace_id == BookingImportRow.workspace_id)
+                    & (ImportJob.id == BookingImportRow.import_job_id),
+                )
+                .where(
+                    BookingImportRow.workspace_id == self._tenant.workspace_id,
+                    ImportJob.data_source_id == data_source_id,
+                    ImportJob.status == ImportJobStatus.SUCCEEDED,
+                    record.in_(chunk),
+                )
+                .distinct(record)
+                .order_by(record, ImportJob.finished_at.desc(), ImportJob.id.desc())
+            )
+            found.update({str(row[0]): row[1] for row in rows})
+        return found
 
 
 def _business_columns(item: ImportItem) -> dict[str, Any]:

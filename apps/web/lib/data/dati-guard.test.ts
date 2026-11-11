@@ -110,6 +110,20 @@ describe("responsive-critical CSS (jsdom cannot lay out, so the rules are pinned
     expect(dati).toMatch(/\.dati-cell \{[^}]*min-width: 0;/u);
   });
 
+  it("fits the detail table on a desktop card: tighter cells, a status that may wrap, a share for one line", () => {
+    // measured in a real browser (Dati Pilot UX fix): at 1440 and 1280 the tables keep room for two
+    // Windows scrollbars; a fixed status width would raise the width below which they must scroll
+    expect(dati).toMatch(/\.dati-table th,\s*\.dati-table td \{\s*padding: 11px 8px;/u);
+    expect(dati).toMatch(/\.dati-table td\.dati-table__status \{\s*white-space: normal;/u);
+    expect(dati).toMatch(/\.dati-table--nights th\.dati-table__status \{\s*width: 22%;/u);
+    expect(dati).toMatch(/\.dati-table--nights-wide th\.dati-table__status \{\s*width: 16%;/u);
+  });
+
+  it("asks no table for more width than the common minimum: 720 px made the summary scroll at 1024 with 567 px of content", () => {
+    expect(dati).toMatch(/\.dati-table \{[^}]*min-width: 600px;/u);
+    expect(dati).not.toMatch(/\.dati-table--summary/u);
+  });
+
   it("respects reduced motion", () => {
     expect(dati).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.dati-skeleton__card \{\s*animation: none;/u);
   });

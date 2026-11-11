@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 
-import type { DecisionFeedResponse } from "@ninfa/contracts";
+import type { AnalysisStatusResponse, DecisionFeedResponse } from "@ninfa/contracts";
 
-import { copy, analysisDomainLabels } from "@/lib/copy";
+import { useAnalysisStatus, type AnalysisStatusHandle } from "@/lib/analysis/use-analysis-status";
+import { copy, analysisDomainLabels, importedKindsText } from "@/lib/copy";
 import { formatBusinessDateItalian } from "@/lib/date/property-date";
 import { useDecisionFeed } from "@/lib/feed/use-decision-feed";
 import { buildDomainSummary, decisionCountOf } from "@/lib/home/domain-summary";
@@ -12,9 +13,10 @@ import { freshnessLineOf } from "@/lib/home/freshness";
 import { firstNameOf } from "@/lib/home/greeting";
 import { heroFragmentsOf, type HeroFragment } from "@/lib/home/hero-copy";
 import { useLogoTransition } from "@/lib/motion/use-logo-transition";
-import { decisioniRoute } from "@/lib/routes";
+import { datiRoute, decisioniRoute, importaFileRoute, strutturaRoute } from "@/lib/routes";
 import { useSession } from "@/lib/session/session-context";
 
+import { AnalysisNotice } from "./analysis-notice";
 import { DomainSummary } from "./domain-summary";
 import { ArrowRightIcon } from "./icons";
 import { LogoTrailCanvas } from "./logo-trail-canvas";
@@ -23,11 +25,39 @@ import { NinfaLogo } from "./ninfa-logo";
 import { RefreshButton } from "./refresh-button";
 import { useShellLogo } from "./shell-logo-context";
 
+/** What the hero says when there is no run for today and the analysis status knows why: data have arrived and
+ * the analysis is on its way, it failed, or it has nothing to run on. `null`: it knows nothing more. */
+function updateHeroOf(status: AnalysisStatusResponse | null): { title: string; body: string } | null {
+  if (status === null) return null;
+  const hero = copy.analysisUpdate.hero;
+  switch (status.state) {
+    case "IN_PROGRESS":
+    case "DELAYED":
+    case "NEW_DATA":
+    case "DEFERRED":
+    case "FAILED":
+    case "SEVERAL_SOURCES":
+      return hero[status.state];
+    case "NEEDS_BOOKINGS":
+      return {
+        title: copy.analysisUpdate.needsBookingsTitle(importedKindsText(status.imported_domains)),
+        body: copy.analysisUpdate.needsBookingsBody,
+      };
+    case "NO_DATA":
+    case "UP_TO_DATE":
+      return null;
+  }
+}
+
 /** What the hero says for each of the four feed states: a headline made of styled fragments, and
  * the supporting lines under it. PRESENTATION ONLY - which branch renders is `feed_state`, exactly
  * as the backend decided it; "Tutto sotto controllo" can only ever come from `NO_ACTION_REQUIRED`
- * (Gate 14), and `NOT_PROCESSED` keeps its Gate 24 wording (never analysed vs. last analysis). */
-function heroOf(feed: DecisionFeedResponse): { fragments: HeroFragment[]; supporting: string[] } {
+ * (Gate 14), and `NOT_PROCESSED` keeps its Gate 24 wording (never analysed vs. last analysis) unless
+ * the analysis status knows more. */
+function heroOf(
+  feed: DecisionFeedResponse,
+  status: AnalysisStatusResponse | null,
+): { fragments: HeroFragment[]; supporting: string[] } {
   switch (feed.feed_state) {
     case "ACTION_REQUIRED": {
       // The feed is already ordered `priority_rank ASC` by the backend - never re-sorted here.
@@ -55,22 +85,28 @@ function heroOf(feed: DecisionFeedResponse): { fragments: HeroFragment[]; suppor
       return { fragments: [{ text: copy.today.noActionTitle, tone: "strong" }], supporting };
     }
     case "DATA_QUALITY_LIMITED": {
-      const supporting: string[] = [copy.today.dataQualityBody];
-      if (feed.insufficient_count !== null && feed.insufficient_count > 0) {
-        supporting.push(copy.today.dataQualityInsufficientCount(feed.insufficient_count));
-      }
+      // Not "all clear" and not a headline about a partial analysis: no reliable decision today, in terms that
+      // are always true (the feed has no reason, so none is named). The number of checks left inconclusive is
+      // an internal count and is never said here.
+      const supporting: string[] = [copy.today.noReliableDecisionHomeBody];
       if (feed.suppressed_count !== null && feed.suppressed_count > 0) {
-        supporting.push(copy.today.dataQualitySuppressedCount(feed.suppressed_count));
+        supporting.push(copy.today.lowConfidenceNote);
       }
-      return { fragments: [{ text: copy.today.dataQualityTitle, tone: "strong" }], supporting };
+      return { fragments: [{ text: copy.today.noReliableDecisionTitle, tone: "strong" }], supporting };
     }
     case "NOT_PROCESSED": {
+      // No run for today says nothing about WHY: the analysis status does, when it has something to say.
+      const update = updateHeroOf(status);
+      if (update !== null) {
+        return { fragments: [{ text: update.title, tone: "strong" }], supporting: [update.body] };
+      }
       // Gate 24B: "never analysed" vs "not analysed today, but a previous run exists" - without ever
       // claiming WHY today's own run is absent.
       const last = feed.last_successful_analysis;
       const supporting: string[] = [
         last === null ? copy.today.notProcessedNeverAnalyzed : copy.today.notProcessedBody,
       ];
+      if (status?.state === "NO_DATA") supporting.push(copy.today.noDataBody);
       if (last !== null) {
         supporting.push(
           copy.today.lastSuccessfulAnalysis(formatBusinessDateItalian(last.as_of_local_date)),
@@ -93,16 +129,52 @@ function Fragments({ fragments }: { fragments: HeroFragment[] }) {
   );
 }
 
+/** Where to go from a hero that says data are missing or the sources need a look. */
+function UpdateLinks({ propertyId, status }: { propertyId: string; status: AnalysisStatusResponse }) {
+  if (status.state === "NO_DATA") {
+    return (
+      <Link className="home__decisions-link" href={importaFileRoute(propertyId)}>
+        <span>{copy.today.importFirstFile}</span>
+        <ArrowRightIcon className="home__decisions-link-arrow" />
+      </Link>
+    );
+  }
+  if (status.state === "SEVERAL_SOURCES") {
+    return (
+      <Link className="home__decisions-link" href={strutturaRoute(propertyId)}>
+        <span>{copy.analysisUpdate.openStructure}</span>
+        <ArrowRightIcon className="home__decisions-link-arrow" />
+      </Link>
+    );
+  }
+  if (status.state !== "NEEDS_BOOKINGS") return null;
+  return (
+    <>
+      <Link className="home__decisions-link" href={importaFileRoute(propertyId)}>
+        <span>{copy.analysisUpdate.importBookings}</span>
+        <ArrowRightIcon className="home__decisions-link-arrow" />
+      </Link>
+      <Link className="home__decisions-link" href={datiRoute(propertyId)}>
+        <span>{copy.analysisUpdate.openData}</span>
+        <ArrowRightIcon className="home__decisions-link-arrow" />
+      </Link>
+    </>
+  );
+}
+
 interface FeedContentProps {
   feed: DecisionFeedResponse;
   propertyId: string;
   timeZone: string;
   busy: boolean;
   onRefresh: () => void;
+  analysis: AnalysisStatusHandle;
 }
 
-function FeedContent({ feed, propertyId, timeZone, busy, onRefresh }: FeedContentProps) {
-  const hero = heroOf(feed);
+function FeedContent({ feed, propertyId, timeZone, busy, onRefresh, analysis }: FeedContentProps) {
+  const { status } = analysis;
+  const hero = heroOf(feed, status);
+  const notProcessed = feed.feed_state === "NOT_PROCESSED";
   const count = decisionCountOf(feed);
   const tiles = buildDomainSummary(feed);
   // Gate 23B: never under NOT_PROCESSED (no run, so nothing to describe) - and always a FACT.
@@ -122,7 +194,22 @@ function FeedContent({ feed, propertyId, timeZone, busy, onRefresh }: FeedConten
         </p>
       ))}
 
+      {/* The run of today stands, whatever arrived after it: this says what is happening beside it. Where there
+          is no run, the hero has already said it, and only the recovery remains. */}
+      {!notProcessed ? <AnalysisNotice analysis={analysis} /> : null}
+      {notProcessed && status?.can_retry ? (
+        <button
+          type="button"
+          className="analysis-notice__retry analysis-notice__retry--hero"
+          disabled={analysis.retrying}
+          onClick={() => void analysis.retry()}
+        >
+          {status.state === "FAILED" ? copy.analysisUpdate.retry : copy.analysisUpdate.start}
+        </button>
+      ) : null}
+
       <div className="home__status">
+        {notProcessed && status !== null ? <UpdateLinks propertyId={propertyId} status={status} /> : null}
         {count > 0 ? (
           <Link className="home__decisions-link" href={decisioniRoute(propertyId)}>
             <span>{copy.home.decisionsRequireAttention(count)}</span>
@@ -179,6 +266,9 @@ export function HomeScreen({ propertyId, timeZone, onPropertyInvalid }: HomeScre
     onPropertyInvalid,
   });
 
+  // A refresh that ends brings its result here by itself: nobody has to press anything.
+  const analysis = useAnalysisStatus({ propertyId, onSettled: () => void refresh() });
+
   const greeting = copy.home.greeting(firstNameOf(session?.user.display_name));
   const fading = logo.phase === "morphing" && logo.mode === "fade";
 
@@ -204,6 +294,7 @@ export function HomeScreen({ propertyId, timeZone, onPropertyInvalid }: HomeScre
               timeZone={timeZone}
               busy={busy}
               onRefresh={() => void refresh()}
+              analysis={analysis}
             />
           ) : failed ? (
             <div className="home__feed">

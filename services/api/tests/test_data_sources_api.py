@@ -392,6 +392,8 @@ def test_a_failed_import_answers_with_a_reason_never_with_technical_text(
         "updated",
         "unchanged",
         "already_imported",
+        "changed_data",
+        "removed",
     }
 
 
@@ -446,6 +448,8 @@ def test_a_successful_first_import_creates_the_source_and_configures_the_card(
         "updated": 0,
         "unchanged": 0,
         "already_imported": False,
+        "changed_data": True,
+        "removed": 0,
     }
     (source,) = sources_of(db_session, env, DataSourceDomain.BOOKINGS)
     assert source.is_active is True
@@ -614,10 +618,11 @@ def test_a_labor_file_needs_the_property_local_day_and_never_guesses_it(
     assert card(api_client, env, "STAFF")["last_update_at"] is not None
 
 
-def test_a_different_labor_file_for_the_same_day_is_a_conflict_not_an_overwrite(
+def test_a_different_labor_file_for_the_same_day_is_imported_beside_the_first(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
-    import_ok(api_client, env, "LABOR")
+    first = import_ok(api_client, env, "LABOR")
+    assert first["changed_data"] is True
     other = (
         b"work_date,labor_category,planned_hours,planned_cost,currency\n"
         b"2026-11-02,HOUSEKEEPING,5,80.00,EUR\n"
@@ -625,9 +630,10 @@ def test_a_different_labor_file_for_the_same_day_is_a_conflict_not_an_overwrite(
 
     body = _upload(api_client, env, "LABOR", other, "personale-2.csv")
 
-    assert body["succeeded"] is False
-    assert body["problem"] == "SAME_DAY_CONFLICT"
-    assert card(api_client, env, "STAFF")["state"] == "CONFIGURED_FILE"  # the first one stands
+    assert body["succeeded"] is True
+    assert body["problem"] is None
+    assert body["changed_data"] is True
+    assert card(api_client, env, "STAFF")["state"] == "CONFIGURED_FILE"
 
 
 def test_an_invoice_xml_is_imported_into_the_costs_source(

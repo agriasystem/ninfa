@@ -7,7 +7,7 @@ touches the language-model provider: Dati is deterministic and does not call Mia
 
 import json
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -25,6 +25,7 @@ from tests.data_overview_support import (
     uniform_nights,
 )
 from tests.decision_api_support import assert_error, authed_tenant, decision_table_counts
+from tests.distribution_support import DistributionWorld
 from tests.support import BookingFactory
 
 AS_OF_TEXT = AS_OF.isoformat()
@@ -277,10 +278,50 @@ def test_a_night_row_exposes_the_stay_date_figures_and_its_status(
         "rooms_delta_7d",
         "status",
         "decision_id",
+        "over_capacity",
     }
     assert first["status"] == "REGULAR"
     flagged = [night for night in nights if night["status"] == "ATTENTION"]
     assert len(flagged) == 2 and all(night["decision_id"] for night in flagged)
+
+
+def test_the_capacity_state_and_what_the_channel_weights_are_a_share_of_are_on_the_wire(
+    api_client: TestClient,
+    factory: BookingFactory,
+    db_session: Session,
+    authenticated_as: Callable[[UUID], None],
+) -> None:
+    auth = authed_tenant(factory, authenticated_as)
+    seed_run(db_session, auth.tenant, nights=uniform_nights(AS_OF, rooms=2, capacity=None))
+    world = DistributionWorld(db_session, auth.tenant, factory)
+    world.booking(world.channel("Booking.com"), AS_OF, AS_OF + timedelta(days=30))
+    world.booking(
+        world.channel("Telefono / Email"),
+        AS_OF,
+        AS_OF + timedelta(days=30),
+        booked_at=datetime(2026, 8, 2, 9, 0, tzinfo=UTC),  # after the analysis day
+    )
+
+    body = _get(api_client, auth.tenant.property.id).json()
+
+    assert body["occupancy"]["selected"]["capacity"] == "MISSING"
+    assert body["occupancy"]["selected"]["room_nights"] == 60  # the bookings stay
+    distribution = body["distribution"]
+    assert distribution["insufficient_reasons"] == ["OTA_CHANNEL_MIX_RECONCILIATION_FAILED"]
+    mix = distribution["channel_mix"]
+    assert {key: mix[key] for key in mix if key != "channels"} == {
+        "total_room_nights": 30,
+        "classified_room_nights": 30,
+        "unclassified_room_nights": 0,
+        "on_books_room_nights": 60,
+        "matches_on_books": False,
+    }
+    assert distribution["date_conflicts"] == {
+        "booked_after": 1,
+        "cancelled_after": 0,
+        "no_show_before_arrival": 0,
+        "total": 1,
+    }
 
 
 def test_not_processed_is_a_designed_response_with_reasons_not_an_error(
@@ -301,6 +342,7 @@ def test_not_processed_is_a_designed_response_with_reasons_not_an_error(
         "days_30": None,
         "selected": None,
         "nights": [],
+        "inventory_consistency": {"over_capacity_nights": 0, "first_night": None},
     }
     assert body["distribution"]["reason"] == "NO_ANALYSIS"
     assert {item["state"] for item in body["analysis"]["domain_states"]} == {"UNKNOWN"}

@@ -29,8 +29,12 @@ facts are for display only and never decide. With the numeric condition true, th
 (MIN of the baseline and the pattern, the authoritative two-decimal score) must be at least 55 to
 TRIGGER; below it the evaluation is SUPPRESSED_LOW_CONFIDENCE.
 
-Order of the checks (the first that applies decides): inventory unknown, closed night, already
-sold out, baseline, pair sample, then the thresholds.
+With no new booking data since the last day analysed, the rooms on the books are what was last
+known, not what they are now: the shortfall of a position nobody has seen cannot be told, and
+nothing is said (INSUFFICIENT_DATA, before anything else). The position stays visible in Dati.
+
+Order of the checks (the first that applies decides): no new booking data, inventory unknown, closed
+night, already sold out, baseline, pair sample, then the thresholds.
 """
 
 from dataclasses import replace
@@ -107,10 +111,12 @@ def evaluate_occupancy(
     selection: PairSelection,
     reference: ReferenceAdr,
     thresholds: OccupancyThresholds = OCCUPANCY_THRESHOLDS,
+    observation_is_fresh: bool = True,
 ) -> RevenueDecisionEvaluation:
     """REV_OCCUPANCY_RISK for one OBSERVED target.
 
     `selection` are the historical remaining-net-pickup pairs of the target's Gate 4 baseline.
+    `observation_is_fresh` says the target's day has new booking data.
     """
     base = OccupancyFacts(
         current_rooms_on_books=target.rooms_on_books,
@@ -141,6 +147,10 @@ def evaluate_occupancy(
             reference=reference,
             revenue_gap_proxy=proxy,
         )
+
+    # 0. nothing new has arrived: this is what was last known, not where the night stands now
+    if not observation_is_fresh:
+        return finish(EvaluationStatus.INSUFFICIENT_DATA, (ReasonCode.BOOKING_DATA_STALE,))
 
     # 1. an occupancy needs a known, positive capacity and a night that is not already full
     if target.rooms_available is None:

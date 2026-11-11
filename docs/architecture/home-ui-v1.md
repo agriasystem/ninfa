@@ -33,7 +33,7 @@ destinations at `/dati` and `/struttura`: see [data-ui-v1.md](data-ui-v1.md) and
 `components/app-shell.tsx` is now a sidebar (~240 px) + content frame (it replaced Gate 14's topbar;
 the Decision Detail uses the same shell, with "Decisioni" active):
 
-- **Sidebar:** logo slot, Oggi / Decisioni / Dati / Struttura, then profile | divider | settings.
+- **Sidebar:** logo slot, Oggi / Decisioni / Dati / Importa file / Struttura, then profile | divider | settings.
 - **Profile** is a real disclosure: display name (when present), e-mail, and "Esci" - the same
   `logout()` Gate 14 wired. Escape and a click outside close it; Esc returns focus to the avatar.
 - **Property header** (top-right of the content): the real property name and today's date in the
@@ -57,7 +57,7 @@ resolution 0/1/N, shell).
 | --- | --- | --- |
 | `ACTION_REQUIRED` | the **first** item of the feed, as a sentence (below) | "N decisioni richiedono attenzione →" + freshness + area strip |
 | `NO_ACTION_REQUIRED` | "Tutto sotto controllo" + the existing body | freshness + area strip; the Gate 22 coverage note ("Non analizzati: ...") |
-| `DATA_QUALITY_LIMITED` | "Analisi parziale" + the existing body and counts | freshness + area strip (prudent, below) |
+| `DATA_QUALITY_LIMITED` | "Nessuna decisione affidabile oggi" + "NINFA non ha ancora elementi sufficienti per formulare nuove decisioni affidabili. Quando emergerà qualcosa che merita attenzione, lo troverai qui." ([ADR 0047](adr/0047-final-pilot-product-ux.md), wording by [ADR 0048](adr/0048-reconstructed-is-not-observed-as-of.md): no reason is named, the feed has none); no count of inconclusive checks | freshness + area strip (prudent, below), where "Analisi parziale" stays as the secondary state |
 | `NOT_PROCESSED` | "Analisi non ancora disponibile" (never analysed / last successful analysis) | **no** freshness, **no** area strip |
 
 Loading is a skeleton (with a visually hidden `<h1>Oggi</h1>`, the logo and Mia already present);

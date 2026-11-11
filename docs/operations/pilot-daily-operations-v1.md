@@ -1,8 +1,8 @@
 # Pilot daily operations V1 (Gate 27B)
 
-The exact daily sequence the **supported** capabilities allow. It is **operator-assisted**: booking
-intake is a manual file import and nothing here is native PMS automation. Automation removes only
-the step "run the analysis". `ninfa-py` is defined in the
+The exact daily sequence the **supported** capabilities allow. The analysis needs nobody: the **worker** asks for it by itself, once per
+property-local day ([ADR 0044](../architecture/adr/0044-pilot-autonomy.md)). What stays manual is bringing the data: the hotel imports its
+files from the web page, or an operator through the CLI below. Nothing here is native PMS automation. `ninfa-py` is defined in the
 [deployment document](pilot-deployment-v1.md) ("Operator shell helpers"); the business rules behind
 the policy are in [automatic-analysis-policy-v1.md](../architecture/automatic-analysis-policy-v1.md).
 
@@ -10,19 +10,22 @@ the policy are in [automatic-analysis-policy-v1.md](../architecture/automatic-an
 
 | When | Who | What |
 |---|---|---|
-| before **09:45** | AGRIA operator | receive the hotel's export → normalize → transfer → import → check (see "File intake") |
-| before 10:00 | operator | `ninfa-py -m worker analysis-status`: the property shows `today_import=YES` and `next_dispatch=ELIGIBLE` |
-| **10:00** | **external scheduler** | runs `scripts/run-daily-analysis.sh` |
-| about **10:15** | **AGRIA operator (mandatory)** | `ninfa-py -m worker analysis-status`: **every enabled property must show `run_today=YES`** |
+| any time | hotel, or an operator | brings a file: the analysis follows by itself |
+| from **10:00** | **the worker** | asks for the day's analysis of every property that has no run today, on its own clock |
+| about **10:15** | AGRIA operator (supervision, not a step of the day) | `ninfa-py -m worker analysis-status`: **every enabled property should show `run_today=YES`** |
 | afterwards | hotel | opens Oggi |
 
-The 09:45 cut-off is **operator discipline**, not a stored threshold. The dispatcher uses "a
-successful booking import exists by dispatch time", so an import that finishes after 09:45 but
-before the dispatch still counts. An import finished **before local midnight** (for example the
-previous evening) does **not** count for today.
+The hour is the property's own: `Europe/Rome` for the first pilot, and each property's own named timezone for any other. No file is needed
+that morning: the bookings NINFA holds are analysed, and Oggi says when they last arrived. A day with no new booking data has no new revenue
+decision (`REV_PICKUP_LOW`, `REV_OCCUPANCY_RISK`) and is no sample of history; Dati still shows what was last known, and when
+([ADR 0045](../architecture/adr/0045-no-new-booking-data-is-not-zero-pickup.md), [ADR 0046](../architecture/adr/0046-a-sample-of-history-is-what-a-finished-analysis-read.md)).
+OTA, labor and costs are still evaluated, and labor's demand side reads the bookings last known: bring the file before reading that as news.
 
-## The daily wrapper
+A job that fails leaves no run and no sample of history, whatever observation it had written. The next attempt finishes the same day's analysis, once.
 
+## The catch-up wrapper
+
+Nobody has to run it: the worker does the day's work. It is for an operator who wants the analysis now, at any hour.
 `scripts/run-daily-analysis.sh` runs, in order and always all three:
 
 1. `python -m worker dispatch-analysis` — evaluates every enabled property and enqueues one job per
@@ -39,30 +42,22 @@ exited 0, and 1 otherwise.
 
 > **A zero exit does NOT prove the analyses succeeded.** `worker run --once` exits 0 even when a
 > queued job failed, and `analysis-status` exits 0 even when an enabled property has no run today.
-> The wrapper logs what happened honestly and does not parse human-readable output. **The 10:15
-> operator check is the control.**
+> The wrapper logs what happened honestly and does not parse human-readable output.
 
 Manual run, as the service account:
 `sudo -u ninfa "$NINFA_APP/scripts/with-env.sh" /etc/ninfa/api.env "$NINFA_APP/scripts/run-daily-analysis.sh"`.
 
-## External scheduler contract (not configured by this repository)
+## How the day's analysis is asked for
 
-- Run the wrapper **once a day at 10:00 in the named timezone `Europe/Rome`**.
-- The scheduler **must support a named timezone**, or otherwise handle daylight saving correctly. A
-  schedule written as a fixed UTC time is **not** equivalent: it is an hour off for half of the
-  year. Check the behaviour around the last Sunday of March and of October.
-- It runs as the service account with the production environment, keeps the output (the journal
-  when started through `deploy/systemd/ninfa-daily-analysis.service`) and is monitored by the 10:15
-  check: a scheduler that silently does not fire is caught there.
-- Examples of mechanisms that *may* satisfy this (verify DST behaviour on the actual host): a systemd
-  calendar event that carries a timezone, a cron implementation with a timezone setting, a platform
-  scheduler with a named-timezone option. No timer is shipped and none is enabled by this package.
-- **Manual catch-up is supported:** running the wrapper later the **same local day** is safe and
-  normal (a late import, a late scheduler, a failed run). The dispatcher skips a property that
-  already has a run today and one that has no import today. Running it **after local midnight** is a
-  different day: the earlier day is not recovered.
-- Running the wrapper before the import is harmless: the property is skipped
-  (`NO_TODAY_BOOKING_IMPORT`) and nothing is persisted.
+- The worker runs a tick every 5 minutes. No scheduler has to be configured, and no timer is shipped.
+- For each property it reads the property's own clock from its **named timezone**, so daylight saving needs no care: 10:00 in `Europe/Rome` stays
+  10:00 on the last Sunday of March and of October. A fixed UTC time would be an hour off for half of the year, which is why none is used.
+- It asks only for what is missing. A worker that was down asks at its first tick after coming back, the **same local day**. A day with the worker
+  down all day is not recovered: an observation cannot be dated in the past. **So the one thing to keep alive is `ninfa-worker`.**
+  A tick asked for while one still waits (it happens at a restart) is skipped, on a PostgreSQL that speaks any language: it no longer stops the worker
+  ([ADR 0049](../architecture/adr/0049-a-taken-queueing-lock-is-the-same-in-every-language.md)).
+- **Manual catch-up is supported:** running the wrapper at any hour is safe. It skips a property that already has a run today and one that has never
+  imported anything (`NO_BOOKING_IMPORT`).
 
 ## File intake (the supported first-pilot process)
 
@@ -90,9 +85,9 @@ reading a file **on the production host**.
 7. **Remove the working copy** from the production host (`rm` the file) once the import succeeded.
 8. `ninfa-py -m worker analysis-status` should now show `today_import=YES`.
 
-Labor and invoice imports exist but are **not** part of the automatic daily run in V1.
+Labor and invoice imports are read by the daily run wherever they exist: it looks at what a refresh looks at.
 
-## The 10:15 check and what to do
+## The 10:15 supervision and what to do
 
 `ninfa-py -m worker analysis-status` prints, per enabled property:
 `run_today=YES|NO today_import=YES|NO latest_analysis=<date> configuration=VALID|<reason>
@@ -101,8 +96,8 @@ next_dispatch=ELIGIBLE|SKIPPED:<reason>`.
 | What you see | Meaning | Action |
 |---|---|---|
 | `run_today=YES` | today's analysis exists | nothing |
-| `run_today=NO`, `next_dispatch=SKIPPED:NO_TODAY_BOOKING_IMPORT` | no qualifying import today | import now (file-intake steps), then **run the wrapper** (same-day catch-up) |
-| `run_today=NO`, `next_dispatch=ELIGIBLE` | the dispatch did not run, or its job failed, or it is still running | check the scheduler output and the worker log (below), then **run the wrapper** |
+| `run_today=NO`, `next_dispatch=SKIPPED:NO_BOOKING_IMPORT` | this source has never delivered | nothing to analyse: bring the first file |
+| `run_today=NO`, `next_dispatch=ELIGIBLE` | the worker is down, or the job failed, or it is still running | check that `ninfa-worker` is up and read its log (below): a failed job is asked again by itself, 1 hour later, 3 times a day |
 | `configuration=` shows a reason (for example `BOOKING_SOURCE_INACTIVE`) | the property's automation configuration is no longer valid | `ninfa-py -m app.cli.analysis_policy show …`, fix the cause, then run the wrapper |
 
 Investigating, without SQL:
@@ -118,26 +113,36 @@ ninfa-py -m procrastinate -a worker.app.app shell     # then: list_jobs status=f
 (`list_jobs …` output shows only task names, statuses and identifiers. Do not use the shell's `retry`
 or `cancel` commands without a developer.)
 
-- A **failed** job stays failed; **nothing retries automatically**. Read its error in the worker log.
-- A job stuck in **`doing`** is a **zombie** left by a killed worker; nothing recovers it. It does not
-  block the next dispatch. Re-run the wrapper if there is no run today, and tell a developer.
+- A **failed** day's job stays failed, and the tick asks for a new one 1 hour later, at most 3 times a day. Read its error in the worker log.
+- A job stuck in **`doing`** is a **zombie** left by a killed worker. A later tick puts it back, at most 3 times (`Stalled job put back` in the log).
+  One still there after that has been marked failed: tell a developer.
 - Manual recovery is safe only through the supported commands: re-running the wrapper, or the
   explicit manual commands (`python -m app.cli.analysis run …`, `python -m worker enqueue-analysis
   …`). **Never edit rows or delete snapshots to "fix" a day.**
 
-## Changed bookings after today's analysis (snapshot conflict)
+## Several files on one day
 
-Each day's observation (a property's snapshot per stay night) is **immutable**. If the bookings
-**changed after today's analysis** (a corrected re-import, or a manual analysis earlier in the day on
-older data followed by a new import), a **changed-data re-run the same day may fail on purpose**
-with a snapshot conflict. That is the product working as designed, not a fault:
+A property can import as many files as it needs, of any kind, on any day (see
+`docs/architecture/same-day-revisions-v1.md`):
 
-- the day keeps its first observation; the next day's run proceeds normally;
-- re-running with identical data is a safe replay (no new run);
-- **do not delete snapshots, edit the database or try to force a re-run.**
+- bookings changed after today's analysis: the day's next observation, and a new analysis the same day.
+  The earlier observation stays as it was, and the earlier run keeps pointing at it;
+- a second staff file: new days live beside the others, the (day, department) it holds are replaced, and
+  hours and costs never add up. A department it lacks on a day stays, even if the file has that day and
+  that department elsewhere: only a file said to be complete takes it away. A row of 0 hours is a plan of
+  zero hours, not a removal;
+- a corrected row of a cost spreadsheet: the document's next version, and only the newest counts. A
+  FatturaPA that comes back different is refused, on purpose: it is corrected by a credit note;
+- the same data again: nothing moves, and the page says so;
+- a file that leaves out something NINFA holds: the page asks once whether it holds everything of its
+  period. If it does, what it no longer holds stops counting and stays in the history, and the summary says how
+  much before anything is imported. If it holds a part, or only what is new, nothing goes. The answer is
+  remembered for files of that structure, but a remembered "complete" asks again whenever something would stop
+  counting, and that answer is about that import unless "Ricorda questa scelta" is ticked
+  (`docs/architecture/import-scope-semantics-v1.md`). The CLI imports never ask, and so never take anything away.
 
-To avoid it: finish the import before the dispatch, and do not run a manual analysis before today's
-import.
+A re-run by hand (`python -m app.cli.analysis`) follows the same rules, and with identical data it is a safe
+replay. **Never delete snapshots or edit the database to "fix" a day:** a file with the right data is enough.
 
 ## Weekly and periodic
 

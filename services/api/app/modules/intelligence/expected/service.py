@@ -42,7 +42,11 @@ from app.modules.intelligence.expected.seasonality import eligible_stay_dates
 from app.modules.intelligence.expected.selection import Candidate, HistoricalTarget
 from app.modules.properties.repository import PropertyRepository
 from app.modules.snapshots.models import BookingSnapshot, SnapshotOrigin
-from app.modules.snapshots.repository import BookingSnapshotRepository, SnapshotKey
+from app.modules.snapshots.repository import (
+    BookingSnapshotRepository,
+    ObservationHistory,
+    SnapshotKey,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +112,7 @@ class BookingExpectedService:
         snapshot_local_date: date,
         stay_date_start: date,
         stay_date_end: date,
+        history: ObservationHistory | None = None,
     ) -> ExpectedRunResult:
         """The baselines of every OBSERVED snapshot of one snapshot day and stay-date range
         (both ends included) of one data source, in one transaction.
@@ -115,6 +120,11 @@ class BookingExpectedService:
         Targets whose stay date precedes their snapshot day (a negative lead time: the night was
         already over) are skipped and counted, not an error. Comparable history is fetched once
         for the whole batch.
+
+        `history` says which observations count (`analysis/observation.py`): no comparable comes
+        from any other, neither one that only repeated what was already known nor one no finished
+        analysis read. What a past day counts for never changes, so a target's comparables do not
+        move between two runs of the same day.
         """
         for value, name in (
             (snapshot_local_date, "snapshot_local_date"),
@@ -147,7 +157,11 @@ class BookingExpectedService:
             )
             usable = [row for row in stored if row.stay_date >= row.snapshot_local_date]
             return self._process(
-                property_id, data_source_id, usable, skipped=len(stored) - len(usable)
+                property_id,
+                data_source_id,
+                usable,
+                skipped=len(stored) - len(usable),
+                history=history,
             )
 
         return self._finish(run)
@@ -233,6 +247,7 @@ class BookingExpectedService:
         targets: Sequence[BookingSnapshot],
         *,
         skipped: int,
+        history: ObservationHistory | None = None,
     ) -> ExpectedRunResult:
         lock_data_source(self._session, data_source_id)
 
@@ -259,7 +274,7 @@ class BookingExpectedService:
                 rooms_on_books=row.rooms_on_books,
                 uncertain_rooms=row.uncertain_rooms,
             )
-            for row in self._snapshots.list_by_keys(data_source_id, wanted)
+            for row in self._snapshots.list_by_keys(data_source_id, wanted, history=history)
         }
 
         calculated: list[NewBaseline] = []

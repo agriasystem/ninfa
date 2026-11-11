@@ -18,6 +18,7 @@ from app.modules.ai.ask_ninfa.home_intents import resolve_question
 from app.modules.data_overview.service import DataOverviewError, DataOverviewService
 from app.modules.data_overview.types import (
     Availability,
+    CapacityState,
     DomainState,
     FreshnessReason,
     NightStatus,
@@ -36,6 +37,7 @@ from app.modules.decisions.models import Decision, DecisionObservation, Decision
 from app.modules.ingestion.models import DataSourceDomain
 from app.modules.intelligence.revenue.types import RevenueDecisionType
 from app.modules.snapshots.models import BookingSnapshot, SnapshotOrigin
+from app.modules.snapshots.repository import RoomInventoryRepository
 from tests.ask_home_support import STAY, five_triggered_evaluations
 from tests.data_overview_support import (
     AS_OF,
@@ -141,6 +143,78 @@ def test_every_night_without_a_capacity_means_no_occupancy_percentage(
     assert week.occupancy_pct is None  # never 0 %
     assert week.rooms_available is None
     assert week.room_nights == 84
+
+
+def test_without_a_room_inventory_only_the_occupancy_is_missing_and_says_why(
+    db_session: Session, tenant: Tenant
+) -> None:
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=12, capacity=None))
+
+    occupancy = overview_of(db_session, tenant).occupancy
+
+    # the page is available: only the figures that need a capacity are absent
+    assert occupancy.state is Availability.AVAILABLE
+    for period in (occupancy.today, occupancy.days_7, occupancy.days_30):
+        assert period is not None
+        assert period.capacity is CapacityState.MISSING
+        assert period.occupancy_pct is None and period.rooms_available is None
+    month = occupancy.days_30
+    assert month is not None
+    assert (month.room_nights, month.room_revenue, month.adr) == (360, D("36000.00"), D("100.00"))
+    assert all(
+        night.rooms_on_books == 12 and night.occupancy_pct is None for night in occupancy.nights
+    )
+
+
+def test_with_a_room_inventory_the_occupancy_is_calculated(
+    db_session: Session, tenant: Tenant
+) -> None:
+    for night in night_range(AS_OF):
+        RoomInventoryRepository(db_session, tenant.context).set_for_date(
+            tenant.property.id, night, rooms_available=40
+        )
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=12, capacity=40))
+
+    month = overview_of(db_session, tenant).occupancy.days_30
+
+    assert month is not None
+    assert month.capacity is CapacityState.KNOWN
+    assert month.occupancy_pct == D("30.00")
+    assert month.rooms_available == 1200
+
+
+def test_an_inventory_set_after_the_observation_waits_for_the_next_analysis(
+    db_session: Session, tenant: Tenant
+) -> None:
+    # observed with no inventory, then the inventory is configured: the stored observation keeps
+    # no capacity (it is copied when the observation is taken), and nothing asks to configure again
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=12, capacity=None))
+    RoomInventoryRepository(db_session, tenant.context).set_for_date(
+        tenant.property.id, AS_OF + timedelta(days=2), rooms_available=40
+    )
+
+    occupancy = overview_of(db_session, tenant).occupancy
+
+    assert occupancy.days_30 is not None and occupancy.days_7 is not None
+    assert occupancy.days_30.capacity is CapacityState.AWAITING_ANALYSIS
+    assert occupancy.days_7.capacity is CapacityState.AWAITING_ANALYSIS
+    assert occupancy.today is not None
+    assert occupancy.today.capacity is CapacityState.MISSING  # tonight has no inventory row
+    assert occupancy.days_30.occupancy_pct is None
+
+
+def test_another_properties_inventory_never_counts_as_this_ones(
+    db_session: Session, factory: BookingFactory, tenant: Tenant
+) -> None:
+    other = factory.tenant()
+    RoomInventoryRepository(db_session, other.context).set_for_date(
+        other.property.id, AS_OF, rooms_available=40
+    )
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=12, capacity=None))
+
+    today = overview_of(db_session, tenant).occupancy.today
+
+    assert today is not None and today.capacity is CapacityState.MISSING
 
 
 def test_a_night_without_a_stored_snapshot_is_a_gap_not_a_zero(

@@ -3,8 +3,10 @@
 ONE statement returns, for every work date a target evaluation needs (the target day itself and
 every historical candidate day), every `LaborEntry` of a snapshot with `snapshot_local_date <=`
 the target's own as-of date. `latest_snapshot_rows_by_work_date` (pure, `aggregation.py`) then
-picks, per work date, the most recent such snapshot: a rolling near-term export and a full-horizon
-export are both handled correctly, with no query per day.
+picks what counts on each work date (`current_plan` does both, plus the one statement that says
+what each file speaks for; `current_labor` also reads the hours worked, for a comparison with the
+past): a rolling near-term export, a full-horizon export and several files of one day are all
+handled correctly, with no query per day.
 
 It reads `labor_entries`/`labor_snapshots` only: never the staging rows, never a file. The
 repository never writes.
@@ -18,8 +20,14 @@ from sqlalchemy import Date, column, select, values
 from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
-from app.modules.intelligence.labor.aggregation import RawLaborEntryRow
+from app.modules.intelligence.labor.aggregation import (
+    LaborEntryRow,
+    RawLaborEntryRow,
+    latest_snapshot_rows_by_work_date,
+    worked_rows_by_work_date,
+)
 from app.modules.labor.models import LaborEntry, LaborSnapshot
+from app.modules.labor.repository import LaborEntryRepository
 
 _KEYS_PER_QUERY = 5000
 
@@ -30,6 +38,27 @@ class LaborEvaluationRepository:
     def __init__(self, session: Session, tenant: TenantContext) -> None:
         self._session = session
         self._tenant = tenant
+        self._entries = LaborEntryRepository(session, tenant)
+
+    def current_plan(
+        self, data_source_id: UUID, as_of_date: date, work_dates: Collection[date]
+    ) -> dict[date, tuple[UUID, list[LaborEntryRow]]]:
+        """What counts on each of these work dates, known at `as_of_date`."""
+        return self.current_labor(data_source_id, as_of_date, work_dates)[0]
+
+    def current_labor(
+        self, data_source_id: UUID, as_of_date: date, work_dates: Collection[date]
+    ) -> tuple[
+        dict[date, tuple[UUID, list[LaborEntryRow]]],
+        dict[date, tuple[UUID, list[LaborEntryRow]]],
+    ]:
+        """The plan of each of these dates, and what a comparison with the past reads of each."""
+        rows = self.entries_as_of(data_source_id, as_of_date, work_dates)
+        files = self._entries.coverage_of_files(data_source_id, as_of_date)
+        return (
+            latest_snapshot_rows_by_work_date(rows, files),
+            worked_rows_by_work_date(rows, files),
+        )
 
     def entries_as_of(
         self, data_source_id: UUID, as_of_date: date, work_dates: Collection[date]
@@ -55,6 +84,7 @@ class LaborEvaluationRepository:
                     LaborEntry.actual_cost,
                     LaborEntry.currency,
                     LaborEntry.classification_confidence,
+                    LaborSnapshot.revision,
                 )
                 .join(
                     LaborSnapshot,

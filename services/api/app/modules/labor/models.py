@@ -1,10 +1,12 @@
 """The canonical labor entities and their import bookkeeping (Gate 8, Part A).
 
-A LaborSnapshot is what NINFA knew of the staffing plan/actuals of ONE data source on ONE local
-date: immutable evidence (a trigger refuses every UPDATE), identified by
-(workspace, data_source, snapshot_local_date). A LaborEntry is one canonical row of that snapshot:
-a work date, a category and its planned/actual minutes and optional cost. NEITHER carries an
-employee identity: V1 reasons about aggregate scheduled/worked minutes, never about a person.
+A LaborSnapshot is what ONE imported file said of the staffing plan/actuals of ONE data source, on
+ONE local date: immutable evidence (a trigger refuses every UPDATE), identified by
+(workspace, data_source, snapshot_local_date, revision). A LaborEntry is one canonical row of that
+snapshot: a work date, a category and its planned/actual minutes and optional cost. NEITHER carries
+an employee identity: V1 reasons about aggregate scheduled/worked minutes, never about a person.
+
+What counts today is decided on reading, never by editing: see `labor.current_plan`.
 """
 
 import uuid
@@ -39,11 +41,12 @@ COST_PRECISION, COST_SCALE = 14, 2
 
 
 class LaborSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
-    """What NINFA knew of the staffing plan/actuals of ONE data source, on ONE local date.
+    """What ONE file said of the staffing plan/actuals of ONE data source, on ONE local date.
 
-    Immutable (a trigger refuses UPDATE): a revision of the plan arrives as a NEW snapshot date,
-    never an edit. `snapshot_local_date` is always given explicitly by the caller (never
-    `date.today()` or a file's mtime): determinism, replay and backtesting all depend on it.
+    Immutable (a trigger refuses UPDATE): a revision of the plan arrives as a NEW snapshot, on a new
+    date or as the next `revision` of the same date, never an edit. `snapshot_local_date` is always
+    given explicitly by the caller (never `date.today()` or a file's mtime): determinism, replay and
+    backtesting all depend on it. Older snapshots stay, with the import that brought them.
     """
 
     __tablename__ = "labor_snapshots"
@@ -53,6 +56,9 @@ class LaborSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     data_source_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
 
     snapshot_local_date: Mapped[date] = mapped_column(Date, nullable=False)
+    revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default=text("1")
+    )
 
     source_import_job_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     source_import_file_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
@@ -88,12 +94,13 @@ class LaborSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             name="fk_labor_snapshots_source_import_file",
             ondelete="RESTRICT",
         ),
-        # The snapshot identity (V1: one snapshot per data source and local date).
+        # The snapshot identity: the files of one source and local date, in the order they came.
         UniqueConstraint(
             "workspace_id",
             "data_source_id",
             "snapshot_local_date",
-            name="uq_labor_snapshots_data_source_id_snapshot_local_date",
+            "revision",
+            name="uq_labor_snapshots_data_source_id_snapshot_local_date_revision",
         ),
         # Foreign-key target of LaborEntry.
         UniqueConstraint("workspace_id", "id", name="uq_labor_snapshots_workspace_id_id"),
@@ -106,6 +113,7 @@ class LaborSnapshot(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             "snapshot_local_date",
         ),
         CheckConstraint("source_fingerprint ~ '^[0-9a-f]{64}$'", name="source_fingerprint_format"),
+        CheckConstraint("revision >= 1", name="revision_positive"),
     )
 
 

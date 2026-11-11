@@ -20,7 +20,7 @@ from tests.support import BookingFactory, Rejects, Tenant
 FK_INVENTORY_PROPERTY = "fk_room_inventory_daily_workspace_id_properties"
 FK_SNAPSHOT_PROPERTY = "fk_booking_snapshots_workspace_id_properties"
 FK_SNAPSHOT_SOURCE = "fk_booking_snapshots_workspace_id_data_sources"
-UQ_SNAPSHOT_KEY = "uq_booking_snapshots_data_source_snapshot_date_stay_date"
+UQ_SNAPSHOT_KEY = "uq_booking_snapshots_source_snapshot_stay_revision"
 
 
 # --- A. room inventory -------------------------------------------------------------------------

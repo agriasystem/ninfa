@@ -18,7 +18,7 @@ import pytest
 from procrastinate import testing
 
 import worker
-from app.modules.analysis import AnalysisInputError, AnalysisRunRequest
+from app.modules.analysis import DAILY_TICK_TASK, AnalysisInputError, AnalysisRunRequest
 from worker import __main__ as worker_main
 from worker import runtime, tasks
 from worker.app import DEFAULT_QUEUE, app
@@ -107,7 +107,9 @@ def _run_enqueue_and_worker(
 
 
 def _statuses(connector: testing.InMemoryConnector) -> list[str]:
-    return [str(job["status"]) for job in connector.jobs.values()]
+    return [
+        str(job["status"]) for job in connector.jobs.values() if job["task_name"] != DAILY_TICK_TASK
+    ]
 
 
 def test_01_task_is_registered_on_the_default_queue_and_heartbeat_is_unchanged() -> None:
@@ -207,7 +209,7 @@ def test_07_an_analysis_exception_fails_the_job_closes_the_session_and_is_not_re
         connector, _ = _run_enqueue_and_worker(_request())
 
     assert _statuses(connector) == ["failed"]
-    assert len(connector.jobs) == 1  # no second job: nothing was retried
+    assert len(_statuses(connector)) == 1  # no second job: nothing was retried
     assert len(rec.calls) == 1
     assert rec.sessions[0].closed
     assert run_property_analysis_task.retry_strategy is None
@@ -290,11 +292,14 @@ def _worker_sources() -> Iterator[tuple[str, ast.Module]]:
         yield path.name, ast.parse(path.read_text(encoding="utf-8"))
 
 
-def test_12_nothing_is_scheduled_or_enqueued_automatically() -> None:
-    assert app.periodic_registry.periodic_tasks == {}
+def test_12_only_the_days_own_tick_is_periodic_and_only_the_commands_enqueue() -> None:
+    assert [task.task.name for task in app.periodic_registry.periodic_tasks.values()] == [
+        DAILY_TICK_TASK
+    ]
     for name, tree in _worker_sources():
         attributes = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
-        assert "periodic" not in attributes, f"{name} registers a periodic task"
+        if name != "daily.py":
+            assert "periodic" not in attributes, f"{name} registers a periodic task"
         if name not in {"enqueue.py", "dispatch.py", "__main__.py"}:
             assert not {"defer", "defer_async"} & attributes, f"{name} enqueues a job"
     # Only the explicit operator commands (enqueue, dispatch) defer a job.

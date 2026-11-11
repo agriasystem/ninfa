@@ -407,6 +407,8 @@ export type DomainState = "ANALYZED" | "PARTIAL" | "NOT_ANALYZED" | "UNKNOWN";
 
 export type DataAvailability = "AVAILABLE" | "NOT_AVAILABLE";
 
+export type DataCapacityState = "KNOWN" | "PARTIAL" | "MISSING" | "AWAITING_ANALYSIS";
+
 export interface DataDecisionRef {
   decision_id: string;
   decision_type: string;
@@ -422,6 +424,10 @@ export interface DataPeriodMetrics {
   nights_requested: number;
   nights_with_data: number;
   nights_with_capacity: number;
+  /** Whether the occupancy can be calculated at all - null with no night of bookings. MISSING: the
+   * property has no room inventory for these nights (never inferred from the bookings);
+   * AWAITING_ANALYSIS: one was set after the observation and the next analysis takes it in. */
+  capacity: DataCapacityState | null;
   /** Room-nights booked over every stored night - NOT a booking count. */
   room_nights: number | null;
   rooms_on_books_with_capacity: number | null;
@@ -448,6 +454,16 @@ export interface DataNightRow {
   rooms_delta_7d: number | null;
   status: NightStatus;
   decision_id: string | null;
+  /** More rooms on the books than the inventory has. The figures stay as stored (an occupancy over 100 %
+   * is shown, never cut). */
+  over_capacity: boolean;
+}
+
+/** How many of the 30 observed nights hold more rooms than the inventory has. A question about the data
+ * (an inventory too low, a real overbooking, a wrong booking), never a decision. */
+export interface DataInventoryConsistency {
+  over_capacity_nights: number;
+  first_night: string | null;
 }
 
 export interface DataOccupancy {
@@ -458,6 +474,7 @@ export interface DataOccupancy {
   days_30: DataPeriodMetrics | null;
   selected: DataPeriodMetrics | null;
   nights: DataNightRow[];
+  inventory_consistency: DataInventoryConsistency;
 }
 
 export interface DataChannelWeight {
@@ -469,8 +486,26 @@ export interface DataChannelWeight {
 }
 
 export interface DataChannelMix {
+  /** The denominator of every weight: the room-nights certain at the end of the analysis day. */
   total_room_nights: number;
+  /** OTA + direct among them. */
+  classified_room_nights: number;
+  /** On a channel NINFA cannot classify. */
+  unclassified_room_nights: number;
+  /** The room-nights the analysis day observed over the same 30 nights (null unless every night is
+   * stored) - the room-nights the rest of the page shows. */
+  on_books_room_nights: number | null;
+  /** Whether the weights are a share of exactly those room-nights (null when they are not known). */
+  matches_on_books: boolean | null;
   channels: DataChannelWeight[];
+}
+
+/** Bookings of the 30-night window whose own dates contradict the analysis day. */
+export interface DataDateConflicts {
+  booked_after: number;
+  cancelled_after: number;
+  no_show_before_arrival: number;
+  total: number;
 }
 
 export interface DataDistribution {
@@ -488,6 +523,14 @@ export interface DataDistribution {
   insufficient_reasons: string[];
   decision_id: string | null;
   channel_mix: DataChannelMix | null;
+  /** Null when the area was not read. */
+  date_conflicts: DataDateConflicts | null;
+  /** Why there is no verdict: "DATA_QUALITY" (the current data cannot be read) or "HISTORY" (they are fine,
+   * and only the past periods to compare them with are missing). Null with a verdict. */
+  insufficiency: string | null;
+  /** With "HISTORY" only: how many comparable past periods exist, and how many are needed. */
+  comparable_periods_available: number | null;
+  comparable_periods_required: number | null;
 }
 
 export interface DataCostCategory {
@@ -509,6 +552,27 @@ export interface DataCostDecision {
   expected_cpor: DecimalString | null;
 }
 
+/** The days a month's cost per occupied room rests on and, for each day it lacks, the one thing it lacks:
+ * `total_days` = `known_days` + the four counts below. */
+export interface DataCostOccupancy {
+  total_days: number;
+  /** Days with a usable snapshot: observed or reconstructed from the bookings. */
+  known_days: number;
+  observed_days: number;
+  reconstructed_days: number;
+  /** A snapshot exists but how many rooms were occupied is not known (a booking cancelled or marked
+   * no-show without a date). */
+  uncertain_days: number;
+  /** The bookings imported say nothing about that night. */
+  days_outside_bookings: number;
+  /** The bookings cover it but the property's number of rooms is not known. */
+  days_without_inventory: number;
+  /** Bookings and inventory are there: the next analysis stores it. */
+  days_awaiting_rebuild: number;
+  /** The day an inventory should be valid from to close the gap above. */
+  first_day_without_inventory: string | null;
+}
+
 export interface DataCosts {
   state: DataAvailability;
   reason: string | null;
@@ -523,6 +587,8 @@ export interface DataCosts {
   classification_coverage_pct: DecimalString | null;
   categories: DataCostCategory[];
   decision: DataCostDecision | null;
+  /** Null with no booking source to take the denominator from. */
+  occupancy: DataCostOccupancy | null;
 }
 
 export interface DataLaborCategory {
@@ -531,6 +597,36 @@ export interface DataLaborCategory {
   days_complete: number;
   days_incomplete: number;
   planned_cost: DecimalString | null;
+  /** Planned cost / planned hours. */
+  average_hourly_cost: DecimalString | null;
+  /** The share of the property's planned labor cost. */
+  cost_share_pct: DecimalString | null;
+  /** The role's cost over the property's reference revenue. A role never has revenue of its own. */
+  revenue_incidence_pct: DecimalString | null;
+}
+
+/** Why the labor figures have no revenue beside them: they are only ever compared on the SAME days. */
+export type LaborRevenueGap =
+  | "NO_LABOR"
+  | "NO_ANALYSIS"
+  | "PERIOD_NOT_COVERED"
+  | "LABOR_INCOMPLETE"
+  | "NO_REVENUE";
+
+/** The planned labor of the window as a whole. Every division is the backend's: the page only formats. */
+export interface DataLaborEconomics {
+  planned_hours: DecimalString | null;
+  planned_cost: DecimalString | null;
+  average_hourly_cost: DecimalString | null;
+  /** The days actually compared. */
+  period_start: string | null;
+  period_end: string | null;
+  period_days: number;
+  /** The ON-BOOKS room revenue of exactly those days: what is booked so far, never a forecast. */
+  reference_revenue: DecimalString | null;
+  revenue_gap: LaborRevenueGap | null;
+  cost_to_revenue_pct: DecimalString | null;
+  revenue_per_hour: DecimalString | null;
 }
 
 export interface DataLaborDecision {
@@ -547,10 +643,14 @@ export interface DataLabor {
   reason: string | null;
   window_start: string;
   window_end: string;
+  /** The days in the window: `economics.period_days` of them have a plan with hours, and every ratio is
+   * calculated on those days alone. */
+  window_days: number;
   currency: string;
   days_with_data: number;
   categories: DataLaborCategory[];
   decision: DataLaborDecision | null;
+  economics: DataLaborEconomics;
 }
 
 /** A FACT about one domain's data: when the latest successful import of its source finished. */
@@ -658,12 +758,13 @@ export type ImportProblem =
   | "DUPLICATE_COLUMNS"
   | "INVALID_ROWS"
   | "UNSUPPORTED_FORMAT"
-  | "SAME_DAY_CONFLICT"
   /** Smart Import: matching the columns of a file the person already has. */
   | "MAPPING_INCOMPLETE"
   | "FORMAT_UNCLEAR"
   | "PROFILE_NOT_USABLE"
   | "SHEET_REQUIRED"
+  /** What the file would take away changed after it was read: it must be read again. */
+  | "DATA_CHANGED"
   | "GENERIC";
 
 export interface ImportPreviewResponse {
@@ -691,6 +792,57 @@ export interface ImportResultResponse {
   updated: number;
   unchanged: number;
   already_imported: boolean;
+  /** `false`: the file said what NINFA already holds: no new analysis is coming, none is needed. */
+  changed_data: boolean;
+  /** What stopped counting because a file said to be complete no longer holds it (kept in the history). */
+  removed: number;
+}
+
+/** One import attempt of a property, for "Importazioni recenti". A failed one says only that it failed. */
+export interface RecentImport {
+  /** The name the file had, with any personal value masked. `null`: no file was recorded. */
+  file_name: string | null;
+  domain: DataSourceDomain;
+  status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED";
+  /** When it ended, or (an attempt still running) when it began. */
+  at: string;
+}
+
+export interface RecentImportsResponse {
+  imports: RecentImport[];
+}
+
+/** What a file may be: the backend's own limits, so that no page repeats them. */
+export interface ImportLimitsResponse {
+  max_file_bytes: number;
+  max_rows: number;
+  max_columns: number;
+  file_extensions: string[];
+}
+
+// --- Where the analysis stands against the data (beside the feed, which keeps its own four states) ---
+
+export type AnalysisUpdateState =
+  | "NO_DATA"
+  | "NEEDS_BOOKINGS"
+  | "SEVERAL_SOURCES"
+  | "NEW_DATA"
+  | "IN_PROGRESS"
+  | "DELAYED"
+  | "DEFERRED"
+  | "FAILED"
+  | "UP_TO_DATE";
+
+export interface AnalysisStatusResponse {
+  state: AnalysisUpdateState;
+  /** The kinds of data the property holds, whatever was analysed: a partial property is not empty. */
+  imported_domains: DataSourceDomain[];
+  latest_import_at: string | null;
+  last_analysis_at: string | null;
+  /** DEFERRED only: when the refresh is due again. */
+  next_attempt_at: string | null;
+  /** The backend's word on whether asking for a refresh would do anything. */
+  can_retry: boolean;
 }
 
 // --- Smart Import: the hotel's own CSV / Excel file, its columns matched by the person -------------------
@@ -790,6 +942,11 @@ export interface ImportMapping {
   layout?: ImportLayout | null;
   /** The words the person taught NINFA: `{ role_mapping: { HK: "HOUSEKEEPING" } }`. */
   labels?: Record<string, Record<string, string>>;
+  /** What the person said this file is. Set by the server on the decisions it issues; never built here. */
+  file_scope?: ImportFileScope | null;
+  /** Carried back as the backend built it: the server reads the file again, and refuses a decision that differs. */
+  remembered_file_scope?: ImportFileScope | null;
+  expected_removals?: number;
   /** Set by the server on the decisions it issues; absent on a matching the person builds by hand. */
   smart_import?: ImportSmartImportRef | null;
 }
@@ -840,6 +997,19 @@ export interface ImportProfileInfo {
  * BLOCKED = the file cannot be imported as it is, and says why. */
 export type UnderstandingLevel = "READY" | "ASK" | "MANUAL" | "BLOCKED";
 
+/** What a file holds of its period: everything, a part, or only what is new. Said by a person, never guessed. */
+export type ImportFileScope = "FULL" | "PARTIAL" | "DELTA";
+
+/** What the server found about the records a file does not hold. Never worked out on the page. */
+export interface ImportScopePreflight {
+  /** What this import would apply; `null`: nobody has said, or a person must say it first. */
+  effective_scope: ImportFileScope | null;
+  remembered_scope: ImportFileScope | null;
+  /** What would stop counting if this file holds everything of its period. */
+  removal_count: number;
+  requires_scope_confirmation: boolean;
+}
+
 export type UnderstandingQuestionKind =
   | "DOMAIN"
   | "TABLE"
@@ -853,7 +1023,11 @@ export type UnderstandingQuestionKind =
   | "DATE_ORDER"
   | "DECIMAL_STYLE"
   /** The arrival is after the departure on (nearly) every row: `column` is the arrival, the one choice the departure. */
-  | "DATES_REVERSED";
+  | "DATES_REVERSED"
+  /** Stored records of this file's period are not in it, and what that means changes what counts. */
+  | "FILE_SCOPE"
+  /** This kind of file is remembered as complete and would take something away: a memory does not do that alone. */
+  | "FILE_SCOPE_CONFIRM";
 
 export type UnderstandingOriginKind =
   | "COLUMN"
@@ -891,6 +1065,8 @@ export interface UnderstandingQuestion {
   /** VALUE_LABELS: the unknown words, most frequent first, with how many rows each. */
   labels: { label: string; count: number }[];
   total_labels: number;
+  /** FILE_SCOPE: how many stored records of the file's period it does not hold. */
+  absent_records: number;
 }
 
 export type UnderstandingBlockerCode =
@@ -953,6 +1129,12 @@ export interface Understanding {
   people: number | null;
   questions: UnderstandingQuestion[];
   blockers: UnderstandingBlocker[];
+  /** The fields the file does not state and whose absence means something (one row, one room): nothing
+   * NINFA read, so never among `recognized`, and said on the summary. */
+  assumed: string[];
+  /** What stops counting if this file is imported, because it is complete and no longer holds it. */
+  removes: number;
+  scope: ImportScopePreflight;
 }
 
 /** What the person has already said, so a question is never asked twice. */
@@ -968,6 +1150,9 @@ export interface UnderstandAnswers {
   decimal_style?: "COMMA" | "POINT" | null;
   column_fields?: Record<string, string>;
   labels?: Record<string, Record<string, string>>;
+  file_scope?: ImportFileScope | null;
+  /** That answer is also for the next files of this structure: only then does the memory change. */
+  remember_scope?: boolean;
 }
 
 export interface FileInspectionResponse {
@@ -1066,6 +1251,59 @@ export interface ImportValidationResponse {
 export interface MappedImportResultResponse extends ImportResultResponse {
   /** The way the columns were matched has been remembered for the next file of the same layout. */
   configuration_saved: boolean;
+}
+
+/** How many rooms a property can sell, from the property-local today on (`app/api/v1/inventory`). */
+export interface RoomInventoryResponse {
+  configured: boolean;
+  /** The first known night's. `varies` says the coming nights do not all share it. */
+  rooms_available: number | null;
+  varies: boolean;
+  first_night: string | null;
+  last_night: string | null;
+  /** The first night the inventory holds at all (a past one when it was saved from a past day). */
+  known_since: string | null;
+  /** The property's own today and the oldest day a save may be valid from: the form's limits. */
+  today: string;
+  earliest_valid_from: string;
+  /** The backend's own limits: a page repeats none of them. */
+  min_rooms: number;
+  max_rooms: number;
+}
+
+export interface RoomInventorySavedResponse extends RoomInventoryResponse {
+  changed_nights: number;
+  /** A refresh of the analysis was asked for, so the occupancy follows by itself. */
+  analysis_requested: boolean;
+}
+
+/** A word a person taught NINFA about a source: it counts for every file of that source. */
+export interface RememberedWord {
+  /** An opaque handle: the word itself travels in no address. */
+  id: string;
+  document: string;
+  /** "status" | "channel" | "role" | "cost_category". */
+  field: string;
+  label: string;
+  value: string;
+  /** What it may be corrected to. Empty: it can only be forgotten. */
+  choices: string[];
+}
+
+/** One recurring kind of file a person taught NINFA: it can only be forgotten, whole and alone. */
+export interface RememberedFile {
+  id: string;
+  columns: string[];
+  /** "date_order" | "decimal_style" | "amount_basis" | "department_value" -> the answer. */
+  answers: Record<string, string>;
+  /** "FULL" | "PARTIAL" | "DELTA", as a person said it. */
+  file_scope: string | null;
+  column_decisions: number;
+}
+
+export interface RememberedAnswers {
+  words: RememberedWord[];
+  files: RememberedFile[];
 }
 
 /** How a source's files are read, as it was saved. */

@@ -49,7 +49,11 @@ from app.modules.intelligence.revenue.types import (
 )
 from app.modules.properties.repository import PropertyRepository
 from app.modules.snapshots.models import BookingSnapshot, SnapshotOrigin
-from app.modules.snapshots.repository import BookingSnapshotRepository, SnapshotHistoryRow
+from app.modules.snapshots.repository import (
+    BookingSnapshotRepository,
+    ObservationHistory,
+    SnapshotHistoryRow,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +78,7 @@ class _Prepared:
     anchors: list[SnapshotPoint]
     reference: ReferenceAdr
     endpoints: dict[SnapshotKey, SnapshotPoint]
+    observation_is_fresh: bool = True
 
     def _has_pairs(self) -> bool:
         return self.context.baseline_status == ExpectedStatus.READY and bool(self.anchors)
@@ -90,6 +95,7 @@ class _Prepared:
             prior=self.endpoints.get(prior_key(context.snapshot_local_date, context.stay_date)),
             selection=selection,
             reference=self.reference,
+            observation_is_fresh=self.observation_is_fresh,
         )
 
     def occupancy(self) -> RevenueDecisionEvaluation:
@@ -99,7 +105,12 @@ class _Prepared:
             if self._has_pairs()
             else empty_selection()
         )
-        return evaluate_occupancy(context, selection=selection, reference=self.reference)
+        return evaluate_occupancy(
+            context,
+            selection=selection,
+            reference=self.reference,
+            observation_is_fresh=self.observation_is_fresh,
+        )
 
     def signals(self) -> RevenueSignals:
         return RevenueSignals(self.pickup(), self.occupancy())
@@ -157,12 +168,18 @@ class RevenueDecisionService:
         snapshot_local_date: date,
         stay_date_start: date,
         stay_date_end: date,
+        observation_is_fresh: bool = True,
+        history: ObservationHistory | None = None,
     ) -> tuple[RevenueSignals, ...]:
         """Both detectors on every OBSERVED snapshot of one snapshot day and stay-date range
         (both ends included) of one data source, earliest stay date first.
 
         Targets whose stay date precedes their snapshot day (a night already over) are not
         evaluated. The history of the whole batch is read once.
+
+        `observation_is_fresh` False: the source said nothing new since the last day analysed, so
+        neither detector is evaluated. `history`: which observations of earlier days count: no
+        endpoint or anchor of a curve comes from any other (`analysis/observation.py`).
         """
         for value, name in (
             (snapshot_local_date, "snapshot_local_date"),
@@ -192,7 +209,14 @@ class RevenueDecisionService:
             origin=SnapshotOrigin.OBSERVED,
         )
         signals = tuple(
-            prepared.signals() for prepared in self._prepare(stored, pickup=True, occupancy=True)
+            prepared.signals()
+            for prepared in self._prepare(
+                stored,
+                pickup=True,
+                occupancy=True,
+                observation_is_fresh=observation_is_fresh,
+                history=history,
+            )
         )
         logger.info(
             "revenue signals evaluated workspace_id=%s property_id=%s data_source_id=%s targets=%d",
@@ -255,13 +279,25 @@ class RevenueDecisionService:
     # --- the evaluation -----------------------------------------------------------------------
 
     def _prepare(
-        self, targets: Sequence[BookingSnapshot], *, pickup: bool = False, occupancy: bool = False
+        self,
+        targets: Sequence[BookingSnapshot],
+        *,
+        pickup: bool = False,
+        occupancy: bool = False,
+        observation_is_fresh: bool = True,
+        history: ObservationHistory | None = None,
     ) -> list[_Prepared]:
         """Read everything the requested detectors need, once, for all the targets."""
         if not targets:
             return []
         data_source_id = targets[0].data_source_id
-        loaded = self._load(targets, data_source_id, pickup=pickup, occupancy=occupancy)
+        loaded = self._load(
+            targets,
+            data_source_id,
+            pickup=pickup,
+            occupancy=occupancy,
+            history=history,
+        )
         prepared: list[_Prepared] = []
         for snapshot in targets:
             baseline = loaded.baselines.get(snapshot.id)
@@ -291,6 +327,7 @@ class RevenueDecisionService:
                         [] if baseline is None else loaded.anchor_adrs.get(baseline.id, []),
                     ),
                     endpoints=loaded.endpoints,
+                    observation_is_fresh=observation_is_fresh,
                 )
             )
         return prepared
@@ -302,6 +339,7 @@ class RevenueDecisionService:
         *,
         pickup: bool,
         occupancy: bool,
+        history: ObservationHistory | None = None,
     ) -> _Loaded:
         # 1. the Gate 4 baselines of the targets, then their comparables (two statements)
         baselines = self._expected.existing_for_targets([target.id for target in targets])
@@ -311,9 +349,11 @@ class RevenueDecisionService:
 
         # 2. the comparable snapshots themselves (the ANCHORS of the curve pairs), one statement
         snapshot_ids = {c.snapshot_id for rows in comparables.values() for c in rows}
+        # (a baseline names its rows by id: one stored before a day stopped counting still does)
         points = {
             row.snapshot_id: _point(row)
             for row in self._snapshots.list_by_ids(data_source_id, snapshot_ids)
+            if history is None or history.admits(row)
         }
         anchors: dict[UUID, list[SnapshotPoint]] = {}
         anchor_adrs: dict[UUID, list[Decimal | None]] = {}
@@ -337,6 +377,6 @@ class RevenueDecisionService:
                     wanted.add(final_key(anchor))
         endpoints = {
             (row.snapshot_local_date, row.stay_date): _point(row)
-            for row in self._snapshots.list_by_keys(data_source_id, wanted)
+            for row in self._snapshots.list_by_keys(data_source_id, wanted, history=history)
         }
         return _Loaded(baselines, anchors, anchor_adrs, endpoints)

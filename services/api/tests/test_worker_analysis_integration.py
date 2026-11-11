@@ -15,6 +15,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from procrastinate import testing
@@ -25,7 +26,7 @@ from app.cli.imports import run_import_bookings
 from app.cli.pilot import run_create_data_source, run_create_property, run_create_workspace
 from app.core.tenant import TenantContext
 from app.db.base import Base
-from app.modules.analysis import AnalysisRunRequest
+from app.modules.analysis import DAILY_TICK_TASK, AnalysisRunRequest
 from app.modules.decision_memory.service import DecisionMemoryService
 from app.modules.decision_memory.types import FeedState
 from app.modules.decisions.models import DecisionRun
@@ -36,7 +37,7 @@ from app.modules.properties.repository import PropertyRepository
 from app.modules.tenancy.models import Workspace
 from app.modules.tenancy.repository import WorkspaceRepository
 from tests.pilot_support import booking_csv
-from worker import runtime
+from worker import daily, runtime
 from worker.app import DEFAULT_QUEUE, app
 from worker.enqueue import enqueue_analysis
 
@@ -62,7 +63,9 @@ class Pilot:
         with Session(self.engine) as session:
             return list(
                 session.scalars(
-                    select(DecisionRun).where(DecisionRun.workspace_id == self.tenant.workspace_id)
+                    select(DecisionRun)
+                    .where(DecisionRun.workspace_id == self.tenant.workspace_id)
+                    .order_by(DecisionRun.run_sequence)
                 ).all()
             )
 
@@ -139,8 +142,12 @@ def pilot(db_engine: Engine, tmp_path: Path) -> Iterator[Pilot]:
 
 
 def _enqueue_and_run_worker(request: AnalysisRunRequest) -> list[str]:
-    """One explicit enqueue, then the worker drains the queue; returns the job statuses."""
+    """One explicit enqueue, then the worker drains the queue; returns the job statuses. A worker
+    that starts also defers the day's tick: quiet here, and not one of this test's jobs."""
     connector = testing.InMemoryConnector()
+
+    async def no_tick(*_: object) -> int:
+        return 0
 
     async def scenario() -> None:
         with app.replace_connector(connector) as test_app:
@@ -148,8 +155,11 @@ def _enqueue_and_run_worker(request: AnalysisRunRequest) -> list[str]:
             async with test_app.open_async():
                 await test_app.run_worker_async(queues=[DEFAULT_QUEUE], wait=False)
 
-    runtime.run(scenario())
-    return [str(job["status"]) for job in connector.jobs.values()]
+    with patch.object(daily, "run_daily_tick", no_tick):
+        runtime.run(scenario())
+    return [
+        str(job["status"]) for job in connector.jobs.values() if job["task_name"] != DAILY_TICK_TASK
+    ]
 
 
 def test_01_enqueued_job_runs_the_shared_analysis_and_persists_a_readable_decision_run(
@@ -182,7 +192,7 @@ def test_02_a_duplicate_identical_execution_the_same_day_is_a_safe_replay(
     assert "is_idempotent_replay=True" in completed[1]
 
 
-def test_03_changed_bookings_then_a_same_day_second_analysis_surfaces_the_snapshot_conflict(
+def test_03_changed_bookings_then_a_same_day_second_analysis_reads_the_next_revision(
     pilot: Pilot, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     assert _enqueue_and_run_worker(pilot.request()) == ["succeeded"]
@@ -214,10 +224,13 @@ def test_03_changed_bookings_then_a_same_day_second_analysis_surfaces_the_snapsh
     with caplog.at_level(logging.ERROR, logger="worker.tasks"):
         statuses = _enqueue_and_run_worker(pilot.request())
 
-    assert statuses == ["failed"]  # no workaround: the existing immutability rule is visible
-    assert any("status=failed error_type=SnapshotError" in m for m in caplog.messages)
+    assert statuses == ["succeeded"]
+    assert not [m for m in caplog.messages if "status=failed" in m]
     runs = pilot.runs()
-    assert [run.id for run in runs] == [first_run.id]  # nothing faked, nothing replaced
+    assert [run.id for run in runs][0] == first_run.id  # nothing replaced
+    assert len(runs) == 2
+    observations = [run.input_provenance["bookings"]["observation"] for run in runs]  # type: ignore[index]
+    assert [observation["revision"] for observation in observations] == [1, 2]
 
 
 def test_04_an_unknown_property_fails_the_job_and_persists_nothing(pilot: Pilot) -> None:

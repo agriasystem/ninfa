@@ -10,7 +10,7 @@ import {
 } from "@/lib/data/dates";
 import { formatPercent } from "@/lib/data/format";
 
-import { DatiCard, DatiEmpty } from "./dati-parts";
+import { ConfigureInventoryLink, DatiCard, DatiEmpty } from "./dati-parts";
 
 /** The tallest value the axis must reach, in percent. Occupancy is stored NOT clamped (45 rooms on 40
  * available is 112,5 %), so the axis grows in steps of 25 when a night exceeds 100 - the bars are
@@ -31,14 +31,27 @@ function heightPercent(occupancy: string, axisMax: number): number {
 }
 
 type Slot =
-  | { kind: "bar"; night: DataNightRow; occupancy: string; height: number }
+  | { kind: "bar"; night: DataNightRow; occupancy: string; height: number; over: boolean }
   | { kind: "unknown-capacity"; night: DataNightRow }
   | { kind: "no-data"; night: DataNightRow };
 
 function slotOf(night: DataNightRow, axisMax: number): Slot {
   if (!night.has_data) return { kind: "no-data", night };
   if (night.occupancy_pct === null) return { kind: "unknown-capacity", night };
-  return { kind: "bar", night, occupancy: night.occupancy_pct, height: heightPercent(night.occupancy_pct, axisMax) };
+  return {
+    kind: "bar",
+    night,
+    occupancy: night.occupancy_pct,
+    height: heightPercent(night.occupancy_pct, axisMax),
+    over: night.over_capacity,
+  };
+}
+
+/** " · 11 prenotate / 10 disponibili": said beside the figure of a night that holds more rooms than the
+ * inventory has. Both numbers are the backend's. */
+function overDetail(night: DataNightRow): string {
+  if (!night.over_capacity || night.rooms_on_books === null || night.rooms_available === null) return "";
+  return ` · ${datiCopy.consistency.detail(night.rooms_on_books, night.rooms_available)}`;
 }
 
 function tipOf(slot: Slot): string {
@@ -46,7 +59,7 @@ function tipOf(slot: Slot): string {
   const flagged = slot.night.status === "ATTENTION" ? ` · ${datiCopy.chart.attentionTip}` : "";
   switch (slot.kind) {
     case "bar":
-      return `${day}: ${formatPercent(slot.occupancy)}${flagged}`;
+      return `${day}: ${formatPercent(slot.occupancy)}${overDetail(slot.night)}${flagged}`;
     case "unknown-capacity":
       return `${day}: ${datiCopy.chart.unknownCapacityTip}${flagged}`;
     case "no-data":
@@ -85,6 +98,23 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
   const hasAnyFigure = nights.some((night) => night.occupancy_pct !== null);
 
   if (occupancy.state !== "AVAILABLE" || nights.length === 0 || !hasAnyFigure) {
+    // Bookings without a room inventory are not "no data": say what is missing and where to set it.
+    const capacity = occupancy.state === "AVAILABLE" ? (occupancy.selected?.capacity ?? null) : null;
+    const empty =
+      capacity === "MISSING" ? (
+        <DatiEmpty
+          title={datiCopy.chart.inventoryMissingTitle}
+          body={datiCopy.chart.inventoryMissingBody}
+          action={<ConfigureInventoryLink propertyId={overview.property_id} />}
+        />
+      ) : capacity === "AWAITING_ANALYSIS" ? (
+        <DatiEmpty title={datiCopy.chart.inventoryAwaitingTitle} body={datiCopy.occupancy.inventoryAwaitingNote} />
+      ) : (
+        <DatiEmpty
+          title={datiCopy.chart.emptyTitle}
+          body={unavailableReasonText(occupancy.state === "AVAILABLE" ? "NO_DATA" : occupancy.reason)}
+        />
+      );
     return (
       <DatiCard id="dati-chart" title={title} className="dati-chart">
         <div className="dati-chart__empty">
@@ -93,10 +123,7 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
               <span key={index} style={{ height: `${height}%` }} />
             ))}
           </div>
-          <DatiEmpty
-            title={datiCopy.chart.emptyTitle}
-            body={unavailableReasonText(occupancy.state === "AVAILABLE" ? "NO_DATA" : occupancy.reason)}
-          />
+          {empty}
         </div>
       </DatiCard>
     );
@@ -107,6 +134,9 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
   const slots = nights.map((night) => slotOf(night, axisMax));
   const hasAttention = nights.some((night) => night.status === "ATTENTION");
   const hasUnknownCapacity = slots.some((slot) => slot.kind === "unknown-capacity");
+  const hasOverCapacity = slots.some((slot) => slot.kind === "bar" && slot.over);
+  // Where the inventory itself is on the axis (100 %), only drawn when a night goes beyond it.
+  const capacityLine = hasOverCapacity ? (100 / axisMax) * 100 : null;
 
   return (
     <DatiCard id="dati-chart" title={title} className="dati-chart">
@@ -124,11 +154,20 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
                 <span key={tick} />
               ))}
             </div>
+            {capacityLine !== null ? (
+              <span
+                className="dati-chart__capacity"
+                style={{ bottom: `calc(24px + (100% - 24px) * ${capacityLine / 100})` }}
+                aria-hidden="true"
+              />
+            ) : null}
             <ol className="dati-chart__bars" data-count={nights.length}>
               {slots.map((slot, index) => (
                 <li
                   key={slot.night.stay_date}
-                  className={`dati-chart__col dati-chart__col--${slot.kind}`}
+                  className={`dati-chart__col dati-chart__col--${slot.kind}${
+                    slot.kind === "bar" && slot.over ? " dati-chart__col--over" : ""
+                  }`}
                   title={tipOf(slot)}
                 >
                   <span className="dati-chart__area">
@@ -158,7 +197,7 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
           </div>
         </div>
 
-        {hasAttention || hasUnknownCapacity ? (
+        {hasAttention || hasUnknownCapacity || hasOverCapacity ? (
           <figcaption className="dati-chart__legend">
             {hasAttention ? (
               <span className="dati-chart__legend-item">
@@ -170,6 +209,12 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
               <span className="dati-chart__legend-item">
                 <span className="dati-chart__legend-hatch" aria-hidden="true" />
                 {datiCopy.chart.unknownCapacityLegend}
+              </span>
+            ) : null}
+            {hasOverCapacity ? (
+              <span className="dati-chart__legend-item">
+                <span className="dati-chart__legend-over" aria-hidden="true" />
+                {datiCopy.consistency.legend}
               </span>
             ) : null}
           </figcaption>
@@ -191,7 +236,10 @@ export function DatiOccupancyChart({ overview }: { overview: DataOverviewRespons
               {nights.map((night) => (
                 <tr key={night.stay_date}>
                   <th scope="row">{formatNightLong(night.stay_date)}</th>
-                  <td>{night.occupancy_pct !== null ? formatPercent(night.occupancy_pct) : datiCopy.notAvailable}</td>
+                  <td>
+                    {night.occupancy_pct !== null ? formatPercent(night.occupancy_pct) : datiCopy.notAvailable}
+                    {overDetail(night)}
+                  </td>
                   <td>{nightStatusText(night.status)}</td>
                 </tr>
               ))}

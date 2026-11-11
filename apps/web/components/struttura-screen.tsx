@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 import type { PropertyAccess } from "@ninfa/contracts";
 
+import { STRUTTURA_INVENTORY_ANCHOR } from "@/lib/routes";
 import { strutturaCopy } from "@/lib/structure/copy";
 import { getStructureOverview } from "@/lib/structure/overview";
 import type { StructureOverview } from "@/lib/structure/types";
+import { useRoomInventory } from "@/lib/structure/use-room-inventory";
 
 import { EditStructureIcon } from "./icons";
 import { PropertyScreen } from "./property-screen";
@@ -30,6 +32,20 @@ function StrutturaContent({
   onPropertyInvalid: () => void;
 }) {
   const overview = useMemo(() => getOverview(property), [getOverview, property]);
+  const { state: inventory, accept: acceptInventory } = useRoomInventory(property.id);
+  // The profile's "Numero camere" and the inventory block say one number, the backend's.
+  const roomCount =
+    inventory.kind === "loaded" && inventory.inventory.configured
+      ? inventory.inventory.rooms_available
+      : overview.profile.roomCount;
+
+  // A link to the inventory block ("Configura inventario" in Dati) lands before this content exists -
+  // the session and the property resolve first - so neither the browser nor the router can scroll to
+  // it: once the blocks are on screen, bring the one the address names into view.
+  useEffect(() => {
+    if (window.location.hash !== `#${STRUTTURA_INVENTORY_ANCHOR}`) return;
+    document.getElementById(STRUTTURA_INVENTORY_ANCHOR)?.scrollIntoView?.({ block: "start" });
+  }, []);
 
   return (
     <div className="struttura-screen">
@@ -44,8 +60,14 @@ function StrutturaContent({
       </header>
 
       <div className="struttura-screen__sections">
-        <StrutturaProfile profile={overview.profile} />
-        <StrutturaRooms rooms={overview.rooms} actions={actions} />
+        <StrutturaProfile profile={{ ...overview.profile, roomCount }} />
+        <StrutturaRooms
+          propertyId={property.id}
+          rooms={overview.rooms}
+          inventory={inventory}
+          actions={actions}
+          onInventorySaved={acceptInventory}
+        />
         <StrutturaParameters parameters={overview.parameters} actions={actions} />
         <StrutturaSources
           propertyId={property.id}
@@ -62,7 +84,7 @@ export interface StrutturaScreenProps {
   requestedPropertyId: string | null;
   onSelectProperty: (propertyId: string) => void;
   onNavigateToLogin: () => void;
-  /** What the profile, inventory and parameter buttons do. None is wired yet (see `StrutturaActions`). */
+  /** What the profile and parameter buttons do. Not wired yet (see `StrutturaActions`). */
   actions?: StrutturaActions;
   /** Where the structure's data comes from: the one seam to point at a real endpoint. The route never passes
    * it, so a real property shows what is really known (its name and timezone) and "Non configurata" for the

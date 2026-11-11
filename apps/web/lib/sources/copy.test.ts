@@ -12,10 +12,12 @@ describe("the formats of the files, as the person reads them", () => {
       sourcesCopy.methods.bookingsCsv.body,
       sourcesCopy.methods.channelCsv.body,
       sourcesCopy.methods.laborCsv.body,
-      sourcesCopy.importFlow.hints.CSV,
+      sourcesCopy.methods.costsRegister.body,
+      sourcesCopy.importPage.drop.formats(null),
+      sourcesCopy.importPage.drop.formats("10 MB"),
+      sourcesCopy.importPage.rejected.WRONG_TYPE,
     ];
     for (const text of offered) expect(text).toMatch(/CSV o Excel \(\.xlsx\)/u);
-    expect(sourcesCopy.importFlow.wrongType.CSV).toContain("CSV o Excel");
     expect(sourcesCopy.problemHints.UNSUPPORTED_FILE.CSV).toContain("CSV o Excel (.xlsx)");
     expect(sourcesCopy.problemHints.UNREADABLE_FILE.CSV).toContain("Excel (.xlsx)");
   });

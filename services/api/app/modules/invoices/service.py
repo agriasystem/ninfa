@@ -136,6 +136,7 @@ class InvoiceImportResult:
     rows_invalid: int = 0
     invoices_created: int = 0
     invoices_unchanged: int = 0
+    invoices_revised: int = 0
     lines_created: int = 0
     suppliers_created: int = 0
     suppliers_matched: int = 0
@@ -152,6 +153,10 @@ class InvoiceImportResult:
     @property
     def succeeded(self) -> bool:
         return self.status == ImportJobStatus.SUCCEEDED
+
+    @property
+    def changed_data(self) -> bool:
+        return self.invoices_created + self.invoices_revised > 0
 
 
 @dataclass(frozen=True)
@@ -607,16 +612,21 @@ class InvoiceImportService:
             conflicts: list[int] = []
             new_invoices: list[dict[str, Any]] = []
             new_lines: list[dict[str, Any]] = []
-            unchanged = 0
+            unchanged = revised = 0
             for identity, document, resolution in keyed:
                 fingerprint = document.fingerprint(str(resolution.supplier_id))
                 stored = existing.get(identity)
+                revision = 1
                 if stored is not None:
                     if stored.source_fingerprint == fingerprint:
                         unchanged += 1
-                    else:
+                        continue
+                    if SourceFormat.FATTURAPA_XML in (stored.source_format, document.source_format):
                         conflicts.append(document.source_document_index)
-                    continue
+                        continue
+                    # A row of a spreadsheet corrected: the older version stays, this one counts.
+                    revision = stored.revision + 1
+                    revised += 1
                 invoice_id = uuid4()
                 new_invoices.append(
                     self._invoice_row(
@@ -626,21 +636,22 @@ class InvoiceImportService:
                         resolution,
                         fingerprint,
                         _resolution_story(resolution, created_by),
+                        revision,
                     )
                 )
                 new_lines.extend(self._line_rows(invoice_id, document, resolution))
             if conflicts:
                 raise InvoiceImportError(
                     InvoiceErrorCode.DOCUMENT_CONFLICT,
-                    "An invoice with this identity already exists with a different content: "
-                    "it is never updated silently",
+                    "A fiscal document with this identity already exists with a different "
+                    "content: it is never replaced",
                     details={"reason": "different_content", "documents": conflicts[:50]},
                 )
 
             self._invoices.insert_invoices(new_invoices)
             self._invoices.insert_lines(new_lines)
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job)
+            self._jobs.succeed(ids.job, changed_data=bool(new_invoices))
             self._session.commit()
         except (InvoiceImportError, SupplierError):
             raise  # rolled back and recorded as FAILED by import_file
@@ -682,8 +693,9 @@ class InvoiceImportService:
             rows_total=counts.rows,
             rows_valid=counts.valid,
             rows_invalid=counts.invalid,
-            invoices_created=len(new_invoices),
+            invoices_created=len(new_invoices) - revised,
             invoices_unchanged=unchanged,
+            invoices_revised=revised,
             lines_created=len(new_lines),
             suppliers_created=len(created_suppliers),
             suppliers_matched=len(matched_suppliers),
@@ -717,9 +729,11 @@ class InvoiceImportService:
         resolution: SupplierResolution,
         fingerprint: str,
         method: ResolutionMethod,
+        revision: int = 1,
     ) -> dict[str, Any]:
         return {
             "id": invoice_id,
+            "revision": revision,
             "workspace_id": self._tenant.workspace_id,
             "property_id": ids.property,
             "data_source_id": ids.data_source,

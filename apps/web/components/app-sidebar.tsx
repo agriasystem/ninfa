@@ -4,17 +4,17 @@ import Link from "next/link";
 import type { ComponentType, RefObject, SVGProps } from "react";
 
 import { copy } from "@/lib/copy";
-import { datiRoute, decisioniRoute, oggiRoute, strutturaRoute } from "@/lib/routes";
+import { datiRoute, decisioniRoute, importaFileRoute, oggiRoute, strutturaRoute } from "@/lib/routes";
 
-import { BarsIcon, BuildingIcon, DecisionsIcon, HomeIcon, SettingsIcon } from "./icons";
+import { BarsIcon, BuildingIcon, DecisionsIcon, HomeIcon, ImportFileIcon, SettingsIcon } from "./icons";
 import { NinfaLogo } from "./ninfa-logo";
 import { ProfileMenu } from "./profile-menu";
 
 /** Which section of the sidebar is the current one. The Decision Detail page belongs to
  * "decisioni" (its back link is "← Decisioni"), so it highlights the same item. "dati" is the Dati
- * workspace (Dati UI V1) - its internal tabs are not sidebar items. "struttura" is the structure's
- * profile and configuration (Struttura UI V1). */
-export type ShellSection = "oggi" | "decisioni" | "dati" | "struttura";
+ * workspace (Dati UI V1) - its internal tabs are not sidebar items. "importa-file" is where new data
+ * comes in (Importa file V1); "struttura" is the structure's profile and configuration (Struttura UI V1). */
+export type ShellSection = "oggi" | "decisioni" | "dati" | "importa-file" | "struttura";
 
 export interface AppSidebarProps {
   /** `""` when the account has no property: the links then carry no `?property=`. */
@@ -57,6 +57,12 @@ const NAV_ITEMS: readonly NavItem[] = [
     href: (propertyId) => datiRoute(propertyId || undefined),
   },
   {
+    section: "importa-file",
+    label: copy.nav.importFile,
+    Icon: ImportFileIcon,
+    href: (propertyId) => importaFileRoute(propertyId || undefined),
+  },
+  {
     section: "struttura",
     label: copy.nav.structure,
     // No <path> inside: the active state fills every <path> (the solid Oggi house), and the reference
@@ -66,7 +72,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   },
 ];
 
-/** The approved sidebar (Home UI V1): logo slot, the four sections, then profile | settings. Impostazioni
+/** The approved sidebar (Home UI V1): logo slot, the five sections, then profile | settings. Impostazioni
  * is the one thing not built yet: it is drawn in the approved layout but NEVER a link - no `href`, not
  * focusable, `aria-disabled="true"` - because a placeholder route would misrepresent the product (see
  * docs/architecture/oggi-ui-v1.md, "Authenticated shell"). */

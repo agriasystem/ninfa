@@ -66,7 +66,10 @@ Then the provenance policy, ordering and caps:
   RECONSTRUCTED_APPROXIMATE** snapshots (`uncertain_rooms = 0`), newest first, **up to the
   24-comparable sample limit** (not merely up to 5). A reconstruction fills the sample; it never
   displaces an observed one, and the confidence pays for it (provenance 60 instead of 100, caps
-  85 and 65).
+  85 and 65). This is the engine's own rule and it is unchanged. In the product the history it is
+  given (`ObservationHistory`, [ADR 0048](adr/0048-reconstructed-is-not-observed-as-of.md)) admits
+  OBSERVATIONS only, so no reconstruction reaches it from the analysis: the completion applies to a
+  direct call that names no history.
 * A reconstruction **with uncertainty** never enters the numbers. Every calendar-eligible
   candidate of that kind is counted in `rejected_uncertain_count` (informative about the quality
   of the history, also when the observed sample was sufficient and no reconstruction was needed).
@@ -76,8 +79,8 @@ Then the provenance policy, ordering and caps:
 * Zero is a real value: a comparable with `rooms_on_books = 0` enters the sample.
 
 With the V1 constants at most 24 stay dates can qualify for one target (two seasonal windows of
-about 12 same-weekday dates each) and a data source has exactly one snapshot per (stay date, lead
-time), so the 24 cap is a structural guarantee: it can only bind on hand-built input, and is
+about 12 same-weekday dates each) and a read gives exactly one snapshot per (stay date, lead time),
+the last revision of that day, so the 24 cap is a structural guarantee: it can only bind on hand-built input, and is
 tested there. The query that fetches the candidates asks for the exact `(snapshot day, stay date)`
 keys the calendar allows (a few dozen), never for a scan of the history.
 
@@ -267,3 +270,11 @@ remaining column; the minimal projection of `REV_OCCUPANCY_RISK` lives only in a
 * No weighting by recency, no outlier removal, no dedicated handling of groups or events.
 * A conflict on re-run (above) means a corrected history needs a new `calculation_version`.
 * No retention policy for baselines yet; no public API, worker task or scheduler.
+
+## Which observations count
+
+No comparable comes from an observation that only repeated what was already known (the absence of new data is not a measured level:
+[ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md)), or that no finished analysis read
+([ADR 0046](adr/0046-a-sample-of-history-is-what-a-finished-analysis-read.md)). The orchestration tells the engine (`ObservationHistory`), and what a past day
+counts for never changes, so a target's comparables do not move between two runs of one day. A reconstruction always counts. Called with none, the engine reads what is
+stored.

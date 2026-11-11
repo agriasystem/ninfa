@@ -52,6 +52,8 @@ never applied on its own, however confident.
 | `source_fingerprint` | 64 hex | SHA-256 of the business content; see Idempotency |
 | `first_import_job_id` | UUID | immutable: the job that introduced the record |
 | `last_import_job_id` | UUID | the last job that created **or changed** it |
+| `removed_by_import_job_id`, `removed_at` | nullable, both or neither | the complete file that no longer held it ([import-scope-semantics-v1.md](import-scope-semantics-v1.md)); every read of the current books filters on `is_current_booking()`, and the row stays |
+| `last_seen_import_job_id` | UUID, nullable | only on a removed booking: the last job whose file held it |
 
 **Identity.** `UNIQUE (workspace_id, data_source_id, source_record_id)`. `source_record_id` is
 mandatory: NINFA never derives an id from guest name + dates + amount. A file without a usable

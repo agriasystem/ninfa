@@ -1,9 +1,11 @@
 import type {
+  AnalysisStatusResponse,
   DataSourceCard,
   DataSourcesResponse,
   FileInspectionResponse,
   ImportColumnInfo,
   ImportFieldSpec,
+  ImportLimitsResponse,
   ImportMapping,
   ImportProfileInfo,
   ImportPreviewResponse,
@@ -150,6 +152,8 @@ export function resultOf(overrides: Partial<ImportResultResponse> = {}): ImportR
     updated: 0,
     unchanged: 0,
     already_imported: false,
+    changed_data: true,
+    removed: 0,
     ...overrides,
   };
 }
@@ -412,6 +416,27 @@ export function xlsxFile(name = "turni.xlsx"): File {
   });
 }
 
+/** The backend's own limits, as `GET .../data-sources/import-limits` says them. */
+export const IMPORT_LIMITS: ImportLimitsResponse = {
+  max_file_bytes: 10 * 1024 * 1024,
+  max_rows: 100_000,
+  max_columns: 200,
+  file_extensions: [".csv", ".xlsx"],
+};
+
+/** Where the analysis stands, as `GET .../analysis/status` says it. */
+export function analysisStatusOf(overrides: Partial<AnalysisStatusResponse> = {}): AnalysisStatusResponse {
+  return {
+    state: "UP_TO_DATE",
+    imported_domains: ["BOOKINGS"],
+    latest_import_at: "2026-10-23T08:00:00Z",
+    last_analysis_at: "2026-10-23T08:01:00Z",
+    next_attempt_at: null,
+    can_retry: false,
+    ...overrides,
+  };
+}
+
 // --- Smart Import V3: NINFA understood the document ---------------------------------------------------------
 
 /** The decision NINFA proposes for the realistic staff file (title, summary, totals, department column). */
@@ -439,6 +464,14 @@ export function proposalOf(overrides: Partial<ImportMapping> = {}): ImportMappin
 
 export function understandingOf(overrides: Partial<Understanding> = {}): Understanding {
   return {
+    assumed: [],
+    removes: 0,
+    scope: {
+      effective_scope: null,
+      remembered_scope: null,
+      removal_count: 0,
+      requires_scope_confirmation: false,
+    },
     level: "READY",
     detection: {
       domain: "LABOR",
@@ -486,6 +519,7 @@ export function understoodInspection(
   understanding: Partial<Understanding> = {},
   overrides: Partial<FileInspectionResponse> = {},
 ): FileInspectionResponse {
+  const domain = overrides.domain ?? "LABOR";
   return laborInspection({
     file_type: "XLSX",
     columns: [
@@ -496,7 +530,11 @@ export function understoodInspection(
       column(4, "Ore effettive", ["8,5", "6"], { field: "actual_hours", level: "RECOGNIZED" }),
       column(5, "Costo previsto", ["120", "84"], { field: "planned_cost", level: "RECOGNIZED" }),
     ],
-    understanding: understandingOf(understanding),
+    // (the backend's verdict on the document agrees with the kind it was read as, unless a test says otherwise)
+    understanding: understandingOf({
+      detection: { domain, level: "HIGH", scores: [{ domain, score: 0.93 }], expected: domain },
+      ...understanding,
+    }),
     proposal: proposalOf(),
     ...overrides,
   });
@@ -517,6 +555,7 @@ export function questionOf(
     choices: [],
     labels: [],
     total_labels: 0,
+    absent_records: 0,
     ...overrides,
   };
 }

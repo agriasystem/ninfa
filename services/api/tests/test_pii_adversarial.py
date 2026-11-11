@@ -153,6 +153,36 @@ def test_tax_alone_is_a_vat_column_not_a_tax_code() -> None:
     assert detect_pii("Tax amount", column_stats(["22.5", "10.1", "5.2"])) is None
 
 
+@pytest.mark.parametrize(
+    ("header", "cells"),
+    [
+        ("Modificato da", ["Marta Verdi", "Luca Neri"] * 20),
+        ("Ultimo aggiornamento", ["Verdi Marta", "Neri Luca"] * 20),
+        ("Reso", ["Giulia Bianchi"] * 40),
+    ],
+)
+def test_a_column_of_one_or_two_people_is_still_a_column_of_people(
+    header: str, cells: list[str]
+) -> None:
+    """A small hotel: the same two names on every row. The header says nothing about a person."""
+    finding = detect_pii(header, column_stats(cells))
+
+    assert finding is not None and finding.kind == PiiKind.PERSON_NAME
+
+
+@pytest.mark.parametrize(
+    "cells",
+    [
+        ["Front Office", "Best Available"] * 20,
+        ["Sito Diretto", "Telefono Email"] * 20,
+        ["Non Rimborsabile", "Colazione Inclusa"] * 20,
+        ["Si", "No"] * 20,
+    ],
+)
+def test_two_words_that_are_nobody_stay_nobody(cells: list[str]) -> None:
+    assert detect_pii("Tipologia", column_stats(cells)) is None
+
+
 def test_a_hidden_hourly_rate_is_still_locked() -> None:
     from app.modules.data_sources.semantics_labor import hourly_or_known_exclusion
 

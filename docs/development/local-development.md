@@ -69,7 +69,7 @@ Gates 1 and 2: `... downgrade 0002_procrastinate_schema`.
 | What     | Command              | Default address / notes                       |
 | -------- | -------------------- | --------------------------------------------- |
 | API      | `npm run dev:api`    | `http://127.0.0.1:8000/api/v1/health`         |
-| Worker   | `npm run dev:worker` | Ctrl+C to stop                                |
+| Worker   | `npm run dev:worker` | Ctrl+C to stop. Needed for an import to reach the Home |
 | Web      | `npm run dev:web`    | `http://127.0.0.1:3100`                       |
 
 Ports and hosts are configurable through `API_HOST`, `API_PORT`, `WEB_HOST`, `WEB_PORT` (the web
@@ -143,9 +143,10 @@ with get_sessionmaker()() as session:
 
 `BookingSnapshotReconstructionService(...).reconstruct(...)` infers **completed earlier days**; its
 rows are `RECONSTRUCTED_APPROXIMATE` and never replace an observation (read
-[booking-snapshots-v1.md](../architecture/booking-snapshots-v1.md) before using them). Observing is
-meant to run once per property-local day; running it again the same day is a no-op unless the
-bookings or the inventory changed, which raises `BOOKING_SNAPSHOT_CONFLICT`. Migration `0005` adds
+[booking-snapshots-v1.md](../architecture/booking-snapshots-v1.md) before using them). A source can
+be observed as often as the data change: running it again the same day is a no-op unless the bookings
+or the inventory changed, which adds the day's next revision and rewrites nothing
+([same-day-revisions-v1.md](../architecture/same-day-revisions-v1.md)). Migration `0005` adds
 the two tables; `npm run db:migrate` applies it. The golden scenario lives in
 `tests/fixtures/snapshots/`; its expected file is regenerated, independently of the application, with
 `uv run --all-packages python tests/fixtures/snapshots/generate_masseria_snapshots_expected.py`.
@@ -155,7 +156,8 @@ Gate 3 adds no dependency.
 
 Also a Python service, with no public API, worker task or scheduler yet. It needs OBSERVED snapshots
 (see above) and, to get more than `INSUFFICIENT_DATA`, history: at least 5 comparable snapshots at the
-same lead time, weekday and season (observed, or clean reconstructions).
+same lead time, weekday and season (observed; clean reconstructions complete a thin sample only in a
+direct call that names no history, never in the analysis: [ADR 0048](../architecture/adr/0048-reconstructed-is-not-observed-as-of.md)).
 
 ```python
 from datetime import date

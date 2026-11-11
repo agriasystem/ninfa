@@ -74,28 +74,26 @@ export function FeedStateView({ feed, timeZone, showAllDecisions = false }: Feed
       );
     }
 
-    case "DATA_QUALITY_LIMITED":
+    case "DATA_QUALITY_LIMITED": {
+      // A real empty state: no reliable decision today - which is neither "nothing to worry about" (that is
+      // `NO_ACTION_REQUIRED`) nor "NINFA has not analysed" (`NOT_PROCESSED`). It says no more than is always
+      // true: the feed has no reason for it, so none is named, and the count of checks left inconclusive is
+      // an internal detail that is not shown.
+      const suppressed = feed.suppressed_count ?? 0;
       return (
         <section
           className="feed-state feed-state--data-quality-limited"
           data-feed-state="DATA_QUALITY_LIMITED"
         >
-          <h2>{copy.today.dataQualityTitle}</h2>
-          <p>{copy.today.dataQualityBody}</p>
-          {feed.insufficient_count !== null && feed.insufficient_count > 0 ? (
-            <p className="feed-state__detail">
-              {copy.today.dataQualityInsufficientCount(feed.insufficient_count)}
-            </p>
-          ) : null}
-          {feed.suppressed_count !== null && feed.suppressed_count > 0 ? (
-            <p className="feed-state__detail">
-              {copy.today.dataQualitySuppressedCount(feed.suppressed_count)}
-            </p>
-          ) : null}
+          <p className="feed-state__badge">{copy.today.partialAnalysisBadge}</p>
+          <h2>{copy.today.noReliableDecisionTitle}</h2>
+          <p>{copy.today.noReliableDecisionBody}</p>
+          {suppressed > 0 ? <p className="feed-state__detail">{copy.today.lowConfidenceNote}</p> : null}
           {coverage !== null ? <p className="feed-state__coverage">{coverage}</p> : null}
           <p className="feed-state__freshness">{freshness}</p>
         </section>
       );
+    }
 
     case "NO_ACTION_REQUIRED":
       return (

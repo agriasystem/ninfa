@@ -1,6 +1,7 @@
 """Wire shapes of the data-source API V1. Enums travel as plain strings (the page never needs the
-Python enum); nothing here carries a file name, a file content (beyond the few preview cells the
-caller just sent) or a technical error message."""
+Python enum); nothing here carries a file content (beyond the few preview cells the caller just
+sent) or a technical error message, and a file name only in the property's own list of recent
+imports, after the personal-data gate."""
 
 import base64
 import binascii
@@ -58,6 +59,53 @@ class ImportPreviewResponse(BaseModel):
     already_imported: bool
 
 
+class RememberedWordResponse(BaseModel):
+    id: str
+    document: str
+    field: str
+    label: str
+    value: str
+    # What it may be corrected to. Empty: it can only be forgotten.
+    choices: list[str]
+
+
+class RememberedFileResponse(BaseModel):
+    id: str
+    columns: list[str]
+    answers: dict[str, str]
+    file_scope: str | None
+    column_decisions: int
+
+
+class RememberedAnswersResponse(BaseModel):
+    words: list[RememberedWordResponse]
+    files: list[RememberedFileResponse]
+
+
+class CorrectRememberedAnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    value: str = Field(min_length=1, max_length=64)
+
+
+class RecentImportResponse(BaseModel):
+    file_name: str | None
+    domain: str
+    status: str
+    at: datetime
+
+
+class RecentImportsResponse(BaseModel):
+    imports: list[RecentImportResponse]
+
+
+class ImportLimitsResponse(BaseModel):
+    max_file_bytes: int
+    max_rows: int
+    max_columns: int
+    file_extensions: list[str]
+
+
 class ImportResultResponse(BaseModel):
     succeeded: bool
     problem: str | None
@@ -67,6 +115,9 @@ class ImportResultResponse(BaseModel):
     updated: int
     unchanged: int
     already_imported: bool
+    # False: the file said what NINFA already holds: no new analysis is coming, none is needed.
+    changed_data: bool
+    removed: int
 
 
 # --- Smart Import: match the columns of the hotel own file ------------------------------
@@ -128,6 +179,7 @@ class QuestionResponse(BaseModel):
     choices: list[ChoiceResponse]
     labels: list[LabelCountResponse]
     total_labels: int
+    absent_records: int
 
 
 class BlockerResponse(BaseModel):
@@ -194,6 +246,13 @@ class DocumentSummaryResponse(BaseModel):
     amounts: str | None = None
 
 
+class ScopePreflightResponse(BaseModel):
+    effective_scope: str | None
+    remembered_scope: str | None
+    removal_count: int
+    requires_scope_confirmation: bool
+
+
 class UnderstandingResponse(BaseModel):
     level: str
     detection: DetectionResponse
@@ -202,6 +261,9 @@ class UnderstandingResponse(BaseModel):
     people: int | None
     questions: list[QuestionResponse]
     blockers: list[BlockerResponse]
+    assumed: list[str]
+    removes: int
+    scope: ScopePreflightResponse
 
 
 class DryRunSummaryResponse(BaseModel):
@@ -389,6 +451,7 @@ __all__ = [
     "InvalidRowResponse",
     "MappedFileRequest",
     "UnderstandRequest",
+    "ScopePreflightResponse",
     "UnderstandingResponse",
     "DryRunSummaryResponse",
     "QuestionResponse",
@@ -398,6 +461,8 @@ __all__ = [
     "MappingCheckResponse",
     "MappingProblemResponse",
     "ProfileInfoResponse",
+    "RecentImportResponse",
+    "RecentImportsResponse",
     "RowIssueResponse",
     "RowProblemResponse",
     "SavedColumnResponse",

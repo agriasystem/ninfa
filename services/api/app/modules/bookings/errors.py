@@ -27,6 +27,8 @@ class BookingErrorCode(StrEnum):
     AMBIGUOUS_DATE_FORMAT = "BOOKING_AMBIGUOUS_DATE_FORMAT"
     AMBIGUOUS_NUMBER_FORMAT = "BOOKING_AMBIGUOUS_NUMBER_FORMAT"
     VALIDATION_FAILED = "BOOKING_VALIDATION_FAILED"
+    # What a complete file would take away is no longer what the person was shown.
+    IMPORT_PLAN_CHANGED = "BOOKING_IMPORT_PLAN_CHANGED"
     CANONICALIZATION_FAILED = "BOOKING_CANONICALIZATION_FAILED"
     INTERNAL_ERROR = "BOOKING_INTERNAL_ERROR"
     # --- row level (also used as job-level summary keys) -----------------------------------------

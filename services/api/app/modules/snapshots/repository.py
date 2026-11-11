@@ -3,32 +3,53 @@
 Every query carries the workspace_id of the TenantContext. Repositories flush but never commit:
 the service owns the transaction. No pickup, velocity, trend, expected value or forecast is
 computed here: the curve access returns stored facts, in order, and nothing else.
+
+A day may hold several observations (`BookingSnapshot.revision`). Every read by day or by key gives
+ONE row per (snapshot day, stay night), the newest: that is what a new analysis looks at, and what
+represents that day in the history of any later day, so a day seen three times is still one sample.
+Only `get_by_id` and `list_by_ids` reach an older revision, because a run or a baseline names it.
+
+A comparison with the past says which observations count (`ObservationHistory`): the rule is told
+to this module, which knows nothing of who made them.
 """
 
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import Date, Table, and_, column, func, select, values
+from sqlalchemy import (
+    ColumnElement,
+    Date,
+    Integer,
+    Table,
+    and_,
+    column,
+    func,
+    or_,
+    select,
+    text,
+    values,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
 from app.core.tenant import TenantContext
-from app.modules.bookings.models import Booking, BookingStatus
+from app.modules.bookings.models import Booking, BookingStatus, is_current_booking
 from app.modules.properties.repository import PropertyRepository
 from app.modules.snapshots.calculation import SnapshotContent, StayRecord
 from app.modules.snapshots.models import BookingSnapshot, RoomInventoryDaily, SnapshotOrigin
 
-SNAPSHOT_KEY_CONSTRAINT = "uq_booking_snapshots_data_source_snapshot_date_stay_date"
+SNAPSHOT_KEY_CONSTRAINT = "uq_booking_snapshots_source_snapshot_stay_revision"
 _INSERT_BLOCK = 2000  # rows per executemany call
 
 # (snapshot_local_date, stay_date): the logical key of a snapshot inside one data source.
 SnapshotKey = tuple[date, date]
-_KEYS_PER_QUERY = 5000  # (date, date) pairs per VALUES join: 10 000 bind parameters
+_KEYS_PER_QUERY = 5000  # (date, date, revision) per VALUES join: 15 000 bind parameters
+_EVERY_REVISION = 2_147_483_647
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +63,41 @@ class SnapshotHistoryRow:
     rooms_on_books: int
     uncertain_rooms: int
     adr_on_books: Decimal | None
+    revision: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class ObservationHistory:
+    """Which snapshots a comparison with the past may take as a SAMPLE of history.
+
+    Readable is not eligible. A reconstruction is inferred TODAY about an earlier day: it can be
+    read wherever a final figure is wanted (the rooms a month ended with, the cost per occupied
+    room, the distribution), but it is not what NINFA knew on that day, and a comparison whose
+    meaning is "what was known then" (the Expected value, the pickup, the curves) must not be built
+    on it. So this admits an OBSERVATION and nothing else. A read that names no history
+    (`list_by_keys` with `history=None`) is the readable one: it hands out what is stored,
+    whatever its origin.
+
+    `newest_revision` names, for each earlier day that counts, the newest of its revisions that does
+    (a night reads as its newest row up to it). A day not named has no observation that counts, and
+    a row above its revision is not read: it never existed for history, whatever the current
+    screens show of it.
+
+    `reading_day` and the days after it are not history, so nothing is said of them.
+    """
+
+    reading_day: date
+    newest_revision: Mapping[date, int]
+
+    def newest_readable(self, snapshot_local_date: date) -> int:
+        if snapshot_local_date >= self.reading_day:
+            return _EVERY_REVISION
+        return self.newest_revision.get(snapshot_local_date, 0)
+
+    def admits(self, row: SnapshotHistoryRow) -> bool:
+        return row.origin == SnapshotOrigin.OBSERVED and row.revision <= self.newest_readable(
+            row.snapshot_local_date
+        )
 
 
 class RoomInventoryRepository:
@@ -115,6 +171,40 @@ class RoomInventoryRepository:
         self._session.flush()
         return row
 
+    def set_for_range(
+        self, property_id: UUID, first: date, last: date, *, rooms_available: int
+    ) -> int:
+        """Create or replace the capacity of every night `first..last` (both included), in one
+        statement. A night that already has this number is not touched, and `rooms_out_of_order` of
+        an existing night stays. Returns how many nights really changed."""
+        if rooms_available < 0:
+            raise ValueError("room counts cannot be negative")
+        if PropertyRepository(self._session, self._tenant).get(property_id) is None:
+            raise NotFoundError("Property")
+        result = self._session.execute(
+            text(
+                """
+                INSERT INTO room_inventory_daily
+                    (workspace_id, property_id, stay_date, rooms_available)
+                SELECT :workspace_id, :property_id, night::date, :rooms
+                  FROM generate_series(CAST(:first AS date), CAST(:last AS date), '1 day') AS night
+                ON CONFLICT (workspace_id, property_id, stay_date) DO UPDATE
+                   SET rooms_available = EXCLUDED.rooms_available, updated_at = now()
+                 WHERE room_inventory_daily.rooms_available <> EXCLUDED.rooms_available
+                """
+            ),
+            {
+                "workspace_id": self._tenant.workspace_id,
+                "property_id": property_id,
+                "rooms": rooms_available,
+                "first": first,
+                "last": last,
+            },
+        )
+        self._session.flush()
+        self._session.expire_all()
+        return int(result.rowcount)  # type: ignore[attr-defined]
+
 
 @dataclass(frozen=True, slots=True)
 class NewSnapshot:
@@ -170,12 +260,15 @@ class BookingSnapshotRepository:
         self, data_source_id: UUID, snapshot_local_date: date, stay_date: date
     ) -> BookingSnapshot | None:
         return self._session.scalar(
-            select(BookingSnapshot).where(
+            select(BookingSnapshot)
+            .where(
                 BookingSnapshot.workspace_id == self._tenant.workspace_id,
                 BookingSnapshot.data_source_id == data_source_id,
                 BookingSnapshot.snapshot_local_date == snapshot_local_date,
                 BookingSnapshot.stay_date == stay_date,
             )
+            .order_by(BookingSnapshot.revision.desc())
+            .limit(1)
         )
 
     def get_by_id(self, snapshot_id: UUID) -> BookingSnapshot | None:
@@ -187,20 +280,43 @@ class BookingSnapshotRepository:
         )
 
     def list_by_keys(
-        self, data_source_id: UUID, keys: Collection[SnapshotKey]
+        self,
+        data_source_id: UUID,
+        keys: Collection[SnapshotKey],
+        *,
+        history: ObservationHistory | None = None,
     ) -> list[SnapshotHistoryRow]:
         """The snapshots of ONE data source at exactly these (snapshot day, stay date) keys.
 
         One statement per block of keys (a join with a VALUES list, served by the unique key's
         index): the way a historical comparison fetches a few dozen exact snapshots instead of
-        scanning the history or asking once per date.
+        scanning the history or asking once per date. `history`: only what counts as a sample of
+        history (an observation a finished analysis read, never a reconstruction); with none, what
+        is stored is read, whatever its origin.
         """
+
+        def newest(day: date) -> int:
+            return _EVERY_REVISION if history is None else history.newest_readable(day)
+
+        def readable(wanted: Any) -> ColumnElement[bool]:
+            # The same rule as `ObservationHistory.admits`, in the statement: with a history only an
+            # observation is a sample; with none, everything stored is read.
+            within = BookingSnapshot.revision <= wanted.c.newest_revision
+            if history is None:
+                return or_(BookingSnapshot.origin != SnapshotOrigin.OBSERVED, within)
+            return and_(BookingSnapshot.origin == SnapshotOrigin.OBSERVED, within)
+
         ordered = sorted(keys)
         found: list[SnapshotHistoryRow] = []
         for start in range(0, len(ordered), _KEYS_PER_QUERY):
             wanted = values(
-                column("snapshot_local_date", Date), column("stay_date", Date), name="wanted"
-            ).data(ordered[start : start + _KEYS_PER_QUERY])
+                column("snapshot_local_date", Date),
+                column("stay_date", Date),
+                column("newest_revision", Integer),
+                name="wanted",
+            ).data(
+                [(day, stay, newest(day)) for day, stay in ordered[start : start + _KEYS_PER_QUERY]]
+            )
             rows = self._session.execute(
                 select(
                     BookingSnapshot.id,
@@ -210,6 +326,7 @@ class BookingSnapshotRepository:
                     BookingSnapshot.rooms_on_books,
                     BookingSnapshot.uncertain_rooms,
                     BookingSnapshot.adr_on_books,
+                    BookingSnapshot.revision,
                 )
                 .join(
                     wanted,
@@ -221,6 +338,13 @@ class BookingSnapshotRepository:
                 .where(
                     BookingSnapshot.workspace_id == self._tenant.workspace_id,
                     BookingSnapshot.data_source_id == data_source_id,
+                    readable(wanted),
+                )
+                .distinct(BookingSnapshot.snapshot_local_date, BookingSnapshot.stay_date)
+                .order_by(
+                    BookingSnapshot.snapshot_local_date,
+                    BookingSnapshot.stay_date,
+                    BookingSnapshot.revision.desc(),
                 )
             )
             found.extend(SnapshotHistoryRow(*row) for row in rows)
@@ -241,6 +365,7 @@ class BookingSnapshotRepository:
                 BookingSnapshot.rooms_on_books,
                 BookingSnapshot.uncertain_rooms,
                 BookingSnapshot.adr_on_books,
+                BookingSnapshot.revision,
             ).where(
                 BookingSnapshot.workspace_id == self._tenant.workspace_id,
                 BookingSnapshot.data_source_id == data_source_id,
@@ -257,8 +382,10 @@ class BookingSnapshotRepository:
         stay_date_from: date | None = None,
         stay_date_to: date | None = None,
         origin: SnapshotOrigin | None = None,
+        as_of_revision: int | None = None,
     ) -> Sequence[BookingSnapshot]:
-        """All the stay nights of one snapshot day, oldest stay night first."""
+        """All the stay nights of one snapshot day, oldest stay night first: the newest revision of
+        each, or the state as of `as_of_revision` (what a run that read that revision saw)."""
         query = select(BookingSnapshot).where(
             BookingSnapshot.workspace_id == self._tenant.workspace_id,
             BookingSnapshot.data_source_id == data_source_id,
@@ -270,7 +397,24 @@ class BookingSnapshotRepository:
             query = query.where(BookingSnapshot.stay_date >= stay_date_from)
         if stay_date_to is not None:
             query = query.where(BookingSnapshot.stay_date <= stay_date_to)
-        return self._session.scalars(query.order_by(BookingSnapshot.stay_date)).all()
+        if as_of_revision is not None:
+            query = query.where(BookingSnapshot.revision <= as_of_revision)
+        return self._session.scalars(
+            query.distinct(BookingSnapshot.stay_date).order_by(
+                BookingSnapshot.stay_date, BookingSnapshot.revision.desc()
+            )
+        ).all()
+
+    def latest_revision(self, data_source_id: UUID, snapshot_local_date: date) -> int:
+        """How many observations this day has had so far: 0 when it has had none."""
+        latest = self._session.scalar(
+            select(func.max(BookingSnapshot.revision)).where(
+                BookingSnapshot.workspace_id == self._tenant.workspace_id,
+                BookingSnapshot.data_source_id == data_source_id,
+                BookingSnapshot.snapshot_local_date == snapshot_local_date,
+            )
+        )
+        return latest or 0
 
     def list_curve_for_stay_date(
         self,
@@ -299,7 +443,11 @@ class BookingSnapshotRepository:
             query = query.where(BookingSnapshot.snapshot_local_date >= snapshot_date_from)
         if snapshot_date_to is not None:
             query = query.where(BookingSnapshot.snapshot_local_date <= snapshot_date_to)
-        rows = self._session.execute(query.order_by(BookingSnapshot.snapshot_local_date)).all()
+        rows = self._session.execute(
+            query.distinct(BookingSnapshot.snapshot_local_date).order_by(
+                BookingSnapshot.snapshot_local_date, BookingSnapshot.revision.desc()
+            )
+        ).all()
         return [BookingCurvePoint(*row) for row in rows]
 
     def existing_in_range(
@@ -310,20 +458,27 @@ class BookingSnapshotRepository:
         stay_date_from: date,
         stay_date_to: date,
     ) -> dict[SnapshotKey, StoredSnapshotRef]:
-        """What is already stored inside a snapshot-day x stay-night rectangle (one query)."""
+        """What is stored now inside a snapshot-day x stay-night rectangle (one query)."""
         rows = self._session.execute(
             select(
                 BookingSnapshot.snapshot_local_date,
                 BookingSnapshot.stay_date,
                 BookingSnapshot.origin,
                 BookingSnapshot.content_fingerprint,
-            ).where(
+            )
+            .where(
                 BookingSnapshot.workspace_id == self._tenant.workspace_id,
                 BookingSnapshot.data_source_id == data_source_id,
                 BookingSnapshot.snapshot_local_date >= snapshot_date_from,
                 BookingSnapshot.snapshot_local_date <= snapshot_date_to,
                 BookingSnapshot.stay_date >= stay_date_from,
                 BookingSnapshot.stay_date <= stay_date_to,
+            )
+            .distinct(BookingSnapshot.snapshot_local_date, BookingSnapshot.stay_date)
+            .order_by(
+                BookingSnapshot.snapshot_local_date,
+                BookingSnapshot.stay_date,
+                BookingSnapshot.revision.desc(),
             )
         ).all()
         return {
@@ -334,9 +489,10 @@ class BookingSnapshotRepository:
         }
 
     def insert_if_absent(
-        self, property_id: UUID, snapshots: Sequence[NewSnapshot]
+        self, property_id: UUID, snapshots: Sequence[NewSnapshot], *, revision: int = 1
     ) -> set[SnapshotKey]:
-        """Store the snapshots whose key is free; never touch a stored one. Returns the new keys.
+        """Store the snapshots whose key is free at this revision; never touch a stored one.
+        Returns the new keys.
 
         `ON CONFLICT DO NOTHING` is the last line of defence: the services already compare with
         what exists (and hold a per-data-source lock), so a key skipped here means somebody else
@@ -357,19 +513,20 @@ class BookingSnapshotRepository:
         inserted: set[SnapshotKey] = set()
         for start in range(0, len(snapshots), _INSERT_BLOCK):
             rows = [
-                self._row(property_id, snapshot)
+                self._row(property_id, snapshot, revision)
                 for snapshot in snapshots[start : start + _INSERT_BLOCK]
             ]
             inserted.update((row[0], row[1]) for row in self._session.execute(statement, rows))
         return inserted
 
-    def _row(self, property_id: UUID, snapshot: NewSnapshot) -> dict[str, object]:
+    def _row(self, property_id: UUID, snapshot: NewSnapshot, revision: int) -> dict[str, object]:
         content = snapshot.content
         return {
             "workspace_id": self._tenant.workspace_id,
             "property_id": property_id,
             "data_source_id": content.data_source_id,
             "snapshot_local_date": content.snapshot_local_date,
+            "revision": revision,
             "as_of_at": snapshot.as_of_at,
             "stay_date": content.stay_date,
             "origin": content.origin.value,
@@ -422,7 +579,25 @@ class BookingStayRepository:
             Booking.data_source_id == data_source_id,
             Booking.check_in <= last_night,
             Booking.check_out > first_night,
+            is_current_booking(),
         )
         if statuses is not None:
             query = query.where(Booking.status.in_(sorted(statuses)))
         return [StayRecord(*row) for row in self._session.execute(query)]
+
+    def stay_span(self, property_id: UUID, data_source_id: UUID) -> tuple[date, date] | None:
+        """The first and the last NIGHT any current booking of this source covers (every status:
+        a cancelled booking still says the file spoke about those dates), or `None` with none.
+
+        What lies outside it is not "zero rooms", it is a period the file says nothing about."""
+        first, last_check_out = self._session.execute(
+            select(func.min(Booking.check_in), func.max(Booking.check_out)).where(
+                Booking.workspace_id == self._tenant.workspace_id,
+                Booking.property_id == property_id,
+                Booking.data_source_id == data_source_id,
+                is_current_booking(),
+            )
+        ).one()
+        if first is None or last_check_out is None or last_check_out <= first:
+            return None
+        return first, last_check_out - timedelta(days=1)

@@ -1,4 +1,4 @@
-import type { DataPeriod } from "@ninfa/contracts";
+import type { DataPeriod, DataSourceDomain } from "@ninfa/contracts";
 
 import { DEFAULT_DATA_PERIOD, type DatiTab } from "@/lib/data/tabs";
 
@@ -35,6 +35,26 @@ export function decisioniRoute(propertyId?: string): string {
  * parameters and connected data sources (Struttura UI V1). Same `?property=` convention as the rest. */
 export function strutturaRoute(propertyId?: string): string {
   return propertyId ? `/struttura?${PROPERTY_QUERY_PARAM}=${propertyId}` : "/struttura";
+}
+
+/** The room inventory block of "/struttura" (its section id): where the number of rooms an occupancy
+ * needs is configured. Dati links to it instead of offering a second inventory setting of its own. */
+export const STRUTTURA_INVENTORY_ANCHOR = "struttura-rooms";
+
+export function strutturaInventoryRoute(propertyId?: string): string {
+  return `${strutturaRoute(propertyId)}#${STRUTTURA_INVENTORY_ANCHOR}`;
+}
+
+export const IMPORTA_FILE_REVIEW_PARAM = "review";
+
+/** "/importa-file", optionally scoped to a property - where a file comes into NINFA (Importa file V1). With
+ * `review`, the person asked to look again at how the files of that kind of source are read. */
+export function importaFileRoute(propertyId?: string, review?: DataSourceDomain): string {
+  const params = new URLSearchParams();
+  if (propertyId) params.set(PROPERTY_QUERY_PARAM, propertyId);
+  if (review !== undefined) params.set(IMPORTA_FILE_REVIEW_PARAM, review);
+  const query = params.toString();
+  return query ? `/importa-file?${query}` : "/importa-file";
 }
 
 export const DATI_TAB_PARAM = "tab";

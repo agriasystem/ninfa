@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 
-import type { UnderstandingRecognized } from "@ninfa/contracts";
+import type { UnderstandAnswers, UnderstandingRecognized } from "@ninfa/contracts";
 
 import { sourcesCopy } from "@/lib/sources/copy";
 import { factsOf, originText, periodText } from "@/lib/sources/understanding-format";
 import type { ReadyStep } from "@/lib/sources/use-import-flow";
 
+import { StrutturaRowProblems } from "./struttura-import-preview";
+import { StrutturaScopeConfirmation } from "./struttura-import-question";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.understanding;
@@ -15,6 +17,11 @@ const FLOW = sourcesCopy.importFlow;
 
 function fieldName(field: string): string {
   return (sourcesCopy.fields as Record<string, string>)[field] ?? field;
+}
+
+/** What the file does not state and NINFA read from its absence, as the backend names it. */
+function assumedText(field: string): string {
+  return (COPY.assumed as Record<string, string>)[field] ?? COPY.assumedFallback(fieldName(field));
 }
 
 /** What is shown as the "value" of a recognised thing: a value seen in the file, or - for a department that
@@ -29,10 +36,14 @@ function valueText(item: UnderstandingRecognized): string {
 
 export interface StrutturaImportUnderstoodProps {
   step: ReadyStep;
+  /** What the person should know about how this kind of file is dated (staff files only). */
+  dateNote: string | null;
   onSave: (save: boolean) => void;
   onImport: () => void;
   onReview: () => void;
   onChooseOther: () => void;
+  /** A word about the file from this summary: NINFA reads it again with it. */
+  onAnswer: (patch: Partial<UnderstandAnswers>) => void;
 }
 
 /**
@@ -43,20 +54,33 @@ export interface StrutturaImportUnderstoodProps {
  */
 export function StrutturaImportUnderstood({
   step,
+  dateNote,
   onSave,
   onImport,
   onReview,
   onChooseOther,
+  onAnswer,
 }: StrutturaImportUnderstoodProps) {
   const [explaining, setExplaining] = useState(false);
+  const [correcting, setCorrecting] = useState(false);
   const { understanding, validation, inspection } = step;
   if (understanding === null) return null;
   const domain = inspection.domain;
-  const facts = factsOf(domain, understanding, validation);
+  const recognizedFields = understanding.recognized.length;
+  const facts = [
+    ...factsOf(domain, understanding, validation),
+    ...(recognizedFields > 0 ? [COPY.facts.fields(recognizedFields)] : []),
+  ];
   const period = periodText(validation);
   const document = understanding.document;
   const known = inspection.profile.status === "RECOGNIZED";
   const suggested = understanding.recognized.some((item) => item.origin.kind === "ASSISTANT");
+  // What the file leaves out stays, on a memory or on an earlier word about this very file: said here,
+  // with a quiet way to correct it. What the person has just answered is not offered again.
+  const { scope } = understanding;
+  const left = scope.removal_count > 0 && scope.effective_scope !== "FULL";
+  const answered = step.decision?.smart_import?.answers.file_scope != null;
+  const words = domain === "LABOR" ? COPY.keeps.LABOR : COPY.keeps.BOOKINGS;
 
   return (
     <>
@@ -70,7 +94,13 @@ export function StrutturaImportUnderstood({
           ))}
         </ul>
         {period !== null ? <p className="struttura-flow__note">{period}</p> : null}
+        {understanding.assumed.map((field) => (
+          <p key={field} className="struttura-flow__note">
+            {assumedText(field)}
+          </p>
+        ))}
         {known ? <p className="struttura-flow__note">{COPY.sameAsLastTime}</p> : null}
+        {dateNote !== null ? <p className="struttura-flow__note">{dateNote}</p> : null}
       </div>
 
       {understanding.people !== null ? (
@@ -103,11 +133,38 @@ export function StrutturaImportUnderstood({
           {COPY.amountsCheck[document.amounts]}
         </p>
       ) : null}
+      {understanding.removes > 0 ? (
+        <div className="struttura-preview__attention" role="note">
+          <p>{COPY.removes[domain === "LABOR" ? "LABOR" : "BOOKINGS"](understanding.removes)}</p>
+        </div>
+      ) : null}
+      {left ? <p className="struttura-flow__note">{words.note(scope.removal_count)}</p> : null}
+      {left && !answered ? (
+        <div className="struttura-flow__actions">
+          <StrutturaButton
+            variant="soft"
+            expanded={correcting}
+            onClick={() => setCorrecting((value) => !value)}
+          >
+            {words.action}
+          </StrutturaButton>
+        </div>
+      ) : null}
+      {left && !answered && correcting ? (
+        <section className="struttura-question" aria-labelledby="struttura-question-title">
+          <StrutturaScopeConfirmation
+            domain={domain}
+            absent={scope.removal_count}
+            onAnswer={onAnswer}
+          />
+        </section>
+      ) : null}
       {validation.rows_unclassified > 0 && validation.rows_invalid === 0 ? (
         <div className="struttura-preview__attention" role="note">
           <p>{COPY.unclassified(validation.rows_unclassified)}</p>
         </div>
       ) : null}
+      {validation.rows_invalid > 0 ? <StrutturaRowProblems validation={validation} /> : null}
       {suggested ? <p className="struttura-flow__note">{COPY.assistantNote}</p> : null}
       {validation.already_imported ? (
         <p className="struttura-flow__note">{sourcesCopy.preview.alreadyImported}</p>

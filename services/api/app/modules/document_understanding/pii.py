@@ -166,12 +166,13 @@ def looks_like_person(text: str) -> bool:
 def looks_like_names(stats: ColumnStats) -> bool:
     """What a column of people's names looks like: values that are two to four capitalised words
     which are not department, channel or room words - and either carry a given name (then the
-    same person may well come back on many rows) or are all different from row to row."""
+    same person may well come back on many rows, and two people may fill a whole column: who
+    changed a booking, in a small hotel) or are all different from row to row."""
     texts = stats.texts
-    if stats.n < 3 or len(texts) < 3 or stats.text_fraction < 0.8:
+    if stats.n < 3 or not texts or stats.text_fraction < 0.8:
         return False
     shaped = [text for text in texts if _name_shaped(text)]
-    if len(shaped) / len(texts) < 0.8:
+    if not shaped or len(shaped) / len(texts) < 0.8:
         return False
     if sum(1 for text in shaped if _has_given_name(text)) / len(shaped) >= 0.6:
         return True

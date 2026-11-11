@@ -805,15 +805,17 @@ def test_the_same_invoice_from_xml_and_from_csv_is_one_invoice(world: CostWorld)
     assert world.invoices()[0].source_format == SourceFormat.FATTURAPA_XML  # the first stays
 
 
-def test_a_csv_that_states_a_different_amount_for_a_known_invoice_conflicts(
+def test_a_csv_that_states_a_different_amount_for_a_known_invoice_corrects_it(
     world: CostWorld,
 ) -> None:
+    """test_same_day_costs.py has the whole story; a fiscal document is still never replaced."""
     world.import_rows([row(line_total="100.00")])
 
     result = world.import_bytes("b.csv", standard_csv([row(line_total="101.00")]))
 
-    assert result.error_code == Code.DOCUMENT_CONFLICT
-    assert world.count(Invoice) == 1
+    assert result.succeeded, result
+    assert (result.invoices_created, result.invoices_revised) == (0, 1)
+    assert world.count(Invoice) == 2  # the older version stays
 
 
 def test_a_structured_import_is_idempotent(world: CostWorld) -> None:

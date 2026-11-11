@@ -473,15 +473,18 @@ def test_planned_cost_needs_every_shift_costed_in_the_property_currency(
     assert rows["FRONT_OFFICE"].planned_cost is None
 
 
-def test_no_ratio_is_ever_calculated() -> None:
-    """NINFA defines no labor incidence, productivity, FTE or labor-cost-to-revenue ratio, so the
-    category row carries hours, the days they rest on and a planned cost - nothing derived."""
+def test_a_role_has_a_share_of_the_cost_and_never_revenue_or_productivity_of_its_own() -> None:
+    """The hotel's revenue is not produced by one department, and NINFA defines no FTE: a role's
+    row carries its hours, its cost and what they weigh, nothing that credits it with revenue."""
     assert {field.name for field in fields(LaborCategoryRow)} == {
         "category",
         "planned_hours",
         "days_complete",
         "days_incomplete",
         "planned_cost",
+        "average_hourly_cost",
+        "cost_share_pct",
+        "revenue_incidence_pct",
     }
 
 

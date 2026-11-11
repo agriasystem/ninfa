@@ -333,6 +333,18 @@ export function UploadIcon(props: IconProps) {
   );
 }
 
+/** The sidebar's "Importa file". No <path> inside: the active state of the sidebar fills every <path>, and this
+ * one stays outlined like the other sections. */
+export function ImportFileIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <line x1="12" y1="16" x2="12" y2="4" />
+      <polyline points="7 9 12 4 17 9" />
+      <polyline points="4 15 4 20 20 20 20 15" />
+    </Icon>
+  );
+}
+
 export function DownloadIcon(props: IconProps) {
   return (
     <Icon {...props}>

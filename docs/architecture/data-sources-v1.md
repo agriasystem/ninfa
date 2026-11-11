@@ -5,6 +5,10 @@ data come from and to put a file in: the cards show what the backend says, "Coll
 the "..." menu open working dialogs, and a file goes through the SAME import services the pilot CLI already used.
 **No migration, no new dependency, no integration simulated.**
 
+> **Importa file V1** moved the way a CSV / Excel file comes in out of this block, to its own page: see
+> [importa-file-v1.md](importa-file-v1.md). What follows about the backend, the rules and the states still holds; the
+> dialogs described here now lead to that page, and only an electronic invoice (XML) is still taken in here.
+
 ## Rule: the UI and the state tell the truth
 
 NINFA has exactly **one kind of data source: a file** (`DataSource.source_type = FILE_UPLOAD`) of one of three domains.
@@ -127,12 +131,13 @@ it is never stored by the API; 10 MB maximum (413 `FILE_TOO_LARGE`). The canonic
 CLI to `app/modules/ingestion/canonical_csv.py` and the CLI now imports it: one copy, same behaviour (its tests pass).
 
 Problems are words, never technical text: `UNSUPPORTED_FILE`, `UNREADABLE_FILE`, `EMPTY_FILE`, `NO_ROWS`, `FILE_TOO_LARGE`,
-`MISSING_COLUMNS`, `DUPLICATE_COLUMNS`, `INVALID_ROWS`, `UNSUPPORTED_FORMAT`, `SAME_DAY_CONFLICT`, `GENERIC`. The import
+`MISSING_COLUMNS`, `DUPLICATE_COLUMNS`, `INVALID_ROWS`, `UNSUPPORTED_FORMAT`, `GENERIC`. The import
 service's own error codes are mapped in ONE place (`files.problem_of_code`); the technical detail stays in the server log.
 
 Labor files are dated `snapshot_local_date`: **the property-local day, sent by the page, never guessed** (the import
 service insists on an explicit date; the page tells the user "I dati vengono registrati con la data di oggi (...)"). A
-different labor file for the same day is a `SAME_DAY_CONFLICT`, not an overwrite.
+different labor file for the same day is the next revision of that day, never an overwrite
+([same-day-revisions-v1.md](same-day-revisions-v1.md)).
 
 ## Frontend
 

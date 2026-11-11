@@ -36,7 +36,7 @@ from app.modules.data_sources.mapping_types import (
     FieldSpec,
 )
 from app.modules.document_understanding.layout import LayoutSpec
-from app.modules.ingestion.models import DataSourceDomain
+from app.modules.ingestion.models import DataSource, DataSourceDomain
 from app.modules.ingestion.suggestions import SuggestionConfidence, suggest_fields
 from app.modules.invoices import mapping as invoice_mapping
 from app.modules.invoices.cost_categories import CostCategory
@@ -128,6 +128,20 @@ class FileDomain(ABC):
         self._session = session
         self._tenant = tenant
 
+    def update_profile_documents(
+        self, data_source_id: UUID, documents: dict[str, dict[str, Any]]
+    ) -> None:
+        """Replace some stored documents of a saved profile, and nothing else: the columns it reads
+        and the signature of the file it was saved from stay. The caller checked that the profile
+        exists."""
+        row = self._profile_row(data_source_id)
+        for name, document in documents.items():
+            setattr(row, name, document)
+        self._session.flush()
+
+    @abstractmethod
+    def _profile_row(self, data_source_id: UUID) -> Any: ...
+
     # --- what a column probably means ---------------------------------------------------------
 
     @abstractmethod
@@ -181,6 +195,11 @@ class FileDomain(ABC):
     @abstractmethod
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]: ...
 
+    def scope_effect(self, source: DataSource, filename: str, content: bytes, config: Any) -> int:
+        """How much of what the source holds would stop counting if this file is complete. 0 for a
+        kind of data where absence never means anything: a cost register may always be partial."""
+        return 0
+
 
 # --- bookings -------------------------------------------------------------------------------------
 
@@ -212,7 +231,9 @@ class BookingsDomain(FileDomain):
         FieldSpec(
             CanonicalField.ROOMS.value,
             FieldKind.INTEGER,
-            ConstantSpec(ConstantKind.INTEGER, default=1),
+            # The rooms OF THE BOOKING, not the rooms of the hotel (that is the room inventory,
+            # which no booking file has to provide): one row is one room unless the file counts.
+            ConstantSpec(ConstantKind.INTEGER, default=1, when_absent=True),
         ),
         FieldSpec(CanonicalField.ROOM_REVENUE.value, FieldKind.DECIMAL),
         FieldSpec(CanonicalField.CHANNEL.value, FieldKind.TEXT, ConstantSpec(ConstantKind.TEXT)),
@@ -274,10 +295,13 @@ class BookingsDomain(FileDomain):
             options.learning,
         )
 
-    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
-        profile = BookingMappingProfileRepository(self._session, self._tenant).get_for_data_source(
+    def _profile_row(self, data_source_id: UUID) -> Any:
+        return BookingMappingProfileRepository(self._session, self._tenant).get_for_data_source(
             data_source_id
         )
+
+    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
+        profile = self._profile_row(data_source_id)
         if profile is None:
             return None
         return StoredProfile(
@@ -334,6 +358,15 @@ class BookingsDomain(FileDomain):
                 channels=result.summary.get("channels"),
                 revenue=result.summary.get("revenue"),
             ),
+        )
+
+    def scope_effect(
+        self, source: DataSource, filename: str, content: bytes, config: MappingConfig
+    ) -> int:
+        return BookingImportService(
+            self._session, self._tenant
+        ).bookings_a_complete_file_would_remove(
+            source.id, source.property_id, filename=filename, content=content, mapping=config
         )
 
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]:
@@ -435,10 +468,13 @@ class LaborDomain(FileDomain):
             options.learning,
         )
 
-    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
-        profile = LaborMappingProfileRepository(self._session, self._tenant).get_for_data_source(
+    def _profile_row(self, data_source_id: UUID) -> Any:
+        return LaborMappingProfileRepository(self._session, self._tenant).get_for_data_source(
             data_source_id
         )
+
+    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
+        profile = self._profile_row(data_source_id)
         if profile is None:
             return None
         return StoredProfile(
@@ -499,6 +535,13 @@ class LaborDomain(FileDomain):
                 actual_cost=result.summary.get("actual_cost"),
                 currency=result.summary.get("currency"),
             ),
+        )
+
+    def scope_effect(
+        self, source: DataSource, filename: str, content: bytes, config: LaborMappingConfig
+    ) -> int:
+        return LaborImportService(self._session, self._tenant).cells_a_complete_file_would_clear(
+            source.id, filename=filename, content=content, mapping=config
         )
 
     def sample_row(self, payload: dict[str, Any]) -> dict[str, str | None]:
@@ -599,10 +642,13 @@ class CostsDomain(FileDomain):
             options.learning,
         )
 
-    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
-        profile = InvoiceMappingProfileRepository(self._session, self._tenant).get_for_data_source(
+    def _profile_row(self, data_source_id: UUID) -> Any:
+        return InvoiceMappingProfileRepository(self._session, self._tenant).get_for_data_source(
             data_source_id
         )
+
+    def get_profile(self, data_source_id: UUID) -> StoredProfile | None:
+        profile = self._profile_row(data_source_id)
         if profile is None:
             return None
         return StoredProfile(

@@ -27,8 +27,9 @@ class LaborErrorCode(StrEnum):
     AMBIGUOUS_DATE_FORMAT = "LABOR_AMBIGUOUS_DATE_FORMAT"
     AMBIGUOUS_NUMBER_FORMAT = "LABOR_AMBIGUOUS_NUMBER_FORMAT"
     SNAPSHOT_DATE_REQUIRED = "LABOR_SNAPSHOT_DATE_REQUIRED"
-    SNAPSHOT_CONFLICT = "LABOR_SNAPSHOT_CONFLICT"
     VALIDATION_FAILED = "LABOR_VALIDATION_FAILED"
+    # What a complete file would stop counting is no longer what the person was shown.
+    IMPORT_PLAN_CHANGED = "LABOR_IMPORT_PLAN_CHANGED"
     CANONICALIZATION_FAILED = "LABOR_CANONICALIZATION_FAILED"
     INTERNAL_ERROR = "LABOR_INTERNAL_ERROR"
     # --- row level (also used as job-level summary keys) -----------------------------------------

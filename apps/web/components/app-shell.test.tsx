@@ -64,13 +64,13 @@ describe("AppShell - structure and landmarks", () => {
     expect(main.getAttribute("id")).toBe("main-content");
   });
 
-  it("has a labelled primary navigation with the four approved sections, in order", () => {
+  it("has a labelled primary navigation with the five approved sections, in order", () => {
     renderShell();
 
     const nav = screen.getByRole("navigation", { name: "Navigazione principale" });
     const items = within(nav).getAllByRole("listitem");
-    // exact labels: no "In arrivo" caption is left on any of the four, and "Home" is never the name
-    expect(items.map((item) => item.textContent)).toEqual(["Oggi", "Decisioni", "Dati", "Struttura"]);
+    // exact labels: no "In arrivo" caption is left on any of the five, and "Home" is never the name
+    expect(items.map((item) => item.textContent)).toEqual(["Oggi", "Decisioni", "Dati", "Importa file", "Struttura"]);
   });
 
   it("no longer carries the old topbar (wordmark text, e-mail line, loose logout button)", () => {
@@ -83,7 +83,7 @@ describe("AppShell - structure and landmarks", () => {
 });
 
 describe("AppShell - navigation", () => {
-  it("makes Oggi, Decisioni, Dati and Struttura real links that keep the property context", () => {
+  it("makes Oggi, Decisioni, Dati, Importa file and Struttura real links that keep the property context", () => {
     renderShell();
 
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("href")).toBe("/oggi?property=p1");
@@ -91,6 +91,9 @@ describe("AppShell - navigation", () => {
       "/decisioni?property=p1",
     );
     expect(screen.getByRole("link", { name: "Dati" }).getAttribute("href")).toBe("/dati?property=p1");
+    expect(screen.getByRole("link", { name: "Importa file" }).getAttribute("href")).toBe(
+      "/importa-file?property=p1",
+    );
     expect(screen.getByRole("link", { name: "Struttura" }).getAttribute("href")).toBe(
       "/struttura?property=p1",
     );
@@ -102,6 +105,7 @@ describe("AppShell - navigation", () => {
     expect(screen.getByRole("link", { name: "Oggi" }).getAttribute("href")).toBe("/oggi");
     expect(screen.getByRole("link", { name: "Decisioni" }).getAttribute("href")).toBe("/decisioni");
     expect(screen.getByRole("link", { name: "Dati" }).getAttribute("href")).toBe("/dati");
+    expect(screen.getByRole("link", { name: "Importa file" }).getAttribute("href")).toBe("/importa-file");
     expect(screen.getByRole("link", { name: "Struttura" }).getAttribute("href")).toBe("/struttura");
   });
 
@@ -146,6 +150,13 @@ describe("AppShell - navigation", () => {
     expect(screen.getByRole("link", { name: "Dati" }).getAttribute("aria-current")).toBeNull();
   });
 
+  it("marks Importa file as the current page on its own page, and only there", () => {
+    renderShell({ activeSection: "importa-file" });
+
+    expect(screen.getByRole("link", { name: "Importa file" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Struttura" }).getAttribute("aria-current")).toBeNull();
+  });
+
   it("Struttura is no longer 'In arrivo': an enabled, focusable link - no section of the main navigation is disabled", () => {
     renderShell();
 
@@ -177,6 +188,7 @@ describe("AppShell - navigation", () => {
           href?.startsWith("/oggi") ||
           href?.startsWith("/decisioni") ||
           href?.startsWith("/dati") ||
+          href?.startsWith("/importa-file") ||
           href?.startsWith("/struttura"),
       ).toBe(true);
     }

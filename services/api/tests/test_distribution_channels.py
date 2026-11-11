@@ -2,6 +2,8 @@
 
 from uuid import uuid4
 
+import pytest
+
 from app.modules.bookings.models import ChannelType
 from app.modules.bookings.text import normalize_key
 from app.modules.intelligence.distribution.channels import ChannelRow, classify_channel
@@ -106,3 +108,65 @@ def test_tour_operator_agency_corporate_types_collapse_to_other_when_verified() 
     for channel_type in (ChannelType.TOUR_OPERATOR, ChannelType.AGENCY, ChannelType.CORPORATE):
         row = _row("Some Named Intermediary", channel_type=channel_type, is_verified=True)
         assert classify_channel(row).group == ChannelGroup.OTHER
+
+
+# --- the booking that reaches the hotel itself is direct (ADR 0044) ------------------------------
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Website",
+        "Sito",
+        "Sito web",
+        "Sito diretto",
+        "Phone",
+        "Telefono",
+        "Email",
+        "E-mail",
+        "Mail",
+        "Phone / Email",
+        "Telefono / Email",
+        "Telefono/E-mail",
+        "TELEFONO - EMAIL",
+        "Email / Telefono",
+        "Walk-in",
+        "Walk in",
+        "Walkin",
+        "Diretto",
+    ],
+)
+def test_what_reaches_the_hotel_itself_is_direct(label: str) -> None:
+    result = classify_channel(_row(label))
+    assert result.group == ChannelGroup.DIRECT
+    assert result.method == ChannelClassificationMethod.DETERMINISTIC_RULE
+
+
+@pytest.mark.parametrize("label", ["Booking.com", "Booking", "Expedia", "Airbnb", "Agoda"])
+def test_what_an_intermediary_brings_stays_ota(label: str) -> None:
+    assert classify_channel(_row(label)).group == ChannelGroup.OTA
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        "Web",
+        "Online",
+        "Reservation",
+        "Booking Engine",
+        "Whatsapp",
+        "Telefono Booking",
+        "Email Expedia",
+        "Sito Partner",
+        "Canale misterioso",
+    ],
+)
+def test_a_channel_nobody_named_is_never_assumed_direct(label: str) -> None:
+    result = classify_channel(_row(label))
+    assert result.group == ChannelGroup.UNKNOWN
+    assert result.method == ChannelClassificationMethod.UNCLASSIFIED
+
+
+def test_the_hotels_own_verified_word_still_wins_over_the_dictionary() -> None:
+    row = _row("Telefono / Email", channel_type=ChannelType.AGENCY, is_verified=True)
+    assert classify_channel(row).group == ChannelGroup.OTHER

@@ -1,7 +1,7 @@
 # deploy/ — NINFA pilot deployment package V1
 
 Reference, **provider-neutral** artifacts for running NINFA on a Linux host for the first pilot.
-Nothing here deploys anything, provisions infrastructure, configures a scheduler or contains a real
+Nothing here deploys anything, provisions infrastructure or contains a real
 secret. Replace every `<PLACEHOLDER>` and the example paths (`/opt/ninfa/app`, `/etc/ninfa`).
 
 The procedures live in [docs/operations/](../docs/operations/README.md); start with
@@ -10,9 +10,9 @@ The procedures live in [docs/operations/](../docs/operations/README.md); start w
 ## Topology
 
 One public HTTPS origin behind a reverse proxy: `/api/*` → FastAPI (loopback), everything else →
-Next.js (loopback); managed PostgreSQL; one worker process; an **external**, timezone-aware
-scheduler running `scripts/run-daily-analysis.sh` at 10:00 `Europe/Rome`. The session cookie is not
-changed: no `Domain`, never a disabled `Secure` flag.
+Next.js (loopback); managed PostgreSQL; one worker process, which also asks for the daily analysis by
+itself, from 10:00 on each property's own clock (`Europe/Rome` for the first pilot): no scheduler to
+configure. The session cookie is not changed: no `Domain`, never a disabled `Secure` flag.
 
 ## Files
 
@@ -21,11 +21,11 @@ changed: no `Domain`, never a disabled `Secure` flag.
 | `env/api.env.example` | environment for the API, worker, daily wrapper and operator CLI (**secrets** once filled in) |
 | `env/web.env.example` | environment for the web process **only** (public origin, host, port; no secrets) |
 | `systemd/ninfa-api.service` | API process (non-root, loopback, restart on failure) |
-| `systemd/ninfa-worker.service` | worker process (one, no public port) |
+| `systemd/ninfa-worker.service` | worker process (one, no public port): the jobs, and the daily analysis |
 | `systemd/ninfa-web.service` | web process (loopback; receives only `web.env`) |
-| `systemd/ninfa-daily-analysis.service` | the unit an external scheduler starts; **no timer is shipped** |
+| `systemd/ninfa-daily-analysis.service` | an operator's catch-up, started by hand; **no timer is shipped, none is needed** |
 | `nginx/ninfa.conf.example` | reverse-proxy example (TLS mandatory, placeholders for certificates and limits) |
-| `../scripts/run-daily-analysis.sh` | the daily wrapper: dispatch → `run --once` → status |
+| `../scripts/run-daily-analysis.sh` | the catch-up wrapper: dispatch → `run --once` → status |
 | `../scripts/with-env.sh` | runs a command with an env file loaded safely (no shell execution of the file) |
 
 ## Rules that hold everywhere

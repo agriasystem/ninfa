@@ -421,12 +421,47 @@ describe("/decisioni - the other feed states keep their semantics", () => {
     expect(screen.queryByText(/richiedono attenzione/u)).toBeNull();
   });
 
-  it("DATA_QUALITY_LIMITED: 'Analisi parziale', never 'Tutto sotto controllo'", async () => {
-    resolve(feed({ feed_state: "DATA_QUALITY_LIMITED", insufficient_count: 2, suppressed_count: 0 }));
-    renderScreen();
+  it("DATA_QUALITY_LIMITED: a real empty state, never 'Tutto sotto controllo'", async () => {
+    resolve(feed({ feed_state: "DATA_QUALITY_LIMITED", insufficient_count: 66, suppressed_count: 0 }));
+    const { container } = renderScreen();
 
-    expect(await screen.findByText("Analisi parziale")).not.toBeNull();
+    expect(await screen.findByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" })).not.toBeNull();
+    expect(
+      screen.getByText("I dati disponibili non consentono ancora una nuova conclusione sufficientemente affidabile."),
+    ).not.toBeNull();
     expect(screen.queryByText("Tutto sotto controllo")).toBeNull();
+    // "Analisi parziale" is a small secondary badge, not the headline
+    expect(container.querySelector(".feed-state__badge")?.textContent).toBe("Analisi parziale");
+    expect(container.querySelector("h2")?.textContent).not.toContain("Analisi parziale");
+  });
+
+  it("DATA_QUALITY_LIMITED: general terms - no reason is named and the count of checks is not shown", async () => {
+    resolve(feed({ feed_state: "DATA_QUALITY_LIMITED", insufficient_count: 66, suppressed_count: 0 }));
+    const { container } = renderScreen();
+    await screen.findByRole("heading", { level: 2, name: "Nessuna decisione affidabile oggi" });
+
+    // the feed has no reason for it, so the page never says it is the history (or anything else)
+    expect(container.textContent).not.toMatch(/storico|costruendo|cronologia/iu);
+    expect(container.querySelector("details")).toBeNull();
+    expect(container.textContent).not.toMatch(/\b66\b|in attesa di dati sufficienti|controlli in attesa/u);
+  });
+
+  it("the three states stay different: nothing found, nothing reliable, nothing analysed", async () => {
+    const titles: Array<[Parameters<typeof feed>[0], string]> = [
+      [{ feed_state: "NO_ACTION_REQUIRED" }, "Tutto sotto controllo"],
+      [{ feed_state: "DATA_QUALITY_LIMITED", insufficient_count: 2, suppressed_count: 0 }, "Nessuna decisione affidabile oggi"],
+      [{ feed_state: "NOT_PROCESSED" }, "Analisi non ancora disponibile"],
+    ];
+    for (const [overrides, title] of titles) {
+      resolve(feed(overrides));
+      const { unmount } = renderScreen();
+      const heading = await screen.findByRole("heading", { level: 2, name: title });
+      expect(heading).not.toBeNull();
+      for (const [, other] of titles) {
+        if (other !== title) expect(screen.queryByRole("heading", { level: 2, name: other })).toBeNull();
+      }
+      unmount();
+    }
   });
 });
 

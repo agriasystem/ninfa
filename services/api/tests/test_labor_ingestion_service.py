@@ -268,9 +268,11 @@ def test_same_snapshot_date_different_content_is_a_conflict(
         content=second_content,
         snapshot_local_date=date(2026, 3, 1),
     )
-    assert second.status == ImportJobStatus.FAILED
-    assert second.error_code == LaborErrorCode.SNAPSHOT_CONFLICT
-    assert db_session.query(LaborSnapshot).count() == 1
+    assert second.status == ImportJobStatus.SUCCEEDED
+    assert second.changed_data is True
+    assert second.snapshot_reused is False
+    snapshots = db_session.query(LaborSnapshot).order_by(LaborSnapshot.revision).all()
+    assert [snapshot.revision for snapshot in snapshots] == [1, 2]
 
 
 def test_the_same_content_in_a_different_row_order_is_still_recognised_as_a_no_op(

@@ -79,6 +79,7 @@ from app.modules.data_sources.source_learning import (
     column_views,
     header_key,
     kept_answers,
+    kept_scope,
     layout_hints,
     match_source,
     parse_learning,
@@ -127,6 +128,7 @@ from app.modules.data_sources.understanding_types import (
     Question,
     QuestionKind,
     Recognized,
+    ScopePreflight,
     SheetSummary,
     SkippedSummary,
     TableSummary,
@@ -151,7 +153,7 @@ from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.document_understanding.structure import RowKind
 from app.modules.document_understanding.text import fold, has_word
 from app.modules.document_understanding.values import text_of
-from app.modules.ingestion.models import DataSource, DataSourceDomain
+from app.modules.ingestion.models import DataSource, DataSourceDomain, FileScope
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +198,10 @@ class UnderstandAnswers(BaseModel):
     column_fields: dict[str, str] = Field(default_factory=dict, max_length=60)
     # What the person taught: {"role_mapping": {"HK": "HOUSEKEEPING"}}.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict, max_length=4)
+    # What THIS file says about the records it does not hold.
+    file_scope: FileScope | None = None
+    # That answer is also for the next files of this structure: only then does the memory change.
+    remember_scope: bool = False
 
 
 @dataclass(slots=True)
@@ -462,6 +468,8 @@ class UnderstandingService:
         if currency and _has_cost_without_currency(domain, proposal):
             # Costs with no currency in the file: the hotel's own currency, said so on screen.
             constants["currency"] = currency
+        absent_means = _meaning_of_absent_columns(adapter, proposal)
+        constants.update(absent_means)
 
         decision_labels = {name: dict(words) for name, words in answers.labels.items() if words}
         if domain == DataSourceDomain.COSTS and "cost_category" in proposal.assigned():
@@ -599,6 +607,10 @@ class UnderstandingService:
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
+        # (the same reading on every file of a source: the file still does not say)
+        assumed = frozenset(
+            key for key, value in absent_means.items() if decision.constants.get(key) == value
+        )
         recognized = self._recognized(
             proposal,
             decision,
@@ -611,6 +623,7 @@ class UnderstandingService:
             ai_headers,
             samples,
             frozenset(remembered),
+            assumed,
         )
         level = self._level(
             adapter,
@@ -622,6 +635,38 @@ class UnderstandingService:
             recognized_by_profile,
             origin_level,
             hold and not recognized_by_family,
+        )
+        # --- what the absence of a record means: the last thing, and only when it changes something
+        # A word about the file as a whole, and asked only of a file that is otherwise ready: until
+        # then NINFA cannot even say which records are in it. It is never read from the file: a
+        # person says it (now, or for this family before); with no such word, absence says nothing.
+        # And a memory never takes anything away by itself: the same source can export a part with
+        # the same columns, so a person says it again whenever something would really stop counting.
+        remembered_scope = kept_scope(choice)
+        file_scope = answers.file_scope or remembered_scope
+        removal_count = 0
+        confirm = False
+        if level == UnderstandingLevel.READY and source is not None:
+            removal_count = self._smart.scope_effect(adapter, decision, filename, content, source)
+            if removal_count and answers.file_scope is None:
+                said = self._smart.scope_said_of_this_file(source, content)
+                if said is not None:
+                    file_scope = said
+                elif remembered_scope is None:
+                    questions = [*questions, _scope_question(removal_count)]
+                    level = UnderstandingLevel.ASK
+                elif remembered_scope is FileScope.FULL:
+                    confirm = True
+                    file_scope = None
+                    questions = [*questions, _scope_confirmation(removal_count)]
+                    level = UnderstandingLevel.ASK
+        removes = removal_count if file_scope is FileScope.FULL else 0
+        decision = decision.model_copy(
+            update={
+                "file_scope": file_scope,
+                "remembered_file_scope": remembered_scope,
+                "expected_removals": removes,
+            }
         )
         columns = tuple(
             self._column_info(sample, cp)
@@ -638,6 +683,9 @@ class UnderstandingService:
             people=people,
             questions=tuple(_dedupe(questions)),
             blockers=tuple(blockers),
+            assumed=tuple(sorted(assumed)),
+            removes=removes,
+            scope=ScopePreflight(file_scope, remembered_scope, removal_count, confirm),
         )
         complete = check.valid
         canonical = complete and all(
@@ -1157,6 +1205,7 @@ class UnderstandingService:
         ai_headers: frozenset[str] = frozenset(),
         samples: Sequence[ColumnSample] = (),
         remembered: frozenset[str] = frozenset(),
+        assumed: frozenset[str] = frozenset(),
     ) -> list[Recognized]:
         out: list[Recognized] = []
         decided = {c.header: c.field for c in decision.columns if c.field is not None}
@@ -1197,6 +1246,8 @@ class UnderstandingService:
                 )
             )
         for key, value in decision.constants.items():
+            if key in assumed:
+                continue  # nothing read from the file: `UnderstandingInfo.assumed` says it
             if by_profile:
                 kind = OriginKind.PROFILE
             else:
@@ -1370,6 +1421,24 @@ _MAX_CONFIRMATIONS = 2
 # ...and so is a column that may be one of two things, or one of two look-alikes.
 _MAX_AMBIGUITY_QUESTIONS = 3
 _AMOUNT_CHECK_ROWS = 400
+
+
+def _meaning_of_absent_columns(adapter: FileDomain, proposal: Proposal) -> dict[str, str | int]:
+    """The fields a file may simply not state (`ConstantSpec.when_absent`) and that this one does
+    not. A column that might be the field keeps it open: it is asked about, never overruled."""
+    assigned = proposal.assigned()
+    out: dict[str, str | int] = {}
+    for spec in adapter.fields:
+        constant = spec.constant
+        if constant is None or not constant.when_absent or constant.default is None:
+            continue
+        if spec.key in assigned or any(
+            column.ambiguous_group and spec.key in column.ambiguous_fields
+            for column in proposal.columns
+        ):
+            continue
+        out[spec.key] = constant.default
+    return out
 
 
 def _ambiguity_questions(
@@ -1608,6 +1677,24 @@ def _dedupe(questions: list[Question]) -> list[Question]:
     return out
 
 
+def _scope_question(absent_records: int) -> Question:
+    return Question(
+        id="FILE_SCOPE",
+        kind=QuestionKind.FILE_SCOPE,
+        choices=tuple(Choice(scope.value) for scope in FileScope),
+        absent_records=absent_records,
+    )
+
+
+def _scope_confirmation(absent_records: int) -> Question:
+    return Question(
+        id="FILE_SCOPE_CONFIRM",
+        kind=QuestionKind.FILE_SCOPE_CONFIRM,
+        choices=(Choice(FileScope.FULL.value), Choice(FileScope.PARTIAL.value)),
+        absent_records=absent_records,
+    )
+
+
 def _synthetic_header(table: SourceTable, kind: str) -> str | None:
     wanted = DEPARTMENT_HEADERS.get(kind)
     if wanted is None:
@@ -1652,7 +1739,13 @@ def confirmation_from(answers: UnderstandAnswers, learning: LearningInfo | None)
         origin = Via.ENGINE
     shape = () if learning is None else learning.shape
     return Confirmation(
-        origin, kept, classified, shape, None if learning is None else learning.family
+        origin,
+        kept,
+        classified,
+        shape,
+        None if learning is None else learning.family,
+        # (an answer about this import stays with this import, unless the person says otherwise)
+        answers.file_scope if answers.remember_scope else None,
     )
 
 

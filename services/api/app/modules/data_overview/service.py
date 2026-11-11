@@ -20,6 +20,7 @@ Scope and provenance, like every other NINFA read:
 import logging
 from collections.abc import Sequence
 from datetime import date, timedelta
+from decimal import Decimal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -47,6 +48,7 @@ from app.modules.data_overview.types import (
     FreshnessReason,
     OccupancyOverview,
     OverviewFreshness,
+    PeriodMetrics,
     UnavailableReason,
 )
 from app.modules.decision_memory.service import DecisionMemoryService
@@ -57,7 +59,7 @@ from app.modules.ingestion.models import DataSourceDomain
 from app.modules.intelligence.priority.types import PriorityDecisionType
 from app.modules.properties.repository import PropertyRepository
 from app.modules.snapshots.models import SnapshotOrigin
-from app.modules.snapshots.repository import BookingSnapshotRepository
+from app.modules.snapshots.repository import BookingSnapshotRepository, RoomInventoryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +153,7 @@ class DataOverviewService:
         self._properties = PropertyRepository(session, tenant)
         self._memory = DecisionMemoryService(session, tenant)
         self._snapshots = BookingSnapshotRepository(session, tenant)
+        self._inventory = RoomInventoryRepository(session, tenant)
         self._sources = PropertySources(session, tenant)
         self._distribution = DistributionReader(session, tenant, ota_evaluator=ota_evaluator)
         self._costs = CostOverviewReader(session, tenant)
@@ -180,6 +183,7 @@ class DataOverviewService:
         booking_source_id, _ = booking_provenance_of(run)
 
         occupancy = self._occupancy(
+            property_id=property_id,
             feed=feed,
             as_of=as_of,
             period_days=period_days,
@@ -195,6 +199,7 @@ class DataOverviewService:
             source_id=booking_source_id,
             state=states[AnalysisDomain.DISTRIBUTION],
             ota_decision=_first_of_type(feed.items, PriorityDecisionType.REV_OTA_DEPENDENCY),
+            on_books_room_nights=_whole_window_room_nights(occupancy),
         )
         costs = self._costs.read(
             property_id=property_id,
@@ -211,6 +216,7 @@ class DataOverviewService:
             source_id=labor_source.source_id,
             source_reason=_unavailable_reason_of(labor_source.reason),
             labor_decision=_first_of_type(feed.items, PriorityDecisionType.LABOR_OVERSTAFFING),
+            revenue_by_day=self._revenue_by_day(booking_source_id, as_of),
         )
         freshness = OverviewFreshness(
             bookings=booking_freshness_of(run),
@@ -236,9 +242,25 @@ class DataOverviewService:
 
     # --- bookings / occupancy ----------------------------------------------------------------
 
+    def _revenue_by_day(self, source_id: UUID | None, as_of: date) -> dict[date, Decimal] | None:
+        """The on-books room revenue of the labor window's nights, as the analysis day observed
+        them: the only revenue NINFA holds for days to come. None with no observation at all."""
+        if source_id is None:
+            return None
+        days = LaborOverviewReader.window_days(as_of)
+        rows = self._snapshots.list_for_snapshot_date(
+            source_id,
+            as_of,
+            stay_date_from=days[0],
+            stay_date_to=days[-1],
+            origin=SnapshotOrigin.OBSERVED,
+        )
+        return {row.stay_date: row.allocated_room_revenue_on_books for row in rows} or None
+
     def _occupancy(
         self,
         *,
+        property_id: UUID,
         feed: FeedResult,
         as_of: date,
         period_days: int,
@@ -281,14 +303,20 @@ class DataOverviewService:
             origin=SnapshotOrigin.OBSERVED,
         )
         rooms_7d_ago = {row.stay_date: row.rooms_on_books for row in older}
+        # The room inventory as it is NOW: only to tell "not configured" from "configured after the
+        # observation" when no night carries a capacity. It never enters a figure.
+        configured = frozenset(
+            row.stay_date for row in self._inventory.list_for_range(property_id, first, last)
+        )
 
-        today = metrics.period_metrics(rows, as_of, as_of, rooms_7d_ago=rooms_7d_ago)
-        days_7 = metrics.period_metrics(
-            rows, *metrics.window_of(as_of, PERIOD_DAYS_SHORT), rooms_7d_ago=rooms_7d_ago
-        )
-        days_30 = metrics.period_metrics(
-            rows, *metrics.window_of(as_of, PERIOD_DAYS_LONG), rooms_7d_ago=rooms_7d_ago
-        )
+        def period(start: date, end: date) -> PeriodMetrics:
+            return metrics.period_metrics(
+                rows, start, end, rooms_7d_ago=rooms_7d_ago, configured_nights=configured
+            )
+
+        today = period(as_of, as_of)
+        days_7 = period(*metrics.window_of(as_of, PERIOD_DAYS_SHORT))
+        days_30 = period(*metrics.window_of(as_of, PERIOD_DAYS_LONG))
         selected = days_7 if period_days == PERIOD_DAYS_SHORT else days_30
         nights = metrics.night_rows(
             rows,
@@ -308,7 +336,17 @@ class DataOverviewService:
             days_30=days_30,
             selected=selected,
             nights=nights,
+            inventory_consistency=metrics.inventory_consistency(rows),
         )
+
+
+def _whole_window_room_nights(occupancy: OccupancyOverview) -> int | None:
+    """The room-nights the analysis day observed over the OTA check's 30 nights (the same nights as
+    `days_30`), or `None` unless every one of them is stored: a part is never a total."""
+    window = occupancy.days_30
+    if window is None or window.nights_with_data != window.nights_requested:
+        return None
+    return window.room_nights
 
 
 def _unavailable_reason_of(reason: FreshnessReason | None) -> UnavailableReason | None:

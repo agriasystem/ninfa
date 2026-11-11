@@ -118,7 +118,7 @@ def test_the_query_count_is_bounded_and_does_not_grow_with_comparables(
     assert len(large_statements) <= 12
 
 
-def test_no_statement_touches_labor_entries_more_than_once(
+def test_labor_entries_are_read_by_a_fixed_number_of_statements(
     db_session: Session, factory: LaborFactory
 ) -> None:
     tenant = labor_tenant(factory)
@@ -140,8 +140,9 @@ def test_no_statement_touches_labor_entries_more_than_once(
             labor_data_source_id=tenant.labor_data_source.id,
             labor_category=LaborCategory.HOUSEKEEPING,
         )
+    # The entries of every date involved, and which categories each file names: never per day.
     touching_entries = [sql for sql, _ in statements if "labor_entries" in sql.lower()]
-    assert len(touching_entries) == 1
+    assert len(touching_entries) == 2
 
 
 def test_the_fingerprint_is_deterministic_across_two_evaluations(

@@ -8,15 +8,19 @@ from app.api.v1.data.schemas import (
     ChannelWeightResponse,
     CostCategoryResponse,
     CostDecisionResponse,
+    CostOccupancyResponse,
     CostsResponse,
     DataOverviewResponse,
+    DateConflictsResponse,
     DecisionRefResponse,
     DistributionResponse,
     DomainFreshnessResponse,
     DomainStateResponse,
     FreshnessResponse,
+    InventoryConsistencyResponse,
     LaborCategoryResponse,
     LaborDecisionResponse,
+    LaborEconomicsResponse,
     LaborResponse,
     NightRowResponse,
     OccupancyResponse,
@@ -25,6 +29,7 @@ from app.api.v1.data.schemas import (
 from app.api.v1.decisions.serializers import coverage_response_of, last_successful_analysis_of
 from app.modules.data_overview.types import (
     DATA_OVERVIEW_VERSION,
+    BookingDateConflicts,
     CostOverview,
     DataOverview,
     DecisionRef,
@@ -62,6 +67,7 @@ def _period(period: PeriodMetrics | None) -> PeriodMetricsResponse | None:
         nights_requested=period.nights_requested,
         nights_with_data=period.nights_with_data,
         nights_with_capacity=period.nights_with_capacity,
+        capacity=None if period.capacity is None else period.capacity.value,
         room_nights=period.room_nights,
         rooms_on_books_with_capacity=period.rooms_on_books_with_capacity,
         rooms_available=period.rooms_available,
@@ -87,6 +93,7 @@ def _night(night: NightRow) -> NightRowResponse:
         rooms_delta_7d=night.rooms_delta_7d,
         status=night.status.value,
         decision_id=night.decision_id,
+        over_capacity=night.over_capacity,
     )
 
 
@@ -99,6 +106,21 @@ def _occupancy(occupancy: OccupancyOverview) -> OccupancyResponse:
         days_30=_period(occupancy.days_30),
         selected=_period(occupancy.selected),
         nights=[_night(night) for night in occupancy.nights],
+        inventory_consistency=InventoryConsistencyResponse(
+            over_capacity_nights=occupancy.inventory_consistency.over_capacity_nights,
+            first_night=occupancy.inventory_consistency.first_night,
+        ),
+    )
+
+
+def _date_conflicts(conflicts: BookingDateConflicts | None) -> DateConflictsResponse | None:
+    if conflicts is None:
+        return None
+    return DateConflictsResponse(
+        booked_after=conflicts.booked_after,
+        cancelled_after=conflicts.cancelled_after,
+        no_show_before_arrival=conflicts.no_show_before_arrival,
+        total=conflicts.total,
     )
 
 
@@ -121,6 +143,10 @@ def _distribution(distribution: DistributionOverview) -> DistributionResponse:
             if mix is None
             else ChannelMixResponse(
                 total_room_nights=mix.total_room_nights,
+                classified_room_nights=mix.classified_room_nights,
+                unclassified_room_nights=mix.unclassified_room_nights,
+                on_books_room_nights=mix.on_books_room_nights,
+                matches_on_books=mix.matches_on_books,
                 channels=[
                     ChannelWeightResponse(
                         name=channel.name,
@@ -132,11 +158,18 @@ def _distribution(distribution: DistributionOverview) -> DistributionResponse:
                 ],
             )
         ),
+        date_conflicts=_date_conflicts(distribution.date_conflicts),
+        insufficiency=None
+        if distribution.insufficiency is None
+        else distribution.insufficiency.value,
+        comparable_periods_available=distribution.comparable_periods_available,
+        comparable_periods_required=distribution.comparable_periods_required,
     )
 
 
 def _costs(costs: CostOverview) -> CostsResponse:
     decision = costs.decision
+    basis = costs.occupancy_basis
     return CostsResponse(
         state=costs.state.value,
         reason=None if costs.reason is None else costs.reason.value,
@@ -171,16 +204,33 @@ def _costs(costs: CostOverview) -> CostsResponse:
                 expected_cpor=_text(decision.expected_cpor),
             )
         ),
+        occupancy=(
+            None
+            if basis is None
+            else CostOccupancyResponse(
+                total_days=basis.total_days,
+                known_days=basis.known_days,
+                observed_days=basis.observed_days,
+                reconstructed_days=basis.reconstructed_days,
+                uncertain_days=basis.uncertain_days,
+                days_outside_bookings=basis.days_outside_bookings,
+                days_without_inventory=basis.days_without_inventory,
+                days_awaiting_rebuild=basis.days_awaiting_rebuild,
+                first_day_without_inventory=basis.first_day_without_inventory,
+            )
+        ),
     )
 
 
 def _labor(labor: LaborOverview) -> LaborResponse:
     decision = labor.decision
+    economics = labor.economics
     return LaborResponse(
         state=labor.state.value,
         reason=None if labor.reason is None else labor.reason.value,
         window_start=labor.window_start,
         window_end=labor.window_end,
+        window_days=labor.window_days,
         currency=labor.currency,
         days_with_data=labor.days_with_data,
         categories=[
@@ -190,9 +240,24 @@ def _labor(labor: LaborOverview) -> LaborResponse:
                 days_complete=row.days_complete,
                 days_incomplete=row.days_incomplete,
                 planned_cost=_text(row.planned_cost),
+                average_hourly_cost=_text(row.average_hourly_cost),
+                cost_share_pct=_text(row.cost_share_pct),
+                revenue_incidence_pct=_text(row.revenue_incidence_pct),
             )
             for row in labor.categories
         ],
+        economics=LaborEconomicsResponse(
+            planned_hours=_text(economics.planned_hours),
+            planned_cost=_text(economics.planned_cost),
+            average_hourly_cost=_text(economics.average_hourly_cost),
+            period_start=economics.period_start,
+            period_end=economics.period_end,
+            period_days=economics.period_days,
+            reference_revenue=_text(economics.reference_revenue),
+            revenue_gap=None if economics.revenue_gap is None else economics.revenue_gap.value,
+            cost_to_revenue_pct=_text(economics.cost_to_revenue_pct),
+            revenue_per_hour=_text(economics.revenue_per_hour),
+        ),
         decision=(
             None
             if decision is None

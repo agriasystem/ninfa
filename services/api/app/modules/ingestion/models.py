@@ -35,6 +35,20 @@ class DataSourceType(StrEnum):
     FILE_UPLOAD = "FILE_UPLOAD"
 
 
+class FileScope(StrEnum):
+    """What a file says about the records it does NOT hold. Never read from the file: a person says
+    it once, and it is remembered for files of that structure (`source_learning`).
+
+    FULL      everything of the period it covers: what it no longer holds there is no longer there.
+    PARTIAL   a part of it (one channel, one department): what it does not hold says nothing.
+    DELTA     only what is new or changed: what it does not hold says nothing.
+    """
+
+    FULL = "FULL"
+    PARTIAL = "PARTIAL"
+    DELTA = "DELTA"
+
+
 class ImportJobStatus(StrEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
@@ -113,6 +127,15 @@ class ImportJob(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_code: Mapped[str | None] = mapped_column(String(100))
     error_message: Mapped[str | None] = mapped_column(Text)
+    # Did this import change the canonical data? False: the same data arrived again, and nothing
+    # downstream has a reason to move. NULL: not recorded (a job from before it was).
+    changed_data: Mapped[bool | None] = mapped_column()
+    # What this file was known to be when it was imported. NULL: not known, and then the absence of
+    # a record says nothing.
+    file_scope: Mapped[FileScope | None] = mapped_column(enum_column(FileScope, 16))
+    # What the family of files remembered when this import was read: with `file_scope`, what
+    # explains why a record stopped counting, or why it did not. NULL: nothing was remembered.
+    remembered_file_scope: Mapped[FileScope | None] = mapped_column(enum_column(FileScope, 16))
 
     data_source: Mapped["DataSource"] = relationship("DataSource", viewonly=True)
     files: Mapped[list["ImportFile"]] = relationship("ImportFile", viewonly=True)
@@ -136,6 +159,14 @@ class ImportJob(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             name="uq_import_jobs_workspace_id_property_id_data_source_id_id",
         ),
         CheckConstraint(values_check("status", ImportJobStatus), name="status_valid"),
+        CheckConstraint(
+            f"file_scope IS NULL OR {values_check('file_scope', FileScope)}",
+            name="file_scope_valid",
+        ),
+        CheckConstraint(
+            f"remembered_file_scope IS NULL OR {values_check('remembered_file_scope', FileScope)}",
+            name="remembered_file_scope_valid",
+        ),
         CheckConstraint(
             "(status = 'PENDING' AND started_at IS NULL AND finished_at IS NULL)"
             " OR (status = 'RUNNING' AND started_at IS NOT NULL AND finished_at IS NULL)"

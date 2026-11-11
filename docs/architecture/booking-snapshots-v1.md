@@ -19,7 +19,7 @@ calls the services.
 | Made by | `ObservedSnapshotService.take_snapshot` | `BookingSnapshotReconstructionService.reconstruct` |
 | `as_of_at` | the injected clock's now (UTC) | the exclusive end of the snapshot day (UTC) |
 | Uncertainty | none (current statuses are known) | `uncertain_booking_count` / `uncertain_rooms` |
-| Can it be replaced? | never | never (a different content raises a conflict) |
+| Can it be replaced? | never: a different content is the day's next revision | never (a different content raises a conflict) |
 | Wins a key clash? | **yes**, always | no |
 | Called "exact"? | no: it is evidence of what was seen, not of the past | no, and never "historical truth" |
 
@@ -58,7 +58,8 @@ The daily on-books metrics live **in the snapshot itself**: there is no separate
 no key/value (EAV) structure.
 
 A row exists for **every** stay night of the requested range, also when nothing is booked: the
-absence of bookings is data (`booking_count = 0`, `rooms = 0`, revenue `0.00`, ADR `NULL`).
+absence of bookings is data (`booking_count = 0`, `rooms = 0`, revenue `0.00`, ADR `NULL`). A booking a
+complete file took away is not on the books (`is_current_booking()`): the nights it was on get the day's next revision.
 
 ## Stay-night semantics
 
@@ -126,8 +127,8 @@ per property and night. `rooms_total` was **not** added to `Property`.
 service = ObservedSnapshotService(session, TenantContext(workspace_id))
 result = service.take_snapshot(property_id=..., data_source_id=...,
                                stay_date_start=date(2026, 3, 20), stay_date_end=date(2026, 7, 21))
-# result.created / result.unchanged; a different content for a stored key raises
-# SnapshotError with code BOOKING_SNAPSHOT_CONFLICT
+# result.created / result.revised / result.unchanged / result.revision; a different content for
+# a stored key is written at the day's next revision, the stored row stays as it is
 ```
 
 Both dates are included. The caller **cannot** choose `as_of_at` or the snapshot day: `as_of_at` is
@@ -141,10 +142,12 @@ the data source must be a `BOOKINGS` / `FILE_UPLOAD`, active source of **that pr
 `COSTS`/`LABOR` source, another property's, another workspace's or an unknown one is refused; the
 last two are indistinguishable). The range has a limit (731 days).
 
-One observation per data source, snapshot day and stay night: rerunning the same day with the same
-content is an **idempotent no-op** (the first `as_of_at` is kept); rerunning it after the bookings or
-the inventory changed raises `BOOKING_SNAPSHOT_CONFLICT`, stores nothing (the whole run is atomic)
-and never updates the stored row. The next local day observes again.
+A day can be observed more than once: rerunning the same day with the same content is an **idempotent
+no-op** (the first `as_of_at` is kept); rerunning it after the bookings or the inventory changed adds a
+row, for the nights that changed, at the day's next `revision`, and never updates a stored row. The
+newest revision of a night is what every read by day or key returns
+([same-day-revisions-v1.md](same-day-revisions-v1.md)). `BOOKING_SNAPSHOT_CONFLICT` is left for an
+observation over a reconstruction, and for two reconstructions that disagree.
 
 ## Historical reconstruction
 
@@ -314,7 +317,7 @@ and 200 000 stored rows per reconstruction.
 
 | Code | When |
 | ---- | ---- |
-| `BOOKING_SNAPSHOT_CONFLICT` | a stored snapshot with different content exists for the key (HTTP-style status 409) |
+| `BOOKING_SNAPSHOT_CONFLICT` | an observation over a reconstruction of the key, or two reconstructions that disagree (HTTP-style status 409) |
 | `BOOKING_SNAPSHOT_INVALID_PROPERTY` | property unknown/foreign, archived or with an invalid time zone (`details.reason`) |
 | `BOOKING_SNAPSHOT_INVALID_DATA_SOURCE` | `not_found`, `wrong_domain`, `wrong_source_type`, `inactive`, `property_mismatch` |
 | `BOOKING_SNAPSHOT_INVALID_RANGE` | `start_after_end`, `too_long`, `too_many_rows`, `snapshot_date_not_completed` |
@@ -339,7 +342,9 @@ The Expected Engine ([expected-engine-v1.md](expected-engine-v1.md)) reads these
 why the origin distinction matters: an Expected baseline must start from an **OBSERVED** target
 (the database refuses a reconstruction as a target), prefers OBSERVED comparables, uses a
 RECONSTRUCTED_APPROXIMATE one only to complete a small observed sample, penalises it in the
-confidence, and never uses one with `uncertain_rooms > 0`. It needs exactly one snapshot per
+confidence, and never uses one with `uncertain_rooms > 0`. (The analysis names a history that admits
+observations only, [ADR 0048](adr/0048-reconstructed-is-not-observed-as-of.md): a reconstruction is
+readable, for how a day ended, and is never a sample of what NINFA knew then.) It needs exactly one snapshot per
 (stay date, lead time) in a data source, which the unique key guarantees, and it reads them by exact
 `(snapshot day, stay date)` keys through `BookingSnapshotRepository.list_by_keys` (the unique key's
 index). Migration `0006` adds one unique constraint to `booking_snapshots`,

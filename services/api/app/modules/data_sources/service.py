@@ -13,17 +13,20 @@ property's source answers the same `DataSourceNotFoundError` as an id that does 
 
 import hashlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
 from app.db.locks import LockWaitTimeoutError, hold_source_import_lock
 from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
+from app.modules.analysis.queue import enqueue_refresh
 from app.modules.bookings.errors import BookingImportError
 from app.modules.bookings.mapping import CanonicalField, header_index, normalize_header
 from app.modules.bookings.models import ChannelType
@@ -54,6 +57,7 @@ from app.modules.data_sources.mapping_types import (
     MappingInput,
     SavedConfiguration,
 )
+from app.modules.data_sources.remembered_answers import RememberedAnswers, RememberedAnswersService
 from app.modules.data_sources.smart_import import (
     Resolved,
     SmartImportService,
@@ -65,6 +69,7 @@ from app.modules.data_sources.types import (
     DOMAIN_METHOD,
     DOMAIN_SOURCE_NAME,
     DerivedFrom,
+    RecentImport,
     SourceCapability,
     SourceCard,
     SourceCardState,
@@ -76,6 +81,7 @@ from app.modules.data_sources.understanding import (
     UnderstandingService,
     confirmation_from,
 )
+from app.modules.document_understanding.redaction import PersonalDataGuard
 from app.modules.ingestion.canonical_csv import (
     booking_format_options,
     identity_column_mapping,
@@ -89,6 +95,7 @@ from app.modules.ingestion.repository import (
     ImportJobRepository,
 )
 from app.modules.ingestion.schemas import DataSourceCreate
+from app.modules.ingestion.scope import ScopePlan
 from app.modules.invoices.service import InvoiceImportService, detect_source
 from app.modules.labor.mapping import LaborField
 from app.modules.labor.service import LaborImportService
@@ -97,10 +104,19 @@ from app.modules.properties.repository import PropertyRepository
 logger = logging.getLogger(__name__)
 
 _MAX_CHANNELS_SHOWN = 8
+_RECENT_IMPORTS_SHOWN = 10
 
 # How long an import waits for another import of the same kind and property to finish. An import is
 # seconds of work (10 MB at most); past this wait the caller is told to retry instead of hanging.
 IMPORT_LOCK_WAIT_MS = 30_000
+
+
+def _scope_plan(mapping: MappingInput | None) -> ScopePlan:
+    """What a verified decision says about the records its file does not hold. A saved configuration
+    says nothing: with no word about the file, absence means nothing."""
+    if mapping is None:
+        return ScopePlan()
+    return ScopePlan(mapping.file_scope, mapping.remembered_file_scope, mapping.expected_removals)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +133,10 @@ class ImportOutcome:
     already_imported: bool = False
     # Smart Import: the way the columns were matched has been remembered for the next file.
     configuration_saved: bool = False
+    # True: the file changed what NINFA holds. Otherwise nothing downstream has a reason to move.
+    changed_data: bool = False
+    # Records this file made no longer current, because it holds everything of its period.
+    removed: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -245,6 +265,21 @@ class DataSourcesService:
         )
         return tuple(names[:_MAX_CHANNELS_SHOWN])
 
+    def recent_imports(self, property_id: UUID) -> tuple[RecentImport, ...]:
+        """The latest import attempts of this property, newest first. Read-only. The name of a
+        file was chosen by a person and may name one: it passes the same gate as every other
+        answer about a file (an e-mail, a telephone number, a tax code or an IBAN never travels)."""
+        guard = PersonalDataGuard()
+        return tuple(
+            RecentImport(
+                file_name=guard.clean(job.files[0].original_filename) if job.files else None,
+                domain=job.data_source.domain,
+                status=job.status,
+                at=job.finished_at or job.created_at,
+            )
+            for job in self._jobs.list_recent_for_property(property_id, limit=_RECENT_IMPORTS_SHOWN)
+        )
+
     # --- removing -------------------------------------------------------------------------------
 
     def deactivate(self, property_id: UUID, data_source_id: UUID) -> None:
@@ -356,8 +391,12 @@ class DataSourcesService:
         if mapping is None:
             return None, None
         if reference is None:
-            return mapping, self._manual_confirmation(
-                property_id, domain, filename, content, mapping
+            # (nobody was asked what a file matched by hand is: absence says nothing about it)
+            by_hand = mapping.model_copy(
+                update={"file_scope": None, "remembered_file_scope": None, "expected_removals": 0}
+            )
+            return by_hand, self._manual_confirmation(
+                property_id, domain, filename, content, by_hand
             ) if confirm else None
         try:
             answers = UnderstandAnswers.model_validate(reference.answers)
@@ -481,6 +520,64 @@ class DataSourcesService:
             )
         return forgotten
 
+    # --- what the person taught, and the way to correct it ---------------------------------------
+
+    def remembered_answers(self, property_id: UUID, data_source_id: UUID) -> RememberedAnswers:
+        """What this source remembers from a person's answers, as far as it changes the next
+        import."""
+        return RememberedAnswersService(self._session, self._tenant).read(
+            self._load(property_id, data_source_id)
+        )
+
+    def correct_remembered_answer(
+        self,
+        property_id: UUID,
+        data_source_id: UUID,
+        answer_id: str,
+        value: str,
+        *,
+        by: UUID | None = None,
+    ) -> RememberedAnswers:
+        """Give a remembered word another meaning. It counts from the next import: nothing already
+        imported is read again."""
+        source = self._load(property_id, data_source_id)
+        service = RememberedAnswersService(self._session, self._tenant)
+        return self._under_import_lock(
+            source, lambda: service.correct(source, answer_id, value, by=by)
+        )
+
+    def forget_remembered_answer(
+        self, property_id: UUID, data_source_id: UUID, answer_id: str, *, by: UUID | None = None
+    ) -> RememberedAnswers:
+        """Forget one remembered answer: the next file asks again where it needs to. Nothing already
+        imported is read again."""
+        source = self._load(property_id, data_source_id)
+        service = RememberedAnswersService(self._session, self._tenant)
+        return self._under_import_lock(source, lambda: service.forget(source, answer_id, by=by))
+
+    def _under_import_lock(
+        self, source: DataSource, change: Callable[[], RememberedAnswers]
+    ) -> RememberedAnswers:
+        """An import saves the profile when it ends: a correction takes the same lock, so neither
+        can overwrite the other."""
+        try:
+            with hold_source_import_lock(
+                self._session,
+                self._tenant.workspace_id,
+                source.property_id,
+                source.domain.value,
+                wait_ms=IMPORT_LOCK_WAIT_MS,
+            ):
+                try:
+                    answers: RememberedAnswers = change()
+                    self._session.commit()
+                except Exception:
+                    self._session.rollback()
+                    raise
+        except LockWaitTimeoutError as error:
+            raise ImportInProgressError() from error
+        return answers
+
     def _already_imported(
         self, property_id: UUID, domain: DataSourceDomain, content: bytes
     ) -> bool:
@@ -568,7 +665,7 @@ class DataSourcesService:
                 domain.value,
                 wait_ms=IMPORT_LOCK_WAIT_MS,
             ):
-                return self._import_into_source(
+                outcome = self._import_into_source(
                     property_id, domain, filename, content, snapshot_local_date, mapped
                 )
         except LockWaitTimeoutError as error:
@@ -580,6 +677,25 @@ class DataSourcesService:
                 domain.value,
             )
             raise ImportInProgressError() from error
+        if outcome.succeeded and outcome.changed_data:
+            self._request_analysis_refresh(property_id)
+        return outcome
+
+    def _request_analysis_refresh(self, property_id: UUID) -> None:
+        """Ask the worker to bring the analysis up to date. The import has already been committed
+        and stands whatever happens here: a request that cannot be queued is logged, the data stay
+        imported, and the analysis status says "new data" and offers to ask again."""
+        try:
+            enqueue_refresh(self._session, self._tenant, property_id)
+            self._session.commit()
+        except SQLAlchemyError as error:
+            self._session.rollback()
+            logger.error(
+                "analysis refresh not queued workspace_id=%s property_id=%s error_type=%s",
+                self._tenant.workspace_id,
+                property_id,
+                type(error).__name__,
+            )
 
     def _refusal_before_import(
         self,
@@ -816,6 +932,7 @@ class DataSourcesService:
                 content=content,
                 property_id=property_id,
                 mapping_override=override,
+                scope=_scope_plan(mapped.mapping),
             )
             return (
                 ImportOutcome(
@@ -829,6 +946,8 @@ class DataSourcesService:
                     updated=booking.bookings_updated,
                     unchanged=booking.bookings_unchanged,
                     already_imported=booking.duplicate_of_import_file_id is not None,
+                    changed_data=booking.changed_data,
+                    removed=booking.bookings_removed,
                 ),
                 resolved,
             )
@@ -849,8 +968,10 @@ class DataSourcesService:
                     rows_total=invoices.rows_total,
                     rows_invalid=invoices.rows_invalid,
                     created=invoices.invoices_created,
+                    updated=invoices.invoices_revised,
                     unchanged=invoices.invoices_unchanged,
                     already_imported=invoices.duplicate_of_import_file_id is not None,
+                    changed_data=invoices.changed_data,
                 ),
                 resolved,
             )
@@ -863,6 +984,7 @@ class DataSourcesService:
             snapshot_local_date=snapshot_local_date,
             property_id=property_id,
             mapping_override=override,
+            scope=_scope_plan(mapped.mapping),
         )
         return (
             ImportOutcome(
@@ -874,6 +996,8 @@ class DataSourcesService:
                 rows_invalid=labor.rows_invalid,
                 created=labor.entries_created,
                 already_imported=labor.duplicate_of_import_file_id is not None,
+                changed_data=labor.changed_data,
+                removed=labor.cells_cleared,
             ),
             resolved,
         )
@@ -902,6 +1026,7 @@ class DataSourcesService:
             updated=result.bookings_updated,
             unchanged=result.bookings_unchanged,
             already_imported=result.duplicate_of_import_file_id is not None,
+            changed_data=result.changed_data,
         )
 
     def _import_labor(
@@ -935,6 +1060,7 @@ class DataSourcesService:
             rows_invalid=result.rows_invalid,
             created=result.entries_created,
             already_imported=result.duplicate_of_import_file_id is not None,
+            changed_data=result.changed_data,
         )
 
     def _import_invoices(
@@ -953,8 +1079,10 @@ class DataSourcesService:
             rows_total=result.rows_total,
             rows_invalid=result.rows_invalid,
             created=result.invoices_created,
+            updated=result.invoices_revised,
             unchanged=result.invoices_unchanged,
             already_imported=result.duplicate_of_import_file_id is not None,
+            changed_data=result.changed_data,
         )
 
     # --- helpers --------------------------------------------------------------------------------

@@ -8,6 +8,8 @@ Fonti dati V1 (docs/architecture/data-sources-v1.md) adds the `.../data-sources`
 `/properties/{property_id}`, whose exact methods are pinned below and in `test_data_sources_api.py`.
 Smart Import V2 (docs/architecture/smart-import-v2.md) adds to that family, all POST except the
 saved configuration (GET / DELETE): read a file, check a matching, dry-run it, import with it.
+Importa file V1 (docs/architecture/importa-file-v1.md) adds a GET to `.../imports`: the latest
+import attempts of the property.
 """
 
 from fastapi.testclient import TestClient
@@ -21,14 +23,26 @@ _SOURCES_METHODS = {
     _SOURCES: {"get"},  # NO POST: a source is never created on its own, only by a successful import
     f"{_SOURCES}/{{data_source_id}}": {"delete"},
     f"{_SOURCES}/import-preview": {"post"},
-    f"{_SOURCES}/imports": {"post"},
+    f"{_SOURCES}/imports": {"get", "post"},
+    f"{_SOURCES}/import-limits": {"get"},
     f"{_SOURCES}/imports/mapped": {"post"},
     f"{_SOURCES}/import-inspection": {"post"},
     f"{_SOURCES}/import-understanding": {"post"},
     f"{_SOURCES}/import-mapping-check": {"post"},
     f"{_SOURCES}/import-validation": {"post"},
     f"{_SOURCES}/{{data_source_id}}/import-configuration": {"get", "delete"},
+    f"{_SOURCES}/{{data_source_id}}/remembered-answers": {"get"},
+    f"{_SOURCES}/{{data_source_id}}/remembered-answers/{{answer_id}}": {"put", "delete"},
     f"{_SOURCES}/templates/{{domain}}": {"get"},
+}
+# Where the analysis stands against the data, and the recovery when a refresh did not happen.
+_ANALYSIS_METHODS = {
+    "/api/v1/properties/{property_id}/analysis/status": {"get"},
+    "/api/v1/properties/{property_id}/analysis/refresh": {"post"},
+}
+# How many rooms a property can sell: the person says it, and the analysis follows.
+_ROOM_INVENTORY_METHODS = {
+    "/api/v1/properties/{property_id}/room-inventory": {"get", "put"},
 }
 
 _EXPECTED_PATHS = {
@@ -44,6 +58,8 @@ _EXPECTED_PATHS = {
     _HOME_ASK_PATH,
     _DATA_OVERVIEW_PATH,
     *_SOURCES_METHODS,
+    *_ANALYSIS_METHODS,
+    *_ROOM_INVENTORY_METHODS,
 }
 
 
@@ -74,6 +90,10 @@ def test_decision_routes_remain_get_only_except_the_two_ask_posts(client: TestCl
             continue
         if path in _SOURCES_METHODS:
             assert set(methods) == _SOURCES_METHODS[path], path
+        elif path in _ANALYSIS_METHODS:
+            assert set(methods) == _ANALYSIS_METHODS[path], path
+        elif path in _ROOM_INVENTORY_METHODS:
+            assert set(methods) == _ROOM_INVENTORY_METHODS[path], path
         elif path in (_ASK_PATH, _HOME_ASK_PATH):
             assert set(methods) == {"post"}, path
         else:

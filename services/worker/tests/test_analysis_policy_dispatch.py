@@ -3,8 +3,9 @@
 
 Queue behaviour uses Procrastinate's in-memory connector (no database). The policy evaluation and
 the analysis are replaced by fakes, so these tests prove the worker side's own contract: one job per
-eligible property, exact arguments, deterministic output, own Session, failure semantics, no retry,
-nothing periodic. The real database path is `services/api/tests/test_worker_policy_integration.py`.
+eligible property, exact arguments, deterministic output, own Session, failure semantics, no retry.
+The real database path is `services/api/tests/test_worker_policy_integration.py`; the worker's own
+tick is `test_daily_tick.py`.
 """
 
 import ast
@@ -19,6 +20,7 @@ from procrastinate import testing
 
 import worker
 from app.modules.analysis import (
+    DAILY_TICK_TASK,
     AutomaticAnalysisOutcome,
     AutomaticOutcome,
     AutomaticSkipReason,
@@ -26,6 +28,7 @@ from app.modules.analysis import (
 )
 from worker import dispatch, tasks
 from worker.app import DEFAULT_QUEUE, app
+from worker.daily import DAILY_TICK_PERIODIC_ID
 from worker.tasks import (
     ANALYSIS_RUN_POLICY_TASK,
     ANALYSIS_RUN_PROPERTY_TASK,
@@ -50,7 +53,7 @@ def _evaluation(
         evaluated_at=NOW,
         local_date=date(2026, 10, 5),
         run_exists_today=reason is AutomaticSkipReason.ALREADY_ANALYZED_TODAY,
-        qualifying_import_today=reason is not AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT,
+        qualifying_import_today=reason is not AutomaticSkipReason.NO_BOOKING_IMPORT,
         latest_analysis_date=date(2026, 10, 4),
         skip_reason=reason,
     )
@@ -134,7 +137,7 @@ class _Recorder:
         if self.skip:
             return AutomaticAnalysisOutcome(
                 AutomaticOutcome.SKIPPED,
-                AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT,
+                AutomaticSkipReason.NO_BOOKING_IMPORT,
                 date(2026, 10, 5),
                 None,
                 None,
@@ -179,7 +182,9 @@ def _run_policy_jobs(
 
 
 def _statuses(connector: testing.InMemoryConnector) -> list[str]:
-    return [str(job["status"]) for job in connector.jobs.values()]
+    return [
+        str(job["status"]) for job in connector.jobs.values() if job["task_name"] != DAILY_TICK_TASK
+    ]
 
 
 def test_03_success_runs_with_its_own_session_per_execution_and_the_exact_ids(
@@ -205,7 +210,7 @@ def test_04_a_skipped_opportunity_is_a_successful_job_and_is_logged(
         connector, _, _ = _run_policy_jobs(recorder, monkeypatch)
 
     assert _statuses(connector) == ["succeeded"]
-    assert any("status=skipped reason=NO_TODAY_BOOKING_IMPORT" in m for m in caplog.messages)
+    assert any("status=skipped reason=NO_BOOKING_IMPORT" in m for m in caplog.messages)
 
 
 def test_05_a_real_failure_fails_the_job_closes_the_session_and_is_not_retried(
@@ -217,7 +222,7 @@ def test_05_a_real_failure_fails_the_job_closes_the_session_and_is_not_retried(
         connector, _, _ = _run_policy_jobs(recorder, monkeypatch)
 
     assert _statuses(connector) == ["failed"]
-    assert len(connector.jobs) == 1 and len(recorder.calls) == 1  # nothing retried
+    assert len(_statuses(connector)) == 1 and len(recorder.calls) == 1  # nothing retried
     assert recorder.sessions[0].closed
     assert any("status=failed error_type=RuntimeError" in m for m in caplog.messages)
 
@@ -266,7 +271,7 @@ def test_08_mixed_policies_skip_visibly_with_a_typed_reason_and_enqueue_only_the
     evaluations.extend(
         [
             _evaluation("ok"),
-            _evaluation("noimport", AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT),
+            _evaluation("noimport", AutomaticSkipReason.NO_BOOKING_IMPORT),
             _evaluation("done", AutomaticSkipReason.ALREADY_ANALYZED_TODAY),
             _evaluation("inactive", AutomaticSkipReason.PROPERTY_INACTIVE),
             _evaluation("ws", AutomaticSkipReason.WORKSPACE_INACTIVE),
@@ -283,7 +288,7 @@ def test_08_mixed_policies_skip_visibly_with_a_typed_reason_and_enqueue_only_the
     out = capsys.readouterr().out
     assert "policies_total=8 eligible=1 enqueued=1 skipped=7" in out
     for slug, reason in [
-        ("noimport", "NO_TODAY_BOOKING_IMPORT"),
+        ("noimport", "NO_BOOKING_IMPORT"),
         ("done", "ALREADY_ANALYZED_TODAY"),
         ("inactive", "PROPERTY_INACTIVE"),
         ("ws", "WORKSPACE_INACTIVE"),
@@ -346,7 +351,7 @@ def test_12_status_reports_every_enabled_policy_and_changes_nothing(
         [
             _evaluation("ready"),
             _evaluation("done", AutomaticSkipReason.ALREADY_ANALYZED_TODAY),
-            _evaluation("noimport", AutomaticSkipReason.NO_TODAY_BOOKING_IMPORT),
+            _evaluation("noimport", AutomaticSkipReason.NO_BOOKING_IMPORT),
         ]
     )
     connector = testing.InMemoryConnector()
@@ -366,7 +371,7 @@ def test_12_status_reports_every_enabled_policy_and_changes_nothing(
 # --- boundaries --------------------------------------------------------------------------------
 
 
-def test_13_the_dispatcher_does_no_detector_work_and_registers_nothing_periodic() -> None:
+def test_13_the_dispatcher_does_no_detector_work_and_the_only_tick_is_the_days_own() -> None:
     tree = ast.parse((_WORKER_DIR / "dispatch.py").read_text(encoding="utf-8"))
     imported = {
         node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module
@@ -375,7 +380,7 @@ def test_13_the_dispatcher_does_no_detector_work_and_registers_nothing_periodic(
     assert not [m for m in imported if m.startswith(forbidden)]
     attributes = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)}
     assert "periodic" not in attributes
-    assert app.periodic_registry.periodic_tasks == {}
+    assert list(app.periodic_registry.periodic_tasks) == [(DAILY_TICK_TASK, DAILY_TICK_PERIODIC_ID)]
 
 
 def test_14_only_the_dispatch_and_enqueue_commands_defer_jobs() -> None:

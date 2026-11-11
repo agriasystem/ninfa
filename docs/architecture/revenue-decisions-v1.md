@@ -173,7 +173,7 @@ mathematically `max(0, final occupancy - forecast occupancy)` without ever subtr
 rounded quotients. With it true, a final confidence of at least 55 is `TRIGGERED` (54.99 / 55.00), otherwise
 `SUPPRESSED_LOW_CONFIDENCE`. The reason says which condition held:
 `TRIGGER_OCCUPANCY_GAP`, `TRIGGER_ROOM_SHORTFALL` or `TRIGGER_OCCUPANCY_AND_ROOM_SHORTFALL`.
-Order of the checks: inventory unknown (`OCCUPANCY_INVENTORY_UNKNOWN`), closed
+Order of the checks: no new booking data (`BOOKING_DATA_STALE`), inventory unknown (`OCCUPANCY_INVENTORY_UNKNOWN`), closed
 (`PROPERTY_CLOSED_FOR_STAY_DATE`), already sold out or overbooked (`OCCUPANCY_ALREADY_SOLD_OUT`),
 baseline, fewer than 5 pairs, then the thresholds.
 
@@ -260,6 +260,13 @@ targets and check the query plans.
 workspace's target, baseline or snapshot does not exist for the service; a foreign target and an
 unknown one raise the same error. Sources never mix: a second data source or another property of
 the same workspace, with identical dates and wild values, changes nothing (tests).
+
+## A day with no new booking data
+
+Neither detector is evaluated on a day whose analysis saw the same import as the previous analysed day: `INSUFFICIENT_DATA`,
+`BOOKING_DATA_STALE`. A first analysis is not such a day. No curve takes an anchor, a prior or a final from such a day, or from an observation no finished analysis read,
+and a prior from either reads as missing. See [ADR 0045](adr/0045-no-new-booking-data-is-not-zero-pickup.md) and
+[ADR 0046](adr/0046-a-sample-of-history-is-what-a-finished-analysis-read.md).
 
 ## Golden scenario
 

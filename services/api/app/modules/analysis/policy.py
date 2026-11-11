@@ -5,7 +5,8 @@ source are usable for automatic analysis. Enabling a policy runs it and refuses 
 the dispatcher and the policy task run it again on every automatic opportunity and SKIP with the
 same typed reason instead - there is never a fallback to another source.
 
-Absence of a row and `enabled = false` both mean "not automated".
+Absence of a row and `enabled = false` both mean "not automated". A property ready for the daily
+analysis gets its row by itself (`automatic.enroll_ready_properties`); `enabled = false` stays off.
 """
 
 from dataclasses import dataclass
@@ -38,8 +39,11 @@ class AutomaticSkipReason(StrEnum):
 
     POLICY_DISABLED = "POLICY_DISABLED"
     ALREADY_ANALYZED_TODAY = "ALREADY_ANALYZED_TODAY"
-    NO_TODAY_BOOKING_IMPORT = "NO_TODAY_BOOKING_IMPORT"
+    NO_BOOKING_IMPORT = "NO_BOOKING_IMPORT"  # the source has never delivered: nothing to analyse
     JOB_ALREADY_QUEUED = "JOB_ALREADY_QUEUED"
+    NOT_DUE_YET = "NOT_DUE_YET"  # the property's clock has not reached the daily hour
+    RETRY_NOT_DUE_YET = "RETRY_NOT_DUE_YET"  # today's job failed a moment ago
+    ATTEMPTS_EXHAUSTED = "ATTEMPTS_EXHAUSTED"  # today's job failed too many times: tomorrow again
 
 
 class AnalysisPolicyError(AppError):

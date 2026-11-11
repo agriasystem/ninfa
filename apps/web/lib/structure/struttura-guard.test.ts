@@ -41,14 +41,14 @@ describe("Struttura sources", () => {
     expect(sources.map((source) => source.file)).toContain(DEMO_FILE);
   });
 
-  it("imports no Mia, Ask or model code, and reaches the backend ONLY through the data-source API", () => {
+  it("imports no Mia, Ask or model code, and reaches the backend ONLY through its own two APIs", () => {
     for (const { file, text } of sources) {
       const imports = text.split("\n").filter((line) => /^\s*(import|export)\b.*\bfrom\b/u.test(line));
       for (const line of imports) {
         expect(line, `${file}: ${line}`).not.toMatch(/ask-ninfa|\/mia|anthropic|openai|gateway|language-model/iu);
-        // the one API of this page is Fonti dati's own: no other client (decisions, data overview, auth...)
+        // Fonti dati's own and the room inventory's: no other client (decisions, data overview, auth...)
         const api = /from "@\/lib\/api\/([^"]+)"/u.exec(line)?.[1];
-        if (api !== undefined) expect(api, `${file}: ${line}`).toBe("data-sources");
+        if (api !== undefined) expect(["data-sources", "room-inventory"], `${file}: ${line}`).toContain(api);
       }
       expect(text, file).not.toMatch(/\bfetch\(|askMiaHome|askNinfa|postMiaMessage|Chiedi a Mia/u);
     }

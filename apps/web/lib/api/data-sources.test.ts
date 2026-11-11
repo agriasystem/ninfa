@@ -59,12 +59,17 @@ describe("the data-source API client", () => {
   it("offers NO call that creates a source: it only comes to exist when an import succeeds", () => {
     expect(Object.keys(dataSourcesApi).sort()).toEqual([
       "checkMapping",
+      "correctRememberedAnswer",
       "dataSourcesPath",
       "downloadTemplate",
       "fileToBase64",
       "forgetImportConfiguration",
+      "forgetRememberedAnswer",
       "getDataSources",
       "getImportConfiguration",
+      "getImportLimits",
+      "getRecentImports",
+      "getRememberedAnswers",
       "importFile",
       "importMatchedFile",
       "inspectFile",
@@ -73,6 +78,19 @@ describe("the data-source API client", () => {
       "understandFile",
       "validateImport",
     ]);
+  });
+
+  it("GETs the latest imports of the property, with the session cookie and no cache", async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ imports: [] }));
+
+    const result = await dataSourcesApi.getRecentImports("p1", fetchMock);
+
+    const { url, init } = lastCall();
+    expect(url).toBe("http://api.test/api/v1/properties/p1/data-sources/imports");
+    expect(init.method).toBe("GET");
+    expect(init.credentials).toBe("include");
+    expect(init.cache).toBe("no-store");
+    expect(result).toEqual({ ok: true, data: { imports: [] } });
   });
 
   it("DELETEs a source and treats 204 as success", async () => {
@@ -236,6 +254,30 @@ describe("the data-source API client - Smart Import", () => {
 
     expect(result.ok).toBe(true);
     expect(lastCall().init.method).toBe("DELETE");
+  });
+
+  it("a file the browser can no longer read ends as a plain result: nothing is sent, nothing throws", async () => {
+    const unreadable = new File(["x"], "sparito.csv");
+    const realReader = globalThis.FileReader;
+    class BrokenReader {
+      error = new Error("NotReadableError");
+      onerror: (() => void) | null = null;
+      readAsDataURL() {
+        this.onerror?.();
+      }
+    }
+    vi.stubGlobal("FileReader", BrokenReader);
+    try {
+      const result = await dataSourcesApi.understandFile(
+        { propertyId: "p1", domain: "BOOKINGS", file: unreadable, answers: {}, confirmedDomain: false },
+        fetchMock,
+      );
+
+      expect(result).toMatchObject({ ok: false, code: "FILE_NOT_READABLE" });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal("FileReader", realReader);
+    }
   });
 
   it("hands a failure back as a plain result, never a technical message", async () => {

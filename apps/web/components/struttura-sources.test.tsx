@@ -15,6 +15,8 @@ import {
   ok,
   PROPERTY_ID,
   previewOf,
+  resultOf,
+  savedConfigurationOf,
   sources,
   xmlFile,
 } from "@/test/sources-support";
@@ -27,6 +29,9 @@ const previewImportMock = vi.fn();
 const importFileMock = vi.fn();
 const getImportConfigurationMock = vi.fn();
 const forgetImportConfigurationMock = vi.fn();
+const getRememberedAnswersMock = vi.fn();
+const correctRememberedAnswerMock = vi.fn();
+const forgetRememberedAnswerMock = vi.fn();
 const downloadTemplateMock = vi.fn();
 const saveBlobMock = vi.fn();
 
@@ -42,6 +47,9 @@ vi.mock("@/lib/api/data-sources", () => ({
   importMatchedFile: vi.fn(),
   getImportConfiguration: (...args: unknown[]) => getImportConfigurationMock(...args),
   forgetImportConfiguration: (...args: unknown[]) => forgetImportConfigurationMock(...args),
+  getRememberedAnswers: (...args: unknown[]) => getRememberedAnswersMock(...args),
+  correctRememberedAnswer: (...args: unknown[]) => correctRememberedAnswerMock(...args),
+  forgetRememberedAnswer: (...args: unknown[]) => forgetRememberedAnswerMock(...args),
   downloadTemplate: (...args: unknown[]) => downloadTemplateMock(...args),
 }));
 vi.mock("@/lib/sources/save-file", async (original) => ({
@@ -81,6 +89,9 @@ beforeEach(() => {
     importFileMock,
     getImportConfigurationMock,
     forgetImportConfigurationMock,
+    getRememberedAnswersMock,
+    correctRememberedAnswerMock,
+    forgetRememberedAnswerMock,
     downloadTemplateMock,
     saveBlobMock,
     onPropertyInvalid,
@@ -89,6 +100,7 @@ beforeEach(() => {
   }
   // a source with no saved configuration: the manage dialog simply has nothing to show
   getImportConfigurationMock.mockResolvedValue(failure("DATA_SOURCE_NOT_FOUND", 404));
+  getRememberedAnswersMock.mockResolvedValue(ok({ words: [], files: [] }));
   // "Oggi" is always the same day: the cards say "Oggi alle 11:31" whatever the real date is
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-23T09:45:00Z"));
@@ -241,7 +253,7 @@ describe("Fonti dati - 'Collega fonte' opens a real dialog for each card", () =>
       "Normalmente NINFA riceve questi dati dal PMS o dal Channel Manager. Non è necessario collegare ogni portale separatamente se il tuo gestionale li raccoglie già.",
       /Importa da file/u,
     ],
-    ["Contabilità", "Come vuoi fornire i dati dei costi?", "Scegli come NINFA riceverà le fatture e i costi della struttura.", /Importa fatture/u],
+    ["Contabilità", "Come vuoi fornire i dati dei costi?", "Scegli come NINFA riceverà le fatture e i costi della struttura.", /Registro dei costi/u],
     ["Personale", "Come vuoi fornire i dati del personale?", "Scegli come NINFA riceverà le ore e i costi del personale.", /Importa da file/u],
   ];
 
@@ -255,7 +267,11 @@ describe("Fonti dati - 'Collega fonte' opens a real dialog for each card", () =>
     expect(within(box).getByRole("heading", { level: 2, name: title })).not.toBeNull();
     expect(within(box).getByText(intro)).not.toBeNull();
     expect(within(box).getByRole("heading", { level: 3, name: option })).not.toBeNull();
-    expect(within(box).getByRole("button", { name: "Importa file" })).not.toBeNull();
+    // a file comes in through its own page: here it is a link, never an uploader
+    expect(within(box).getByRole("link", { name: "Importa un file" }).getAttribute("href")).toBe(
+      `/importa-file?property=${PROPERTY_ID}`,
+    );
+    expect(box.querySelector("input[type='file']")).toBeNull();
     // automatic integrations: said plainly, not clickable, not named
     expect(within(box).getByText("Integrazioni automatiche")).not.toBeNull();
     expect(within(box).getByText("Prossimamente")).not.toBeNull();
@@ -269,7 +285,7 @@ describe("Fonti dati - 'Collega fonte' opens a real dialog for each card", () =>
 
     await user.click(within(cardOf("Personale")).getByRole("button", { name: "Collega fonte Personale" }));
 
-    expect(within(dialog()).queryByRole("button", { name: "Importa file" })).toBeNull();
+    expect(within(dialog()).queryByRole("link", { name: "Importa un file" })).toBeNull();
     expect(within(dialog()).getByText("Questa modalità non è disponibile al momento.")).not.toBeNull();
   });
 
@@ -320,86 +336,462 @@ describe("Fonti dati - 'Collega fonte' opens a real dialog for each card", () =>
 
 // --- setting up a source and importing a file ------------------------------------------------------------------
 
-describe("Fonti dati - from 'Importa file' to the result", () => {
-  it("opens the import of the right kind of data and creates nothing: no call at all is made", async () => {
+describe("Fonti dati - a file comes in through the 'Importa file' page", () => {
+  const importPage = `/importa-file?property=${PROPERTY_ID}`;
+
+  it("says where a file goes from the block itself, and leaves the block's own work where it was", async () => {
+    await renderBlock(nothingConfigured());
+
+    expect(screen.getByRole("link", { name: "Importa un file" }).getAttribute("href")).toBe(importPage);
+    expect(screen.getByRole("button", { name: "Collega una nuova fonte" })).not.toBeNull();
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+  });
+
+  it("'Collega fonte' leads to the page and creates nothing: no call at all is made", async () => {
     const user = userEvent.setup();
     await renderBlock(nothingConfigured());
 
     await user.click(within(cardOf("PMS")).getByRole("button", { name: "Collega fonte PMS" }));
-    await user.click(within(dialog()).getByRole("button", { name: "Importa file" }));
 
-    expect(await screen.findByRole("heading", { level: 2, name: "Importa le prenotazioni" })).not.toBeNull();
+    expect(within(dialog()).getByRole("link", { name: "Importa un file" }).getAttribute("href")).toBe(importPage);
     expect(getDataSourcesMock).toHaveBeenCalledTimes(1); // only the first read: nothing changed, nothing re-read
     expect(previewImportMock).not.toHaveBeenCalled();
     expect(importFileMock).not.toHaveBeenCalled();
     expect(removeDataSourceMock).not.toHaveBeenCalled();
   });
 
-  it("a configured card goes straight to the import of its kind of data", async () => {
-    const user = userEvent.setup();
+  it("a configured card's 'Carica nuovo file' is a link to the page, not a dialog", async () => {
     await renderBlock(laborViaCsv());
 
-    await user.click(within(cardOf("Personale")).getByRole("button", { name: "Carica nuovo file Personale" }));
+    const link = within(cardOf("Personale")).getByRole("link", { name: "Carica nuovo file Personale" });
 
-    expect(await screen.findByRole("heading", { level: 2, name: "Importa i dati del personale" })).not.toBeNull();
+    expect(link.getAttribute("href")).toBe(importPage);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("a Channel Manager or OTA import goes into the same bookings source: the hotelier links nothing twice", async () => {
-    const user = userEvent.setup();
-    await renderBlock(bookingsViaFile());
-
-    await user.click(within(cardOf("PMS")).getByRole("button", { name: "Carica nuovo file PMS" }));
-
-    expect(await screen.findByRole("heading", { level: 2, name: "Importa le prenotazioni" })).not.toBeNull();
-    expect(importFileMock).not.toHaveBeenCalled();
-  });
-
-  it("an OTA that has nothing yet leads to the bookings import, the one source of its data", async () => {
+  it("an OTA that has nothing yet leads to the same page: its data come with the bookings", async () => {
     const user = userEvent.setup();
     await renderBlock(nothingConfigured());
 
     await user.click(within(cardOf("OTA")).getByRole("button", { name: "Configura fonte OTA" }));
-    await user.click(within(dialog()).getByRole("button", { name: "Importa file" }));
 
-    expect(await screen.findByRole("heading", { level: 2, name: "Importa le prenotazioni" })).not.toBeNull();
+    expect(within(dialog()).getByRole("link", { name: "Importa un file" }).getAttribute("href")).toBe(importPage);
   });
 
-  it("with several sources of a kind it refuses to pick one and says so", async () => {
+  it("with several sources of a kind it offers no file and says so", async () => {
     const user = userEvent.setup();
     await renderBlock(sources({ STAFF: { state: "CONFIGURED_FILE", several_sources: true, method: "CSV" } }));
 
     await user.click(screen.getByRole("button", { name: "Collega una nuova fonte" }));
     await user.click(within(dialog()).getByRole("button", { name: /^Personale/u }));
-    await user.click(within(dialog()).getByRole("button", { name: "Carica nuovo file" }));
 
-    expect(within(dialog()).getAllByText("Hai già una fonte per questi dati.").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("dialog", { name: "Importa i dati del personale" })).toBeNull();
+    expect(within(dialog()).getByRole("alert").textContent).toBe("Hai già una fonte per questi dati.");
+    expect(within(dialog()).queryByRole("link", { name: "Importa un file" })).toBeNull();
   });
 
-  it("costs take FatturaPA XML or a register: their own hint, no template, no labor date", async () => {
+  it("downloads the template of NINFA's own format for whoever wants it", async () => {
+    const user = userEvent.setup();
+    await renderBlock(nothingConfigured());
+    await user.click(within(cardOf("Personale")).getByRole("button", { name: "Collega fonte Personale" }));
+    const blob = new Blob(["work_date\r\n"], { type: "text/csv" });
+    downloadTemplateMock.mockResolvedValue(blob);
+
+    await user.click(within(dialog()).getByRole("button", { name: "Scarica modello CSV" }));
+
+    await waitFor(() => expect(saveBlobMock).toHaveBeenCalledWith(blob, "modello-personale.csv"));
+    expect(downloadTemplateMock).toHaveBeenCalledWith(PROPERTY_ID, "LABOR");
+  });
+
+  it("says so when the template cannot be fetched", async () => {
+    const user = userEvent.setup();
+    await renderBlock(nothingConfigured());
+    await user.click(within(cardOf("PMS")).getByRole("button", { name: "Collega fonte PMS" }));
+    downloadTemplateMock.mockResolvedValue(null);
+
+    await user.click(within(dialog()).getByRole("button", { name: "Scarica modello CSV" }));
+
+    expect(await within(dialog()).findByText("Il modello non è disponibile al momento.")).not.toBeNull();
+    expect(saveBlobMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Fonti dati - an invoice (XML), the one file that page does not read", () => {
+  async function openInvoiceImport(response: DataSourcesResponse = costsViaXml()) {
     const user = userEvent.setup({ applyAccept: false });
+    await renderBlock(response);
+    await user.click(within(cardOf("Contabilità")).getByRole("button", { name: "Carica nuovo file Contabilità" }));
+    await user.click(within(dialog()).getByRole("button", { name: "Importa fatture XML" }));
+    await screen.findByRole("dialog", { name: "Importa le fatture" });
+    return user;
+  }
+  const pickInvoice = (user: ReturnType<typeof userEvent.setup>, file: File) =>
+    user.upload(within(dialog()).getByLabelText("Seleziona file"), file);
+
+  it("Contabilità offers both: the invoice here, the register on the page", async () => {
+    const user = userEvent.setup();
     await renderBlock(costsViaXml());
+
     await user.click(within(cardOf("Contabilità")).getByRole("button", { name: "Carica nuovo file Contabilità" }));
 
-    const box = await screen.findByRole("dialog", { name: "Importa le fatture" });
-    expect(
-      within(box).getByText(
-        "Carica le fatture elettroniche (XML) oppure il registro dei costi che hai già, in formato CSV o Excel (.xlsx).",
-      ),
-    ).not.toBeNull();
-    expect(within(box).queryByRole("button", { name: /modello/iu })).toBeNull();
-    expect(within(box).queryByText(/data di oggi/u)).toBeNull();
-
-    await user.upload(within(box).getByLabelText("Seleziona file"), new File(["x"], "costi.txt"));
-    expect(within(box).getByRole("alert").textContent).toBe(
-      "Scegli un file XML, CSV o Excel (con estensione .xml, .csv o .xlsx).",
+    const box = screen.getByRole("dialog", { name: "Come vuoi fornire i dati dei costi?" });
+    expect(within(box).getByRole("heading", { level: 3, name: "Fatture elettroniche" })).not.toBeNull();
+    expect(within(box).getByRole("button", { name: "Importa fatture XML" })).not.toBeNull();
+    expect(within(box).getByRole("heading", { level: 3, name: "Registro dei costi" })).not.toBeNull();
+    expect(within(box).getByRole("link", { name: "Importa un file" }).getAttribute("href")).toBe(
+      `/importa-file?property=${PROPERTY_ID}`,
     );
-
-    previewImportMock.mockResolvedValue(ok(previewOf({ method: "XML", rows_total: 1, sample_columns: [], sample_rows: [] })));
-    await user.upload(within(box).getByLabelText("Seleziona file"), xmlFile());
-    expect(await within(box).findByText("1 fattura trovata")).not.toBeNull();
+    expect(within(box).queryByRole("button", { name: /modello/iu })).toBeNull();
   });
 
+  it("'Gestisci' of Contabilità leads to the same choice: an invoice here, a register on the page", async () => {
+    const user = userEvent.setup();
+    await renderBlock(costsViaXml());
+    await user.click(within(cardOf("Contabilità")).getByRole("button", { name: "Gestisci Contabilità" }));
+
+    await user.click(within(dialog()).getByRole("button", { name: "Carica nuovo file" }));
+
+    expect(screen.getByRole("dialog", { name: "Come vuoi fornire i dati dei costi?" })).not.toBeNull();
+  });
+
+  it("takes an XML and nothing else: a spreadsheet is sent to the page, with no call", async () => {
+    const user = await openInvoiceImport();
+    const box = dialog();
+    expect(within(box).getByText(/Carica una fattura elettronica in formato XML/u)).not.toBeNull();
+    expect((within(box).getByLabelText("Seleziona file") as HTMLInputElement).accept).toBe(".xml,text/xml,application/xml");
+
+    await pickInvoice(user, new File(["x"], "registro.xlsx"));
+
+    expect(within(box).getByRole("alert").textContent).toBe("Scegli un file XML di fattura elettronica (con estensione .xml).");
+    expect(previewImportMock).not.toHaveBeenCalled();
+  });
+
+  it("looks at the invoice, imports it only on confirmation, and re-reads the cards", async () => {
+    const user = await openInvoiceImport();
+    previewImportMock.mockResolvedValue(ok(previewOf({ method: "XML", rows_total: 1, sample_columns: [], sample_rows: [] })));
+    importFileMock.mockResolvedValue(ok(resultOf({ rows_total: 1, created: 1 })));
+
+    await pickInvoice(user, xmlFile());
+
+    expect(await within(dialog()).findByText("1 fattura trovata")).not.toBeNull();
+    expect(previewImportMock).toHaveBeenCalledWith(PROPERTY_ID, "COSTS", expect.any(File));
+    expect(importFileMock).not.toHaveBeenCalled();
+
+    await user.click(within(dialog()).getByRole("button", { name: "Conferma importazione" }));
+
+    expect(await within(dialog()).findByRole("heading", { level: 3, name: "Importazione completata" })).not.toBeNull();
+    expect(importFileMock.mock.calls[0]?.[0]).toMatchObject({ propertyId: PROPERTY_ID, domain: "COSTS" });
+    await waitFor(() => expect(getDataSourcesMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("an invoice NINFA cannot read says why, and imports nothing", async () => {
+    const user = await openInvoiceImport();
+    previewImportMock.mockResolvedValue(ok(previewOf({ method: "XML", can_import: false, problem: "UNSUPPORTED_FORMAT" })));
+
+    await pickInvoice(user, xmlFile());
+
+    const alert = await within(dialog()).findByRole("alert");
+    expect(flat(alert)).toContain("Questa fattura non è in un formato che NINFA sa leggere.");
+    expect(flat(alert)).toContain("Non è stato importato nulla.");
+    expect(within(dialog()).queryByRole("button", { name: "Conferma importazione" })).toBeNull();
+    expect(getDataSourcesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a request that fails says so plainly, and the dialog cannot be dismissed while it is out", async () => {
+    const user = await openInvoiceImport();
+    let answer: (value: unknown) => void = () => undefined;
+    previewImportMock.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+
+    await pickInvoice(user, xmlFile());
+
+    expect(await within(dialog()).findByText("Controllo del file in corso…")).not.toBeNull();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+
+    answer(failure("NETWORK_ERROR", 0));
+    const alert = await within(dialog()).findByRole("alert");
+    expect(flat(alert)).toContain("Importazione non riuscita");
+    expect(document.body.textContent).not.toMatch(/NETWORK_ERROR|technical message/u);
+  });
+});
+
+// --- "Gestisci": what NINFA remembers from the person's answers ---------------------------------------------------------------
+
+describe("Gestisci > Risposte ricordate", () => {
+  const MODIFICATA = {
+    id: "w-1",
+    document: "status_mapping",
+    field: "status",
+    label: "modificata",
+    value: "NO_SHOW",
+    choices: ["CONFIRMED", "CANCELLED", "NO_SHOW", "CHECKED_IN", "CHECKED_OUT"],
+  };
+  const PMS_EXPORT = {
+    id: "f-1",
+    columns: ["giorno", "ore a", "ore b"],
+    answers: { date_order: "DMY" },
+    file_scope: "PARTIAL",
+    column_decisions: 2,
+  };
+
+  async function openManage(words: unknown[] = [MODIFICATA], files: unknown[] = []) {
+    getRememberedAnswersMock.mockResolvedValue(ok({ words, files }));
+    const user = userEvent.setup({ applyAccept: false });
+    await renderBlock(bookingsViaFile());
+    await user.click(within(cardOf("PMS")).getByRole("button", { name: "Gestisci PMS" }));
+    return user;
+  }
+  const section = () => screen.findByRole("region", { name: "Risposte ricordate" });
+
+  it("says what is remembered in the hotelier's words, reading the source it is open on", async () => {
+    await openManage();
+
+    const shown = await section();
+    expect(getRememberedAnswersMock).toHaveBeenCalledWith(PROPERTY_ID, "src-bookings");
+    expect(flat(shown)).toContain("Stato «modificata» → Non presentato");
+    expect(flat(shown)).not.toMatch(/NO_SHOW|status_mapping|family|famiglia/u);
+    expect(within(shown).getByRole("button", { name: "Correggi" })).not.toBeNull();
+    expect(within(shown).getByRole("button", { name: "Dimentica" })).not.toBeNull();
+  });
+
+  it("with nothing remembered the section is not there", async () => {
+    await openManage([]);
+
+    await waitFor(() => expect(getRememberedAnswersMock).toHaveBeenCalled());
+    expect(screen.queryByRole("region", { name: "Risposte ricordate" })).toBeNull();
+  });
+
+  it("forgetting asks first, then the answer is gone and the page says what happens next", async () => {
+    const user = await openManage();
+    forgetRememberedAnswerMock.mockResolvedValue(ok({ words: [], files: [] }));
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    expect(forgetRememberedAnswerMock).not.toHaveBeenCalled();
+    await user.click(within(shown).getByRole("button", { name: "Dimentica questa risposta" }));
+
+    await waitFor(() =>
+      expect(forgetRememberedAnswerMock).toHaveBeenCalledWith(PROPERTY_ID, "src-bookings", "w-1"),
+    );
+    const note = await within(shown).findByRole("status");
+    expect(flat(note)).toContain("al prossimo file NINFA te la chiederà di nuovo");
+    expect(flat(note)).toContain("I dati già importati non cambiano");
+    expect(flat(shown)).not.toContain("modificata");
+  });
+
+  it("forgetting can be called off", async () => {
+    const user = await openManage();
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    await user.click(within(shown).getByRole("button", { name: "Annulla" }));
+
+    expect(forgetRememberedAnswerMock).not.toHaveBeenCalled();
+    expect(flat(shown)).toContain("modificata");
+  });
+
+  it("correcting offers only what the backend allows, in plain words, and saves the choice", async () => {
+    const user = await openManage();
+    correctRememberedAnswerMock.mockResolvedValue(
+      ok({ words: [{ ...MODIFICATA, value: "CONFIRMED" }], files: [] }),
+    );
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Correggi" }));
+    const select = within(shown).getByLabelText<HTMLSelectElement>("Che cosa significa");
+    expect(Array.from(select.options).map((option) => option.text)).toEqual([
+      "Confermata",
+      "Cancellata",
+      "Non presentato (risposta attuale)",
+      "Arrivato",
+      "Partito",
+    ]);
+    await user.selectOptions(select, "CONFIRMED");
+    await user.click(within(shown).getByRole("button", { name: "Salva correzione" }));
+
+    await waitFor(() =>
+      expect(correctRememberedAnswerMock).toHaveBeenCalledWith(
+        PROPERTY_ID,
+        "src-bookings",
+        "w-1",
+        "CONFIRMED",
+      ),
+    );
+    expect(flat(await section())).toContain("Stato «modificata» → Confermata");
+    expect(flat(await within(shown).findByRole("status"))).toContain("vale dal prossimo file");
+  });
+
+  it("a word with no list can only be forgotten", async () => {
+    await openManage([{ ...MODIFICATA, field: "channel", document: "channel_mapping", value: "OTA", choices: [] }]);
+    const shown = await section();
+
+    expect(within(shown).queryByRole("button", { name: "Correggi" })).toBeNull();
+    expect(within(shown).getByRole("button", { name: "Dimentica" })).not.toBeNull();
+  });
+
+  it("a kind of file is said by its columns, with what was said about it, and can only be forgotten", async () => {
+    const user = await openManage([], [PMS_EXPORT]);
+    forgetRememberedAnswerMock.mockResolvedValue(ok({ words: [], files: [] }));
+    const shown = await section();
+
+    const text = flat(shown);
+    expect(text).toContain("File con le colonne: giorno, ore a, ore b");
+    expect(text).toContain("Date scritte giorno/mese/anno");
+    expect(text).toContain("Il file contiene solo una parte del periodo");
+    expect(text).toContain("2 colonne abbinate da te");
+    expect(within(shown).queryByRole("button", { name: "Correggi" })).toBeNull();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    await user.click(within(shown).getByRole("button", { name: "Dimentica questa risposta" }));
+
+    await waitFor(() =>
+      expect(forgetRememberedAnswerMock).toHaveBeenCalledWith(PROPERTY_ID, "src-bookings", "f-1"),
+    );
+  });
+
+  it("a request that fails says so and keeps the answer", async () => {
+    const user = await openManage();
+    forgetRememberedAnswerMock.mockResolvedValue(failure("X", 500));
+    const shown = await section();
+
+    await user.click(within(shown).getByRole("button", { name: "Dimentica" }));
+    await user.click(within(shown).getByRole("button", { name: "Dimentica questa risposta" }));
+
+    expect(await within(shown).findByRole("alert")).not.toBeNull();
+    expect(flat(shown)).toContain("modificata");
+  });
+
+  it("an answer that cannot be read is said, and the rest of the dialog works", async () => {
+    getRememberedAnswersMock.mockResolvedValue(failure("X", 500));
+    const user = userEvent.setup({ applyAccept: false });
+    await renderBlock(bookingsViaFile());
+    await user.click(within(cardOf("PMS")).getByRole("button", { name: "Gestisci PMS" }));
+
+    expect(await screen.findByText("Non siamo riusciti a leggere le risposte ricordate.")).not.toBeNull();
+    expect(within(dialog()).getByRole("link", { name: "Carica nuovo file" })).not.toBeNull();
+  });
+});
+
+// --- "Gestisci": the saved configuration ------------------------------------------------------------------------------------
+
+describe("Gestisci > Configurazione import", () => {
+  async function openManage(response: DataSourcesResponse = laborViaCsv("2026-10-18T10:00:00Z")) {
+    const user = userEvent.setup({ applyAccept: false });
+    await renderBlock(response);
+    await user.click(within(cardOf("Personale")).getByRole("button", { name: "Gestisci Personale" }));
+    return user;
+  }
+
+  it("shows what each column of the file means, the last use, and the ways to change or forget it", async () => {
+    getImportConfigurationMock.mockResolvedValue(ok(savedConfigurationOf()));
+    await openManage();
+
+    const section = await screen.findByRole("region", { name: "Configurazione import" });
+    expect(getImportConfigurationMock).toHaveBeenCalledWith(PROPERTY_ID, "src-labor");
+    expect(within(section).getByText("Come NINFA legge i file di questa fonte.")).not.toBeNull();
+    expect(within(section).getAllByRole("listitem").map(flat)).toEqual([
+      "Giorno → Data",
+      "Ore turno → Ore previste",
+      "Reparto → Reparto o mansione",
+    ]);
+    expect(within(section).getByText(/Ultimo utilizzo: 22 ottobre 2026/u)).not.toBeNull();
+    expect(within(section).getByRole("link", { name: "Modifica associazioni" })).not.toBeNull();
+    expect(within(section).getByRole("button", { name: "Dimentica configurazione" })).not.toBeNull();
+    expect(within(section).queryByText(/regole di NINFA diverse/u)).toBeNull();
+  });
+
+  it("shows a fixed value in the hotelier's words", async () => {
+    getImportConfigurationMock.mockResolvedValue(
+      ok(savedConfigurationOf({ constants: [{ field: "labor_category", value: "KITCHEN" }] })),
+    );
+    await openManage();
+
+    const section = await screen.findByRole("region", { name: "Configurazione import" });
+    expect(flat(section)).toContain("Reparto (nome standard di NINFA): sempre Cucina");
+  });
+
+  it("says when a configuration was made for other rules of NINFA", async () => {
+    getImportConfigurationMock.mockResolvedValue(ok(savedConfigurationOf({ schema_current: false })));
+    await openManage();
+
+    const section = await screen.findByRole("region", { name: "Configurazione import" });
+    expect(
+      within(section).getByText("Questa configurazione è stata salvata con regole di NINFA diverse: al prossimo file controlla di nuovo le colonne."),
+    ).not.toBeNull();
+  });
+
+  it("with nothing saved says so, and offers no change", async () => {
+    await openManage();
+
+    const section = await screen.findByRole("region", { name: "Configurazione import" });
+    expect(
+      await within(section).findByText("Nessuna configurazione salvata: al prossimo file potrai abbinare le colonne e salvarle."),
+    ).not.toBeNull();
+    expect(within(section).queryByRole("button")).toBeNull();
+  });
+
+  it("if the configuration cannot be loaded it says so and the rest of the dialog still works", async () => {
+    getImportConfigurationMock.mockResolvedValue(failure("INTERNAL_ERROR", 500));
+    await openManage();
+
+    expect(await screen.findByText("Non siamo riusciti a caricare la configurazione.")).not.toBeNull();
+    expect(within(dialog()).getByRole("link", { name: "Carica nuovo file" })).not.toBeNull();
+    expect(document.body.textContent).not.toContain("technical message");
+  });
+
+  it("invoices (XML) have no columns to match, so no configuration is asked for", async () => {
+    const user = userEvent.setup();
+    await renderBlock({ ...nothingConfigured(), cards: nothingConfigured().cards.map((item) => item.card === "ACCOUNTING" ? { ...item, state: "CONFIGURED_FILE" as const, data_source_id: "src-costs", method: "XML" as const, last_update_at: "2026-10-22T16:04:00Z" } : item) });
+
+    await user.click(within(cardOf("Contabilità")).getByRole("button", { name: "Gestisci Contabilità" }));
+
+    expect(screen.queryByRole("region", { name: "Configurazione import" })).toBeNull();
+    expect(getImportConfigurationMock).not.toHaveBeenCalled();
+  });
+
+  it("forgetting asks first, says what stays, and then forgets: the source and its data are untouched", async () => {
+    getImportConfigurationMock.mockResolvedValue(ok(savedConfigurationOf()));
+    forgetImportConfigurationMock.mockResolvedValue(ok(undefined));
+    const user = await openManage();
+    await user.click(await screen.findByRole("button", { name: "Dimentica configurazione" }));
+
+    const box = screen.getByRole("dialog", { name: "Dimenticare la configurazione?" });
+    expect(
+      within(box).getByText(/I dati già importati restano in NINFA\./u),
+    ).not.toBeNull();
+    expect(forgetImportConfigurationMock).not.toHaveBeenCalled(); // asking is not forgetting
+    await user.click(within(box).getByRole("button", { name: "Annulla" }));
+    expect(forgetImportConfigurationMock).not.toHaveBeenCalled();
+
+    await user.click(await screen.findByRole("button", { name: "Dimentica configurazione" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dimentica configurazione" }));
+
+    expect(await screen.findByText("Configurazione dimenticata. I dati già importati sono rimasti in NINFA.")).not.toBeNull();
+    expect(forgetImportConfigurationMock).toHaveBeenCalledWith(PROPERTY_ID, "src-labor");
+    expect(removeDataSourceMock).not.toHaveBeenCalled();
+    expect(getDataSourcesMock).toHaveBeenCalledTimes(1); // the source is still there: nothing to re-read
+  });
+
+  it("a failure to forget is said plainly and the configuration stays", async () => {
+    getImportConfigurationMock.mockResolvedValue(ok(savedConfigurationOf()));
+    forgetImportConfigurationMock.mockResolvedValue(failure("INTERNAL_ERROR", 500));
+    const user = await openManage();
+    await user.click(await screen.findByRole("button", { name: "Dimentica configurazione" }));
+
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dimentica configurazione" }));
+
+    expect(flat(await within(screen.getByRole("dialog")).findByRole("alert"))).toContain("NINFA non è riuscita a leggere questa fonte.");
+    expect(document.body.textContent).not.toContain("technical message");
+  });
+
+  it("'Modifica associazioni' leads to the page, on the columns of this kind of source", async () => {
+    getImportConfigurationMock.mockResolvedValue(ok(savedConfigurationOf()));
+    await openManage();
+
+    const link = await screen.findByRole("link", { name: "Modifica associazioni" });
+
+    expect(link.getAttribute("href")).toBe(`/importa-file?property=${PROPERTY_ID}&review=LABOR`);
+    expect(dialog().querySelector("input[type='file']")).toBeNull();
+  });
 });
 
 // --- the "..." menu ------------------------------------------------------------------------------------------
@@ -443,7 +835,7 @@ describe("Fonti dati - the '...' menu works and lists only usable actions", () =
     expect(document.activeElement).toBe(items[2]);
   });
 
-  it("'Gestisci' opens the manage dialog; 'Carica nuovo file' opens the import; 'Rimuovi fonte' opens the confirmation", async () => {
+  it("'Gestisci' opens the manage dialog; 'Carica nuovo file' is a link to the page; 'Rimuovi fonte' opens the confirmation", async () => {
     const user = userEvent.setup();
     await renderBlock(laborViaCsv("2026-10-18T10:00:00Z"));
     const open = () => within(cardOf("Personale")).getByRole("button", { name: "Azioni per Personale" });
@@ -454,9 +846,10 @@ describe("Fonti dati - the '...' menu works and lists only usable actions", () =
     await user.click(within(dialog()).getAllByRole("button", { name: "Chiudi" })[0] as HTMLElement);
 
     await user.click(open());
-    await user.click(screen.getByRole("menuitem", { name: "Carica nuovo file" }));
-    expect(await screen.findByRole("dialog", { name: "Importa i dati del personale" })).not.toBeNull();
-    await user.click(within(dialog()).getByRole("button", { name: "Chiudi" }));
+    const upload = screen.getByRole("menuitem", { name: "Carica nuovo file" });
+    expect(upload.tagName).toBe("A");
+    expect(upload.getAttribute("href")).toBe(`/importa-file?property=${PROPERTY_ID}`);
+    await user.keyboard("{Escape}");
 
     await user.click(open());
     await user.click(screen.getByRole("menuitem", { name: "Rimuovi fonte" }));
@@ -500,7 +893,9 @@ describe("Fonti dati - 'Gestisci' and 'Rimuovi fonte'", () => {
     expect(flat(box.querySelector("dl") as HTMLElement)).toBe(
       "Come arrivano i dati Import file Ultimo aggiornamento 18 ottobre 2026",
     );
-    expect(within(box).getByRole("button", { name: "Carica nuovo file" })).not.toBeNull();
+    expect(within(box).getByRole("link", { name: "Carica nuovo file" }).getAttribute("href")).toBe(
+      `/importa-file?property=${PROPERTY_ID}`,
+    );
     expect(within(box).getByRole("button", { name: "Rimuovi fonte" })).not.toBeNull();
   });
 
@@ -565,6 +960,7 @@ describe("Fonti dati - 'Gestisci' and 'Rimuovi fonte'", () => {
 
     expect(within(dialog()).queryByRole("button", { name: "Rimuovi fonte" })).toBeNull();
     expect(within(dialog()).queryByRole("button", { name: /Carica/u })).toBeNull();
+    expect(within(dialog()).queryByRole("link", { name: /Carica/u })).toBeNull();
   });
 });
 
@@ -589,7 +985,8 @@ describe("Fonti dati - 'Collega una nuova fonte'", () => {
     await user.click(within(box).getByRole("button", { name: /^Costi/u }));
     const how = screen.getByRole("dialog", { name: "Costi" });
     expect(within(how).getByText("Come vuoi fornire questi dati?")).not.toBeNull();
-    expect(within(how).getByRole("heading", { level: 3, name: "Importa fatture" })).not.toBeNull();
+    expect(within(how).getByRole("heading", { level: 3, name: "Fatture elettroniche" })).not.toBeNull();
+    expect(within(how).getByRole("heading", { level: 3, name: "Registro dei costi" })).not.toBeNull();
     expect(within(how).getByText("Prossimamente")).not.toBeNull();
 
     await user.click(within(how).getByRole("button", { name: "Indietro" }));
@@ -604,8 +1001,9 @@ describe("Fonti dati - 'Collega una nuova fonte'", () => {
     await user.click(within(dialog()).getByRole("button", { name: /^Distribuzione/u }));
 
     expect(within(dialog()).getByText(/I canali di vendita arrivano insieme alle prenotazioni: non serve collegarli separatamente/u)).not.toBeNull();
-    await user.click(within(dialog()).getByRole("button", { name: "Importa file" }));
-    expect(await screen.findByRole("dialog", { name: "Importa le prenotazioni" })).not.toBeNull();
+    expect(within(dialog()).getByRole("link", { name: "Importa un file" }).getAttribute("href")).toBe(
+      `/importa-file?property=${PROPERTY_ID}`,
+    );
     expect(getDataSourcesMock).toHaveBeenCalledTimes(1); // nothing was created, so nothing was re-read
   });
 
@@ -618,8 +1016,9 @@ describe("Fonti dati - 'Collega una nuova fonte'", () => {
 
     const box = screen.getByRole("dialog", { name: "Personale" });
     expect(within(box).getByText("Hai già una fonte per questi dati. Puoi caricare un nuovo file per aggiornarli.")).not.toBeNull();
-    await user.click(within(box).getByRole("button", { name: "Carica nuovo file" }));
-    expect(await screen.findByRole("dialog", { name: "Importa i dati del personale" })).not.toBeNull();
+    expect(within(box).getByRole("link", { name: "Importa un file" }).getAttribute("href")).toBe(
+      `/importa-file?property=${PROPERTY_ID}`,
+    );
   });
 });
 

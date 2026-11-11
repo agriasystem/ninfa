@@ -24,7 +24,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from app.modules.ingestion.models import DataSourceDomain
+from app.modules.ingestion.models import DataSourceDomain, ImportJobStatus
 
 
 class SourceCard(StrEnum):
@@ -91,6 +91,19 @@ class SourcesOverview:
     automatic_integrations: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class RecentImport:
+    """One import attempt, in the words the "Importa file" page uses. A FAILED attempt says only
+    that it failed: its stored error text is for operators and never travels."""
+
+    # The name the file had, with any personal value in it masked. `None`: no file was recorded.
+    file_name: str | None
+    domain: DataSourceDomain
+    status: ImportJobStatus
+    # When it ended, or (an attempt still running) when it began.
+    at: datetime
+
+
 # The file method of each domain: the ONLY ways NINFA can receive data today.
 DOMAIN_METHOD: dict[DataSourceDomain, SourceMethod] = {
     DataSourceDomain.BOOKINGS: SourceMethod.CSV,
@@ -109,6 +122,7 @@ __all__ = [
     "DOMAIN_METHOD",
     "DOMAIN_SOURCE_NAME",
     "DerivedFrom",
+    "RecentImport",
     "SourceCapability",
     "SourceCard",
     "SourceCardState",

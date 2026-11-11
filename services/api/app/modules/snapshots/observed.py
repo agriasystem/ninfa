@@ -1,7 +1,9 @@
 """ObservedSnapshotService: what the canonical bookings say RIGHT NOW.
 
 An observation is evidence: it records what NINFA saw at `as_of_at`, computed from the bookings
-as they are at that instant. It is not the history of the bookings and it is never rewritten.
+as they are at that instant. It is not the history of the bookings and it is never rewritten. A day
+can be looked at more than once: what changed joins the day as its next revision, and what was seen
+earlier stays what it is.
 
     one transaction:  validate -> lock the data source -> read the clock -> read bookings and
                       inventory -> calculate one row per stay night -> store or compare -> commit
@@ -22,6 +24,7 @@ import logging
 from datetime import date
 from uuid import UUID
 
+from app.modules.ingestion.repository import ImportJobRepository
 from app.modules.snapshots.aggregate import aggregate_observed
 from app.modules.snapshots.calculation import (
     OBSERVED_STATUSES,
@@ -51,9 +54,9 @@ class ObservedSnapshotService(SnapshotServiceBase):
         `as_of_at` is the injected clock's now (UTC); the snapshot day is that instant's date in
         the property's time zone. There is deliberately no way to pass either of them in.
 
-        Same key + same content -> idempotent no-op. Same key + different content -> raises
-        `BOOKING_SNAPSHOT_CONFLICT` and stores nothing: an observation is never updated (one
-        observation per data source, snapshot day and stay night).
+        Same key + same content -> idempotent no-op, no new revision. A night whose content
+        changed -> a new row for it, at the day's next revision: an observation is never updated.
+        The last revision of a day is the one that represents it from then on.
         """
         self._validate_range(stay_date_start, stay_date_end, "stay_date")
 
@@ -93,18 +96,21 @@ class ObservedSnapshotService(SnapshotServiceBase):
             existing = self._snapshots.existing_in_range(
                 source.data_source_id, snapshot_date, snapshot_date, stay_date_start, stay_date_end
             )
-            created, unchanged, skipped = self._store(
-                source, calculated, existing, origin=SnapshotOrigin.OBSERVED
-            )
+            stored = self._store(source, calculated, existing, origin=SnapshotOrigin.OBSERVED)
+            latest_import = ImportJobRepository(
+                self._session, self._tenant
+            ).latest_changing_for_data_source(source.data_source_id)
             logger.info(
                 "observed snapshots stored workspace_id=%s property_id=%s data_source_id=%s "
-                "snapshot_date=%s created=%d unchanged=%d",
+                "snapshot_date=%s revision=%d created=%d revised=%d unchanged=%d",
                 self._tenant.workspace_id,
                 source.property_id,
                 source.data_source_id,
                 snapshot_date,
-                created,
-                unchanged,
+                stored.revision,
+                stored.created,
+                stored.revised,
+                stored.unchanged,
             )
             return SnapshotRunResult(
                 origin=SnapshotOrigin.OBSERVED,
@@ -114,9 +120,13 @@ class ObservedSnapshotService(SnapshotServiceBase):
                 snapshot_date_last=snapshot_date,
                 stay_date_first=stay_date_start,
                 stay_date_last=stay_date_end,
-                created=created,
-                unchanged=unchanged,
-                skipped_observed=skipped,
+                created=stored.created,
+                unchanged=stored.unchanged,
+                skipped_observed=stored.skipped,
+                revised=stored.revised,
+                revision=stored.revision,
+                import_job_id=None if latest_import is None else latest_import.id,
+                import_finished_at=None if latest_import is None else latest_import.finished_at,
             )
 
         return self._finish(run)

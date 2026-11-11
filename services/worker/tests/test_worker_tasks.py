@@ -4,6 +4,7 @@ import asyncio
 
 from procrastinate import testing
 
+from app.modules.analysis import DAILY_TICK_TASK
 from worker import runtime
 from worker.app import DEFAULT_QUEUE, app
 from worker.tasks import HEARTBEAT_TASK, heartbeat
@@ -23,7 +24,11 @@ def test_worker_executes_a_deferred_heartbeat_job() -> None:
             async with test_app.open_async():
                 await heartbeat.defer_async()
                 await test_app.run_worker_async(queues=[DEFAULT_QUEUE], wait=False)
-        return [str(job["status"]) for job in connector.jobs.values()]
+        return [
+            str(job["status"])
+            for job in connector.jobs.values()
+            if job["task_name"] != DAILY_TICK_TASK
+        ]
 
     assert runtime.run(scenario()) == ["succeeded"]
 

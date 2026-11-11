@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import type {
   DataSourceDomain,
@@ -9,20 +9,21 @@ import type {
   SourceMethod,
 } from "@ninfa/contracts";
 
-import { propertyLocalDate } from "@/lib/date/property-date";
+import { importaFileRoute } from "@/lib/routes";
 import { sourcesCopy } from "@/lib/sources/copy";
 import type { SourceCardView } from "@/lib/sources/view-model";
 
-import { StrutturaImportDialog } from "./struttura-import-dialog";
+import { StrutturaInvoiceDialog } from "./struttura-invoice-dialog";
 import { StrutturaManageDialog } from "./struttura-manage-dialog";
 import { StrutturaModal } from "./struttura-modal";
-import { StrutturaButton } from "./struttura-parts";
+import { StrutturaButton, StrutturaLinkButton } from "./struttura-parts";
+import { StrutturaTemplateButton } from "./struttura-template-button";
 
 export type SourceDialog =
   | { kind: "connect"; card: SourceCardKey }
   | { kind: "wizard" }
   | { kind: "manage"; card: SourceCardKey; confirmRemove?: boolean }
-  | { kind: "import"; domain: DataSourceDomain; mode?: "import" | "edit" };
+  | { kind: "invoices" };
 
 /** The card that owns each kind of file source (a card is a presentation of a kind of data). */
 const OWNER_OF_DOMAIN: Record<DataSourceDomain, SourceCardKey> = {
@@ -47,7 +48,7 @@ const FILE_OPTION_OF_CARD: Record<SourceCardKey, OptionCopy> = {
   PMS: sourcesCopy.methods.bookingsCsv,
   CHANNEL_MANAGER: sourcesCopy.methods.bookingsCsv,
   OTA: sourcesCopy.methods.channelCsv,
-  ACCOUNTING: sourcesCopy.methods.invoicesXml,
+  ACCOUNTING: sourcesCopy.methods.costsRegister,
   STAFF: sourcesCopy.methods.laborCsv,
 };
 
@@ -61,17 +62,55 @@ const METHOD_OF_DOMAIN: Record<DataSourceDomain, SourceMethod> = {
   LABOR: "CSV",
 };
 
-function FileOption({ option, onChoose }: { option: OptionCopy; onChoose: () => void }) {
+function Option({ option, children }: { option: Pick<OptionCopy, "title" | "body">; children: ReactNode }) {
   return (
     <div className="struttura-option">
       <div>
         <h3 className="struttura-option__title">{option.title}</h3>
         <p className="struttura-option__body">{option.body}</p>
       </div>
-      <StrutturaButton variant="primary" onClick={onChoose}>
-        {option.cta}
-      </StrutturaButton>
+      <div className="struttura-option__actions">{children}</div>
     </div>
+  );
+}
+
+/**
+ * How a kind of data gets in: a file goes through the "Importa file" page, which works out what it is. These
+ * dialogs only say so and lead there. Invoices (XML), which that page does not read, get their own dialog.
+ */
+function FileOptions({
+  propertyId,
+  domain,
+  option,
+  onInvoices,
+}: {
+  propertyId: string;
+  domain: DataSourceDomain;
+  option: OptionCopy;
+  onInvoices: () => void;
+}) {
+  const link = (
+    <StrutturaLinkButton variant={domain === "COSTS" ? "outline" : "primary"} href={importaFileRoute(propertyId)}>
+      {option.cta}
+    </StrutturaLinkButton>
+  );
+  if (domain === "COSTS") {
+    return (
+      <>
+        <Option option={sourcesCopy.methods.invoicesXml}>
+          <StrutturaButton variant="primary" onClick={onInvoices}>
+            {sourcesCopy.methods.invoicesXml.cta}
+          </StrutturaButton>
+        </Option>
+        <Option option={option}>{link}</Option>
+      </>
+    );
+  }
+  return (
+    <Option option={option}>
+      {link}
+      <StrutturaTemplateButton propertyId={propertyId} domain={domain} />
+    </Option>
   );
 }
 
@@ -101,7 +140,7 @@ export interface StrutturaSourceDialogsProps {
 
 /**
  * Every dialog of "Fonti dati": the per-card "Collega fonte", the "Collega una nuova fonte" wizard, "Gestisci"
- * and the file import. They offer ONLY what the backend says NINFA can really do (`capabilities`); automatic
+ * and the invoice import. They offer ONLY what the backend says NINFA can really do (`capabilities`); automatic
  * integrations are "Prossimamente" and can never be started.
  */
 export function StrutturaSourceDialogs({
@@ -113,44 +152,26 @@ export function StrutturaSourceDialogs({
   setDialog,
   refresh,
 }: StrutturaSourceDialogsProps) {
-  const [startError, setStartError] = useState<string | null>(null);
   const [wizardKind, setWizardKind] = useState<"bookings" | "distribution" | "costs" | "labor" | null>(null);
 
   const close = () => {
-    setStartError(null);
     setWizardKind(null);
     setDialog(null);
   };
 
   /**
-   * Goes to the import of a kind of data. This creates NOTHING: the backend sets the source up (or switches
-   * the removed one back on) only when the confirmed import succeeds, so choosing "Collega fonte" and then
-   * closing the dialog leaves the card "Non configurato".
+   * Goes to the import of an invoice. This creates NOTHING: the backend sets the source up (or switches the
+   * removed one back on) only when the confirmed import succeeds, so choosing "Collega fonte" and then closing
+   * the dialog leaves the card "Non configurato".
    */
-  function start(domain: DataSourceDomain) {
-    const owner = sources.cards.find((card) => card.card === OWNER_OF_DOMAIN[domain]);
-    if (owner?.several_sources) {
-      setStartError(sourcesCopy.errors.alreadyConfigured);
-      return;
-    }
-    setStartError(null);
-    setDialog({ kind: "import", domain });
-  }
+  const openInvoices = () => setDialog({ kind: "invoices" });
 
   if (dialog === null) return null;
 
-  // --- the file import ----------------------------------------------------------------------------
-  if (dialog.kind === "import") {
+  // --- an invoice -------------------------------------------------------------------------------
+  if (dialog.kind === "invoices") {
     return (
-      <StrutturaImportDialog
-        propertyId={propertyId}
-        timeZone={timeZone}
-        domain={dialog.domain}
-        mode={dialog.mode}
-        snapshotLocalDate={propertyLocalDate(new Date(), timeZone)}
-        onImported={() => void refresh()}
-        onClose={close}
-      />
+      <StrutturaInvoiceDialog propertyId={propertyId} onImported={() => void refresh()} onClose={close} />
     );
   }
 
@@ -165,12 +186,9 @@ export function StrutturaSourceDialogs({
         timeZone={timeZone}
         view={view}
         initialConfirm={dialog.confirmRemove === true}
-        onUpload={() => {
-          if (domain !== null) start(domain);
-        }}
-        onEditColumns={() => {
-          if (domain !== null) setDialog({ kind: "import", domain, mode: "edit" });
-        }}
+        uploadHref={domain === "COSTS" ? null : importaFileRoute(propertyId)}
+        onUpload={() => setDialog({ kind: "connect", card: dialog.card })}
+        reviewHref={importaFileRoute(propertyId, domain ?? undefined)}
         onRemoved={() => {
           close();
           void refresh();
@@ -189,16 +207,16 @@ export function StrutturaSourceDialogs({
       <StrutturaModal title={copy.title} description={copy.intro} onClose={close}>
         <div className="struttura-options">
           {available ? (
-            <FileOption option={FILE_OPTION_OF_CARD[dialog.card]} onChoose={() => start(domain)} />
+            <FileOptions
+              propertyId={propertyId}
+              domain={domain}
+              option={FILE_OPTION_OF_CARD[dialog.card]}
+              onInvoices={openInvoices}
+            />
           ) : (
             <p className="struttura-flow__note">{sourcesCopy.dialog.unavailable}</p>
           )}
           {sources.automatic_integrations.length === 0 ? <ComingSoonOption /> : null}
-          {startError !== null ? (
-            <p className="struttura-flow__error" role="alert">
-              {startError}
-            </p>
-          ) : null}
         </div>
       </StrutturaModal>
     );
@@ -240,15 +258,12 @@ export function StrutturaSourceDialogs({
   const domain = kindToDomain[wizardKind];
   const owner = sources.cards.find((card) => card.card === OWNER_OF_DOMAIN[domain]);
   const configured = owner !== undefined && owner.state !== "NOT_CONFIGURED";
+  const several = owner?.several_sources === true;
   const available = canProvide(sources, domain, METHOD_OF_DOMAIN[domain]);
   const option: OptionCopy =
     wizardKind === "distribution"
       ? { title: kinds.bookings.title, body: sourcesCopy.methods.channelCsv.body, cta: sourcesCopy.methods.channelCsv.cta }
-      : wizardKind === "bookings"
-        ? sourcesCopy.methods.bookingsCsv
-        : wizardKind === "costs"
-          ? sourcesCopy.methods.invoicesXml
-          : sourcesCopy.methods.laborCsv;
+      : FILE_OPTION_OF_CARD[OWNER_OF_DOMAIN[domain]];
 
   return (
     <StrutturaModal
@@ -260,25 +275,18 @@ export function StrutturaSourceDialogs({
         {wizardKind === "distribution" ? (
           <p className="struttura-flow__note">{sourcesCopy.wizard.distributionNote}</p>
         ) : null}
-        {configured ? <p className="struttura-flow__note">{sourcesCopy.wizard.alreadyHave}</p> : null}
-        {available ? (
-          <FileOption
-            option={
-              configured
-                ? { ...option, title: sourcesCopy.actions.uploadNew, cta: sourcesCopy.actions.uploadNew }
-                : option
-            }
-            onChoose={() => start(domain)}
-          />
+        {configured && !several ? <p className="struttura-flow__note">{sourcesCopy.wizard.alreadyHave}</p> : null}
+        {several ? (
+          // Created outside this page: NINFA does not pick one, so no file can be offered.
+          <p className="struttura-flow__error" role="alert">
+            {sourcesCopy.errors.alreadyConfigured}
+          </p>
+        ) : available ? (
+          <FileOptions propertyId={propertyId} domain={domain} option={option} onInvoices={openInvoices} />
         ) : (
           <p className="struttura-flow__note">{sourcesCopy.dialog.unavailable}</p>
         )}
         {!configured && sources.automatic_integrations.length === 0 ? <ComingSoonOption /> : null}
-        {startError !== null ? (
-          <p className="struttura-flow__error" role="alert">
-            {startError}
-          </p>
-        ) : null}
         <div className="struttura-flow__actions">
           <StrutturaButton variant="outline" onClick={() => setWizardKind(null)}>
             {sourcesCopy.dialog.back}

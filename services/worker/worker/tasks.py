@@ -3,13 +3,16 @@
 * `system.heartbeat` (Gate 0): smoke task proving that the worker starts, connects and executes.
 * `analysis.run_property` (Gate 25B): runs the shared production analysis for ONE property, every
   choice explicit.
-* `analysis.run_policy` (Gate 26B): one AUTOMATIC opportunity for ONE property: it re-validates the
-  policy and computes the 30-date window at execution time (Revenue + Distribution only).
+* `analysis.run_policy` (Gate 26B): the day's analysis of ONE property: it re-validates the policy
+  and works out what to analyse at execution time.
+* `analysis.refresh_property`: the refresh after a successful import of the web API, or after the
+  room inventory was saved, for ONE property: what it analyses is decided at execution time, from
+  what is really stored.
 
-NOTHING inside NINFA schedules anything: there is no periodic job, no startup hook and no import
-trigger. `analysis.run_property` runs only when an operator enqueues it explicitly
-(`python -m worker enqueue-analysis ...`); `analysis.run_policy` is enqueued only by the
-dispatcher command (`python -m worker dispatch-analysis`), which an EXTERNAL scheduler invokes.
+`analysis.run_property` runs only when an operator enqueues it explicitly (`python -m worker
+enqueue-analysis ...`); `analysis.run_policy` is enqueued by the worker's own tick (`worker.daily`)
+or by an operator's catch-up (`python -m worker dispatch-analysis`); `analysis.refresh_property`
+only by the API (`app.modules.analysis.queue`). The operator's own import commands trigger nothing.
 """
 
 import logging
@@ -17,15 +20,25 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
+from app.core.tenant import TenantContext
 from app.db.session import get_sessionmaker
-from app.modules.analysis import AnalysisRunRequest, run_automatic_analysis, run_property_analysis
+from app.modules.analysis import (
+    ANALYSIS_POLICY_TASK,
+    ANALYSIS_REFRESH_TASK,
+    AnalysisRunRequest,
+    RefreshOutcomeKind,
+    enqueue_refresh,
+    run_automatic_analysis,
+    run_property_analysis,
+    run_refresh,
+)
 from worker.app import DEFAULT_QUEUE, app
 
 logger = logging.getLogger(__name__)
 
 HEARTBEAT_TASK = "system.heartbeat"
 ANALYSIS_RUN_PROPERTY_TASK = "analysis.run_property"
-ANALYSIS_RUN_POLICY_TASK = "analysis.run_policy"
+ANALYSIS_RUN_POLICY_TASK = ANALYSIS_POLICY_TASK
 
 
 @app.task(name=HEARTBEAT_TASK, queue=DEFAULT_QUEUE)
@@ -35,7 +48,7 @@ async def heartbeat() -> None:
 
 # A plain `def` on purpose: Procrastinate runs a synchronous task in a thread pool, and the
 # analysis uses a synchronous SQLAlchemy Session. No retry is configured (deterministic failures -
-# unknown ids, snapshot CONFLICT, out-of-order run - would only loop); a failure is the job state
+# unknown ids, an out-of-order run - would only loop); a failure is the job state
 # `failed` plus the real exception in the worker log.
 @app.task(name=ANALYSIS_RUN_PROPERTY_TASK, queue=DEFAULT_QUEUE)
 def run_property_analysis_task(
@@ -87,9 +100,10 @@ def run_property_analysis_task(
     )
 
 
-# Sync `def` for the same reason as above. Only the policy's identity is an argument: the stay
-# dates are computed here, at EXECUTION time, so a job that waited in the queue past local midnight
-# still analyses the right window - or skips, if the day's rules no longer hold. No retry.
+# Sync `def` for the same reason as above. Only the policy's identity is an argument: the stay dates
+# are computed here, at EXECUTION time, so a job that waited in the queue past local midnight still
+# analyses the right window - or skips, if the day's rules no longer hold. No retry here: asking
+# again is the tick's (`worker.daily`), a bounded number of times a day.
 @app.task(name=ANALYSIS_RUN_POLICY_TASK, queue=DEFAULT_QUEUE)
 def run_policy_analysis_task(*, workspace_id: str, property_id: str) -> None:
     ids = f"workspace_id={workspace_id} property_id={property_id}"
@@ -117,6 +131,48 @@ def run_policy_analysis_task(*, workspace_id: str, property_id: str) -> None:
         outcome.local_date,
         outcome.result.decision_run_id,
         outcome.result.is_idempotent_replay,
+    )
+
+
+# Sync `def` for the same reason as above, and no retry: a real failure stays a failed job, which
+# the status reports and the person can ask to repeat. The one outcome that is due again by itself
+# is a key that cannot be observed yet: the refresh is queued for the next local day. `lock` and
+# `queueing_lock` come with the job (`queue.py`): one running and one waiting per property.
+@app.task(name=ANALYSIS_REFRESH_TASK, queue=DEFAULT_QUEUE)
+def refresh_property_task(*, workspace_id: str, property_id: str) -> None:
+    ids = f"workspace_id={workspace_id} property_id={property_id}"
+    logger.info("Analysis refresh started: %s", ids)
+    with get_sessionmaker()() as session:
+        try:
+            outcome = run_refresh(session, UUID(workspace_id), UUID(property_id))
+        except Exception as error:
+            logger.error(
+                "Analysis refresh failed: %s status=failed error_type=%s", ids, type(error).__name__
+            )
+            raise
+        if outcome.kind is RefreshOutcomeKind.DEFERRED:
+            enqueue_refresh(
+                session,
+                TenantContext(workspace_id=UUID(workspace_id)),
+                UUID(property_id),
+                scheduled_at=outcome.retry_at,
+            )
+            session.commit()
+    if outcome.result is not None:
+        logger.info(
+            "Analysis refresh completed: %s status=succeeded decision_run_id=%s "
+            "is_idempotent_replay=%s",
+            ids,
+            outcome.result.decision_run_id,
+            outcome.result.is_idempotent_replay,
+        )
+        return
+    logger.info(
+        "Analysis refresh not run: %s outcome=%s reason=%s retry_at=%s",
+        ids,
+        outcome.kind,
+        outcome.skip_reason,
+        outcome.retry_at,
     )
 
 

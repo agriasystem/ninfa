@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# NINFA daily analysis wrapper - the ONE command an external scheduler runs (Gate 27B).
+# NINFA daily analysis wrapper - an operator's CATCH-UP (Gate 27B). Nothing has to run it: the worker
+# asks for the day's analysis by itself, from 10:00 on each property's own clock (Europe/Rome for the
+# first pilot). See docs/architecture/adr/0044-pilot-autonomy.md.
 #
 # Supported V1 sequence (docs/operations/pilot-daily-operations-v1.md):
 #
@@ -8,9 +10,8 @@
 #   2. python -m worker run --once          process every queued job, then exit
 #   3. python -m worker analysis-status     print, per enabled property, whether today's run exists
 #
-# THE SCHEDULER: not configured by this repository. It must run this script at 10:00 in the
-# NAMED timezone Europe/Rome every day (never a fixed UTC time: that is wrong twice a year when
-# daylight saving changes). Running it later the same local day is supported (manual catch-up).
+# It can be run at any hour. A property that already has a run today, or has never imported anything,
+# is skipped.
 #
 # ENVIRONMENT: loaded EXTERNALLY - by the scheduler (for example systemd `EnvironmentFile=`) or by
 # `scripts/with-env.sh /etc/ninfa/api.env scripts/run-daily-analysis.sh`. This script never reads or
@@ -22,8 +23,8 @@
 # HONEST LIMITATION - read this: the exit codes below do NOT prove that every analysis succeeded.
 # `worker run --once` exits 0 even when a queued job failed, and `analysis-status` exits 0 even
 # when an enabled property has no run today. A zero exit means "the three commands ran". The
-# operator must read the analysis-status output (run_today=YES for every enabled property) at
-# about 10:15. This script does not parse that human-readable output.
+# operator reads the analysis-status output (run_today=YES for every enabled property). This script
+# does not parse that human-readable output.
 #
 # Exit codes: 0 = all three commands exited 0; 1 = at least one command exited non-zero (all three
 # are still attempted, in order); 2 = refused to start (configuration problem), nothing was run.

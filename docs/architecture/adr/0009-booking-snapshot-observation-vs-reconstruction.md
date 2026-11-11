@@ -69,7 +69,7 @@ unknown, and a wrong recommendation would be built on a reconstruction believed 
   history is available as reconstructions, always labelled approximate, with the uncertainty counted.
   Consumers (curves, pickup, expected) must handle the two origins explicitly, and can decide to use
   only `OBSERVED`, or both while keeping them apart.
-- A second run on the same day after the data changed is a conflict rather than an update, so a
+- (Superseded by [ADR 0039](0039-same-day-revisions.md): it is now the day's next revision.) A second run on the same day after the data changed is a conflict rather than an update, so a
   scheduler will run once per local day (after the day's import) and a correction of an observation
   is not possible in V1 by design.
 - Rules changes (allocation, rounding, status policy) require a new `calculation_version`; storing

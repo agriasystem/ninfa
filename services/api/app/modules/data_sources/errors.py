@@ -16,6 +16,28 @@ class DataSourceNotFoundError(AppError):
         )
 
 
+class RememberedAnswerNotFoundError(AppError):
+    """This source remembers no such answer: it was forgotten already, or it never existed."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "REMEMBERED_ANSWER_NOT_FOUND",
+            "Remembered answer not found",
+            status_code=HTTPStatus.NOT_FOUND,
+        )
+
+
+class InvalidRememberedAnswerError(AppError):
+    """A remembered answer can be corrected only to what its own question offers."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "INVALID_REMEMBERED_ANSWER",
+            "That is not one of the meanings this answer can have",
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+        )
+
+
 class AmbiguousSourceError(AppError):
     """The property has several ACTIVE sources of this domain (set up outside this API): NINFA
     keeps ONE per domain, because an analysis reads a domain from exactly one source and never

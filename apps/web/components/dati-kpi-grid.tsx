@@ -26,7 +26,7 @@ interface KpiProps {
 
 /** A KPI whose figure cannot be calculated shows "Non disponibile" and, in the note's place, WHY -
  * never a zero and never an empty tile. */
-function Kpi({ id, label, value, note, delta, highlight = false, unavailableNote }: KpiProps) {
+export function Kpi({ id, label, value, note, delta, highlight = false, unavailableNote }: KpiProps) {
   const labelId = `${id}-label`;
   return (
     <article className={`dati-kpi${highlight ? " dati-kpi--highlight" : ""}`} aria-labelledby={labelId}>

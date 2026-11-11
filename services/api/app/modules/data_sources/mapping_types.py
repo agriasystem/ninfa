@@ -17,7 +17,7 @@ from app.modules.data_sources.files import ImportProblem
 from app.modules.data_sources.source_learning import LearningInfo
 from app.modules.data_sources.understanding_types import Question, UnderstandingInfo
 from app.modules.document_understanding.layout import LayoutSpec
-from app.modules.ingestion.models import DataSourceDomain
+from app.modules.ingestion.models import DataSourceDomain, FileScope
 
 MAX_COLUMNS = 200
 MAX_HEADER_LENGTH = 200
@@ -81,6 +81,15 @@ class MappingInput(BaseModel):
     # The words the person taught NINFA: {"role_mapping": {"HK": "HOUSEKEEPING"}} (a department
     # label, a status, a cost category). Kept in the configuration of THIS source only.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # What this file says about the records it does not hold, as the server knows it from a person
+    # (an answer, or the family's memory). Verified with the rest of a decision the server issued;
+    # ignored on a matching built by hand, where nobody was asked.
+    file_scope: FileScope | None = None
+    # What the family remembered when the server read the file, and what that reading found would
+    # stop counting. Issued and verified like `file_scope`: posted back different, they only get the
+    # decision refused, and what is taken away is computed again when it is taken away.
+    remembered_file_scope: FileScope | None = None
+    expected_removals: int = 0
     # Set by the server on the decisions IT issues (see `SmartImportDecision`); absent on a matching
     # the person builds by hand.
     smart_import: SmartImportDecision | None = None
@@ -121,11 +130,17 @@ class ConstantKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ConstantSpec:
-    """A field that may be given ONE value for every row of the file."""
+    """A field that may be given ONE value for every row of the file.
+
+    `when_absent`: a file with no column for this field still says what it means, and `default` is
+    what it says - a line of a bookings export is one room unless the file counts them. NINFA then
+    reads that value by itself and states it on the summary. It is never used while a column of the
+    file might be the field: that is a question, not an absence."""
 
     kind: ConstantKind
     choices: tuple[str, ...] = ()
     default: str | int | None = None
+    when_absent: bool = False
 
 
 @dataclass(frozen=True, slots=True)

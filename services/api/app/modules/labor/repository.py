@@ -5,9 +5,10 @@ but never `commit()`: transaction boundaries belong to LaborImportService. Write
 statement per kind of row) so an import does not grow with its number of entries.
 """
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -17,13 +18,15 @@ from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
 from app.modules.bookings.models import ImportRowStatus
-from app.modules.ingestion.models import DataSource
+from app.modules.ingestion.models import DataSource, FileScope, ImportJob
+from app.modules.labor.current_plan import FileCoverage
 from app.modules.labor.models import (
     LaborEntry,
     LaborImportRow,
     LaborMappingProfile,
     LaborSnapshot,
 )
+from app.modules.labor.roles import LaborCategory, LaborClassificationMethod
 
 _CHUNK = 1000
 
@@ -38,6 +41,25 @@ class StagedRow:
     validation_warnings: list[dict[str, str]]
 
 
+@dataclass(frozen=True, slots=True)
+class StoredPlanRow:
+    """One stored entry, with the file it came from: what `current_rows` and a comparison need."""
+
+    labor_snapshot_id: UUID
+    snapshot_local_date: date
+    revision: int
+    work_date: date
+    role_normalized: str | None
+    labor_category: LaborCategory
+    planned_minutes: int | None
+    actual_minutes: int | None
+    planned_cost: Decimal | None
+    actual_cost: Decimal | None
+    currency: str | None
+    classification_method: LaborClassificationMethod
+    classification_confidence: Decimal
+
+
 class LaborSnapshotRepository:
     """Labor snapshots of ONE workspace."""
 
@@ -48,13 +70,27 @@ class LaborSnapshotRepository:
     def get_by_identity(
         self, data_source_id: UUID, snapshot_local_date: date
     ) -> LaborSnapshot | None:
+        """The newest snapshot of this source and date."""
         return self._session.scalar(
-            select(LaborSnapshot).where(
+            select(LaborSnapshot)
+            .where(
+                LaborSnapshot.workspace_id == self._tenant.workspace_id,
+                LaborSnapshot.data_source_id == data_source_id,
+                LaborSnapshot.snapshot_local_date == snapshot_local_date,
+            )
+            .order_by(LaborSnapshot.revision.desc())
+            .limit(1)
+        )
+
+    def next_revision(self, data_source_id: UUID, snapshot_local_date: date) -> int:
+        latest = self._session.scalar(
+            select(func.max(LaborSnapshot.revision)).where(
                 LaborSnapshot.workspace_id == self._tenant.workspace_id,
                 LaborSnapshot.data_source_id == data_source_id,
                 LaborSnapshot.snapshot_local_date == snapshot_local_date,
             )
         )
+        return (latest or 0) + 1
 
     def get_by_id(self, snapshot_id: UUID) -> LaborSnapshot | None:
         return self._session.scalar(
@@ -81,6 +117,98 @@ class LaborEntryRepository:
     def insert_many(self, rows: Sequence[dict[str, Any]]) -> None:
         for start in range(0, len(rows), _CHUNK):
             self._session.execute(insert(LaborEntry), list(rows[start : start + _CHUNK]))
+
+    def plan_rows_as_of(
+        self, data_source_id: UUID, as_of_date: date, work_dates: Collection[date]
+    ) -> list[StoredPlanRow]:
+        """Every stored entry of these work dates, from every snapshot known at `as_of_date`."""
+        if not work_dates:
+            return []
+        rows = self._session.execute(
+            select(
+                LaborEntry.labor_snapshot_id,
+                LaborSnapshot.snapshot_local_date,
+                LaborSnapshot.revision,
+                LaborEntry.work_date,
+                LaborEntry.role_normalized,
+                LaborEntry.labor_category,
+                LaborEntry.planned_minutes,
+                LaborEntry.actual_minutes,
+                LaborEntry.planned_cost,
+                LaborEntry.actual_cost,
+                LaborEntry.currency,
+                LaborEntry.classification_method,
+                LaborEntry.classification_confidence,
+            )
+            .join(
+                LaborSnapshot,
+                (LaborEntry.workspace_id == LaborSnapshot.workspace_id)
+                & (LaborEntry.labor_snapshot_id == LaborSnapshot.id),
+            )
+            .where(
+                LaborEntry.workspace_id == self._tenant.workspace_id,
+                LaborSnapshot.data_source_id == data_source_id,
+                LaborSnapshot.snapshot_local_date <= as_of_date,
+                LaborEntry.work_date.in_(sorted(set(work_dates))),
+            )
+        )
+        return [StoredPlanRow(*row) for row in rows]
+
+    def coverage_of_files(self, data_source_id: UUID, as_of_date: date) -> dict[UUID, FileCoverage]:
+        """What each file known at `as_of_date` speaks for, from the whole file (one statement).
+        A complete file with no row on a day still speaks for that day, so every file is here, not
+        only those with rows among the dates being read."""
+        rows = self._session.execute(
+            select(
+                LaborSnapshot.id,
+                LaborSnapshot.snapshot_local_date,
+                LaborSnapshot.revision,
+                ImportJob.file_scope,
+                LaborEntry.labor_category,
+                func.min(LaborEntry.work_date),
+                func.max(LaborEntry.work_date),
+                func.bool_or(LaborEntry.planned_minutes.is_not(None)),
+                func.bool_or(LaborEntry.actual_minutes.is_not(None)),
+            )
+            .join(
+                LaborEntry,
+                (LaborEntry.workspace_id == LaborSnapshot.workspace_id)
+                & (LaborEntry.labor_snapshot_id == LaborSnapshot.id),
+            )
+            .join(
+                ImportJob,
+                (ImportJob.workspace_id == LaborSnapshot.workspace_id)
+                & (ImportJob.id == LaborSnapshot.source_import_job_id),
+            )
+            .where(
+                LaborSnapshot.workspace_id == self._tenant.workspace_id,
+                LaborSnapshot.data_source_id == data_source_id,
+                LaborSnapshot.snapshot_local_date <= as_of_date,
+            )
+            .group_by(
+                LaborSnapshot.id,
+                LaborSnapshot.snapshot_local_date,
+                LaborSnapshot.revision,
+                ImportJob.file_scope,
+                LaborEntry.labor_category,
+            )
+        )
+        coverage: dict[UUID, FileCoverage] = {}
+        for snapshot, day, revision, scope, category, first, last, planned, actual in rows:
+            known = coverage.get(snapshot)
+            complete = scope is FileScope.FULL
+            first_day = min(first, known.complete_from) if known and known.complete_from else first
+            last_day = max(last, known.complete_to) if known and known.complete_to else last
+            coverage[snapshot] = FileCoverage(
+                day,
+                revision,
+                (known.categories if known else frozenset()) | {category},
+                bool(planned) or (known.has_planned if known else False),
+                bool(actual) or (known.has_actual if known else False),
+                first_day if complete else None,
+                last_day if complete else None,
+            )
+        return coverage
 
     def list_for_snapshot(self, snapshot_id: UUID) -> Sequence[LaborEntry]:
         return self._session.scalars(

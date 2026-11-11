@@ -4,8 +4,8 @@
 its profile, its room inventory, the few operating parameters the analysis uses, and which systems feed it.
 It is **not** a PMS, a CMS or a hotel page. Blocks 1-3 (profile, inventory, parameters) are **frontend-only**: no
 endpoint, no migration, no new dependency, no model, no Mia. **Block 4 (Fonti dati) is real**: it has its own backend
-API and working dialogs - see [data-sources-v1.md](data-sources-v1.md). The visual source of truth is the approved
-mockup of the screen.
+API and working dialogs - see [data-sources-v1.md](data-sources-v1.md); a CSV or Excel file comes in through the "Importa file"
+page, see [importa-file-v1.md](importa-file-v1.md). The visual source of truth is the approved mockup of the screen.
 
 ## Composition
 
@@ -58,6 +58,20 @@ imports the demo). The demo's capacity is the room types' theoretical capacity (
 operating configuration exists. The demo contains **no data source and no vendor** (the old "Mews / SiteMinder /
 Booking.com connected" demo was removed: a source is "Collegato" only because the backend says so).
 
+**The inventory block is an anchor.** Dati's "Configura inventario" (no room inventory, so no occupancy) links to
+`/struttura?property=…#struttura-rooms` (`strutturaInventoryRoute`): each block's section carries its id, and once the
+blocks are on screen the page scrolls the one the address names into view (the session and the property resolve
+first, so neither the browser nor the router can).
+
+**The inventory is real** ([ADR 0044](adr/0044-pilot-autonomy.md)): "Configura inventario" and "Modifica inventario" open a form with one
+number, saved through `GET`/`PUT .../room-inventory`. The occupancy follows by itself, and the profile's "Numero camere" says the same
+number. The table of room types is only the demo fixture's: the model has a capacity per night, not room types.
+
+**"Valido dal"** ([ADR 0047](adr/0047-final-pilot-product-ux.md)): the form also asks the day the number starts to be true, today by default, so a hotel that begins
+with last month's costs can say it had these rooms then. The limits (today, and the oldest day) are the backend's (`today`, `earliest_valid_from`); a day outside them is
+refused before the request, with the limits in words. A plain save sends the number alone. Saved from an earlier day, the block says "Vale dal 1 ottobre 2026 in poi" and
+the refresh that follows rebuilds, from the bookings, the history those nights make possible. What was analysed does not change.
+
 Wording lives in `lib/structure/copy.ts` (the "Fonti dati" wording is in `lib/sources/copy.ts`); month ranges, the zone
 label ("Europe/Rome (CET)", the standard-time abbreviation), the currency label ("Euro (€)") and "2 adulti + 1 bambino"
 are built in `lib/structure/format.ts`.
@@ -71,7 +85,7 @@ are built in `lib/structure/format.ts`.
 - **No parameter on a whim.** A parameter belongs in card 3 only once an NINFA engine actually uses it.
 - **No vendor logos, no vendor names.** Each category has a neutral icon; the states are told apart by pill text, icon
   tint and action, not by colour alone. Green appears only for "connected" and "active"; nothing is orange.
-- **Profile, inventory and parameter buttons are drawn, not wired.** There is no write path for the structure, so those
+- **Profile and parameter buttons are drawn, not wired.** There is no write path for them, so those
   buttons are real, focusable `<button>`s whose handler is an **optional** prop of `StrutturaScreen`
   (`StrutturaActions`); without one a click does nothing. No modal, form or workflow is invented for them. The
   **Fonti dati buttons and menus are fully wired** (see data-sources-v1.md).

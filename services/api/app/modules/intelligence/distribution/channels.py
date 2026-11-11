@@ -47,11 +47,12 @@ _CANONICAL_GROUP: Mapping[ChannelType, ChannelGroup] = {
     ChannelType.OTHER: ChannelGroup.OTHER,
 }
 
-# The deterministic dictionary (Part "DETERMINISTIC OTA/DIRECT RULES"): deliberately small,
-# matched EXACTLY on the normalised label (`app.modules.bookings.text.normalize_key`, the same
-# normalisation `BookingChannel.normalized_name` was stored with - never re-normalised here).
-# A generic label ("web", "online", "reservation") is intentionally absent: on its own it is
-# ambiguous and stays UNKNOWN.
+# The deterministic dictionary (Part "DETERMINISTIC OTA/DIRECT RULES"): deliberately small, matched
+# EXACTLY on the normalised label (`app.modules.bookings.text.normalize_key`, the same normalisation
+# `BookingChannel.normalized_name` was stored with - never re-normalised here). A generic label
+# ("web", "online", "reservation") is intentionally absent: on its own it is ambiguous and stays
+# UNKNOWN. DIRECT means the booking reached the hotel itself with no intermediary: its own site, the
+# telephone, an e-mail, the front desk (ADR 0044).
 OTA_NORMALIZED_NAMES: frozenset[str] = frozenset(
     {
         "booking com",
@@ -69,10 +70,30 @@ DIRECT_NORMALIZED_NAMES: frozenset[str] = frozenset(
     {
         "direct",
         "diretto",
+        "website",
         "website direct",
+        "sito",
+        "sito web",
+        "sito ufficiale",
         "sito diretto",
+        "phone",
         "phone direct",
+        "telephone",
+        "telefono",
+        "email",
+        "e mail",
+        "mail",
+        "telefono email",
+        "telefono e mail",
+        "telefono mail",
+        "email telefono",
+        "e mail telefono",
+        "phone email",
+        "phone e mail",
+        "phone mail",
+        "email phone",
         "walk in",
+        "walkin",
     }
 )
 

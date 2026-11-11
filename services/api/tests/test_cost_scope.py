@@ -245,11 +245,10 @@ def test_the_schema_gained_no_table() -> None:
 def test_there_is_no_migration_for_gate_7() -> None:
     script = ScriptDirectory.from_config(alembic_config("postgresql+psycopg://unused/unused"))
     revisions = {rev.revision: rev.down_revision for rev in script.walk_revisions()}
-    # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008. Gate 23B's
-    # own 0012 (input provenance) is the real chain head, unrelated to cost intelligence.
+    # Gate 7 added no migration: Gate 6's 0007 is directly followed by Gate 8's 0008.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0013_property_analysis_policy"]
-    assert len(revisions) == 13  # 0001 .. 0013: Gate 7 added none
+    assert script.get_heads() == ["0016_remembered_scope"]
+    assert len(revisions) == 16  # 0001 .. 0016: Gate 7 added none
 
 
 # --- read-only, no clock, no float ---------------------------------------------------------------
@@ -349,7 +348,7 @@ def test_no_worker_task_and_no_scheduler_was_added() -> None:
             for path in engine_free_worker_files(WORKER_DIR)
         ), word
     tasks = (WORKER_DIR / "tasks.py").read_text(encoding="utf-8")
-    assert tasks.count("@app.task") == 3  # heartbeat + Gate 25B run_property + 26B run_policy
+    assert tasks.count("@app.task") == 4  # + the refresh after an import
 
 
 def test_the_dependency_manifests_do_not_mention_scientific_ai_or_currency_libraries() -> None:

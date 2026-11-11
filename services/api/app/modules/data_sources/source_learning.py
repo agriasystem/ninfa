@@ -67,6 +67,7 @@ from app.modules.document_understanding.pii_text import normalize
 from app.modules.document_understanding.stats import ColumnStats
 from app.modules.document_understanding.text import fold, stem
 from app.modules.document_understanding.values import CellKind
+from app.modules.ingestion.models import FileScope
 
 # The placeholder of a column of personal data in a structure: its header is never kept.
 PERSONAL = "~"
@@ -176,6 +177,9 @@ class Memory(BaseModel):
     # person chose, the hours of a day grid, where the department comes from; never a date or a
     # row). None: not known (the family was remembered before layouts were).
     layout: dict[str, Any] | None = None
+    # What THIS family's files say about the records they do not hold, as a person said it. Kept
+    # apart from `trust`: a person answering this has confirmed nothing about the columns.
+    file_scope: FileScope | None = None
 
     def header_keys(self) -> list[str]:
         return [key for key, _ in self.shape if key != PERSONAL]
@@ -209,6 +213,8 @@ class Learning(BaseModel):
     # matching is only ever applied to a file of the same family.
     current: str = ""
     families: list[Memory] = []
+    # What a person corrected or made NINFA forget, newest last (`remembered_answers`).
+    corrections: list[dict[str, Any]] = []
 
     def family(self, family_id: str | None) -> Memory | None:
         return next((m for m in self.families if family_id and m.id == family_id), None)
@@ -246,10 +252,16 @@ def parse_learning(raw: Mapping[str, Any] | None) -> Learning | None:
         families.append(memory)
     seq = raw.get("seq")
     current = raw.get("current")
+    corrections = raw.get("corrections")
     return Learning(
         seq=max([seq if isinstance(seq, int) else 0, *(m.touched for m in families)]),
         current=current if isinstance(current, str) and current in seen else "",
         families=families,
+        corrections=(
+            [entry for entry in corrections if isinstance(entry, dict)]
+            if isinstance(corrections, list)
+            else []
+        ),
     )
 
 
@@ -669,6 +681,15 @@ def choose_family(
     )
 
 
+def kept_scope(choice: FamilyChoice) -> FileScope | None:
+    """What the person said this family's files are, for a file that IS that family: never for a
+    structure of its own, for one that could be two, or for one that now contradicts what was
+    confirmed."""
+    if choice.memory is None or choice.match is None or not choice.revision:
+        return None
+    return None if choice.match.drift == Drift.SEMANTIC_CONFLICT else choice.memory.file_scope
+
+
 @dataclass(frozen=True, slots=True)
 class LearningInfo:
     """What Source Learning did for THIS file. Internal: it is never part of the API response."""
@@ -707,6 +728,8 @@ class Confirmation:
     shape: tuple[tuple[str, str], ...]
     # The family the server found this file to be a revision of (None: it starts a new one).
     family: str | None = None
+    # What the person said NOW about the records this file does not hold.
+    file_scope: FileScope | None = None
 
 
 # --- remembering ---
@@ -789,6 +812,7 @@ def remember(
         history=history[-HISTORY_KEPT:],
         fingerprint=fingerprint,
         layout=layout_now if layout_now is not None else (existing.layout if existing else None),
+        file_scope=existing.file_scope if existing else None,
     )
 
 
@@ -803,6 +827,7 @@ def remember_in(
     answers: Mapping[str, str],
     origin: Via,
     layout: Mapping[str, Any] | None = None,
+    file_scope: FileScope | None = None,
 ) -> Learning | None:
     """The source's families after an import that succeeded, or None when nothing is to be saved.
 
@@ -817,10 +842,18 @@ def remember_in(
     * The engine alone never writes once a person has confirmed anything in this source: it cannot
       teach itself, and what a person confirmed is not for it to replace.
     * Over `FAMILIES_KEPT` the families least useful are dropped: those only the engine read first,
-      then the ones longest unused. The one just written is never dropped."""
+      then the ones longest unused. The one just written is never dropped.
+    * `file_scope`, what a person said about the records these files do not hold, stays with its
+      family and changes nothing else: it confirms no column, so a family keeps the trust it had. It
+      is the one word that may reach a family the engine alone read, or start one."""
     families = list(learning.families) if learning is not None else []
     seq = (learning.seq if learning is not None else 0) + 1
     existing = next((m for m in families if family and m.id == family), None)
+    if file_scope is not None and existing is not None and origin in (Via.REUSE, Via.ENGINE):
+        families[families.index(existing)] = existing.model_copy(
+            update={"touched": seq, "file_scope": file_scope}
+        )
+        return Learning(seq=seq, current=existing.id, families=families)
     if origin == Via.REUSE:
         if learning is None:
             return None
@@ -829,7 +862,11 @@ def remember_in(
         families[families.index(existing)] = existing.model_copy(update={"touched": seq})
         return Learning(seq=seq, current=existing.id, families=families)
     trust = Trust.PERSON if origin in (Via.ANSWERS, Via.MANUAL) else Trust.ENGINE
-    if trust == Trust.ENGINE and any(m.trust == Trust.PERSON for m in families):
+    if (
+        trust == Trust.ENGINE
+        and file_scope is None
+        and any(m.trust == Trust.PERSON for m in families)
+    ):
         return None
     if existing is None:
         # (the same structure and matching confirmed again is the same family, not a second one)
@@ -848,7 +885,11 @@ def remember_in(
     if updated is None:  # (only for a decision that came from the memory, handled above)
         return None
     updated = updated.model_copy(
-        update={"id": existing.id if existing is not None else f"{seq:x}", "touched": seq}
+        update={
+            "id": existing.id if existing is not None else f"{seq:x}",
+            "touched": seq,
+            "file_scope": file_scope or updated.file_scope,
+        }
     )
     if existing is None:
         families.append(updated)
@@ -909,6 +950,7 @@ __all__ = [
     "layout_hints",
     "is_revision",
     "kept_answers",
+    "kept_scope",
     "match_source",
     "parse_learning",
     "parse_memory",

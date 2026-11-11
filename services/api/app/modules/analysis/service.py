@@ -19,16 +19,23 @@ Procrastinate. It makes no choice for the caller: no source auto-selection, no s
 no cost month default - an omitted optional domain is recorded as SKIPPED/NOT_REQUESTED.
 
 The snapshot day is ALWAYS the real clock's "today" in the property's own time zone (see
-`snapshots/common.py`); the same-day immutability of OBSERVED snapshots is unchanged: a second
-run on the same day after the bookings changed raises the existing snapshot CONFLICT.
+`snapshots/common.py`). An OBSERVED snapshot stays immutable: a second run on the same day after the
+bookings changed adds the day's next revision and analyses that, and the run before keeps pointing
+at what it read. With nothing changed, a second run is an idempotent replay of the first.
 
 FAIL LOUD, NEVER A FALSE ALL-CLEAR (Gate 21A): no detector call below is wrapped in a try/except.
 If one raises, the exception propagates and `DecisionService.sync()` is never reached.
 
 COVERAGE (Gate 22) and PROVENANCE (Gate 23B) are built here, from the same booleans that decide
-the optional steps and from the latest SUCCEEDED import of the EXACT booking data source used.
+the optional steps and from the latest import that changed the EXACT booking data source used.
+
+What a day's observation can be used for is told apart here (`observation.py`, ADR 0045 and 0046),
+and said to the two engines that read one as a measure of what was booked: with no new booking data
+neither revenue detector speaks today, and only what a finished analysis read, with something new in
+it, is a sample of history. Nothing else about the run changes.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import date
 from http import HTTPStatus
@@ -38,6 +45,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
+from app.modules.analysis.observation import booking_observation_freshness
 from app.modules.decisions.coverage import (
     AnalysisCoverage,
     AnalysisDomain,
@@ -45,8 +53,13 @@ from app.modules.decisions.coverage import (
     DomainCoverageStatus,
     DomainSkipReason,
 )
-from app.modules.decisions.provenance import BookingProvenance, RunInputProvenance
+from app.modules.decisions.provenance import (
+    BookingProvenance,
+    DomainProvenance,
+    RunInputProvenance,
+)
 from app.modules.decisions.service import DecisionService
+from app.modules.ingestion.models import DataSourceDomain
 from app.modules.ingestion.repository import ImportJobRepository
 from app.modules.intelligence.costs.service import CostDecisionService
 from app.modules.intelligence.distribution.service import OtaDependencyService
@@ -61,6 +74,8 @@ from app.modules.snapshots.models import SnapshotOrigin
 from app.modules.snapshots.observed import ObservedSnapshotService
 from app.modules.snapshots.repository import BookingSnapshotRepository
 
+logger = logging.getLogger(__name__)
+
 
 class AnalysisInputError(AppError):
     """The explicit run request is internally inconsistent (never a data or engine failure)."""
@@ -73,7 +88,11 @@ class AnalysisInputError(AppError):
 class AnalysisRunRequest:
     """Every execution choice, explicit and already resolved. `cost_year`/`cost_month` come
     together or not at all (checked here, the one place, so enqueueing a job and running one
-    reject the same inconsistent request); `currency` falls back to the property's own currency."""
+    reject the same inconsistent request); `currency` falls back to the property's own currency.
+
+    `cost_periods` is the same choice for several months at once ((year, month), oldest first), for
+    a file that spans them; never together with `cost_year`/`cost_month`. `labor_work_dates` narrows
+    labor to the dates a source really has entries for (None: every target of the window)."""
 
     workspace_id: UUID
     property_id: UUID
@@ -84,10 +103,24 @@ class AnalysisRunRequest:
     cost_year: int | None = None
     cost_month: int | None = None
     currency: str | None = None
+    cost_periods: tuple[tuple[int, int], ...] = ()
+    labor_work_dates: frozenset[date] | None = None
 
     def __post_init__(self) -> None:
         if (self.cost_year is None) != (self.cost_month is None):
             raise AnalysisInputError("cost_year and cost_month must be given together")
+        if self.cost_periods and self.cost_year is not None:
+            raise AnalysisInputError("cost_periods replaces cost_year and cost_month")
+        if self.labor_work_dates is not None and self.labor_data_source_id is None:
+            raise AnalysisInputError("labor_work_dates needs a labor data source")
+
+    @property
+    def cost_months(self) -> tuple[tuple[int, int], ...]:
+        if self.cost_periods:
+            return self.cost_periods
+        if self.cost_year is not None and self.cost_month is not None:
+            return ((self.cost_year, self.cost_month),)
+        return ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +162,8 @@ class AnalysisRunResult:
     decisions_resolved: int
     decisions_reopened: int
     open_decisions_after_sync: int
+    # False: the booking source said nothing new since the last day analysed (`observation.py`).
+    booking_observation_fresh: bool = True
 
 
 def run_property_analysis(session: Session, request: AnalysisRunRequest) -> AnalysisRunResult:
@@ -141,8 +176,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
     stay_date_start = request.stay_date_start
     stay_date_end = request.stay_date_end
     labor_data_source_id = request.labor_data_source_id
-    cost_year = request.cost_year
-    cost_month = request.cost_month
+    cost_months = request.cost_months
 
     # 1. Materialize today's OBSERVED booking snapshots - the ONLY step below that writes
     # anything before the final sync(). The snapshot day is the real clock's "today" in the
@@ -155,6 +189,24 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
     )
     as_of_local_date = snapshot_result.snapshot_date_first
 
+    # Has the source said anything new since the last day analysed? (read-only, from the runs)
+    observation = booking_observation_freshness(
+        session,
+        tenant,
+        property_id=prop.id,
+        data_source_id=booking_data_source_id,
+        as_of_local_date=as_of_local_date,
+        import_job_id=snapshot_result.import_job_id,
+    )
+    if not observation.fresh:
+        logger.info(
+            "no new booking data workspace_id=%s property_id=%s data_source_id=%s as_of=%s",
+            tenant.workspace_id,
+            prop.id,
+            booking_data_source_id,
+            as_of_local_date,
+        )
+
     # 2. Expected baselines for those same targets.
     expected_result = BookingExpectedService(session, tenant).calculate_for_snapshot_date(
         property_id=prop.id,
@@ -162,6 +214,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         snapshot_local_date=as_of_local_date,
         stay_date_start=stay_date_start,
         stay_date_end=stay_date_end,
+        history=observation.history,
     )
 
     evaluations: list[SourceEvaluation] = []
@@ -173,6 +226,8 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         snapshot_local_date=as_of_local_date,
         stay_date_start=stay_date_start,
         stay_date_end=stay_date_end,
+        observation_is_fresh=observation.fresh,
+        history=observation.history,
     )
     for signal in signals:
         evaluations.append(signal.pickup_low)
@@ -186,25 +241,29 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
     )
     evaluations.append(ota_evaluation)
 
-    # 5. Cost: only when the caller gave an explicit target month - never a hidden default.
+    # 5. Cost: only when the caller gave explicit target months - never a hidden default.
     cost_currency: str | None = None
     cost_category_count: int | None = None
-    if cost_year is not None and cost_month is not None:
+    if cost_months:
         cost_currency = request.currency or prop.currency
-        cost_evaluations = CostDecisionService(session, tenant).evaluate_month(
-            property_id=prop.id,
-            booking_data_source_id=booking_data_source_id,
-            year=cost_year,
-            month=cost_month,
-            currency=cost_currency,
-        )
-        evaluations.extend(cost_evaluations)
-        cost_category_count = len(cost_evaluations)
+        cost_service = CostDecisionService(session, tenant)
+        cost_category_count = 0
+        for cost_year, cost_month in cost_months:
+            cost_evaluations = cost_service.evaluate_month(
+                property_id=prop.id,
+                booking_data_source_id=booking_data_source_id,
+                year=cost_year,
+                month=cost_month,
+                currency=cost_currency,
+            )
+            evaluations.extend(cost_evaluations)
+            cost_category_count += len(cost_evaluations)
 
     # 6. Labor: only when the caller gave an explicit labor data source - one evaluation per
     # OBSERVED target snapshot and labor category, reusing the same targets as step 3.
     labor_target_count: int | None = None
     labor_evaluation_count: int | None = None
+    labor_files_read: set[UUID] = set()
     if labor_data_source_id is not None:
         target_snapshots = BookingSnapshotRepository(session, tenant).list_for_snapshot_date(
             booking_data_source_id,
@@ -213,6 +272,12 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
             stay_date_to=stay_date_end,
             origin=SnapshotOrigin.OBSERVED,
         )
+        if request.labor_work_dates is not None:
+            target_snapshots = [
+                target
+                for target in target_snapshots
+                if target.stay_date in request.labor_work_dates
+            ]
         labor_service = LaborDecisionService(session, tenant)
         labor_evaluations = [
             labor_service.evaluate_overstaffing(
@@ -224,6 +289,11 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
             for category in LaborCategory
         ]
         evaluations.extend(labor_evaluations)
+        labor_files_read = {
+            evaluation.target_labor_snapshot_id
+            for evaluation in labor_evaluations
+            if evaluation.target_labor_snapshot_id is not None
+        }
         labor_target_count = len(target_snapshots)
         labor_evaluation_count = len(labor_evaluations)
 
@@ -235,7 +305,7 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
             DomainCoverage(AnalysisDomain.REVENUE, DomainCoverageStatus.EVALUATED),
             DomainCoverage(AnalysisDomain.DISTRIBUTION, DomainCoverageStatus.EVALUATED),
             DomainCoverage(AnalysisDomain.COSTS, DomainCoverageStatus.EVALUATED)
-            if cost_year is not None and cost_month is not None
+            if cost_months
             else DomainCoverage(
                 AnalysisDomain.COSTS, DomainCoverageStatus.SKIPPED, DomainSkipReason.NOT_REQUESTED
             ),
@@ -247,29 +317,37 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         )
     )
 
-    # 8. Provenance (Gate 23B): the latest SUCCEEDED import known, right now, for the EXACT
-    # booking data source this run used. No successful import yet is a legitimate, non-fatal
-    # outcome: freshness stays UNKNOWN, never fabricated.
-    latest_booking_import = ImportJobRepository(session, tenant).latest_succeeded_for_data_source(
-        booking_data_source_id
+    # 8. Provenance (Gate 23B): the observation this run read, and the latest import that had
+    # changed the EXACT booking data source when it looked (`take_snapshot` read it under its lock).
+    # No such import yet is a legitimate, non-fatal outcome: freshness stays UNKNOWN, never
+    # fabricated. Labor and costs: the same fact, for the data this run looked at.
+    imports = ImportJobRepository(session, tenant)
+    labor_provenance: DomainProvenance | None = None
+    if labor_data_source_id is not None:
+        labor_import = imports.latest_changing_for_data_source(labor_data_source_id)
+        labor_provenance = DomainProvenance(
+            data_source_id=labor_data_source_id,
+            import_job_id=None if labor_import is None else labor_import.id,
+            snapshot_ids=tuple(sorted(labor_files_read, key=str)),
+        )
+    cost_provenance: DomainProvenance | None = None
+    if cost_months:
+        cost_import = imports.latest_changing_for_domain(prop.id, DataSourceDomain.COSTS)
+        cost_provenance = DomainProvenance(
+            data_source_id=None if cost_import is None else cost_import.data_source_id,
+            import_job_id=None if cost_import is None else cost_import.id,
+        )
+    provenance = RunInputProvenance(
+        bookings=BookingProvenance(
+            data_source_id=booking_data_source_id,
+            import_job_id=snapshot_result.import_job_id,
+            last_successful_import_finished_at=snapshot_result.import_finished_at,
+            snapshot_local_date=as_of_local_date,
+            observation_revision=snapshot_result.revision,
+        ),
+        labor=labor_provenance,
+        costs=cost_provenance,
     )
-    if latest_booking_import is None:
-        provenance = RunInputProvenance(
-            bookings=BookingProvenance(
-                data_source_id=booking_data_source_id,
-                import_job_id=None,
-                last_successful_import_finished_at=None,
-            )
-        )
-    else:
-        assert latest_booking_import.finished_at is not None  # SUCCEEDED implies finished_at
-        provenance = RunInputProvenance(
-            bookings=BookingProvenance(
-                data_source_id=booking_data_source_id,
-                import_job_id=latest_booking_import.id,
-                last_successful_import_finished_at=latest_booking_import.finished_at,
-            )
-        )
 
     # 9. Rank, then persist. Every evaluation gathered above reaches BOTH calls, or an exception
     # already propagated above and neither call happens.
@@ -312,4 +390,5 @@ def run_property_analysis(session: Session, request: AnalysisRunRequest) -> Anal
         decisions_resolved=sync_result.resolved_count,
         decisions_reopened=sync_result.reopened_count,
         open_decisions_after_sync=sync_result.open_decision_count_after_sync,
+        booking_observation_fresh=observation.fresh,
     )

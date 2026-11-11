@@ -3,12 +3,19 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import AppError, NotFoundError
 from app.core.tenant import TenantContext
-from app.modules.ingestion.models import DataSource, ImportFile, ImportJob, ImportJobStatus
+from app.modules.ingestion.models import (
+    DataSource,
+    DataSourceDomain,
+    FileScope,
+    ImportFile,
+    ImportJob,
+    ImportJobStatus,
+)
 from app.modules.ingestion.schemas import DataSourceCreate, ImportFileCreate, ImportJobCreate
 from app.modules.properties.models import Property
 
@@ -123,6 +130,23 @@ class ImportJobRepository:
             query = query.where(ImportJob.status == status)
         return self._session.scalars(query.order_by(ImportJob.created_at)).all()
 
+    def list_recent_for_property(self, property_id: UUID, *, limit: int) -> Sequence[ImportJob]:
+        """The latest import attempts of ONE property, newest first, with their source and file
+        (`id` as a deterministic tie-break, like `latest_succeeded_for_data_source`)."""
+        return self._session.scalars(
+            select(ImportJob)
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.property_id == property_id,
+            )
+            .options(selectinload(ImportJob.data_source), selectinload(ImportJob.files))
+            .order_by(
+                func.coalesce(ImportJob.finished_at, ImportJob.created_at).desc(),
+                ImportJob.id.desc(),
+            )
+            .limit(limit)
+        ).all()
+
     def latest_succeeded_for_data_source(self, data_source_id: UUID) -> ImportJob | None:
         """The latest SUCCEEDED import of this EXACT data source (Gate 23B), ordered by
         `finished_at` DESC - the authoritative completion instant, never `created_at` - with `id`
@@ -139,6 +163,72 @@ class ImportJobRepository:
             .order_by(ImportJob.finished_at.desc(), ImportJob.id.desc())
             .limit(1)
         )
+
+    def latest_changing_for_data_source(self, data_source_id: UUID) -> ImportJob | None:
+        """The latest SUCCEEDED import of this data source that changed its data: what the source
+        holds today came, at the latest, from this one. A file that brought nothing new is not it,
+        so analysing again after one is an idempotent replay and not a new run. A job from before
+        this was recorded counts as a change (nothing can be said of it)."""
+        return self._session.scalar(
+            select(ImportJob)
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.data_source_id == data_source_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+                ImportJob.changed_data.is_not(False),
+            )
+            .order_by(ImportJob.finished_at.desc(), ImportJob.id.desc())
+            .limit(1)
+        )
+
+    def latest_changing_for_domain(
+        self, property_id: UUID, domain: DataSourceDomain
+    ) -> ImportJob | None:
+        """The same, across the active sources of one kind of data of ONE property."""
+        return self._session.scalar(
+            select(ImportJob)
+            .join(
+                DataSource,
+                (DataSource.workspace_id == ImportJob.workspace_id)
+                & (DataSource.id == ImportJob.data_source_id),
+            )
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.property_id == property_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+                ImportJob.changed_data.is_not(False),
+                DataSource.domain == domain,
+                DataSource.is_active.is_(True),
+            )
+            .order_by(ImportJob.finished_at.desc(), ImportJob.id.desc())
+            .limit(1)
+        )
+
+    def latest_succeeded_by_domain(
+        self, property_id: UUID, *, changed_only: bool = False
+    ) -> dict[DataSourceDomain, datetime]:
+        """When the latest SUCCEEDED import of each kind of data of ONE property finished, through
+        its active sources only (a source that was switched off no longer speaks for the property).
+        A kind with no such import has no key: "nothing imported" is never a date. `changed_only`
+        leaves out the imports that brought nothing new."""
+        conditions = [ImportJob.changed_data.is_not(False)] if changed_only else []
+        rows = self._session.execute(
+            select(DataSource.domain, func.max(ImportJob.finished_at))
+            .join(
+                DataSource,
+                (DataSource.workspace_id == ImportJob.workspace_id)
+                & (DataSource.id == ImportJob.data_source_id),
+            )
+            .where(
+                ImportJob.workspace_id == self._tenant.workspace_id,
+                ImportJob.property_id == property_id,
+                ImportJob.status == ImportJobStatus.SUCCEEDED,
+                DataSource.is_active.is_(True),
+                *conditions,
+            )
+            .group_by(DataSource.domain)
+        ).all()
+        return {domain: finished for domain, finished in rows if finished is not None}
 
     def has_succeeded_between(
         self, data_source_id: UUID, not_before: datetime, not_after: datetime
@@ -182,9 +272,19 @@ class ImportJobRepository:
         self._session.flush()
         return job
 
-    def succeed(self, import_job_id: UUID) -> ImportJob:
+    def succeed(
+        self,
+        import_job_id: UUID,
+        *,
+        changed_data: bool | None = None,
+        file_scope: FileScope | None = None,
+        remembered_file_scope: FileScope | None = None,
+    ) -> ImportJob:
         job = self._load_for_transition(import_job_id, {ImportJobStatus.RUNNING})
         job.status = ImportJobStatus.SUCCEEDED
+        job.changed_data = changed_data
+        job.file_scope = file_scope
+        job.remembered_file_scope = remembered_file_scope
         job.finished_at = datetime.now(UTC)
         job.error_code = None
         job.error_message = None

@@ -8,6 +8,9 @@ the person ended up answering "Reparto di tutte le righe" about a file that has 
 **Smart Import V3** reads the whole DOCUMENT first (every sheet, titles, totals, sections, grids), says what it understood
 and asks ONLY what is really ambiguous. Almost always the person sees a summary and one button.
 
+> The screens described here now live on the "Importa file" page, which reads the kind of data from the document instead of a
+> card: see [importa-file-v1.md](importa-file-v1.md).
+
 **No migration. No new dependency. No employee identity. Nothing of Decision Engine, Mia, scoring, Home, auth or connectors
 is touched.** The AI part exists as a boundary and is OFF by default; everything works without it.
 
@@ -123,6 +126,8 @@ Category words are NINFA's own lexicon (Utenze, Lavanderia, Consulenze...) plus 
 | `AMOUNT_BASIS` | an amount that does not say whether VAT is in it | net / gross |
 | `DATE_ORDER`, `DECIMAL_STYLE` | `03/10/2026`, `1,234`: the values cannot prove it | the choice |
 | `DATES_REVERSED` | the arrival is after the departure on (nearly) every row | "Controlla le colonne" (the matching screen); nothing is swapped |
+| `FILE_SCOPE` | stored records of the file's period are not in it, and that changes what counts ([import-scope-semantics-v1.md](import-scope-semantics-v1.md)) | all of it / a part / what is new |
+| `FILE_SCOPE_CONFIRM` | a family remembered as complete, and this file would stop something counting ([ADR 0041](adr/0041-remembered-scope-safety.md)) | all of it / a part, for this import; remembered only if the box is ticked |
 
 Blockers: `NO_TABLE`, `MISSING_REQUIRED`, `PERIOD_SUMMARY_ONLY`, `GRID_NOT_SUPPORTED`, `GRID_NOT_HOURS`, `AMOUNT_NOT_NET`,
 `MIXED_FORMATS`. What the person says is never asked again (`answers`).

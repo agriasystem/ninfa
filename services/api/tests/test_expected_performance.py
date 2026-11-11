@@ -215,7 +215,7 @@ def test_the_candidate_query_is_served_by_the_gate_3_unique_key_index(
 
     assert "Seq Scan on booking_snapshots" not in plan
     assert (
-        "uq_booking_snapshots_data_source_snapshot_date_stay_date" in plan
+        "uq_booking_snapshots_source_snapshot_stay_revision" in plan
         or "ix_booking_snapshots_booking_curve" in plan
     ), plan
     assert BookingSnapshot.__tablename__ in plan

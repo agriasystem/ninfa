@@ -20,6 +20,7 @@ Everything is scoped by the request's `TenantContext` and property: a saved conf
 ONE data source of ONE property of ONE workspace and is reachable only through it.
 """
 
+import hashlib
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, replace
@@ -92,8 +93,8 @@ from app.modules.data_sources.understanding_redaction import (
 )
 from app.modules.data_sources.understanding_types import Question
 from app.modules.document_understanding.layout import LayoutSpec
-from app.modules.ingestion.models import DataSource, DataSourceDomain
-from app.modules.ingestion.repository import ImportJobRepository
+from app.modules.ingestion.models import DataSource, DataSourceDomain, FileScope
+from app.modules.ingestion.repository import ImportFileRepository, ImportJobRepository
 from app.modules.ingestion.suggestions import SuggestionConfidence
 
 logger = logging.getLogger(__name__)
@@ -172,6 +173,7 @@ class SmartImportService:
         self._session = session
         self._tenant = tenant
         self._jobs = ImportJobRepository(session, tenant)
+        self._files = ImportFileRepository(session, tenant)
 
     # --- the domain ---------------------------------------------------------------------------
 
@@ -649,6 +651,33 @@ class SmartImportService:
             )
         return resolved.config, None, resolved.format_hints
 
+    def scope_effect(
+        self,
+        adapter: FileDomain,
+        mapping: MappingInput,
+        filename: str,
+        content: bytes,
+        source: DataSource,
+    ) -> int:
+        """How much of what the source holds would stop counting if this file is complete: 0 when it
+        makes no difference, which is when nobody needs to be asked what the file is. Reads only."""
+        try:
+            config, refused, _ = self._config_for(adapter, mapping, filename, content, source)
+            if config is None or refused is not None:
+                return 0
+            return adapter.scope_effect(source, filename, content, config)
+        except (AppError, ValueError):
+            return 0
+
+    def scope_said_of_this_file(self, source: DataSource, content: bytes) -> FileScope | None:
+        """What was said about these very bytes the last time they were imported, when it was a part
+        of the period or what was new: the same file need not be explained twice. Never that it was
+        complete: that one took something away once is no reason to take anything away now."""
+        digest = hashlib.sha256(content).hexdigest()
+        earlier = self._files.find_successful_for_data_source(source.id, digest)
+        scope = None if earlier is None else earlier.import_job.file_scope
+        return None if scope is FileScope.FULL else scope
+
     def _to_dry_run(
         self,
         adapter: FileDomain,
@@ -886,11 +915,18 @@ class SmartImportService:
                 origin=origin,
                 # how THIS family is read travels with it: never the next family's business
                 layout=safe_layout((documents.get("format_options") or {}).get("layout")),
+                file_scope=confirmation.file_scope,
             )
             if families is None and origin != Via.REUSE:
                 # the engine alone never replaces what a person confirmed
                 return False
-            learning = existing_raw if families is None else stored_learning(families)
+            if families is None:
+                learning = existing_raw
+            else:
+                # (what a person corrected stays on record, whatever this import remembers)
+                known = parse_learning(existing_raw)
+                trail = [] if known is None else known.corrections
+                learning = stored_learning(families.model_copy(update={"corrections": trail}))
         else:
             # The saved matching is rewritten without saying which family it belongs to.
             known = parse_learning(existing_raw)
