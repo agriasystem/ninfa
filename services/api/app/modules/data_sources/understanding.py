@@ -838,9 +838,11 @@ class UnderstandingService:
                 if any(q.kind == QuestionKind.DATES_REVERSED for q in questions):
                     skip.update({"check_in", "check_out"})  # looked at together, not one by one
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
-                # whatever a model named and is not certain stays a question, required or
-                # not: the rules only ask about the fields an import cannot run without
-                questions.extend(_assisted_confirmations(proposal, ai_headers, questions))
+                # whatever the SEMANTIC layer named and is not certain stays a question, required
+                # or not: the rules only ask about the fields an import cannot run without. (The
+                # original assistant's suggestions are unchanged: it is not this layer.)
+                if ai_reading is not None or assisted:
+                    questions.extend(_assisted_confirmations(proposal, ai_headers, questions))
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         # (the same reading on every file of a source: the file still does not say)

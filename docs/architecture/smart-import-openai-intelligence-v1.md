@@ -124,3 +124,10 @@ the layer OFF, in SHADOW and in ASSIST against five stand-ins:
   themselves were not changed.
 * Residual risk, stated plainly: a WRONG model puts a *suggestion* (MEDIUM, always with a question) on a column that must not be mapped in 5 of 290 challenge files and 1 of 240 official ones, and
   adds 6-7 questions to the official set. None is ever certain; a person who confirms without looking is the only way it becomes data. That risk is V3's and is unchanged by this gate.
+
+## Found while building, NOT changed (the original assistant)
+
+The original Anthropic assistant of V3 (`IMPORT_UNDERSTANDING_PROVIDER=anthropic`, off by default, never run on a real model) can put a suggestion on a column of an OPTIONAL field and the rules ask no
+question about it: they only ask about the fields an import cannot run without, so such a file can be READY with the model's word alone in that field. The semantic layer closes the same hole for
+itself (every column it names and nothing made certain is a question, at most six per file); the original assistant was left exactly as it was, because it is not this gate. Closing it there is one
+line and a recommendation.
