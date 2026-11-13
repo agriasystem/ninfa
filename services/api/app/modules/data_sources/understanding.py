@@ -28,7 +28,11 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppError
 from app.core.tenant import TenantContext
-from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
+from app.modules.ai.import_understanding.resolver import (
+    ImportUnderstandingResolver,
+    ReplayResolver,
+)
+from app.modules.ai.import_understanding.types import AiMode, AiResolution, LevelCounts
 from app.modules.bookings.errors import BookingImportError
 from app.modules.bookings.mapping import normalize_header
 from app.modules.bookings.normalization import DateOrder
@@ -89,8 +93,11 @@ from app.modules.data_sources.source_learning import (
 from app.modules.data_sources.understanding_ai import (
     apply_resolution,
     build_evidence,
+    conflicts_with_confirmed,
+    corroborate,
     egress_guard,
     fit_function,
+    levels_of,
     needs_help,
 )
 from app.modules.data_sources.understanding_bookings import (
@@ -226,6 +233,33 @@ class _Reading:
     choice: FamilyChoice
 
 
+@dataclass(frozen=True, slots=True)
+class _AiRun:
+    """What was true when the model's reading came back (before anything of it was applied)."""
+
+    resolution: AiResolution
+    before: LevelCounts
+    questions_before: int
+    suggested: int
+    source_conflicts: int
+
+
+@dataclass(frozen=True, slots=True)
+class _AiOutcome:
+    """What a reading of a document came to, for the audit: the model's resolution and the state
+    before and after it was (or, for a replay, would have been) applied."""
+
+    resolution: AiResolution
+    before: LevelCounts
+    questions_before: int
+    suggested: int
+    source_conflicts: int
+    after: LevelCounts
+    questions_after: int
+    promoted: int
+    applied: bool
+
+
 class UnderstandingService:
     def __init__(
         self,
@@ -252,12 +286,89 @@ class UnderstandingService:
         already_imported: bool,
         currency: str | None = None,
     ) -> FileInspection:
+        """What the document says, as the person is shown it.
+
+        With the semantic layer in SHADOW the model is asked and measured but NOTHING it says is
+        applied: the answer returned is the one the rules alone gave. To record what ASSIST would
+        have done, the same document is read a second time with the model's reading applied (a
+        replay: no second call) and only the comparison is kept - as an audit record, never in
+        the answer."""
+        resolver = self._resolver
+        inspection, outcome = self._read_document(
+            domain,
+            filename,
+            content,
+            answers,
+            confirmed_domain,
+            source,
+            already_imported,
+            currency,
+            resolver,
+        )
+        if resolver is None or outcome is None:
+            return inspection
+        if outcome.applied:
+            resolver.record(
+                resolver.trace_of(
+                    outcome.resolution,
+                    before=outcome.before,
+                    after=outcome.after,
+                    questions_before=outcome.questions_before,
+                    questions_after=outcome.questions_after,
+                    suggested=outcome.suggested,
+                    promoted=outcome.promoted,
+                    source_learning_conflicts=outcome.source_conflicts,
+                )
+            )
+            return inspection
+        try:
+            _, replayed = self._read_document(
+                domain,
+                filename,
+                content,
+                answers,
+                confirmed_domain,
+                source,
+                already_imported,
+                currency,
+                ReplayResolver(outcome.resolution),
+            )
+        except Exception:  # a measurement must never be able to break the answer
+            logger.warning("shadow replay failed", exc_info=False)
+            replayed = None
+        after = replayed if replayed is not None else outcome
+        resolver.record(
+            resolver.trace_of(
+                outcome.resolution,
+                before=outcome.before,
+                after=after.after,
+                questions_before=outcome.questions_before,
+                questions_after=after.questions_after,
+                suggested=after.suggested,
+                promoted=after.promoted,
+                source_learning_conflicts=outcome.source_conflicts,
+            )
+        )
+        return inspection
+
+    def _read_document(
+        self,
+        domain: DataSourceDomain,
+        filename: str,
+        content: bytes,
+        answers: UnderstandAnswers,
+        confirmed_domain: bool,
+        source: DataSource | None,
+        already_imported: bool,
+        currency: str | None,
+        resolver: ImportUnderstandingResolver | None,
+    ) -> tuple[FileInspection, "_AiOutcome | None"]:
         adapter = self._smart.domain(domain)
         sem = _SEMANTICS[domain]
         try:
             scan = scan_workbook(content, filename)
         except BookingImportError as error:
-            return FileInspection(domain, problem=problem_of_error(error))
+            return FileInspection(domain, problem=problem_of_error(error)), None
 
         saved_config, saved_layout = self._saved(adapter, source)
         taught = {
@@ -276,9 +387,12 @@ class UnderstandingService:
         neutral = self._base_layout(answers, None)
         reading = self._read(scan, content, filename, domain, sem, answers, store, neutral)
         if reading.chosen is None:
-            return redact_inspection(
-                self._without_table(domain, scan, reading.document, already_imported),
-                PersonalDataGuard(),
+            return (
+                redact_inspection(
+                    self._without_table(domain, scan, reading.document, already_imported),
+                    PersonalDataGuard(),
+                ),
+                None,
             )
         base = neutral
         hints = self._hints(reading.choice, store, saved_layout)
@@ -398,8 +512,11 @@ class UnderstandingService:
                 questions.append(reversed_dates)
 
         # The optional assistant: asked only when the rules left something open it could help with,
-        # and what it says is a SUGGESTION (MEDIUM at most) that the person still confirms.
+        # and what it says is a SUGGESTION (MEDIUM at most) that the person still confirms - save
+        # for a column its own values prove (see `corroborate`, below). In SHADOW it is asked and
+        # measured, and nothing of what it says is applied.
         ai_headers: frozenset[str] = frozenset()
+        ai_run: _AiRun | None = None
         # The rules say the document is ANOTHER kind of data than the card the person came from:
         # they ask which it is, and the model is not asked at all - what the document says wins
         # over anything anyone suggests.
@@ -407,8 +524,8 @@ class UnderstandingService:
             q.kind == QuestionKind.DOMAIN and q.candidate is not None for q in questions
         )
         if (
-            self._resolver is not None
-            and self._resolver.enabled
+            resolver is not None
+            and resolver.enabled
             and not rules_contradict_card
             and needs_help(proposal, adapter.groups, questions)
         ):
@@ -441,22 +558,36 @@ class UnderstandingService:
                     ),
                 ],
             )
-            resolution = self._resolver.resolve(
+            resolution = resolver.resolve(
                 evidence,
                 fit_function(_SEMANTICS, proposal),
                 egress_guard(guard_for(samples, proposal), _SEMANTICS),
             )
-            proposal, questions, ai_headers = apply_resolution(
-                proposal, questions, resolution, domain, offered
+            applied, applied_questions, applied_headers = apply_resolution(
+                proposal, questions, resolution, domain, offered, sem.financial
             )
-            if ai_headers and {"role", "labor_category"} & set(proposal.assigned()):
-                # the assistant found the department column: "which department are all the rows?"
-                # is no longer a question
-                questions = [
-                    q
-                    for q in questions
-                    if q.kind not in (QuestionKind.DEPARTMENT_ROWS, QuestionKind.DEPARTMENT_CONFIRM)
-                ]
+            ai_run = _AiRun(
+                resolution=resolution,
+                before=levels_of(proposal),
+                questions_before=len(questions),
+                suggested=len(applied_headers) + len(resolution.answers),
+                # what a PERSON confirmed (an answer now, or this source remembers) is not to be
+                # changed by a model: where it reads that column differently, it is counted
+                source_conflicts=conflicts_with_confirmed(
+                    resolution, proposal, frozenset(asked_fields)
+                ),
+            )
+            if resolver.mode == AiMode.ASSIST:
+                proposal, questions, ai_headers = applied, applied_questions, applied_headers
+                if ai_headers and {"role", "labor_category"} & set(proposal.assigned()):
+                    # the assistant found the department column: "which department are all the
+                    # rows?" is no longer a question
+                    questions = [
+                        q
+                        for q in questions
+                        if q.kind
+                        not in (QuestionKind.DEPARTMENT_ROWS, QuestionKind.DEPARTMENT_CONFIRM)
+                    ]
         constants: dict[str, str | int] = {}
         if (
             domain == DataSourceDomain.LABOR
@@ -535,6 +666,10 @@ class UnderstandingService:
         proposal = _with_known_departments(proposal, samples, taught_roles, value_questions)
         # (a booking status, once its words are known; the category of a cost keeps its level)
         proposal = _with_known_words(proposal, "status", value_questions)
+        promoted: frozenset[str] = frozenset()
+        if ai_run is not None and resolver is not None and resolver.corroborates:
+            # a column the model named and NINFA's own vocabulary recognises in the values
+            proposal, promoted = corroborate(proposal, ai_headers, ai_run.resolution, sem)
 
         # --- the profile, the people, the explanation ---------------------------------------------
         # A grid whose week is not known yet is judged by the columns it WILL have (its names do
@@ -693,6 +828,21 @@ class UnderstandingService:
             for c in columns
             if c.field is not None
         )
+        outcome = (
+            None
+            if ai_run is None or resolver is None
+            else _AiOutcome(
+                resolution=ai_run.resolution,
+                before=ai_run.before,
+                questions_before=ai_run.questions_before,
+                suggested=ai_run.suggested,
+                source_conflicts=ai_run.source_conflicts,
+                after=levels_of(proposal),
+                questions_after=len(questions),
+                promoted=len(promoted),
+                applied=resolver.mode == AiMode.ASSIST,
+            )
+        )
         # The last gate: nothing personal in this file goes out, whatever put it in the answer.
         return redact_inspection(
             FileInspection(
@@ -722,7 +872,7 @@ class UnderstandingService:
                 ),
             ),
             guard_for(samples, proposal),
-        )
+        ), outcome
 
     # --- phases A and B: the document, and whose it is ---
 

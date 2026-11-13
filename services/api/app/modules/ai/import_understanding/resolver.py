@@ -442,6 +442,35 @@ class ImportUnderstandingResolver:
         return cost(ResolutionReason.INVALID, failure)
 
 
+class ReplayResolver(ImportUnderstandingResolver):
+    """Hands back ONE resolution that was already obtained, as an ASSIST resolver would apply it.
+
+    SHADOW needs to know what ASSIST would have done with the model's reading. Rather than a second
+    implementation of "applying" (which could drift from the real one), the service reads the file
+    a second time through the real code with this resolver in place of the real one: no second
+    call to a model, the same checks, the same outcome ASSIST would have produced. Nothing it
+    produces is ever returned to a person."""
+
+    def __init__(self, resolution: AiResolution) -> None:
+        super().__init__(None, AiMode.ASSIST, corroborate=True)
+        self._replayed = resolution
+
+    @property
+    def enabled(self) -> bool:
+        return True
+
+    def resolve(
+        self,
+        evidence: UnderstandingEvidence,
+        fit_of: FitOf,
+        guard: EgressGuard | None = None,
+    ) -> AiResolution:
+        return self._replayed
+
+    def record(self, trace: AiTrace) -> None:
+        return None
+
+
 def _weight(payload: object) -> int:
     """The size of an answer in characters (one that cannot even be written out is too heavy)."""
     if isinstance(payload, SemanticInterpretation):
@@ -458,5 +487,6 @@ __all__ = [
     "ImportUnderstandingProvider",
     "ImportUnderstandingResolver",
     "ImportUnderstandingUnavailableError",
+    "ReplayResolver",
     "worth_asking",
 ]

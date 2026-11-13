@@ -4,7 +4,15 @@
 file name, no personal data - a personal-data column is only its class - no free text beyond a few
 cleaned words); `apply_resolution` puts what survived the checks back as SUGGESTIONS: a field at
 MEDIUM confidence ("to be checked"), a likely answer on a question the person will still answer.
-Nothing here can make a column certain, and with no provider the whole step is skipped.
+Nothing here can make a column certain on the model's word alone, and with no provider the whole
+step is skipped.
+
+There is ONE exception, and it is narrow (`corroborate`): a column the model named and whose VALUES
+NINFA recognises from its own closed vocabulary (booking statuses, channels, departments, cost
+categories). That is the same two proofs - a name that says it and values that confirm it - that
+let a rule take a column as certain; here the model reads the name and NINFA's vocabulary reads the
+values. Dates, hours, amounts, identifiers and counts are never promoted: their values cannot tell
+one such column from another, so the person still confirms them.
 """
 
 from collections.abc import Mapping, Sequence
@@ -15,6 +23,7 @@ from app.modules.ai.import_understanding.sanitize import clean_text
 from app.modules.ai.import_understanding.types import (
     AiResolution,
     ColumnEvidence,
+    LevelCounts,
     OfferedQuestion,
     UnderstandingEvidence,
 )
@@ -44,6 +53,14 @@ MAX_AVG_LENGTH_FOR_SAMPLES = 30
 _ASKABLE = frozenset(
     {QuestionKind.DOMAIN, QuestionKind.TABLE, QuestionKind.GRID_HOURS, QuestionKind.COLUMN_MEANING}
 )
+# The fields whose VALUES NINFA can read for itself: a booking status, a channel, a department, a
+# cost category are recognised from closed vocabularies (`fit_vocabulary`, `fit_channel`), so a name
+# the model read for them is confirmed by what the column holds. For every other field the values
+# say too little to tell it from its neighbours (two date columns, two amounts, two counts).
+CORROBORATED_FIELDS = frozenset({"status", "channel", "role", "cost_category"})
+# The vocabulary fits return exactly 1.0 when most of the distinct values are known words, and at
+# most 0.8 of a base fit otherwise: only the first is a recognition.
+RECOGNISED = 1.0
 
 
 def _kind_of(stats: ColumnStats) -> str:
@@ -205,11 +222,18 @@ def apply_resolution(
     resolution: AiResolution,
     expected: DataSourceDomain,
     domains: Sequence[str] = (),
+    never: frozenset[str] = frozenset(),
 ) -> tuple[Proposal, list[Question], frozenset[str]]:
     """What the model suggested, as suggestions: fields at MEDIUM on columns the rules left alone,
-    a likely answer on the questions that were still open. Returns the headers it filled."""
+    a likely answer on the questions that were still open. Returns the headers it filled.
+
+    `never` are fields a model with a structured reading (`semantic-v1`) does not place at all: the
+    fields that are MONEY. A choice about money is the person's, matched by hand, and never a yes or
+    no on a model's word (the same rule the rules themselves keep)."""
     if not resolution.used:
         return proposal, questions, frozenset()
+    if resolution.interpretation is None:
+        never = frozenset()  # the original assistant is unchanged
     same_domain = resolution.domain in (None, expected.value)
     filled: set[str] = set()
     columns: list[ColumnProposal] = []
@@ -227,6 +251,7 @@ def apply_resolution(
             and column.ambiguous_group is None  # a choice between candidates is the person's
             and field not in taken
             and field not in contended
+            and field not in never
         ):
             taken.add(field)
             filled.add(column.header)
@@ -273,4 +298,99 @@ def apply_resolution(
     return Proposal(tuple(columns)), suggested, frozenset(filled)
 
 
-__all__ = ["apply_resolution", "build_evidence", "egress_guard", "fit_function", "needs_help"]
+def levels_of(proposal: Proposal) -> LevelCounts:
+    """How many columns are certain, probable, doubtful, or not placed at all."""
+    counts = {Level.HIGH: 0, Level.MEDIUM: 0, Level.LOW: 0}
+    open_columns = 0
+    for column in proposal.columns:
+        if column.field is None:
+            if column.locked is None and column.pii is None and column.stats.n >= 1:
+                open_columns += 1
+            continue
+        counts[column.level or Level.LOW] += 1
+    return LevelCounts(
+        high=counts[Level.HIGH],
+        medium=counts[Level.MEDIUM],
+        low=counts[Level.LOW],
+        open=open_columns,
+    )
+
+
+def conflicts_with_confirmed(
+    resolution: AiResolution, proposal: Proposal, confirmed: frozenset[str]
+) -> int:
+    """How many columns the model reads differently from what a PERSON confirmed (an answer just
+    given, or what this source remembers from before). Counted, never applied: a confirmed column is
+    nobody's to change but the person's."""
+    summary = resolution.interpretation
+    if summary is None:
+        return 0
+    by_index = {c.position: c for c in proposal.columns}
+    return sum(
+        1
+        for index, _placed, _said in summary.conflicts
+        if (column := by_index.get(index)) is not None and column.header in confirmed
+    )
+
+
+def corroborate(
+    proposal: Proposal,
+    filled: frozenset[str],
+    resolution: AiResolution,
+    sem: DomainSem,
+) -> tuple[Proposal, frozenset[str]]:
+    """Columns the model named AND NINFA's own vocabulary recognises in the values: certain.
+
+    Every condition must hold, each is a way for a wrong model to be stopped:
+
+    * the model's whole reading is clear (`InterpretationSummary.clear`: status INTERPRETED, overall
+      MEDIUM, no ambiguity, no question left for a person, a plausible header) and it is about the
+      kind of data the person chose;
+    * the field is one whose values NINFA reads for itself (`CORROBORATED_FIELDS`), not money, and
+      the column holds enough values;
+    * those values are RECOGNISED by the field's vocabulary (fit 1.0) - a model that names a status
+      column "channel" meets a channel vocabulary that does not recognise it and is not believed;
+    * no other column that is still free holds values the same vocabulary recognises: if two columns
+      could be the field, the values cannot tell which, and that is the person's to say.
+    """
+    summary = resolution.interpretation
+    if summary is None or not summary.clear or not filled:
+        return proposal, frozenset()
+    free = [c for c in proposal.columns if c.field is None and c.locked is None and c.pii is None]
+    promoted: set[str] = set()
+    columns: list[ColumnProposal] = []
+    for column in proposal.columns:
+        spec = sem.fields.get(column.field) if column.field is not None else None
+        if (
+            column.header in filled
+            and column.level == Level.MEDIUM
+            and column.field in CORROBORATED_FIELDS
+            and column.field not in sem.financial
+            and spec is not None
+            and spec.fit is not None
+            and column.ambiguous_group is None
+            and column.pii is None
+            and column.stats.enough()
+            and spec.fit(column.stats) >= RECOGNISED
+            and not any(
+                other.stats.enough() and spec.fit(other.stats) >= RECOGNISED for other in free
+            )
+        ):
+            promoted.add(column.header)
+            columns.append(replace(column, level=Level.HIGH))
+        else:
+            columns.append(column)
+    return Proposal(tuple(columns)), frozenset(promoted)
+
+
+__all__ = [
+    "CORROBORATED_FIELDS",
+    "apply_resolution",
+    "build_evidence",
+    "conflicts_with_confirmed",
+    "corroborate",
+    "egress_guard",
+    "fit_function",
+    "levels_of",
+    "needs_help",
+]

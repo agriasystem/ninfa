@@ -113,7 +113,7 @@ def test_the_original_provider_selection_is_untouched() -> None:
     legacy = Settings(
         _env_file=None,
         import_understanding_provider="anthropic",
-        anthropic_api_key="a-key-for-the-other-vendor",  # type: ignore[arg-type]
+        anthropic_api_key="a-key-for-the-other-vendor",
     )
 
     resolver = build_import_understanding_resolver(legacy)
