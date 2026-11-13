@@ -18,7 +18,13 @@ from app.modules.ai.import_understanding.resolver import ImportUnderstandingProv
 
 _APP = Path(__file__).resolve().parents[1] / "app"
 _MODULES = _APP / "modules"
-_ADAPTER = _MODULES / "ai" / "gateway" / "anthropic_provider.py"
+_GATEWAY = _MODULES / "ai" / "gateway"
+# Each adapter may import ITS OWN vendor SDK and no other: a second vendor never rides in through
+# the adapter of the first.
+_ADAPTERS = {
+    _GATEWAY / "anthropic_provider.py": frozenset({"anthropic"}),
+    _GATEWAY / "openai_provider.py": frozenset({"openai"}),
+}
 # Everything that can open a connection, directly or through a vendor SDK. (`http` itself holds
 # status constants that are harmless: only its client and server modules count.)
 _NETWORK = frozenset(
@@ -82,15 +88,23 @@ def test_the_core_of_smart_import_imports_no_library_that_can_reach_the_network(
     assert offenders == {}
 
 
-def test_only_the_adapter_file_imports_a_vendor_sdk_anywhere_under_the_modules() -> None:
+def test_only_the_adapter_files_import_a_vendor_sdk_anywhere_under_the_modules() -> None:
     vendors = {"anthropic", "openai", "mistralai", "cohere", "google"}
     offenders = [
         str(path.relative_to(_APP))
         for path in _files(_MODULES)
-        if path != _ADAPTER and _imports(path) & vendors
+        if path not in _ADAPTERS and _imports(path) & vendors
     ]
 
     assert offenders == []
+
+
+@pytest.mark.parametrize("adapter", sorted(_ADAPTERS), ids=lambda p: p.stem)
+def test_an_adapter_imports_its_own_vendor_and_no_other(adapter: Path) -> None:
+    vendors = {"anthropic", "openai", "mistralai", "cohere", "google"}
+
+    assert adapter.exists()
+    assert _imports(adapter) & vendors == _ADAPTERS[adapter]
 
 
 def test_the_port_imports_no_vendor() -> None:
