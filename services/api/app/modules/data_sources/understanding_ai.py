@@ -27,7 +27,7 @@ from app.modules.ai.import_understanding.types import (
     OfferedQuestion,
     UnderstandingEvidence,
 )
-from app.modules.ai.import_understanding.validator import FitOf
+from app.modules.ai.import_understanding.validator import MIN_FIT, FitOf
 from app.modules.data_sources.proposal import ColumnProposal, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
 from app.modules.data_sources.understanding_types import (
@@ -152,6 +152,7 @@ def build_evidence(
     title: str | None,
     proposal: Proposal,
     questions: Sequence[Question],
+    confirmable: bool = False,
 ) -> UnderstandingEvidence:
     """The cleaned document the model sees. Never the file name, never a cell of a personal-data
     column, never a long free text: sheet names and the title are reduced to the words NINFA's own
@@ -175,6 +176,7 @@ def build_evidence(
         title=None if title is None else (known_words(title, vocabulary) or None),
         columns=tuple(_evidence_of_column(c) for c in proposal.columns[:MAX_COLUMNS]),
         questions=offered,
+        confirmable=_confirmable(proposal) if confirmable else frozenset(),
     )
 
 
@@ -195,10 +197,25 @@ def fit_function(semantics: Mapping[DataSourceDomain, DomainSem], proposal: Prop
     return fit_of
 
 
+def _confirmable(proposal: Proposal) -> frozenset[int]:
+    """The columns the rules put on a field NINFA's vocabulary can prove, without being sure."""
+    return frozenset(
+        c.position
+        for c in proposal.columns
+        if c.field in CORROBORATED_FIELDS
+        and c.level is not None
+        and c.level != Level.HIGH
+        and c.ambiguous_group is None
+        and c.locked is None
+        and c.pii is None
+    )
+
+
 def needs_help(
     proposal: Proposal,
     groups: Sequence[tuple[str, ...]],
     questions: Sequence[Question],
+    confirmable: bool = False,
 ) -> bool:
     """Is something unresolved that a model could help with: a required piece of information with
     no column yet and a column left over, or a question about the kind of data?"""
@@ -213,7 +230,10 @@ def needs_help(
         for c in proposal.columns
     )
     asks_kind = any(q.kind == QuestionKind.DOMAIN for q in questions)
-    return (missing and left_over) or asks_kind
+    # (a column the rules placed without being sure, on a field a vocabulary can prove: the name,
+    # read by someone else, may be all that is missing)
+    doubtful = confirmable and bool(_confirmable(proposal))
+    return (missing and left_over) or asks_kind or doubtful
 
 
 def apply_resolution(
@@ -333,48 +353,74 @@ def conflicts_with_confirmed(
     )
 
 
+def _recognised(
+    column: ColumnProposal, field: str, free: Sequence[ColumnProposal], sem: DomainSem
+) -> bool:
+    """Do the VALUES of this column prove the field, by NINFA's own vocabulary, with nobody else
+    to be it? (The name was read by somebody else - a model, a person; this is the other half.)"""
+    spec = sem.fields.get(field)
+    return (
+        field in CORROBORATED_FIELDS
+        and field not in sem.financial
+        and spec is not None
+        and spec.fit is not None
+        and column.pii is None
+        and column.locked is None
+        and column.ambiguous_group is None
+        and column.stats.enough()
+        and spec.fit(column.stats) >= RECOGNISED
+        # if another column that is still free holds the same kind of words, the values cannot
+        # tell which of the two it is: that is the person's to say
+        and not any(
+            other is not column and other.stats.enough() and spec.fit(other.stats) >= RECOGNISED
+            for other in free
+        )
+    )
+
+
+def _free(proposal: Proposal) -> list[ColumnProposal]:
+    return [c for c in proposal.columns if c.field is None and c.locked is None and c.pii is None]
+
+
+def sole_candidates(proposal: Proposal, named: frozenset[str], sem: DomainSem) -> frozenset[str]:
+    """Of the columns whose name somebody else read, those that nobody else could be: no other
+    column still free holds values the same field's vocabulary recognises. If two columns hold the
+    same kind of words (two columns of booking statuses), the words cannot tell which is which, and
+    that is the person's to say - whichever way the name was read."""
+    free = _free(proposal)
+    sole: set[str] = set()
+    for column in proposal.columns:
+        spec = sem.fields.get(column.field) if column.field is not None else None
+        if column.header not in named or spec is None:
+            continue
+        if spec.fit is None or not any(
+            other.stats.enough() and spec.fit(other.stats) >= RECOGNISED for other in free
+        ):
+            sole.add(column.header)
+    return frozenset(sole)
+
+
 def corroborate(
-    proposal: Proposal,
-    filled: frozenset[str],
-    resolution: AiResolution,
-    sem: DomainSem,
+    proposal: Proposal, eligible: frozenset[str], sem: DomainSem
 ) -> tuple[Proposal, frozenset[str]]:
-    """Columns the model named AND NINFA's own vocabulary recognises in the values: certain.
+    """Columns whose name somebody else read (`eligible`) and that NINFA's own vocabulary recognises
+    in the values: certain. Returns the proposal and the headers that became so.
 
-    Every condition must hold, each is a way for a wrong model to be stopped:
-
-    * the model's whole reading is clear (`InterpretationSummary.clear`: status INTERPRETED, overall
-      MEDIUM, no ambiguity, no question left for a person, a plausible header) and it is about the
-      kind of data the person chose;
-    * the field is one whose values NINFA reads for itself (`CORROBORATED_FIELDS`), not money, and
-      the column holds enough values;
-    * those values are RECOGNISED by the field's vocabulary (fit 1.0) - a model that names a status
-      column "channel" meets a channel vocabulary that does not recognise it and is not believed;
-    * no other column that is still free holds values the same vocabulary recognises: if two columns
-      could be the field, the values cannot tell which, and that is the person's to say.
-    """
-    summary = resolution.interpretation
-    if summary is None or not summary.clear or not filled:
+    The conditions, each a way for a wrong reading to be stopped (`_recognised`): a field whose
+    values NINFA reads for itself, not money; enough values; recognised by the field's
+    vocabulary (fit 1.0); and nobody else still free that holds the same kind of words. (The
+    caller has already required the model's whole reading to be clear.)"""
+    if not eligible:
         return proposal, frozenset()
-    free = [c for c in proposal.columns if c.field is None and c.locked is None and c.pii is None]
+    free = _free(proposal)
     promoted: set[str] = set()
     columns: list[ColumnProposal] = []
     for column in proposal.columns:
-        spec = sem.fields.get(column.field) if column.field is not None else None
         if (
-            column.header in filled
-            and column.level == Level.MEDIUM
-            and column.field in CORROBORATED_FIELDS
-            and column.field not in sem.financial
-            and spec is not None
-            and spec.fit is not None
-            and column.ambiguous_group is None
-            and column.pii is None
-            and column.stats.enough()
-            and spec.fit(column.stats) >= RECOGNISED
-            and not any(
-                other.stats.enough() and spec.fit(other.stats) >= RECOGNISED for other in free
-            )
+            column.header in eligible
+            and column.level in (Level.MEDIUM, Level.LOW)
+            and column.field is not None
+            and _recognised(column, column.field, free, sem)
         ):
             promoted.add(column.header)
             columns.append(replace(column, level=Level.HIGH))
@@ -383,9 +429,66 @@ def corroborate(
     return Proposal(tuple(columns)), frozenset(promoted)
 
 
+def assist_named(
+    proposal: Proposal, named: Mapping[str, str], sem: DomainSem
+) -> tuple[Proposal, frozenset[str]]:
+    """The NAMES a decision records as read by the semantic layer
+    (`UnderstandAnswers.assisted_fields`), put on the columns they name - at MEDIUM, like any
+    reading of a name by somebody else. The same
+    chain that decided them the first time (the vocabulary of the values, the words NINFA knows)
+    decides again whether they are certain, with no model: this is what the server runs to verify a
+    decision a model helped to read. Only a free column, a free field NINFA's vocabulary reads and
+    that is not money, and values that do not contradict the field, are given a name."""
+    if not named:
+        return proposal, frozenset()
+    taken = {c.field for c in proposal.columns if c.field is not None}
+    applied: set[str] = set()
+    columns: list[ColumnProposal] = []
+    for column in proposal.columns:
+        field = named.get(column.header)
+        spec = sem.fields.get(field) if field is not None else None
+        if (
+            field is not None
+            and column.field == field
+            and column.level in (Level.MEDIUM, Level.LOW)
+            and field in CORROBORATED_FIELDS
+        ):
+            # the rules read it the same way, by its values, without being sure
+            applied.add(column.header)
+            columns.append(column)
+        elif (
+            field is not None
+            and spec is not None
+            and column.field is None
+            and column.locked is None
+            and column.pii is None
+            and column.ambiguous_group is None
+            and field in CORROBORATED_FIELDS
+            and field not in sem.financial
+            and field not in taken
+            and (spec.fit is None or spec.fit(column.stats) >= MIN_FIT)
+        ):
+            taken.add(field)
+            applied.add(column.header)
+            columns.append(
+                replace(
+                    column,
+                    field=field,
+                    level=Level.MEDIUM,
+                    name=NameMatch.VALUES,
+                    ambiguous_group=None,
+                    ambiguous_fields=(),
+                )
+            )
+        else:
+            columns.append(column)
+    return Proposal(tuple(columns)), frozenset(applied)
+
+
 __all__ = [
     "CORROBORATED_FIELDS",
     "apply_resolution",
+    "assist_named",
     "build_evidence",
     "conflicts_with_confirmed",
     "corroborate",
@@ -393,4 +496,5 @@ __all__ = [
     "fit_function",
     "levels_of",
     "needs_help",
+    "sole_candidates",
 ]

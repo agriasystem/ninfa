@@ -252,7 +252,7 @@ def semantic_service(
     resolver = ImportUnderstandingResolver(
         provider,  # type: ignore[arg-type]
         mode,
-        corroborate=(mode == AiMode.ASSIST) if corroborate is None else corroborate,
+        corroborate=True if corroborate is None else corroborate,  # acts in ASSIST only
         observer=observer,
     )
     return UnderstandingService(session, tenant, SmartImportService(session, tenant), resolver)

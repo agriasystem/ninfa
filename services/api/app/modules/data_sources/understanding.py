@@ -91,7 +91,9 @@ from app.modules.data_sources.source_learning import (
     shape_of,
 )
 from app.modules.data_sources.understanding_ai import (
+    CORROBORATED_FIELDS,
     apply_resolution,
+    assist_named,
     build_evidence,
     conflicts_with_confirmed,
     corroborate,
@@ -99,6 +101,7 @@ from app.modules.data_sources.understanding_ai import (
     fit_function,
     levels_of,
     needs_help,
+    sole_candidates,
 )
 from app.modules.data_sources.understanding_bookings import (
     channel_by_taught,
@@ -203,6 +206,11 @@ class UnderstandAnswers(BaseModel):
     department_value: str | None = Field(default=None, max_length=40)
     # A column the person classified: {"Ore": "planned_hours"}.
     column_fields: dict[str, str] = Field(default_factory=dict, max_length=60)
+    # A column whose NAME the semantic layer read and whose VALUES NINFA's own vocabulary proves
+    # (a status, a channel, a department, a cost category): {"Condizione": "status"}. It is the
+    # record of what a model helped to read, so the server can apply the same rule again without
+    # any model; it is checked against the file every time and is not a confirmation by a person.
+    assisted_fields: dict[str, str] = Field(default_factory=dict, max_length=20)
     # What the person taught: {"role_mapping": {"HK": "HOUSEKEEPING"}}.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict, max_length=4)
     # What THIS file says about the records it does not hold.
@@ -231,6 +239,14 @@ class _Reading:
     chosen: _Candidate | None
     views: list[ColumnView]
     choice: FamilyChoice
+
+
+def _verdict(inspection: FileInspection | None) -> tuple[int, str | None]:
+    """How many questions a reading leaves and its verdict, for the audit."""
+    info = None if inspection is None else inspection.understanding
+    if info is None:
+        return 0, None
+    return len(info.questions), info.level.value
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,45 +323,57 @@ class UnderstandingService:
         )
         if resolver is None or outcome is None:
             return inspection
-        if outcome.applied:
-            resolver.record(
-                resolver.trace_of(
-                    outcome.resolution,
-                    before=outcome.before,
-                    after=outcome.after,
-                    questions_before=outcome.questions_before,
-                    questions_after=outcome.questions_after,
-                    suggested=outcome.suggested,
-                    promoted=outcome.promoted,
-                    source_learning_conflicts=outcome.source_conflicts,
-                )
-            )
-            return inspection
+        # What the rules alone say, and what the model's reading makes of it: the one the person is
+        # shown is `inspection`; the other is read once more, for the audit only. In ASSIST the
+        # answer IS "with the model" and the rules alone are read again; in SHADOW the answer is the
+        # rules' own and the model's reading is replayed (no second call).
+        before: FileInspection | None
+        after: FileInspection | None
         try:
-            _, replayed = self._read_document(
-                domain,
-                filename,
-                content,
-                answers,
-                confirmed_domain,
-                source,
-                already_imported,
-                currency,
-                ReplayResolver(outcome.resolution),
-            )
+            if outcome.applied:
+                other, _ = self._read_document(
+                    domain,
+                    filename,
+                    content,
+                    answers,
+                    confirmed_domain,
+                    source,
+                    already_imported,
+                    currency,
+                    None,
+                )
+                before, after, counted = other, inspection, outcome
+            else:
+                replayed, replayed_outcome = self._read_document(
+                    domain,
+                    filename,
+                    content,
+                    answers,
+                    confirmed_domain,
+                    source,
+                    already_imported,
+                    currency,
+                    ReplayResolver(outcome.resolution),
+                )
+                before, after = inspection, replayed
+                counted = replayed_outcome or outcome
         except Exception:  # a measurement must never be able to break the answer
-            logger.warning("shadow replay failed", exc_info=False)
-            replayed = None
-        after = replayed if replayed is not None else outcome
+            logger.warning("the audit comparison failed", exc_info=False)
+            before = after = None
+            counted = outcome
+        questions_before, level_before = _verdict(before)
+        questions_after, level_after = _verdict(after)
         resolver.record(
             resolver.trace_of(
                 outcome.resolution,
                 before=outcome.before,
-                after=after.after,
-                questions_before=outcome.questions_before,
-                questions_after=after.questions_after,
-                suggested=after.suggested,
-                promoted=after.promoted,
+                after=counted.after,
+                questions_before=questions_before,
+                questions_after=questions_after,
+                level_before=level_before,
+                level_after=level_after,
+                suggested=counted.suggested,
+                promoted=counted.promoted,
                 source_learning_conflicts=outcome.source_conflicts,
             )
         )
@@ -511,11 +539,14 @@ class UnderstandingService:
             if reversed_dates is not None:
                 questions.append(reversed_dates)
 
+        # Columns a decision RECORDS as read by the semantic layer and proved by their values: read
+        # again here by the same rule, with no model (this is what the server does to verify one).
+        proposal, assisted = assist_named(proposal, answers.assisted_fields, sem)
+        ai_headers = assisted
         # The optional assistant: asked only when the rules left something open it could help with,
         # and what it says is a SUGGESTION (MEDIUM at most) that the person still confirms - save
         # for a column its own values prove (see `corroborate`, below). In SHADOW it is asked and
         # measured, and nothing of what it says is applied.
-        ai_headers: frozenset[str] = frozenset()
         ai_run: _AiRun | None = None
         # The rules say the document is ANOTHER kind of data than the card the person came from:
         # they ask which it is, and the model is not asked at all - what the document says wins
@@ -527,7 +558,7 @@ class UnderstandingService:
             resolver is not None
             and resolver.enabled
             and not rules_contradict_card
-            and needs_help(proposal, adapter.groups, questions)
+            and needs_help(proposal, adapter.groups, questions, resolver.reads_confirmations)
         ):
             # where the rules saw nothing at all, the model may say it is ANOTHER kind of data (the
             # person is asked only if it does: the card they chose is what NINFA goes by)
@@ -557,6 +588,7 @@ class UnderstandingService:
                         else []
                     ),
                 ],
+                confirmable=resolver.reads_confirmations,
             )
             resolution = resolver.resolve(
                 evidence,
@@ -578,7 +610,8 @@ class UnderstandingService:
                 ),
             )
             if resolver.mode == AiMode.ASSIST:
-                proposal, questions, ai_headers = applied, applied_questions, applied_headers
+                proposal, questions = applied, applied_questions
+                ai_headers = ai_headers | applied_headers
                 if ai_headers and {"role", "labor_category"} & set(proposal.assigned()):
                     # the assistant found the department column: "which department are all the
                     # rows?" is no longer a question
@@ -663,13 +696,56 @@ class UnderstandingService:
         questions.extend(value_questions)
         if reuse and match is not None:
             questions.extend(_conflict_questions(match, answers, questions))
-        proposal = _with_known_departments(proposal, samples, taught_roles, value_questions)
+        # Columns whose NAME the semantic layer read - and which may be taken as certain: those a
+        # decision records (the server reads them again with no model), and those a clear reading of
+        # a model named just now when the layer is allowed to corroborate. Their VALUES then have to
+        # prove them, by the same two rules a clear name from the rules is proved by: NINFA knows
+        # every word of the column (its own, or what the person taught), or its vocabulary
+        # recognises most of them (`corroborate`).
+        ai_reading = None if ai_run is None else ai_run.resolution.interpretation
+        eligible = assisted
+        if (
+            resolver is not None
+            and resolver.corroborates
+            and ai_reading is not None
+            and ai_reading.clear
+        ):
+            # the columns the model named, and those the rules placed without being sure that it
+            # reads the same way
+            agreed = {
+                c.header
+                for c in proposal.columns
+                if c.position in ai_reading.agreements
+                and c.level in (Level.MEDIUM, Level.LOW)
+                and c.field in CORROBORATED_FIELDS
+            }
+            eligible = eligible | ai_headers | frozenset(agreed)
+        eligible = sole_candidates(proposal, eligible, sem)
+        proposal = _with_known_departments(
+            proposal, samples, taught_roles, value_questions, eligible
+        )
         # (a booking status, once its words are known; the category of a cost keeps its level)
-        proposal = _with_known_words(proposal, "status", value_questions)
-        promoted: frozenset[str] = frozenset()
-        if ai_run is not None and resolver is not None and resolver.corroborates:
-            # a column the model named and NINFA's own vocabulary recognises in the values
-            proposal, promoted = corroborate(proposal, ai_headers, ai_run.resolution, sem)
+        proposal = _with_known_words(proposal, "status", value_questions, eligible)
+        proposal, _ = corroborate(proposal, eligible, sem)
+        # what the decision must say about how it was read: the columns the layer helped with and
+        # that are certain, so the server can read the file the same way without any model
+        promoted = {
+            c.header: c.field
+            for c in proposal.columns
+            if c.header in eligible and c.level == Level.HIGH and c.field is not None
+        }
+        ai_headers = ai_headers | frozenset(promoted)
+        if promoted:
+            decision = decision.model_copy(
+                update={
+                    "smart_import": SmartImportDecision(
+                        answers=answers.model_copy(
+                            update={"assisted_fields": {**answers.assisted_fields, **promoted}}
+                        ).model_dump(mode="json", exclude_defaults=True),
+                        confirmed_domain=confirmed_domain,
+                    )
+                }
+            )
 
         # --- the profile, the people, the explanation ---------------------------------------------
         # A grid whose week is not known yet is judged by the columns it WILL have (its names do
@@ -1666,14 +1742,16 @@ def _with_known_departments(
     samples: Sequence[ColumnSample],
     known: Mapping[str, str],
     asked: Sequence[Question],
+    named: frozenset[str] = frozenset(),
 ) -> Proposal:
     """A department column whose NAME is clear is as sure as its values: when NINFA knows every
-    label in it (by its own rules or because the person taught them), nothing is left to doubt."""
+    label in it (by its own rules or because the person taught them), nothing is left to doubt.
+    (`named`: columns whose name the semantic layer read, clearly - they count as a clear name.)"""
     column = proposal.assigned().get("role")
     if (
         column is None
         or column.level == Level.HIGH
-        or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
+        or (column.name not in (NameMatch.EXACT, NameMatch.TOKEN) and column.header not in named)
         or any(q.kind == QuestionKind.VALUE_LABELS for q in asked)
         or label_question(column_labels(samples[column.position]), known, lexicon=True) is not None
     ):
@@ -1686,15 +1764,21 @@ def _with_known_departments(
     )
 
 
-def _with_known_words(proposal: Proposal, field: str, asked: Sequence[Question]) -> Proposal:
+def _with_known_words(
+    proposal: Proposal,
+    field: str,
+    asked: Sequence[Question],
+    named: frozenset[str] = frozenset(),
+) -> Proposal:
     """A column of words (a booking status) whose NAME is clear is as sure as its words: when no
     word of it is left to ask about (the person has just taught them, or NINFA knew them), nothing
-    is left to doubt - and the column is not asked about on top of its words."""
+    is left to doubt - and the column is not asked about on top of its words.
+    (`named`: columns whose name the semantic layer read, clearly - they count as a clear name.)"""
     column = proposal.assigned().get(field)
     if (
         column is None
         or column.level == Level.HIGH
-        or column.name not in (NameMatch.EXACT, NameMatch.TOKEN)
+        or (column.name not in (NameMatch.EXACT, NameMatch.TOKEN) and column.header not in named)
         or any(q.kind == QuestionKind.VALUE_LABELS and q.field == field for q in asked)
     ):
         return proposal

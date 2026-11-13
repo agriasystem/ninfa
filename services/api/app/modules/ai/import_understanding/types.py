@@ -155,6 +155,10 @@ class UnderstandingEvidence:
     questions: tuple[OfferedQuestion, ...] = ()
     # opaque question id -> the real one. Never serialised: it stays on this side.
     aliases: Mapping[str, str] = field(default_factory=dict)
+    # Columns the rules placed on a field a vocabulary can prove, without being sure (a question
+    # for the person is about to be asked): a reading of their NAME is worth a call. The indexes
+    # only, never serialised: what the model is shown is unchanged.
+    confirmable: frozenset[int] = frozenset()
 
     def column(self, index: int) -> ColumnEvidence | None:
         return next((c for c in self.columns if c.index == index), None)
@@ -274,6 +278,8 @@ class AiTrace:
     after: LevelCounts = field(default_factory=LevelCounts)
     questions_before: int = 0
     questions_after: int = 0
+    level_before: str | None = None  # the verdict the rules alone gave
+    level_after: str | None = None  # the verdict with the model's reading (applied, or replayed)
     suggested: int = 0  # columns / answers the model offered that survived every check
     promoted: int = 0  # columns the file's own values confirmed (no question left for them)
     agreements: int = 0

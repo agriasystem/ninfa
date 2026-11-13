@@ -85,7 +85,7 @@ def _build_semantic_resolver(settings: Settings) -> ImportUnderstandingResolver:
     return ImportUnderstandingResolver(
         provider,
         mode,
-        corroborate=mode == AiMode.ASSIST,
+        corroborate=True,  # (it acts only in ASSIST: `ImportUnderstandingResolver.corroborates`)
         provider_name="openai",
         model=settings.smart_import_openai_model,
     )

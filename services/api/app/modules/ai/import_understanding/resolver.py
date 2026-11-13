@@ -121,7 +121,7 @@ def worth_asking(evidence: UnderstandingEvidence) -> bool:
         for c in evidence.columns
         if c.assigned is None and c.pii is None and c.kind != "EMPTY" and c.values > 0
     ]
-    return bool(open_columns or evidence.questions)
+    return bool(open_columns or evidence.questions or evidence.confirmable)
 
 
 class ImportUnderstandingResolver:
@@ -162,7 +162,15 @@ class ImportUnderstandingResolver:
 
     @property
     def corroborates(self) -> bool:
+        """Does a column the model named, and the values prove, become certain? (ASSIST only.)"""
         return self._corroborate and self._mode == AiMode.ASSIST
+
+    @property
+    def reads_confirmations(self) -> bool:
+        """Is a model worth asking about a column the rules placed without being sure? Yes for the
+        semantic layer in either mode (SHADOW must ask what ASSIST would); no for the original
+        assistant, which can only suggest what the rules left open."""
+        return self._corroborate
 
     def resolve(
         self,
@@ -211,6 +219,8 @@ class ImportUnderstandingResolver:
         after: LevelCounts = LevelCounts(),  # noqa: B008
         questions_before: int = 0,
         questions_after: int = 0,
+        level_before: str | None = None,
+        level_after: str | None = None,
         suggested: int = 0,
         promoted: int = 0,
         source_learning_conflicts: int = 0,
@@ -241,6 +251,8 @@ class ImportUnderstandingResolver:
             after=after,
             questions_before=questions_before,
             questions_after=questions_after,
+            level_before=level_before,
+            level_after=level_after,
             suggested=suggested,
             promoted=promoted,
             agreements=len(summary.agreements) if summary else 0,
@@ -253,8 +265,8 @@ class ImportUnderstandingResolver:
         logger.info(
             "import_understanding trace mode=%s provider=%s model=%s prompt=%s schema=%s "
             "outcome=%s fallback=%s status=%s calls=%d retries=%d latency_ms=%d in=%s out=%s "
-            "request_ids=%s open_before=%d open_after=%d questions=%d->%d suggested=%d "
-            "promoted=%d agreements=%d conflicts=%d source_learning_conflicts=%d",
+            "request_ids=%s open_before=%d open_after=%d questions=%d->%d level=%s->%s "
+            "suggested=%d promoted=%d agreements=%d conflicts=%d source_learning_conflicts=%d",
             trace.mode,
             trace.provider,
             trace.model,
@@ -273,6 +285,8 @@ class ImportUnderstandingResolver:
             trace.after.open,
             trace.questions_before,
             trace.questions_after,
+            trace.level_before or "-",
+            trace.level_after or "-",
             trace.suggested,
             trace.promoted,
             trace.agreements,

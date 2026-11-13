@@ -232,6 +232,7 @@ def prepare(
         columns=columns,
         questions=tuple(questions),
         aliases=aliases,
+        confirmable=frozenset(i for i in evidence.confirmable if i in sent_columns),
     )
     return clean, count.removed
 

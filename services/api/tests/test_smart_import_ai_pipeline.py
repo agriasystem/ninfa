@@ -613,6 +613,9 @@ def test_the_audit_record_holds_counts_words_and_ids_never_content() -> None:
     assert trace.provider and trace.model == "stand-in"
     assert trace.calls == 1 and trace.input_tokens == 900 and trace.output_tokens == 250
     assert trace.before.open == 1 and trace.after.open == 0
+    # the verdict and the questions are those the PERSON is shown, with and without the model
+    assert (trace.level_before, trace.level_after) == ("MANUAL", "READY")
+    assert (trace.questions_before, trace.questions_after) == (0, 0)
     for forbidden in ("Condizione", "Confermata", "RES-1000", "Booking.com"):
         assert forbidden not in text
 
@@ -625,3 +628,62 @@ def test_the_semantic_instructions_ask_for_no_reasoning_allow_unknown_and_leave_
     # whether a file replaces, completes or amends what NINFA holds is not a model's to decide
     assert "replaces, completes or amends" in SEMANTIC_INSTRUCTIONS
     assert "not for you to decide" in SEMANTIC_INSTRUCTIONS
+
+
+# --- a column the rules placed without being sure: the model reads its name --------------------
+
+
+STAFF = "Postazione"
+
+
+def staff_with_unknown_department() -> bytes:
+    return xlsx_bytes(
+        {
+            "Turni": [
+                ["Giorno", STAFF, "Ore previste", "Costo previsto"],
+                *[
+                    [datetime(2027, 3, 1 + day), department, 8, 120]
+                    for day in range(2)
+                    for department in ("Reception", "Housekeeping", "Cucina")
+                ],
+            ]
+        }
+    )
+
+
+def test_a_department_the_rules_were_unsure_of_is_confirmed_by_its_name_and_values() -> None:
+    content = staff_with_unknown_department()
+
+    legacy = without_a_model(content, domain=LABOR)
+    result, provider, traces = read(Behaviour.ORACLE, content, {STAFF: "role"}, domain=LABOR)
+
+    # the rules alone ask one question about it; with the model's reading of its name there is none
+    assert legacy["level"] == "ASK" and [q[0] for q in legacy["questions"]] == [f"CONFIRM:{STAFF}"]
+    assert result["level"] == "READY" and result["questions"] == []
+    assert provider is not None and provider.calls == 1
+    (trace,) = traces
+    assert (trace.questions_before, trace.questions_after) == (1, 0)
+    assert (trace.level_before, trace.level_after) == ("ASK", "READY")
+    assert trace.promoted == 1 and trace.agreements == 1
+
+
+def test_a_model_that_disagrees_about_a_column_the_rules_placed_is_not_believed_over_them() -> None:
+    content = staff_with_unknown_department()
+
+    result, _, traces = read(Behaviour.DISAGREES, content, {STAFF: "role"}, domain=LABOR)
+
+    assert result == without_a_model(content, domain=LABOR)
+    assert traces[0].promoted == 0 and traces[0].conflicts >= 1
+
+
+def test_shadow_measures_the_same_confirmation_without_applying_it() -> None:
+    content = staff_with_unknown_department()
+
+    shadow, _, traces = read(
+        Behaviour.ORACLE, content, {STAFF: "role"}, domain=LABOR, mode=AiMode.SHADOW
+    )
+
+    assert shadow == without_a_model(content, domain=LABOR)
+    (trace,) = traces
+    assert (trace.level_before, trace.level_after) == ("ASK", "READY")
+    assert trace.mode == "shadow" and trace.promoted == 1
