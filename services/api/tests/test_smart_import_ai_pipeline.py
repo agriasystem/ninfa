@@ -687,3 +687,50 @@ def test_shadow_measures_the_same_confirmation_without_applying_it() -> None:
     (trace,) = traces
     assert (trace.level_before, trace.level_after) == ("ASK", "READY")
     assert trace.mode == "shadow" and trace.promoted == 1
+
+
+# --- nothing a model names is imported without a yes ------------------------------------------
+
+
+def with_an_optional_free_text_column() -> bytes:
+    header = [*header_of(status="Condizione"), "Dettaglio camera"]
+    body = [[*row, ("Doppia", "Singola")[i % 2]] for i, row in enumerate(rows_of())]
+    return table(header, body)
+
+
+def test_a_column_a_model_names_on_an_optional_field_is_asked_about_not_imported_silently() -> None:
+    content = with_an_optional_free_text_column()
+    truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
+
+    result, _, traces = read(Behaviour.ORACLE, content, truth)
+
+    # the status (a vocabulary proves it) is certain; the room type is the model's word alone
+    assert traces[0].promoted == 1
+    assert result["level"] == "ASK"
+    assert [q[0] for q in result["questions"]] == ["CONFIRM:Dettaglio camera"]
+    assert ("Dettaglio camera", "room_type", "TO_CHECK") in result["columns"]
+
+
+def test_a_wrong_model_cannot_slip_a_column_into_an_import_through_an_optional_field() -> None:
+    content = bookings(status=INJECTION)
+
+    result, _, _ = read(Behaviour.WRONG, content, {INJECTION: "status"})
+
+    assert result["level"] != "READY"
+    assert not any(
+        field == "status" and str(level).endswith("RECOGNIZED")
+        for _, field, level in result["columns"]
+    )
+
+
+def test_the_model_never_names_more_columns_than_a_person_can_be_asked_about() -> None:
+    from app.modules.data_sources.understanding_ai import MAX_ASSISTED
+
+    header = [*header_of(status="Condizione"), *[f"Extra {n}" for n in range(10)]]
+    body = [[*row, *[("A", "B")[i % 2]] * 10] for i, row in enumerate(rows_of())]
+    truth = {**TRUTH_STATUS, **{f"Extra {n}": "room_type" for n in range(10)}}
+
+    result, _, traces = read(Behaviour.ORACLE, table(header, body), truth)
+
+    assert traces[0].suggested <= MAX_ASSISTED
+    assert result["level"] != "READY"  # every one of them is a question for the person

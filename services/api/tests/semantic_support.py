@@ -102,6 +102,16 @@ class SemanticStandIn:
     def calls(self) -> int:
         return len(self.requests)
 
+    def truth_of(self, header: str) -> str | None:
+        """The field a column really is, by the header the model is SHOWN: a long one reaches it cut
+        short and ending in an ellipsis."""
+        if header in self.truth:
+            return self.truth[header]
+        if header.endswith("\u2026"):
+            prefix = header[:-1]
+            return next((v for k, v in self.truth.items() if k.startswith(prefix)), None)
+        return None
+
     def suggest(self, request: ImportUnderstandingRequest) -> object:
         self.requests.append(request)
         self.violations += audit(request, self.forbidden)
@@ -136,11 +146,11 @@ class SemanticStandIn:
         }
         readable = [c for c in _columns(document) if c["pii"] is None and c["values"] > 0]
         right = [
-            (int(c["index"]), self.truth[str(c["header"])])
+            (int(c["index"]), found)
             for c in readable
-            if str(c["header"]) in self.truth
+            if (found := self.truth_of(str(c["header"]))) is not None
         ]
-        nothing = [int(c["index"]) for c in readable if str(c["header"]) not in self.truth]
+        nothing = [int(c["index"]) for c in readable if self.truth_of(str(c["header"])) is None]
         behaviour = self.behaviour
 
         if behaviour in (
@@ -207,7 +217,7 @@ class SemanticStandIn:
             for column in readable:
                 if column["assigned"] is not None:
                     continue
-                correct = self.truth.get(str(column["header"]))
+                correct = self.truth_of(str(column["header"]))
                 name = next(
                     (f for f in ranked if f in offered and f != correct and f not in used), None
                 )

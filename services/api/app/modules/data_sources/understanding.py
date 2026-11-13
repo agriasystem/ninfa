@@ -32,7 +32,12 @@ from app.modules.ai.import_understanding.resolver import (
     ImportUnderstandingResolver,
     ReplayResolver,
 )
-from app.modules.ai.import_understanding.types import AiMode, AiResolution, LevelCounts
+from app.modules.ai.import_understanding.types import (
+    AiMode,
+    AiResolution,
+    LevelCounts,
+    ResolutionReason,
+)
 from app.modules.bookings.errors import BookingImportError
 from app.modules.bookings.mapping import normalize_header
 from app.modules.bookings.normalization import DateOrder
@@ -322,6 +327,23 @@ class UnderstandingService:
             resolver,
         )
         if resolver is None or outcome is None:
+            return inspection
+        if outcome.resolution.reason != ResolutionReason.OK:
+            # the model contributed nothing (it failed, it was not needed, its answer was
+            # void): the answer IS the rules' own, and there is no second reading to make
+            questions, level = _verdict(inspection)
+            resolver.record(
+                resolver.trace_of(
+                    outcome.resolution,
+                    before=outcome.before,
+                    after=outcome.before,
+                    questions_before=questions,
+                    questions_after=questions,
+                    level_before=level,
+                    level_after=level,
+                    source_learning_conflicts=outcome.source_conflicts,
+                )
+            )
             return inspection
         # What the rules alone say, and what the model's reading makes of it: the one the person is
         # shown is `inspection`; the other is read once more, for the audit only. In ASSIST the
@@ -816,6 +838,9 @@ class UnderstandingService:
                 if any(q.kind == QuestionKind.DATES_REVERSED for q in questions):
                     skip.update({"check_in", "check_out"})  # looked at together, not one by one
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
+                # whatever a model named and is not certain stays a question, required or
+                # not: the rules only ask about the fields an import cannot run without
+                questions.extend(_assisted_confirmations(proposal, ai_headers, questions))
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         # (the same reading on every file of a source: the file still does not say)
@@ -1735,6 +1760,39 @@ def _confirm_questions(
         )
         for c in unsure
     ]
+
+
+def _assisted_confirmations(
+    proposal: Proposal, assisted: frozenset[str], asked: Sequence[Question]
+) -> list[Question]:
+    """A column the semantic layer named, that nothing made certain, is never imported on the
+    model's word alone: the person is asked (a column of a field the import cannot run without is
+    asked by `_confirm_questions` already, and one whose WORDS are asked about waits for them)."""
+    out: list[Question] = []
+    for column in proposal.columns:
+        if (
+            column.header not in assisted
+            or column.field is None
+            or column.level == Level.HIGH
+            or any(
+                q.column == column.header
+                or (q.kind == QuestionKind.VALUE_LABELS and q.field == column.field)
+                for q in asked
+            )
+        ):
+            continue
+        out.append(
+            Question(
+                id=f"CONFIRM:{column.header}",
+                kind=QuestionKind.COLUMN_MEANING,
+                column=column.header,
+                field=column.field,
+                candidate=column.field,
+                origin=OriginKind.ASSISTANT,
+                choices=(Choice(column.field),),
+            )
+        )
+    return out
 
 
 def _with_known_departments(

@@ -1149,6 +1149,12 @@ export interface UnderstandAnswers {
   date_order?: "DMY" | "MDY" | null;
   decimal_style?: "COMMA" | "POINT" | null;
   column_fields?: Record<string, string>;
+  /**
+   * Set by the server in the decisions it issues, never built here: columns whose name the semantic
+   * layer read and whose values NINFA's own vocabulary proves. It is carried back unchanged so the
+   * server can read the file the same way without any model; it is not a confirmation by the person.
+   */
+  assisted_fields?: Record<string, string>;
   labels?: Record<string, Record<string, string>>;
   file_scope?: ImportFileScope | null;
   /** That answer is also for the next files of this structure: only then does the memory change. */

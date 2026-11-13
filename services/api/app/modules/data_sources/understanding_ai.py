@@ -57,6 +57,9 @@ _ASKABLE = frozenset(
 # cost category are recognised from closed vocabularies (`fit_vocabulary`, `fit_channel`), so a name
 # the model read for them is confirmed by what the column holds. For every other field the values
 # say too little to tell it from its neighbours (two date columns, two amounts, two counts).
+# The most columns a model's structured reading may name in one file: a file that needs more is
+# the person's to match.
+MAX_ASSISTED = 6
 CORROBORATED_FIELDS = frozenset({"status", "channel", "role", "cost_category"})
 # The vocabulary fits return exactly 1.0 when most of the distinct values are known words, and at
 # most 0.8 of a base fit otherwise: only the first is a recognition.
@@ -233,7 +236,20 @@ def needs_help(
     # (a column the rules placed without being sure, on a field a vocabulary can prove: the name,
     # read by someone else, may be all that is missing)
     doubtful = confirmable and bool(_confirmable(proposal))
-    return (missing and left_over) or asks_kind or doubtful
+    # (a requirement that is met by ONE of its alternatives - planned OR actual hours - while a
+    # column nobody read is still there: it may be the other alternative, silently left out. Asked
+    # about, it becomes a question for the person; not asked, it is a file that looks complete)
+    other_half = (
+        confirmable
+        and left_over
+        and any(
+            len(group) > 1
+            and any(f in assigned for f in group)
+            and not all(f in assigned for f in group)
+            for group in groups
+        )
+    )
+    return (missing and left_over) or asks_kind or doubtful or other_half
 
 
 def apply_resolution(
@@ -258,6 +274,7 @@ def apply_resolution(
     filled: set[str] = set()
     columns: list[ColumnProposal] = []
     taken = {c.field for c in proposal.columns if c.field is not None}
+    structured = resolution.interpretation is not None
     # a field that some OTHER column is still a candidate for (a hours/amount column that does not
     # say which, look-alikes for one field) is not given away: there is a competing candidate
     contended = {f for c in proposal.columns for f in c.ambiguous_fields}
@@ -265,6 +282,7 @@ def apply_resolution(
         field = resolution.columns.get(column.position) if same_domain else None
         if (
             field is not None
+            and not (structured and len(filled) >= MAX_ASSISTED)
             and column.field is None
             and column.locked is None
             and column.pii is None
