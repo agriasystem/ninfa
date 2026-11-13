@@ -1016,6 +1016,38 @@ def _table(metrics: Mapping[str, Any], configs: Sequence[str]) -> list[str]:
     return lines
 
 
+def caused_and_fixed(block: Mapping[str, Any]) -> dict[str, tuple[int, int]]:
+    """Per configuration: unsafe READY the layer CAUSED (not so with the rules alone) and FIXED (so
+    with the rules alone, not any more). The raw counts hide the difference."""
+    rules = set(block["unsafe_ready_ids"]["deterministic"])
+    return {
+        config: (len(set(ids) - rules), len(rules - set(ids)))
+        for config, ids in block["unsafe_ready_ids"].items()
+        if config != "deterministic"
+    }
+
+
+READING_GUIDE = """\
+## How to read this
+
+* **Unsafe READY**: offered as automatic (READY, no question) and wrong - a truth fact is read
+  wrong, a column that must not be mapped is, or the truth says a person is needed. What decides is
+  the *difference from the rules alone*: "caused" (it was not so before) and "fixed" (it was, and is
+  not any more) are counted per document under each table. A raw count hides which one it is.
+* **Files made automatic, wrongly** is a strict count: the file became automatic while some truth
+  fact is still unread (not necessarily the column the layer touched). It is NOT a false automation
+  caused by the layer - that is the "caused" line, and it is zero everywhere.
+* **Junk / personal columns mapped** counts columns the truth says must NOT become a field that got
+  a field *suggested* - always at MEDIUM, always with a question for the person, never certain. It
+  is the residual risk of a wrong suggestion that a person confirms without looking: it is V3's, and
+  the WRONG stand-in measures its size.
+* **Certain-and-wrong claims** and **P0 findings** that are the same in every column are defects of
+  the RULES on these files, not of the layer; the layer only ever lowers them.
+* Tokens are estimated from the size of the payload (about three characters per token); latency is
+  not measured (no network call).
+"""
+
+
 def markdown(data: Mapping[str, Any], today: str) -> str:
     out = [
         "# Smart Import - OpenAI semantic layer - Intelligence Benchmark V1",
@@ -1081,6 +1113,15 @@ def markdown(data: Mapping[str, Any], today: str) -> str:
                 )
                 + " |"
             )
+        shown = caused_and_fixed(block)
+        out += [
+            "",
+            "Unsafe READY against the rules alone (caused / fixed by the layer): "
+            + "; ".join(
+                f"{LABELS[c]}: {shown[c][0]} / {shown[c][1]}" for c in configs if c in shown
+            )
+            + ".",
+        ]
         silent = block["silent_configs_that_changed_a_screen"]
         out += [
             "",
@@ -1118,7 +1159,7 @@ def markdown(data: Mapping[str, Any], today: str) -> str:
             f"| {structure} | {a['documents']} | {a['automatic']} | {b['automatic']} | "
             f"{a['manual_matching']} | {b['manual_matching']} |"
         )
-    out += ["", "## Cost", "", data["cost"], ""]
+    out += ["", "## Cost", "", data["cost"], "", READING_GUIDE]
     return "\n".join(out) + "\n"
 
 
@@ -1239,7 +1280,17 @@ def main(argv: list[str] | None = None) -> int:
         "--price-out", type=float, default=None, help="USD per million output tokens"
     )
     parser.add_argument("--no-write", action="store_true")
+    parser.add_argument(
+        "--render", type=Path, default=None, help="write the Markdown again from a saved JSON"
+    )
     args = parser.parse_args(argv)
+    if args.render is not None:
+        saved = json.loads(args.render.read_text(encoding="utf-8"))
+        args.markdown.write_text(
+            markdown(saved, date.today().isoformat()), encoding="utf-8", newline="\n"
+        )
+        say(f"Markdown {args.markdown}")
+        return 0
     data = run_benchmark(args.per_doc, args.limit, args.price_in, args.price_out)
     print(json.dumps(data["summary"], indent=1))
     official = args.json == DEFAULT_JSON and args.markdown == DEFAULT_MD

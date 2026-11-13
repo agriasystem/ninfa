@@ -102,3 +102,25 @@ python -m tests.live_openai_acceptance                               # ONE real 
 - A plausible wrong suggestion on a column the layer does not certify (a date, an hours column) is still a question a person may confirm without looking. That risk is V3's, unchanged.
 - The vocabularies that prove a column (statuses, channels, departments, cost categories) are NINFA's own; a hotel that uses other words is asked about them, as before.
 - Cost: the call is one per file the model is worth asking about, ~2k input tokens; the price of the configured model is not known here and no cost is invented.
+
+## What was measured (stand-ins only; full tables in the benchmark report)
+
+On 290 "challenge" workbooks (the official READY files with one or two headers replaced by a word NINFA's rules do not know), 240 official documents and 15 hand-built adversarial files, with
+the layer OFF, in SHADOW and in ASSIST against five stand-ins:
+
+| | rules alone | oracle | lexicon stand-in | wrong model | hostile model |
+|---|---:|---:|---:|---:|---:|
+| Challenge: manual matching required | 154 | 56 | 69 | 148 | 154 |
+| Challenge: automatic (READY, no question) | 60 | 65 | 81 | 60 | 60 |
+| Challenge: unsafe READY (offered as automatic and wrong) | 41 | 1 | 21 | 41 | 41 |
+| **Unsafe READY CAUSED by the layer, all populations** | - | **0** | **0** | **0** | **0** |
+| Official 240: any change in a verdict | - | 0 | 0 | extra questions only | extra questions only |
+| Adversarial: wrong-domain READY, PII sent to the model, scope violations | 0 | 0 | 0 | 0 | 0 |
+
+* With the layer **off** (the default) the official benchmark (240) and the Universal Understanding V2 benchmark (417) answer **identically, case by case, to `main`**.
+* In SHADOW and with the provider down, not one screen changed in any population.
+* The 41 challenge files the rules alone offer as automatic while a column is silently left out (planned OR actual hours: one half read, the other unread) are a weakness of the RULES, found by
+  this benchmark; a reader that notices the unread column turns each into a question (oracle: 40 of 41, lexicon stand-in: 20 of 41). The layer asks about it only when it is enabled; the rules
+  themselves were not changed.
+* Residual risk, stated plainly: a WRONG model puts a *suggestion* (MEDIUM, always with a question) on a column that must not be mapped in 5 of 290 challenge files and 1 of 240 official ones, and
+  adds 6-7 questions to the official set. None is ever certain; a person who confirms without looking is the only way it becomes data. That risk is V3's and is unchanged by this gate.

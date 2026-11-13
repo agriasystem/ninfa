@@ -61,6 +61,8 @@ Against the rules alone, document by document:
 | Model suggestions wrong | 0 | 1 | 46 | 1 | 0 | 0 |
 | Screens that changed | 191 | 149 | 43 | 1 | 0 | 0 |
 
+Unsafe READY against the rules alone (caused / fixed by the layer): ASSIST - oracle: 0 / 40; ASSIST - lexicon stand-in: 0 / 20; ASSIST - wrong model: 0 / 0; ASSIST - hostile model: 0 / 0; ASSIST - provider down: 0 / 0; SHADOW - lexicon stand-in: 0 / 0.
+
 Screens changed where the answer must stay exactly the rules' own: assist_failing: 0, shadow_lexicon: 0.
 
 ## Population: official
@@ -108,6 +110,8 @@ Against the rules alone, document by document:
 | Model suggestions wrong | 0 | 0 | 15 | 9 | 0 | 0 |
 | Screens that changed | 1 | 1 | 10 | 6 | 0 | 0 |
 
+Unsafe READY against the rules alone (caused / fixed by the layer): ASSIST - oracle: 0 / 0; ASSIST - lexicon stand-in: 0 / 0; ASSIST - wrong model: 0 / 0; ASSIST - hostile model: 0 / 0; ASSIST - provider down: 0 / 0; SHADOW - lexicon stand-in: 0 / 0.
+
 Screens changed where the answer must stay exactly the rules' own: assist_failing: 0, shadow_lexicon: 0.
 
 ## Population: adversarial
@@ -154,6 +158,8 @@ Against the rules alone, document by document:
 | Model suggestions right | 7 | 2 | 0 | 0 | 0 | 0 |
 | Model suggestions wrong | 0 | 0 | 7 | 1 | 0 | 0 |
 | Screens that changed | 6 | 1 | 4 | 1 | 0 | 0 |
+
+Unsafe READY against the rules alone (caused / fixed by the layer): ASSIST - oracle: 0 / 0; ASSIST - lexicon stand-in: 0 / 0; ASSIST - wrong model: 0 / 0; ASSIST - hostile model: 0 / 0; ASSIST - provider down: 0 / 0; SHADOW - lexicon stand-in: 0 / 0.
 
 Screens changed where the answer must stay exactly the rules' own: assist_failing: 0, shadow_lexicon: 0.
 
@@ -203,4 +209,22 @@ Screens changed where the answer must stay exactly the rules' own: assist_failin
 ## Cost
 
 With the lexicon stand-in the model is asked about 225 of 290 challenge documents, about 1758 input tokens each (estimated from the size of the payload and the instructions, ~3 characters per token). Latency and actual token counts are NOT measured: there is no network call in this benchmark. The approximate API cost is **not computed**: no price is known for the configured model, and none was invented. Pass `--price-in` / `--price-out` (USD per million tokens) to compute it.
+
+## How to read this
+
+* **Unsafe READY**: offered as automatic (READY, no question) and wrong - a truth fact is read
+  wrong, a column that must not be mapped is, or the truth says a person is needed. What decides is
+  the *difference from the rules alone*: "caused" (it was not so before) and "fixed" (it was, and is
+  not any more) are counted per document under each table. A raw count hides which one it is.
+* **Files made automatic, wrongly** is a strict count: the file became automatic while some truth
+  fact is still unread (not necessarily the column the layer touched). It is NOT a false automation
+  caused by the layer - that is the "caused" line, and it is zero everywhere.
+* **Junk / personal columns mapped** counts columns the truth says must NOT become a field that got
+  a field *suggested* - always at MEDIUM, always with a question for the person, never certain. It
+  is the residual risk of a wrong suggestion that a person confirms without looking: it is V3's, and
+  the WRONG stand-in measures its size.
+* **Certain-and-wrong claims** and **P0 findings** that are the same in every column are defects of
+  the RULES on these files, not of the layer; the layer only ever lowers them.
+* Tokens are estimated from the size of the payload (about three characters per token); latency is
+  not measured (no network call).
 
