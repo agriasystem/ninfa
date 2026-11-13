@@ -979,7 +979,7 @@ ROWS = (
 VS = (
     ("Files made automatic, correctly", "files_made_automatic_correctly"),
     (
-        "Files made automatic, wrongly (questions INCORRECTLY avoided)",
+        "Files made automatic with ANOTHER fact still unread (not a false automation)",
         "files_made_automatic_wrongly",
     ),
     ("Questions correctly avoided", "questions_correctly_avoided"),
@@ -1034,9 +1034,11 @@ READING_GUIDE = """\
   wrong, a column that must not be mapped is, or the truth says a person is needed. What decides is
   the *difference from the rules alone*: "caused" (it was not so before) and "fixed" (it was, and is
   not any more) are counted per document under each table. A raw count hides which one it is.
-* **Files made automatic, wrongly** is a strict count: the file became automatic while some truth
-  fact is still unread (not necessarily the column the layer touched). It is NOT a false automation
-  caused by the layer - that is the "caused" line, and it is zero everywhere.
+* **Files made automatic with another fact still unread** is a strict count: the file became
+  automatic - correctly, for the column the layer touched - while some OTHER truth fact the rules
+  already did not read stays unread (in the challenge set it is one accessory column of a
+  two-level-header file, `B36`, P2). It is NOT a false automation: that is the "caused" line, and
+  it is zero everywhere.
 * **Junk / personal columns mapped** counts columns the truth says must NOT become a field that got
   a field *suggested* - always at MEDIUM, always with a question for the person, never certain. It
   is the residual risk of a wrong suggestion that a person confirms without looking: it is V3's, and
