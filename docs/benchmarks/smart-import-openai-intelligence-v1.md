@@ -26,7 +26,7 @@ Regenerate (from `services/api`): `python -m tests.benchmarks.smart_import_v3.op
 | READY with no question (automatic) | 60 | 65 | 81 | 60 | 60 | 60 | 60 |
 | Manual matching required | 154 | 56 | 69 | 148 | 154 | 154 | 154 |
 | Files that ask questions | 76 | 169 | 140 | 82 | 76 | 76 | 76 |
-| Questions asked | 78 | 181 | 150 | 88 | 78 | 78 | 78 |
+| Questions asked | 78 | 184 | 152 | 90 | 79 | 78 | 78 |
 | Mapping recall (truth facts found) | 82.6% | 93.7% | 91.1% | 82.6% | 82.6% | 82.6% | 82.6% |
 | Claims precision (claims that are right) | 99.0% | 99.2% | 99.1% | 98.0% | 99.0% | 99.0% | 99.0% |
 | Domain accuracy | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
@@ -73,7 +73,7 @@ Screens changed where the answer must stay exactly the rules' own: assist_failin
 | READY with no question (automatic) | 154 | 154 | 154 | 154 | 154 | 154 | 154 |
 | Manual matching required | 52 | 52 | 52 | 52 | 52 | 52 | 52 |
 | Files that ask questions | 34 | 34 | 34 | 34 | 34 | 34 | 34 |
-| Questions asked | 47 | 47 | 47 | 53 | 53 | 47 | 47 |
+| Questions asked | 47 | 47 | 47 | 54 | 53 | 47 | 47 |
 | Mapping recall (truth facts found) | 98.8% | 98.8% | 98.8% | 98.9% | 98.9% | 98.8% | 98.8% |
 | Claims precision (claims that are right) | 99.8% | 99.8% | 99.8% | 99.3% | 99.4% | 99.8% | 99.8% |
 | Domain accuracy | 98.7% | 98.7% | 98.7% | 98.7% | 98.7% | 98.7% | 98.7% |
@@ -117,19 +117,19 @@ Screens changed where the answer must stay exactly the rules' own: assist_failin
 | Metric | Deterministic only | ASSIST - oracle | ASSIST - lexicon stand-in | ASSIST - wrong model | ASSIST - hostile model | ASSIST - provider down | SHADOW - lexicon stand-in |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Documents | 15 | 15 | 15 | 15 | 15 | 15 | 15 |
-| READY with no question (automatic) | 0 | 6 | 0 | 1 | 0 | 0 | 0 |
-| Manual matching required | 15 | 6 | 14 | 12 | 15 | 15 | 15 |
+| READY with no question (automatic) | 0 | 3 | 0 | 0 | 0 | 0 | 0 |
+| Manual matching required | 15 | 9 | 14 | 13 | 15 | 15 | 15 |
 | Files that ask questions | 0 | 3 | 1 | 2 | 0 | 0 | 0 |
 | Questions asked | 2 | 5 | 3 | 4 | 2 | 2 | 2 |
-| Mapping recall (truth facts found) | 74.3% | 87.8% | 77.0% | 75.7% | 74.3% | 74.3% | 74.3% |
+| Mapping recall (truth facts found) | 74.3% | 83.8% | 77.0% | 74.3% | 74.3% | 74.3% | 74.3% |
 | Claims precision (claims that are right) | 100.0% | 100.0% | 100.0% | 96.5% | 100.0% | 100.0% | 100.0% |
 | Domain accuracy | 93.3% | 93.3% | 93.3% | 93.3% | 93.3% | 93.3% | 93.3% |
 | Header detection accuracy | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
-| **Unsafe READY** | 0 | 6 | 0 | 1 | 0 | 0 | 0 |
-| **False automation** | 0 | 6 | 0 | 1 | 0 | 0 | 0 |
+| **Unsafe READY** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **False automation** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | **Wrong-domain READY** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Certain-and-wrong claims | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| P0 findings (silent wrong data) | 1 | 7 | 1 | 2 | 1 | 1 | 1 |
+| P0 findings (silent wrong data) | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
 | Junk / personal columns mapped | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Unknown correctly declared | 1 | 1 | 1 | 1 | 1 | 1 | 1 |
 | **PII values sent to the model** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -144,16 +144,16 @@ Against the rules alone, document by document:
 
 | | ASSIST - oracle | ASSIST - lexicon stand-in | ASSIST - wrong model | ASSIST - hostile model | ASSIST - provider down | SHADOW - lexicon stand-in |
 |---|---:|---:|---:|---:|---:|---:|
-| Files made automatic, correctly | 0 | 0 | 0 | 0 | 0 | 0 |
-| Files made automatic, wrongly (questions INCORRECTLY avoided) | 6 | 0 | 1 | 0 | 0 | 0 |
+| Files made automatic, correctly | 3 | 0 | 0 | 0 | 0 | 0 |
+| Files made automatic, wrongly (questions INCORRECTLY avoided) | 0 | 0 | 0 | 0 | 0 | 0 |
 | Questions correctly avoided | 0 | 0 | 0 | 0 | 0 | 0 |
 | Questions incorrectly avoided | 0 | 0 | 0 | 0 | 0 | 0 |
 | Manual matching turned into questions with a suggestion | 3 | 1 | 2 | 0 | 0 | 0 |
-| Manual matching turned into READY | 6 | 0 | 1 | 0 | 0 | 0 |
+| Manual matching turned into READY | 3 | 0 | 0 | 0 | 0 | 0 |
 | Questions turned into READY | 0 | 0 | 0 | 0 | 0 | 0 |
-| Model suggestions right | 10 | 2 | 1 | 0 | 0 | 0 |
+| Model suggestions right | 7 | 2 | 0 | 0 | 0 | 0 |
 | Model suggestions wrong | 0 | 0 | 7 | 1 | 0 | 0 |
-| Screens that changed | 9 | 1 | 5 | 1 | 0 | 0 |
+| Screens that changed | 6 | 1 | 4 | 1 | 0 | 0 |
 
 Screens changed where the answer must stay exactly the rules' own: assist_failing: 0, shadow_lexicon: 0.
 
@@ -166,7 +166,7 @@ Screens changed where the answer must stay exactly the rules' own: assist_failin
 | channel | 16 | 0 | 9 | 16 | 6 | 0 | 1 |
 | check_out | 8 | 0 | 0 | 7 | 0 | 1 | 10 |
 | cost_category | 8 | 7 | 7 | 0 | 0 | 2 | 2 |
-| department | 36 | 0 | 33 | 0 | 0 | 36 | 3 |
+| department | 36 | 0 | 33 | 0 | 0 | 36 | 5 |
 | invoice_date | 39 | 0 | 0 | 38 | 38 | 1 | 1 |
 | planned_hours | 36 | 8 | 0 | 0 | 0 | 29 | 39 |
 | room_revenue | 20 | 1 | 1 | 18 | 18 | 1 | 1 |

@@ -19,7 +19,7 @@ from app.modules.ai.import_understanding.types import (
 )
 
 PROMPT_VERSION = "import-understanding-v2"
-# The prompt of the `semantic-v1` contract (`interpretation.py`), spoken by the OpenAI adapter.
+# The prompt of the `semantic-v1` contract (`interpretation.py`), spoken by a structured adapter.
 SEMANTIC_PROMPT_VERSION = "import-semantic-v1"
 
 SYSTEM_INSTRUCTIONS = """\

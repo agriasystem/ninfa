@@ -57,7 +57,7 @@
       "UNAVAILABLE": 12
      },
      "scope_violations": 0,
-     "seconds": 3.72,
+     "seconds": 2.28,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -105,7 +105,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 3.61,
+     "seconds": 4.12,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 10800,
      "tokens_out_total": 3000,
@@ -154,7 +154,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 3.66,
+     "seconds": 4.06,
      "tokens_in_per_asked_document": 1794,
      "tokens_in_total": 21530,
      "tokens_out_total": 3329,
@@ -176,26 +176,26 @@
     },
     "assist_oracle": {
      "asking": 3,
-     "automatic": 6,
+     "automatic": 3,
      "certain_and_wrong": 0,
      "claims_precision": 1.0,
      "documents": 15,
      "documents_where_the_model_was_asked": 12,
      "domain_accuracy": 0.9333,
      "fallbacks_by_kind": {},
-     "false_automation": 6,
+     "false_automation": 0,
      "header_accuracy": 1.0,
      "junk_columns_mapped": 0,
      "levels": {
       "ASK": 3,
       "BLOCKED": 1,
-      "MANUAL": 5,
-      "READY": 6
+      "MANUAL": 8,
+      "READY": 3
      },
-     "manual_matching": 6,
-     "mapping_recall": 0.8784,
+     "manual_matching": 9,
+     "mapping_recall": 0.8378,
      "model_calls": 12,
-     "p0_findings": 7,
+     "p0_findings": 1,
      "pii_values_in_the_browser_answer": 1,
      "pii_violations_in_what_the_model_was_sent": 0,
      "questions_asked": 5,
@@ -204,48 +204,47 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 3.64,
+     "seconds": 4.11,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 10800,
      "tokens_out_total": 3000,
      "unknown_correctly_declared": 1,
-     "unsafe_ready": 6,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
-      "files_made_automatic_correctly": 0,
-      "files_made_automatic_wrongly": 6,
+      "files_made_automatic_correctly": 3,
+      "files_made_automatic_wrongly": 0,
       "manual_matching_became_questions": 3,
-      "manual_matching_became_ready": 6,
-      "model_suggestions_right": 10,
+      "manual_matching_became_ready": 3,
+      "model_suggestions_right": 7,
       "model_suggestions_wrong": 0,
       "questions_became_ready": 0,
       "questions_correctly_avoided": 0,
       "questions_incorrectly_avoided": 0,
-      "screens_that_changed": 9
+      "screens_that_changed": 6
      },
      "wrong_domain_ready": 0
     },
     "assist_wrong": {
      "asking": 2,
-     "automatic": 1,
+     "automatic": 0,
      "certain_and_wrong": 0,
-     "claims_precision": 0.9655,
+     "claims_precision": 0.9649,
      "documents": 15,
      "documents_where_the_model_was_asked": 12,
      "domain_accuracy": 0.9333,
      "fallbacks_by_kind": {},
-     "false_automation": 1,
+     "false_automation": 0,
      "header_accuracy": 1.0,
      "junk_columns_mapped": 0,
      "levels": {
       "ASK": 2,
       "BLOCKED": 1,
-      "MANUAL": 11,
-      "READY": 1
+      "MANUAL": 12
      },
-     "manual_matching": 12,
-     "mapping_recall": 0.7568,
+     "manual_matching": 13,
+     "mapping_recall": 0.7432,
      "model_calls": 12,
-     "p0_findings": 2,
+     "p0_findings": 1,
      "pii_values_in_the_browser_answer": 1,
      "pii_violations_in_what_the_model_was_sent": 0,
      "questions_asked": 4,
@@ -254,23 +253,23 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 3.66,
+     "seconds": 4.06,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 10800,
      "tokens_out_total": 3000,
      "unknown_correctly_declared": 1,
-     "unsafe_ready": 1,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 0,
-      "files_made_automatic_wrongly": 1,
+      "files_made_automatic_wrongly": 0,
       "manual_matching_became_questions": 2,
-      "manual_matching_became_ready": 1,
-      "model_suggestions_right": 1,
+      "manual_matching_became_ready": 0,
+      "model_suggestions_right": 0,
       "model_suggestions_wrong": 7,
       "questions_became_ready": 0,
       "questions_correctly_avoided": 0,
       "questions_incorrectly_avoided": 0,
-      "screens_that_changed": 5
+      "screens_that_changed": 4
      },
      "wrong_domain_ready": 0
     },
@@ -300,7 +299,7 @@
      "questions_unnecessary": 2,
      "resolutions_by_reason": {},
      "scope_violations": 0,
-     "seconds": 1.91,
+     "seconds": 2.21,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -348,7 +347,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 3.66,
+     "seconds": 4.06,
      "tokens_in_per_asked_document": 1794,
      "tokens_in_total": 21530,
      "tokens_out_total": 3329,
@@ -377,17 +376,8 @@
     "assist_failing": [],
     "assist_hostile": [],
     "assist_lexicon": [],
-    "assist_oracle": [
-     "ADV06-injection-in-a-cell",
-     "ADV07-injection-in-a-sheet-name",
-     "ADV08-injection-in-a-title-header-on-row-4",
-     "ADV09-personal-value-as-a-header",
-     "ADV10-introduction-sheet-and-data-sheet",
-     "ADV11-header-on-row-7"
-    ],
-    "assist_wrong": [
-     "ADV05-injection-in-a-header"
-    ],
+    "assist_oracle": [],
+    "assist_wrong": [],
     "deterministic": [],
     "shadow_lexicon": []
    }
@@ -480,7 +470,7 @@
       "documents": 36,
       "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 3
+      "questions_asked": 5
      },
      "deterministic": {
       "automatic": 0,
@@ -738,7 +728,7 @@
       "documents": 230,
       "false_automation": 15,
       "manual_matching": 60,
-      "questions_asked": 115
+      "questions_asked": 117
      },
      "deterministic": {
       "automatic": 42,
@@ -802,7 +792,7 @@
       "documents": 262,
       "false_automation": 19,
       "manual_matching": 66,
-      "questions_asked": 129
+      "questions_asked": 131
      },
      "deterministic": {
       "automatic": 57,
@@ -914,7 +904,7 @@
       "documents": 290,
       "false_automation": 21,
       "manual_matching": 69,
-      "questions_asked": 150
+      "questions_asked": 152
      },
      "deterministic": {
       "automatic": 60,
@@ -1250,7 +1240,7 @@
       "UNAVAILABLE": 225
      },
      "scope_violations": 0,
-     "seconds": 95.33,
+     "seconds": 67.78,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -1293,13 +1283,13 @@
      "p0_findings": 55,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 78,
-     "questions_unnecessary": 70,
+     "questions_asked": 79,
+     "questions_unnecessary": 71,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 111.26,
+     "seconds": 155.51,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 202500,
      "tokens_out_total": 56250,
@@ -1342,13 +1332,13 @@
      "p0_findings": 35,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 150,
-     "questions_unnecessary": 129,
+     "questions_asked": 152,
+     "questions_unnecessary": 131,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 95.13,
+     "seconds": 126.96,
      "tokens_in_per_asked_document": 1758,
      "tokens_in_total": 395478,
      "tokens_out_total": 57175,
@@ -1391,13 +1381,13 @@
      "p0_findings": 15,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 181,
-     "questions_unnecessary": 159,
+     "questions_asked": 184,
+     "questions_unnecessary": 162,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 118.13,
+     "seconds": 131.06,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 202500,
      "tokens_out_total": 56250,
@@ -1440,13 +1430,13 @@
      "p0_findings": 55,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 88,
-     "questions_unnecessary": 77,
+     "questions_asked": 90,
+     "questions_unnecessary": 79,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 95.68,
+     "seconds": 136.56,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 202500,
      "tokens_out_total": 56250,
@@ -1493,7 +1483,7 @@
      "questions_unnecessary": 70,
      "resolutions_by_reason": {},
      "scope_violations": 0,
-     "seconds": 55.79,
+     "seconds": 74.11,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -1542,7 +1532,7 @@
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 92.86,
+     "seconds": 103.85,
      "tokens_in_per_asked_document": 1758,
      "tokens_in_total": 395478,
      "tokens_out_total": 57175,
@@ -2090,7 +2080,7 @@
       "UNAVAILABLE": 46
      },
      "scope_violations": 0,
-     "seconds": 44.18,
+     "seconds": 40.34,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -2140,7 +2130,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 43.46,
+     "seconds": 48.34,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 41400,
      "tokens_out_total": 11500,
@@ -2190,7 +2180,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 43.68,
+     "seconds": 52.57,
      "tokens_in_per_asked_document": 1759,
      "tokens_in_total": 80907,
      "tokens_out_total": 9398,
@@ -2240,7 +2230,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 44.17,
+     "seconds": 52.11,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 41400,
      "tokens_out_total": 11500,
@@ -2284,13 +2274,13 @@
      "p0_findings": 1,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 53,
+     "questions_asked": 54,
      "questions_unnecessary": 8,
      "resolutions_by_reason": {
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 43.69,
+     "seconds": 48.75,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 41400,
      "tokens_out_total": 11500,
@@ -2338,7 +2328,7 @@
      "questions_unnecessary": 1,
      "resolutions_by_reason": {},
      "scope_violations": 0,
-     "seconds": 37.62,
+     "seconds": 41.24,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -2388,7 +2378,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 43.0,
+     "seconds": 49.01,
      "tokens_in_per_asked_document": 1759,
      "tokens_in_total": 80907,
      "tokens_out_total": 9398,
@@ -2446,16 +2436,16 @@
      "screens_that_changed": 1
     },
     "assist_oracle": {
-     "files_made_automatic_correctly": 0,
-     "files_made_automatic_wrongly": 6,
+     "files_made_automatic_correctly": 3,
+     "files_made_automatic_wrongly": 0,
      "manual_matching_became_questions": 3,
-     "manual_matching_became_ready": 6,
-     "model_suggestions_right": 10,
+     "manual_matching_became_ready": 3,
+     "model_suggestions_right": 7,
      "model_suggestions_wrong": 0,
      "questions_became_ready": 0,
      "questions_correctly_avoided": 0,
      "questions_incorrectly_avoided": 0,
-     "screens_that_changed": 9
+     "screens_that_changed": 6
     }
    },
    "challenge": {
@@ -2544,22 +2534,22 @@
    },
    "assist_oracle": {
     "certain_and_wrong": 0,
-    "false_automation": -34,
+    "false_automation": -40,
     "junk_columns_mapped": 0,
-    "p0_findings": -34,
+    "p0_findings": -40,
     "pii_violations_in_what_the_model_was_sent": 0,
     "scope_violations": 0,
-    "unsafe_ready": -34,
+    "unsafe_ready": -40,
     "wrong_domain_ready": 0
    },
    "assist_wrong": {
     "certain_and_wrong": 0,
-    "false_automation": 1,
+    "false_automation": 0,
     "junk_columns_mapped": 6,
-    "p0_findings": 1,
+    "p0_findings": 0,
     "pii_violations_in_what_the_model_was_sent": 0,
     "scope_violations": 0,
-    "unsafe_ready": 1,
+    "unsafe_ready": 0,
     "wrong_domain_ready": 0
    },
    "shadow_lexicon": {
