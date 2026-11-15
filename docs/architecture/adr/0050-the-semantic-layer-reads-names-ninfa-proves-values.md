@@ -1,6 +1,7 @@
 # ADR 0050: The semantic layer reads names; NINFA proves values
 
-Status: accepted (Smart Import OpenAI Intelligence V1). One new runtime dependency (`openai`), no migration, no change to any analysis, detector, Expected value, Decision, Mia, the
+Status: accepted (Smart Import OpenAI Intelligence V1; amended by [ADR 0051](0051-an-unread-column-that-moves-with-a-read-one-is-never-lost-in-silence.md): the
+always-ask rule and the money rule apply to every model, and the rules close the silent drop of an unread sibling). One new runtime dependency (`openai`), no migration, no change to any analysis, detector, Expected value, Decision, Mia, the
 scheduler, the Windows runtime supervision or the UI. Builds on [smart-import-v3-ai-readiness](../smart-import-v3-ai-readiness.md) (the AI port, the egress gate and the closed
 validator) and on [import-scope-semantics-v1](../import-scope-semantics-v1.md) (FULL / PARTIAL / DELTA), none of which it changes.
 

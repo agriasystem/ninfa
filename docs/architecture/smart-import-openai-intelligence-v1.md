@@ -52,7 +52,7 @@ deterministic understanding  ->  anything the model could add?  -> egress gate -
 | `OPENAI_BASE_URL` | unset | a custom https endpoint (or loopback) |
 | `OPENAI_DATA_RESIDENCY` | unset | `eu`, `us`, ... the SDK's regional endpoints; mutually exclusive with `OPENAI_BASE_URL`. The EU endpoint applies only if the OpenAI project is set up for it |
 
-`SMART_IMPORT_AI_MODE` and the older `IMPORT_UNDERSTANDING_PROVIDER` (the Anthropic assistant, unchanged and still suggest-only) are not combined: setting both is a startup error.
+`SMART_IMPORT_AI_MODE` and the older `IMPORT_UNDERSTANDING_PROVIDER` (the Anthropic assistant, still suggest-only) are not combined: setting both is a startup error.
 
 ## Privacy: what is sent and what is not
 
@@ -108,26 +108,42 @@ python -m tests.live_openai_acceptance                               # ONE real 
 On 290 "challenge" workbooks (the official READY files with one or two headers replaced by a word NINFA's rules do not know), 240 official documents and 15 hand-built adversarial files, with
 the layer OFF, in SHADOW and in ASSIST against five stand-ins:
 
-| | rules alone | oracle | lexicon stand-in | wrong model | hostile model |
-|---|---:|---:|---:|---:|---:|
-| Challenge: manual matching required | 154 | 56 | 69 | 148 | 154 |
-| Challenge: automatic (READY, no question) | 60 | 65 | 81 | 60 | 60 |
-| Challenge: unsafe READY (offered as automatic and wrong) | 41 | 1 | 21 | 41 | 41 |
-| **Unsafe READY CAUSED by the layer, all populations** | - | **0** | **0** | **0** | **0** |
-| Official 240: any change in a verdict | - | 0 | 0 | extra questions only | extra questions only |
-| Adversarial: wrong-domain READY, PII sent to the model, scope violations | 0 | 0 | 0 | 0 | 0 |
+| | rules alone | oracle | lexicon stand-in | wrong model | hostile model | provider down | SHADOW (lexicon) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Challenge: manual matching required | 155 | 57 | 70 | 149 | 155 | 155 | 155 |
+| Challenge: automatic (READY, no question) | 19 | 64 | 60 | 19 | 19 | 19 | 19 |
+| **Challenge: unsafe READY** (offered as automatic and wrong) | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| **Unsafe READY CAUSED by the layer, all populations** | - | **0** | **0** | **0** | **0** | **0** | **0** |
+| Official 240: unsafe READY | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Official 240: any change in a verdict caused by the layer | - | 0 | 0 | extra questions only | extra questions only | 0 | 0 |
+| Adversarial 15: unsafe READY, wrong-domain READY, PII sent to the model, scope violations | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 * With the layer **off** (the default) the official benchmark (240) and the Universal Understanding V2 benchmark (417) answer **identically, case by case, to `main`**.
 * In SHADOW and with the provider down, not one screen changed in any population.
-* The 41 challenge files the rules alone offer as automatic while a column is silently left out (planned OR actual hours: one half read, the other unread) are a weakness of the RULES, found by
-  this benchmark; a reader that notices the unread column turns each into a question (oracle: 40 of 41, lexicon stand-in: 20 of 41). The layer asks about it only when it is enabled; the rules
-  themselves were not changed.
+* The 41 challenge files the rules alone used to offer as automatic while a column was silently left out (planned OR actual hours, or a room's revenue next to the stay's: one half read, the other
+  unread) were a weakness of the RULES, found by this benchmark and closed in the rules (below, [ADR 0051](adr/0051-an-unread-column-that-moves-with-a-read-one-is-never-lost-in-silence.md)):
+  **41 -> 0** with the layer off, and 0 in every configuration. The layer is therefore measured against rules that are already safe: net automatic files go 19 -> 64 with the oracle and
+  19 -> 60 with the lexicon stand-in (57 / 46 files made automatic, minus 12 / 5 that the rules left READY with an unread optional `rooms` count and that a model naming the column turns into one
+  question - a count is never promoted by a model), and 74 / 72 manual matchings become questions that already carry a suggestion.
+* What is still in the challenge table's "P0" and "certain-and-wrong" rows (13 and 14, the same in EVERY column, rules alone included) is not an unsafe READY and not the layer's: 13 are files with
+  one sheet per month / week / department whose sheets stopped looking alike once a header was replaced, so one sheet is read and the person is asked WHICH table to read (a `TABLE` question,
+  level ASK); the 14th is `B07` (ADR 0051), a MANUAL file. The scorer counts the default table of those screens as a P0 before the person answers.
 * Residual risk, stated plainly: a WRONG model puts a *suggestion* (MEDIUM, always with a question) on a column that must not be mapped in 5 of 290 challenge files and 1 of 240 official ones, and
   adds 6-7 questions to the official set. None is ever certain; a person who confirms without looking is the only way it becomes data. That risk is V3's and is unchanged by this gate.
 
-## Found while building, NOT changed (the original assistant)
+## Closed for every model, not for one (Safety Closure)
 
-The original Anthropic assistant of V3 (`IMPORT_UNDERSTANDING_PROVIDER=anthropic`, off by default, never run on a real model) can put a suggestion on a column of an OPTIONAL field and the rules ask no
-question about it: they only ask about the fields an import cannot run without, so such a file can be READY with the model's word alone in that field. The semantic layer closes the same hole for
-itself (every column it names and nothing made certain is a question, at most six per file); the original assistant was left exactly as it was, because it is not this gate. Closing it there is one
-line and a recommendation.
+Three defects were found by measuring, and closed in the SHARED understanding, with no branch on the provider ([ADR 0051](adr/0051-an-unread-column-that-moves-with-a-read-one-is-never-lost-in-silence.md)):
+
+1. **An unread column that moves with a read one** (actual hours next to planned ones, a room's revenue next to the stay's) was dropped in silence by the RULES ALONE: 41 of 290 challenge files were
+   READY with a column left out. A deterministic rule about the VALUES now makes such a file ASK (hours) or MANUAL (money). It holds with the model off, in SHADOW and ASSIST against any model, and with
+   the original assistant.
+2. **A column a model names and nothing makes certain** was imported with no question when its field is optional (the rules only ask about the fields an import cannot run without). It is now a
+   question, at most six per file, and money is never placed by any model - for the semantic layer AND the original Anthropic assistant, which is no longer an exception. What the RULES themselves
+   place below certainty on an optional field (in the official corpus: 9 `cost_category`, 1 amount in a file that already warns) is untouched: it is shown as "to check", as V3 decided.
+3. **A file held for the matching screen stays there.** The level rule answers ASK as soon as ANY question exists, ahead of the "held" check (money in competition, an unread amount that moves with
+   a read one). A model's hint turned into a question would therefore have taken such a file off the matching screen (found by the readiness benchmark: `CO04`, plausible-wrong stand-in, one AI-caused
+   P1). Held files no longer get questions made from a model's hints, for any provider.
+
+What the rules still do NOT ask about: an unread optional count (`rooms`, 12 challenge files) or any other column that moves with nothing the file reads. The benchmark's truth classes those as not
+critical, and the V1.1 decision for an absent `rooms` column ("one room per row") is unchanged. They are listed here, not hidden.
