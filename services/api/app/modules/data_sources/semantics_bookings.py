@@ -281,6 +281,8 @@ BOOKINGS = DomainSem(
     },
     pairs=(((F.CHECK_IN.value, "dal"), (F.CHECK_OUT.value, "al")),),
     relations=(Relation(F.CHECK_IN.value, F.CHECK_OUT.value, stay_dates),),
+    siblings=((F.ROOM_REVENUE.value, F.TOTAL_REVENUE.value),),
+    parts=((F.ROOM_REVENUE.value, F.TOTAL_REVENUE.value),),
     context=stems("prenotazione prenotazioni booking bookings reservation reservations"),
     financial=frozenset(
         {

@@ -130,6 +130,7 @@ from app.modules.data_sources.understanding_labor import (
     plan_labor,
 )
 from app.modules.data_sources.understanding_redaction import guard_for, redact_inspection
+from app.modules.data_sources.understanding_siblings import unread_siblings
 from app.modules.data_sources.understanding_types import (
     Blocker,
     BlockerCode,
@@ -714,6 +715,9 @@ class UnderstandingService:
         # its columns happen to fit the card: the card alone is not evidence)
         hold = hold or (detection.domain is None and not confirmed_domain)
         questions.extend(ambiguity)
+        # a column nobody read that moves with one somebody did (actual hours next to planned
+        # ones): never left out in silence, with the model off or on, whatever the model
+        unread_questions, unread_hold = unread_siblings(sem, proposal, samples)
         value_questions = self._value_questions(domain, proposal, samples, taught, answers)
         questions.extend(value_questions)
         if reuse and match is not None:
@@ -838,11 +842,16 @@ class UnderstandingService:
                 if any(q.kind == QuestionKind.DATES_REVERSED for q in questions):
                     skip.update({"check_in", "check_out"})  # looked at together, not one by one
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
-                # whatever the SEMANTIC layer named and is not certain stays a question, required
-                # or not: the rules only ask about the fields an import cannot run without. (The
-                # original assistant's suggestions are unchanged: it is not this layer.)
-                if ai_reading is not None or assisted:
+                # whatever a MODEL named and nothing made certain stays a question, required or
+                # not, whichever model it was: the rules only ask about the fields an import cannot
+                # run without, and a model's word alone is never a reason to put values in a field.
+                # (A file that is held for the matching screen - money in competition, a kind of
+                # data nobody confirmed - stays there: a question about a model's hint must never
+                # lower it to a yes/no screen, and the person sees every column there anyway.)
+                if not ((hold or unread_hold) and not recognized_by_family):
                     questions.extend(_assisted_confirmations(proposal, ai_headers, questions))
+                if not recognized_by_family:
+                    questions.extend(unread_questions)
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         # (the same reading on every file of a source: the file still does not say)
@@ -872,7 +881,7 @@ class UnderstandingService:
             blockers,
             recognized_by_profile,
             origin_level,
-            hold and not recognized_by_family,
+            (hold or unread_hold) and not recognized_by_family,
         )
         # --- what the absence of a record means: the last thing, and only when it changes something
         # A word about the file as a whole, and asked only of a file that is otherwise ready: until
