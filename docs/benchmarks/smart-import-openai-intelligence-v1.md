@@ -23,19 +23,19 @@ Regenerate (from `services/api`): `python -m tests.benchmarks.smart_import_v3.op
 | Metric | Deterministic only | ASSIST - oracle | ASSIST - lexicon stand-in | ASSIST - wrong model | ASSIST - hostile model | ASSIST - provider down | SHADOW - lexicon stand-in |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Documents | 290 | 290 | 290 | 290 | 290 | 290 | 290 |
-| READY with no question (automatic) | 60 | 65 | 81 | 60 | 60 | 60 | 60 |
-| Manual matching required | 154 | 56 | 69 | 148 | 154 | 154 | 154 |
-| Files that ask questions | 76 | 169 | 140 | 82 | 76 | 76 | 76 |
-| Questions asked | 78 | 184 | 152 | 90 | 79 | 78 | 78 |
+| READY with no question (automatic) | 19 | 64 | 60 | 19 | 19 | 19 | 19 |
+| Manual matching required | 155 | 57 | 70 | 149 | 155 | 155 | 155 |
+| Files that ask questions | 116 | 169 | 160 | 122 | 116 | 116 | 116 |
+| Questions asked | 121 | 184 | 173 | 133 | 122 | 121 | 121 |
 | Mapping recall (truth facts found) | 82.6% | 93.7% | 91.1% | 82.6% | 82.6% | 82.6% | 82.6% |
 | Claims precision (claims that are right) | 99.0% | 99.2% | 99.1% | 98.0% | 99.0% | 99.0% | 99.0% |
 | Domain accuracy | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
 | Header detection accuracy | 99.7% | 99.7% | 99.7% | 99.7% | 99.7% | 99.7% | 99.7% |
-| **Unsafe READY** | 41 | 1 | 21 | 41 | 41 | 41 | 41 |
-| **False automation** | 41 | 1 | 21 | 41 | 41 | 41 | 41 |
+| **Unsafe READY** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| **False automation** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | **Wrong-domain READY** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Certain-and-wrong claims | 14 | 14 | 14 | 14 | 14 | 14 | 14 |
-| P0 findings (silent wrong data) | 55 | 15 | 35 | 55 | 55 | 55 | 55 |
+| P0 findings (silent wrong data) | 13 | 13 | 13 | 13 | 13 | 13 | 13 |
 | Junk / personal columns mapped | 0 | 0 | 0 | 5 | 0 | 0 | 0 |
 | Unknown correctly declared | 70 | 70 | 70 | 65 | 70 | 70 | 70 |
 | **PII values sent to the model** | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -61,7 +61,7 @@ Against the rules alone, document by document:
 | Model suggestions wrong | 0 | 1 | 46 | 1 | 0 | 0 |
 | Screens that changed | 191 | 149 | 43 | 1 | 0 | 0 |
 
-Unsafe READY against the rules alone (caused / fixed by the layer): ASSIST - oracle: 0 / 40; ASSIST - lexicon stand-in: 0 / 20; ASSIST - wrong model: 0 / 0; ASSIST - hostile model: 0 / 0; ASSIST - provider down: 0 / 0; SHADOW - lexicon stand-in: 0 / 0.
+Unsafe READY against the rules alone (caused / fixed by the layer): ASSIST - oracle: 0 / 0; ASSIST - lexicon stand-in: 0 / 0; ASSIST - wrong model: 0 / 0; ASSIST - hostile model: 0 / 0; ASSIST - provider down: 0 / 0; SHADOW - lexicon stand-in: 0 / 0.
 
 Screens changed where the answer must stay exactly the rules' own: assist_failing: 0, shadow_lexicon: 0.
 
@@ -167,15 +167,15 @@ Screens changed where the answer must stay exactly the rules' own: assist_failin
 
 | Field | Docs | Automatic (rules) | Automatic (lexicon) | Manual (rules) | Manual (lexicon) | Questions (rules) | Questions (lexicon) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| actual_hours | 38 | 32 | 20 | 2 | 1 | 4 | 17 |
+| actual_hours | 38 | 0 | 0 | 2 | 1 | 37 | 38 |
 | booked_at | 13 | 0 | 0 | 12 | 0 | 1 | 15 |
 | channel | 16 | 0 | 9 | 16 | 6 | 0 | 1 |
 | check_out | 8 | 0 | 0 | 7 | 0 | 1 | 10 |
 | cost_category | 8 | 7 | 7 | 0 | 0 | 2 | 2 |
 | department | 36 | 0 | 33 | 0 | 0 | 36 | 5 |
 | invoice_date | 39 | 0 | 0 | 38 | 38 | 1 | 1 |
-| planned_hours | 36 | 8 | 0 | 0 | 0 | 29 | 39 |
-| room_revenue | 20 | 1 | 1 | 18 | 18 | 1 | 1 |
+| planned_hours | 36 | 0 | 0 | 0 | 0 | 39 | 39 |
+| room_revenue | 20 | 0 | 0 | 19 | 19 | 1 | 1 |
 | rooms | 14 | 12 | 7 | 0 | 0 | 2 | 7 |
 | source_record_id | 13 | 0 | 0 | 13 | 0 | 0 | 14 |
 | status | 10 | 0 | 4 | 10 | 6 | 0 | 0 |
@@ -185,26 +185,26 @@ Screens changed where the answer must stay exactly the rules' own: assist_failin
 
 | Structure | Docs | Automatic (rules) | Automatic (lexicon) | Manual (rules) | Manual (lexicon) |
 |---|---:|---:|---:|---:|---:|
-| department-from-section | 4 | 3 | 2 | 0 | 0 |
+| department-from-section | 4 | 0 | 0 | 0 | 0 |
 | department-from-sheet | 4 | 0 | 0 | 0 | 0 |
-| department-from-title | 4 | 2 | 1 | 0 | 0 |
-| hidden-sheet | 6 | 1 | 2 | 4 | 1 |
-| indented | 12 | 3 | 5 | 6 | 3 |
-| merged-cells | 47 | 16 | 18 | 14 | 6 |
-| notes | 8 | 3 | 3 | 3 | 1 |
+| department-from-title | 4 | 0 | 0 | 0 | 0 |
+| hidden-sheet | 6 | 0 | 1 | 4 | 1 |
+| indented | 12 | 1 | 4 | 6 | 3 |
+| merged-cells | 47 | 2 | 10 | 14 | 6 |
+| notes | 8 | 1 | 2 | 3 | 1 |
 | planned_hours-from-grid | 3 | 0 | 3 | 0 | 0 |
-| preamble:0 | 230 | 42 | 60 | 131 | 60 |
-| preamble:1-3 | 34 | 10 | 12 | 13 | 6 |
-| preamble:4+ | 26 | 8 | 9 | 10 | 3 |
-| sections | 4 | 3 | 2 | 0 | 0 |
-| sheets:1 | 262 | 57 | 77 | 144 | 66 |
-| sheets:2 | 24 | 3 | 3 | 8 | 3 |
+| preamble:0 | 230 | 14 | 45 | 132 | 61 |
+| preamble:1-3 | 34 | 3 | 9 | 13 | 6 |
+| preamble:4+ | 26 | 2 | 6 | 10 | 3 |
+| sections | 4 | 0 | 0 | 0 | 0 |
+| sheets:1 | 262 | 19 | 58 | 145 | 67 |
+| sheets:2 | 24 | 0 | 1 | 8 | 3 |
 | sheets:3 | 2 | 0 | 1 | 2 | 0 |
 | sheets:4 | 2 | 0 | 0 | 0 | 0 |
-| totals | 19 | 6 | 8 | 6 | 3 |
+| totals | 19 | 2 | 7 | 6 | 3 |
 | two-level-header | 5 | 0 | 2 | 4 | 2 |
 | work_date-from-grid | 3 | 0 | 3 | 0 | 0 |
-| xlsx | 290 | 60 | 81 | 154 | 69 |
+| xlsx | 290 | 19 | 60 | 155 | 70 |
 
 ## Cost
 

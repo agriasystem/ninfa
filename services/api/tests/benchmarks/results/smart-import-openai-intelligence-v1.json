@@ -57,7 +57,7 @@
       "UNAVAILABLE": 12
      },
      "scope_violations": 0,
-     "seconds": 2.28,
+     "seconds": 2.52,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -105,7 +105,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 4.12,
+     "seconds": 4.4,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 10800,
      "tokens_out_total": 3000,
@@ -154,7 +154,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 4.06,
+     "seconds": 4.36,
      "tokens_in_per_asked_document": 1794,
      "tokens_in_total": 21530,
      "tokens_out_total": 3329,
@@ -204,7 +204,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 4.11,
+     "seconds": 4.5,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 10800,
      "tokens_out_total": 3000,
@@ -253,7 +253,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 4.06,
+     "seconds": 4.37,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 10800,
      "tokens_out_total": 3000,
@@ -299,7 +299,7 @@
      "questions_unnecessary": 2,
      "resolutions_by_reason": {},
      "scope_violations": 0,
-     "seconds": 2.21,
+     "seconds": 2.36,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -347,7 +347,7 @@
       "OK": 12
      },
      "scope_violations": 0,
-     "seconds": 4.06,
+     "seconds": 4.39,
      "tokens_in_per_asked_document": 1794,
      "tokens_in_total": 21530,
      "tokens_out_total": 3329,
@@ -386,18 +386,18 @@
    "challenge_by_field": {
     "actual_hours": {
      "assist_lexicon": {
-      "automatic": 20,
+      "automatic": 0,
       "documents": 38,
-      "false_automation": 20,
+      "false_automation": 0,
       "manual_matching": 1,
-      "questions_asked": 17
+      "questions_asked": 38
      },
      "deterministic": {
-      "automatic": 32,
+      "automatic": 0,
       "documents": 38,
-      "false_automation": 32,
+      "false_automation": 0,
       "manual_matching": 2,
-      "questions_asked": 4
+      "questions_asked": 37
      }
     },
     "booked_at": {
@@ -505,26 +505,26 @@
       "questions_asked": 39
      },
      "deterministic": {
-      "automatic": 8,
+      "automatic": 0,
       "documents": 36,
-      "false_automation": 8,
+      "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 29
+      "questions_asked": 39
      }
     },
     "room_revenue": {
      "assist_lexicon": {
-      "automatic": 1,
+      "automatic": 0,
       "documents": 20,
-      "false_automation": 1,
-      "manual_matching": 18,
+      "false_automation": 0,
+      "manual_matching": 19,
       "questions_asked": 1
      },
      "deterministic": {
-      "automatic": 1,
+      "automatic": 0,
       "documents": 20,
-      "false_automation": 1,
-      "manual_matching": 18,
+      "false_automation": 0,
+      "manual_matching": 19,
       "questions_asked": 1
      }
     },
@@ -596,18 +596,18 @@
    "challenge_by_structure": {
     "department-from-section": {
      "assist_lexicon": {
-      "automatic": 2,
+      "automatic": 0,
       "documents": 4,
-      "false_automation": 2,
+      "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 2
+      "questions_asked": 4
      },
      "deterministic": {
-      "automatic": 3,
+      "automatic": 0,
       "documents": 4,
-      "false_automation": 3,
+      "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 1
+      "questions_asked": 4
      }
     },
     "department-from-sheet": {
@@ -628,82 +628,82 @@
     },
     "department-from-title": {
      "assist_lexicon": {
-      "automatic": 1,
+      "automatic": 0,
       "documents": 4,
-      "false_automation": 1,
+      "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 4
+      "questions_asked": 6
      },
      "deterministic": {
-      "automatic": 2,
+      "automatic": 0,
       "documents": 4,
-      "false_automation": 2,
+      "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 2
+      "questions_asked": 6
      }
     },
     "hidden-sheet": {
      "assist_lexicon": {
-      "automatic": 2,
-      "documents": 6,
-      "false_automation": 1,
-      "manual_matching": 1,
-      "questions_asked": 3
-     },
-     "deterministic": {
       "automatic": 1,
       "documents": 6,
-      "false_automation": 1,
+      "false_automation": 0,
+      "manual_matching": 1,
+      "questions_asked": 4
+     },
+     "deterministic": {
+      "automatic": 0,
+      "documents": 6,
+      "false_automation": 0,
       "manual_matching": 4,
-      "questions_asked": 1
+      "questions_asked": 2
      }
     },
     "indented": {
      "assist_lexicon": {
-      "automatic": 5,
+      "automatic": 4,
       "documents": 12,
-      "false_automation": 1,
+      "false_automation": 0,
       "manual_matching": 3,
-      "questions_asked": 4
+      "questions_asked": 5
      },
      "deterministic": {
-      "automatic": 3,
+      "automatic": 1,
       "documents": 12,
-      "false_automation": 2,
+      "false_automation": 0,
       "manual_matching": 6,
-      "questions_asked": 3
+      "questions_asked": 5
      }
     },
     "merged-cells": {
      "assist_lexicon": {
-      "automatic": 18,
+      "automatic": 10,
       "documents": 47,
-      "false_automation": 8,
+      "false_automation": 0,
       "manual_matching": 6,
-      "questions_asked": 24
+      "questions_asked": 33
      },
      "deterministic": {
-      "automatic": 16,
+      "automatic": 2,
       "documents": 47,
-      "false_automation": 14,
+      "false_automation": 0,
       "manual_matching": 14,
-      "questions_asked": 17
+      "questions_asked": 33
      }
     },
     "notes": {
      "assist_lexicon": {
-      "automatic": 3,
+      "automatic": 2,
       "documents": 8,
-      "false_automation": 1,
+      "false_automation": 0,
       "manual_matching": 1,
-      "questions_asked": 4
+      "questions_asked": 5
      },
      "deterministic": {
-      "automatic": 3,
+      "automatic": 1,
       "documents": 8,
-      "false_automation": 2,
+      "false_automation": 0,
       "manual_matching": 3,
-      "questions_asked": 2
+      "questions_asked": 4
      }
     },
     "planned_hours-from-grid": {
@@ -724,98 +724,98 @@
     },
     "preamble:0": {
      "assist_lexicon": {
-      "automatic": 60,
+      "automatic": 45,
       "documents": 230,
-      "false_automation": 15,
-      "manual_matching": 60,
-      "questions_asked": 117
+      "false_automation": 0,
+      "manual_matching": 61,
+      "questions_asked": 131
      },
      "deterministic": {
-      "automatic": 42,
+      "automatic": 14,
       "documents": 230,
-      "false_automation": 28,
-      "manual_matching": 131,
-      "questions_asked": 58
+      "false_automation": 0,
+      "manual_matching": 132,
+      "questions_asked": 86
      }
     },
     "preamble:1-3": {
      "assist_lexicon": {
-      "automatic": 12,
+      "automatic": 9,
       "documents": 34,
-      "false_automation": 3,
+      "false_automation": 0,
       "manual_matching": 6,
-      "questions_asked": 19
+      "questions_asked": 23
      },
      "deterministic": {
-      "automatic": 10,
+      "automatic": 3,
       "documents": 34,
-      "false_automation": 7,
+      "false_automation": 0,
       "manual_matching": 13,
-      "questions_asked": 12
+      "questions_asked": 21
      }
     },
     "preamble:4+": {
      "assist_lexicon": {
-      "automatic": 9,
+      "automatic": 6,
       "documents": 26,
-      "false_automation": 3,
+      "false_automation": 0,
       "manual_matching": 3,
-      "questions_asked": 16
+      "questions_asked": 19
      },
      "deterministic": {
-      "automatic": 8,
+      "automatic": 2,
       "documents": 26,
-      "false_automation": 6,
+      "false_automation": 0,
       "manual_matching": 10,
-      "questions_asked": 8
+      "questions_asked": 14
      }
     },
     "sections": {
      "assist_lexicon": {
-      "automatic": 2,
+      "automatic": 0,
       "documents": 4,
-      "false_automation": 2,
+      "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 2
+      "questions_asked": 4
      },
      "deterministic": {
-      "automatic": 3,
+      "automatic": 0,
       "documents": 4,
-      "false_automation": 3,
+      "false_automation": 0,
       "manual_matching": 0,
-      "questions_asked": 1
+      "questions_asked": 4
      }
     },
     "sheets:1": {
      "assist_lexicon": {
-      "automatic": 77,
+      "automatic": 58,
       "documents": 262,
-      "false_automation": 19,
-      "manual_matching": 66,
-      "questions_asked": 131
+      "false_automation": 0,
+      "manual_matching": 67,
+      "questions_asked": 150
      },
      "deterministic": {
-      "automatic": 57,
+      "automatic": 19,
       "documents": 262,
-      "false_automation": 38,
-      "manual_matching": 144,
-      "questions_asked": 63
+      "false_automation": 0,
+      "manual_matching": 145,
+      "questions_asked": 103
      }
     },
     "sheets:2": {
      "assist_lexicon": {
-      "automatic": 3,
+      "automatic": 1,
       "documents": 24,
-      "false_automation": 2,
+      "false_automation": 0,
       "manual_matching": 3,
-      "questions_asked": 18
+      "questions_asked": 20
      },
      "deterministic": {
-      "automatic": 3,
+      "automatic": 0,
       "documents": 24,
-      "false_automation": 3,
+      "false_automation": 0,
       "manual_matching": 8,
-      "questions_asked": 13
+      "questions_asked": 16
      }
     },
     "sheets:3": {
@@ -852,18 +852,18 @@
     },
     "totals": {
      "assist_lexicon": {
-      "automatic": 8,
+      "automatic": 7,
       "documents": 19,
-      "false_automation": 1,
+      "false_automation": 0,
       "manual_matching": 3,
-      "questions_asked": 8
+      "questions_asked": 9
      },
      "deterministic": {
-      "automatic": 6,
+      "automatic": 2,
       "documents": 19,
-      "false_automation": 4,
+      "false_automation": 0,
       "manual_matching": 6,
-      "questions_asked": 7
+      "questions_asked": 11
      }
     },
     "two-level-header": {
@@ -900,18 +900,18 @@
     },
     "xlsx": {
      "assist_lexicon": {
-      "automatic": 81,
-      "documents": 290,
-      "false_automation": 21,
-      "manual_matching": 69,
-      "questions_asked": 152
-     },
-     "deterministic": {
       "automatic": 60,
       "documents": 290,
-      "false_automation": 41,
-      "manual_matching": 154,
-      "questions_asked": 78
+      "false_automation": 0,
+      "manual_matching": 70,
+      "questions_asked": 173
+     },
+     "deterministic": {
+      "automatic": 19,
+      "documents": 290,
+      "false_automation": 0,
+      "manual_matching": 155,
+      "questions_asked": 121
      }
     }
    },
@@ -1210,8 +1210,8 @@
    ],
    "metrics": {
     "assist_failing": {
-     "asking": 76,
-     "automatic": 60,
+     "asking": 116,
+     "automatic": 19,
      "certain_and_wrong": 14,
      "claims_precision": 0.9903,
      "documents": 290,
@@ -1220,32 +1220,32 @@
      "fallbacks_by_kind": {
       "TIMEOUT": 225
      },
-     "false_automation": 41,
+     "false_automation": 0,
      "header_accuracy": 0.9966,
      "junk_columns_mapped": 0,
      "levels": {
-      "ASK": 76,
-      "MANUAL": 154,
-      "READY": 60
+      "ASK": 116,
+      "MANUAL": 155,
+      "READY": 19
      },
-     "manual_matching": 154,
+     "manual_matching": 155,
      "mapping_recall": 0.8261,
      "model_calls": 225,
-     "p0_findings": 55,
+     "p0_findings": 13,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 78,
-     "questions_unnecessary": 70,
+     "questions_asked": 121,
+     "questions_unnecessary": 113,
      "resolutions_by_reason": {
       "UNAVAILABLE": 225
      },
      "scope_violations": 0,
-     "seconds": 67.78,
+     "seconds": 67.24,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
      "unknown_correctly_declared": 70,
-     "unsafe_ready": 41,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 0,
       "files_made_automatic_wrongly": 0,
@@ -1261,40 +1261,40 @@
      "wrong_domain_ready": 0
     },
     "assist_hostile": {
-     "asking": 76,
-     "automatic": 60,
+     "asking": 116,
+     "automatic": 19,
      "certain_and_wrong": 14,
      "claims_precision": 0.9897,
      "documents": 290,
      "documents_where_the_model_was_asked": 225,
      "domain_accuracy": 1.0,
      "fallbacks_by_kind": {},
-     "false_automation": 41,
+     "false_automation": 0,
      "header_accuracy": 0.9966,
      "junk_columns_mapped": 0,
      "levels": {
-      "ASK": 76,
-      "MANUAL": 154,
-      "READY": 60
+      "ASK": 116,
+      "MANUAL": 155,
+      "READY": 19
      },
-     "manual_matching": 154,
+     "manual_matching": 155,
      "mapping_recall": 0.8261,
      "model_calls": 225,
-     "p0_findings": 55,
+     "p0_findings": 13,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 79,
-     "questions_unnecessary": 71,
+     "questions_asked": 122,
+     "questions_unnecessary": 114,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 155.51,
+     "seconds": 108.73,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 202500,
      "tokens_out_total": 56250,
      "unknown_correctly_declared": 70,
-     "unsafe_ready": 41,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 0,
       "files_made_automatic_wrongly": 0,
@@ -1310,40 +1310,40 @@
      "wrong_domain_ready": 0
     },
     "assist_lexicon": {
-     "asking": 140,
-     "automatic": 81,
+     "asking": 160,
+     "automatic": 60,
      "certain_and_wrong": 14,
      "claims_precision": 0.9912,
      "documents": 290,
      "documents_where_the_model_was_asked": 225,
      "domain_accuracy": 1.0,
      "fallbacks_by_kind": {},
-     "false_automation": 21,
+     "false_automation": 0,
      "header_accuracy": 0.9966,
      "junk_columns_mapped": 0,
      "levels": {
-      "ASK": 140,
-      "MANUAL": 69,
-      "READY": 81
+      "ASK": 160,
+      "MANUAL": 70,
+      "READY": 60
      },
-     "manual_matching": 69,
+     "manual_matching": 70,
      "mapping_recall": 0.9108,
      "model_calls": 225,
-     "p0_findings": 35,
+     "p0_findings": 13,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 152,
-     "questions_unnecessary": 131,
+     "questions_asked": 173,
+     "questions_unnecessary": 152,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 126.96,
+     "seconds": 120.59,
      "tokens_in_per_asked_document": 1758,
      "tokens_in_total": 395478,
      "tokens_out_total": 57175,
      "unknown_correctly_declared": 70,
-     "unsafe_ready": 21,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 45,
       "files_made_automatic_wrongly": 1,
@@ -1360,25 +1360,25 @@
     },
     "assist_oracle": {
      "asking": 169,
-     "automatic": 65,
+     "automatic": 64,
      "certain_and_wrong": 14,
      "claims_precision": 0.9915,
      "documents": 290,
      "documents_where_the_model_was_asked": 225,
      "domain_accuracy": 1.0,
      "fallbacks_by_kind": {},
-     "false_automation": 1,
+     "false_automation": 0,
      "header_accuracy": 0.9966,
      "junk_columns_mapped": 0,
      "levels": {
       "ASK": 169,
-      "MANUAL": 56,
-      "READY": 65
+      "MANUAL": 57,
+      "READY": 64
      },
-     "manual_matching": 56,
+     "manual_matching": 57,
      "mapping_recall": 0.9367,
      "model_calls": 225,
-     "p0_findings": 15,
+     "p0_findings": 13,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
      "questions_asked": 184,
@@ -1387,12 +1387,12 @@
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 131.06,
+     "seconds": 117.26,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 202500,
      "tokens_out_total": 56250,
      "unknown_correctly_declared": 70,
-     "unsafe_ready": 1,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 55,
       "files_made_automatic_wrongly": 2,
@@ -1408,40 +1408,40 @@
      "wrong_domain_ready": 0
     },
     "assist_wrong": {
-     "asking": 82,
-     "automatic": 60,
+     "asking": 122,
+     "automatic": 19,
      "certain_and_wrong": 14,
      "claims_precision": 0.9795,
      "documents": 290,
      "documents_where_the_model_was_asked": 225,
      "domain_accuracy": 1.0,
      "fallbacks_by_kind": {},
-     "false_automation": 41,
+     "false_automation": 0,
      "header_accuracy": 0.9966,
      "junk_columns_mapped": 5,
      "levels": {
-      "ASK": 82,
-      "MANUAL": 148,
-      "READY": 60
+      "ASK": 122,
+      "MANUAL": 149,
+      "READY": 19
      },
-     "manual_matching": 148,
+     "manual_matching": 149,
      "mapping_recall": 0.8261,
      "model_calls": 225,
-     "p0_findings": 55,
+     "p0_findings": 13,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 90,
-     "questions_unnecessary": 79,
+     "questions_asked": 133,
+     "questions_unnecessary": 122,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 136.56,
+     "seconds": 111.71,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 202500,
      "tokens_out_total": 56250,
      "unknown_correctly_declared": 65,
-     "unsafe_ready": 41,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 0,
       "files_made_automatic_wrongly": 0,
@@ -1457,38 +1457,38 @@
      "wrong_domain_ready": 0
     },
     "deterministic": {
-     "asking": 76,
-     "automatic": 60,
+     "asking": 116,
+     "automatic": 19,
      "certain_and_wrong": 14,
      "claims_precision": 0.9903,
      "documents": 290,
      "documents_where_the_model_was_asked": 0,
      "domain_accuracy": 1.0,
      "fallbacks_by_kind": {},
-     "false_automation": 41,
+     "false_automation": 0,
      "header_accuracy": 0.9966,
      "junk_columns_mapped": 0,
      "levels": {
-      "ASK": 76,
-      "MANUAL": 154,
-      "READY": 60
+      "ASK": 116,
+      "MANUAL": 155,
+      "READY": 19
      },
-     "manual_matching": 154,
+     "manual_matching": 155,
      "mapping_recall": 0.8261,
      "model_calls": 0,
-     "p0_findings": 55,
+     "p0_findings": 13,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 78,
-     "questions_unnecessary": 70,
+     "questions_asked": 121,
+     "questions_unnecessary": 113,
      "resolutions_by_reason": {},
      "scope_violations": 0,
-     "seconds": 74.11,
+     "seconds": 72.02,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
      "unknown_correctly_declared": 70,
-     "unsafe_ready": 41,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 0,
       "files_made_automatic_wrongly": 0,
@@ -1504,40 +1504,40 @@
      "wrong_domain_ready": 0
     },
     "shadow_lexicon": {
-     "asking": 76,
-     "automatic": 60,
+     "asking": 116,
+     "automatic": 19,
      "certain_and_wrong": 14,
      "claims_precision": 0.9903,
      "documents": 290,
      "documents_where_the_model_was_asked": 225,
      "domain_accuracy": 1.0,
      "fallbacks_by_kind": {},
-     "false_automation": 41,
+     "false_automation": 0,
      "header_accuracy": 0.9966,
      "junk_columns_mapped": 0,
      "levels": {
-      "ASK": 76,
-      "MANUAL": 154,
-      "READY": 60
+      "ASK": 116,
+      "MANUAL": 155,
+      "READY": 19
      },
-     "manual_matching": 154,
+     "manual_matching": 155,
      "mapping_recall": 0.8261,
      "model_calls": 225,
-     "p0_findings": 55,
+     "p0_findings": 13,
      "pii_values_in_the_browser_answer": 0,
      "pii_violations_in_what_the_model_was_sent": 0,
-     "questions_asked": 78,
-     "questions_unnecessary": 70,
+     "questions_asked": 121,
+     "questions_unnecessary": 113,
      "resolutions_by_reason": {
       "OK": 225
      },
      "scope_violations": 0,
-     "seconds": 103.85,
+     "seconds": 109.02,
      "tokens_in_per_asked_document": 1758,
      "tokens_in_total": 395478,
      "tokens_out_total": 57175,
      "unknown_correctly_declared": 70,
-     "unsafe_ready": 41,
+     "unsafe_ready": 0,
      "vs_rules_alone": {
       "files_made_automatic_correctly": 0,
       "files_made_automatic_wrongly": 0,
@@ -1558,247 +1558,13 @@
     "shadow_lexicon": []
    },
    "unsafe_ready_ids": {
-    "assist_failing": [
-     "L03_alias_settore_pianificate_lavorate~actual_hours",
-     "L07_reparto_slash_mansione_ore_prog~planned_hours",
-     "L07_reparto_slash_mansione_ore_prog~actual_hours",
-     "L08_reparto_o_mansione_with_hourly_rate~actual_hours",
-     "L09_centro_operativo~actual_hours",
-     "L13_title_block_before_table~actual_hours",
-     "L14_summary_block_before_table~actual_hours",
-     "L15_summary_block_after_table~actual_hours",
-     "L16_total_row_correct~actual_hours",
-     "L17_subtotals_per_department~actual_hours",
-     "L20_department_as_section_lines~actual_hours",
-     "L21_sections_with_totals_and_notes~actual_hours",
-     "L21_sections_with_totals_and_notes~planned_hours",
-     "L39_known_italian_department_words~planned_hours",
-     "L39_known_italian_department_words~actual_hours",
-     "L40_vocabulary_restaurant_bar_governante~actual_hours",
-     "L41_pii_split_name_email_phone_taxcode~actual_hours",
-     "L42_pii_name_and_company_email~actual_hours",
-     "L45_dates_weekday_prefix_text~actual_hours",
-     "L47_rates_and_costs_columns~actual_hours",
-     "L50_hidden_draft_sheet_and_visible_sheet~actual_hours",
-     "L51_summary_sheet_first_then_detail~actual_hours",
-     "L52_dashboard_sheet_and_data_sheet~actual_hours",
-     "L53_header_on_row_nine_after_long_preamble~actual_hours",
-     "L58_office_names_in_two_columns_and_comments~actual_hours",
-     "L67_adv_prompt_injection_in_cells~planned_hours",
-     "L67_adv_prompt_injection_in_cells~actual_hours",
-     "L68_adv_formulas_html_and_unicode~actual_hours",
-     "L69_adv_very_long_cell_and_odd_headers~actual_hours",
-     "L70_adv_example_table_before_real_table~planned_hours",
-     "L72_large_three_months_roster~actual_hours",
-     "LO06_job_titles_in_qualifica_column~planned_hours",
-     "LO06_job_titles_in_qualifica_column~actual_hours",
-     "LO07_department_in_a_label_value_block~planned_hours",
-     "LO07_department_in_a_label_value_block~actual_hours",
-     "LO09_legend_block_drawn_beside_the_table~actual_hours",
-     "LO11_department_cells_merged_down_the_column~actual_hours",
-     "LO12_blank_row_between_every_record~planned_hours",
-     "LO12_blank_row_between_every_record~actual_hours",
-     "LO13_hours_written_with_a_unit~actual_hours",
-     "B07_room_revenue_and_total_stay_both~room_revenue"
-    ],
-    "assist_hostile": [
-     "L03_alias_settore_pianificate_lavorate~actual_hours",
-     "L07_reparto_slash_mansione_ore_prog~planned_hours",
-     "L07_reparto_slash_mansione_ore_prog~actual_hours",
-     "L08_reparto_o_mansione_with_hourly_rate~actual_hours",
-     "L09_centro_operativo~actual_hours",
-     "L13_title_block_before_table~actual_hours",
-     "L14_summary_block_before_table~actual_hours",
-     "L15_summary_block_after_table~actual_hours",
-     "L16_total_row_correct~actual_hours",
-     "L17_subtotals_per_department~actual_hours",
-     "L20_department_as_section_lines~actual_hours",
-     "L21_sections_with_totals_and_notes~actual_hours",
-     "L21_sections_with_totals_and_notes~planned_hours",
-     "L39_known_italian_department_words~planned_hours",
-     "L39_known_italian_department_words~actual_hours",
-     "L40_vocabulary_restaurant_bar_governante~actual_hours",
-     "L41_pii_split_name_email_phone_taxcode~actual_hours",
-     "L42_pii_name_and_company_email~actual_hours",
-     "L45_dates_weekday_prefix_text~actual_hours",
-     "L47_rates_and_costs_columns~actual_hours",
-     "L50_hidden_draft_sheet_and_visible_sheet~actual_hours",
-     "L51_summary_sheet_first_then_detail~actual_hours",
-     "L52_dashboard_sheet_and_data_sheet~actual_hours",
-     "L53_header_on_row_nine_after_long_preamble~actual_hours",
-     "L58_office_names_in_two_columns_and_comments~actual_hours",
-     "L67_adv_prompt_injection_in_cells~planned_hours",
-     "L67_adv_prompt_injection_in_cells~actual_hours",
-     "L68_adv_formulas_html_and_unicode~actual_hours",
-     "L69_adv_very_long_cell_and_odd_headers~actual_hours",
-     "L70_adv_example_table_before_real_table~planned_hours",
-     "L72_large_three_months_roster~actual_hours",
-     "LO06_job_titles_in_qualifica_column~planned_hours",
-     "LO06_job_titles_in_qualifica_column~actual_hours",
-     "LO07_department_in_a_label_value_block~planned_hours",
-     "LO07_department_in_a_label_value_block~actual_hours",
-     "LO09_legend_block_drawn_beside_the_table~actual_hours",
-     "LO11_department_cells_merged_down_the_column~actual_hours",
-     "LO12_blank_row_between_every_record~planned_hours",
-     "LO12_blank_row_between_every_record~actual_hours",
-     "LO13_hours_written_with_a_unit~actual_hours",
-     "B07_room_revenue_and_total_stay_both~room_revenue"
-    ],
-    "assist_lexicon": [
-     "L07_reparto_slash_mansione_ore_prog~actual_hours",
-     "L08_reparto_o_mansione_with_hourly_rate~actual_hours",
-     "L09_centro_operativo~actual_hours",
-     "L13_title_block_before_table~actual_hours",
-     "L20_department_as_section_lines~actual_hours",
-     "L21_sections_with_totals_and_notes~actual_hours",
-     "L40_vocabulary_restaurant_bar_governante~actual_hours",
-     "L41_pii_split_name_email_phone_taxcode~actual_hours",
-     "L42_pii_name_and_company_email~actual_hours",
-     "L45_dates_weekday_prefix_text~actual_hours",
-     "L47_rates_and_costs_columns~actual_hours",
-     "L50_hidden_draft_sheet_and_visible_sheet~actual_hours",
-     "L52_dashboard_sheet_and_data_sheet~actual_hours",
-     "L53_header_on_row_nine_after_long_preamble~actual_hours",
-     "L67_adv_prompt_injection_in_cells~actual_hours",
-     "L72_large_three_months_roster~actual_hours",
-     "LO06_job_titles_in_qualifica_column~actual_hours",
-     "LO07_department_in_a_label_value_block~actual_hours",
-     "LO11_department_cells_merged_down_the_column~actual_hours",
-     "LO12_blank_row_between_every_record~actual_hours",
-     "B07_room_revenue_and_total_stay_both~room_revenue"
-    ],
-    "assist_oracle": [
-     "B07_room_revenue_and_total_stay_both~room_revenue"
-    ],
-    "assist_wrong": [
-     "L03_alias_settore_pianificate_lavorate~actual_hours",
-     "L07_reparto_slash_mansione_ore_prog~planned_hours",
-     "L07_reparto_slash_mansione_ore_prog~actual_hours",
-     "L08_reparto_o_mansione_with_hourly_rate~actual_hours",
-     "L09_centro_operativo~actual_hours",
-     "L13_title_block_before_table~actual_hours",
-     "L14_summary_block_before_table~actual_hours",
-     "L15_summary_block_after_table~actual_hours",
-     "L16_total_row_correct~actual_hours",
-     "L17_subtotals_per_department~actual_hours",
-     "L20_department_as_section_lines~actual_hours",
-     "L21_sections_with_totals_and_notes~actual_hours",
-     "L21_sections_with_totals_and_notes~planned_hours",
-     "L39_known_italian_department_words~planned_hours",
-     "L39_known_italian_department_words~actual_hours",
-     "L40_vocabulary_restaurant_bar_governante~actual_hours",
-     "L41_pii_split_name_email_phone_taxcode~actual_hours",
-     "L42_pii_name_and_company_email~actual_hours",
-     "L45_dates_weekday_prefix_text~actual_hours",
-     "L47_rates_and_costs_columns~actual_hours",
-     "L50_hidden_draft_sheet_and_visible_sheet~actual_hours",
-     "L51_summary_sheet_first_then_detail~actual_hours",
-     "L52_dashboard_sheet_and_data_sheet~actual_hours",
-     "L53_header_on_row_nine_after_long_preamble~actual_hours",
-     "L58_office_names_in_two_columns_and_comments~actual_hours",
-     "L67_adv_prompt_injection_in_cells~planned_hours",
-     "L67_adv_prompt_injection_in_cells~actual_hours",
-     "L68_adv_formulas_html_and_unicode~actual_hours",
-     "L69_adv_very_long_cell_and_odd_headers~actual_hours",
-     "L70_adv_example_table_before_real_table~planned_hours",
-     "L72_large_three_months_roster~actual_hours",
-     "LO06_job_titles_in_qualifica_column~planned_hours",
-     "LO06_job_titles_in_qualifica_column~actual_hours",
-     "LO07_department_in_a_label_value_block~planned_hours",
-     "LO07_department_in_a_label_value_block~actual_hours",
-     "LO09_legend_block_drawn_beside_the_table~actual_hours",
-     "LO11_department_cells_merged_down_the_column~actual_hours",
-     "LO12_blank_row_between_every_record~planned_hours",
-     "LO12_blank_row_between_every_record~actual_hours",
-     "LO13_hours_written_with_a_unit~actual_hours",
-     "B07_room_revenue_and_total_stay_both~room_revenue"
-    ],
-    "deterministic": [
-     "L03_alias_settore_pianificate_lavorate~actual_hours",
-     "L07_reparto_slash_mansione_ore_prog~planned_hours",
-     "L07_reparto_slash_mansione_ore_prog~actual_hours",
-     "L08_reparto_o_mansione_with_hourly_rate~actual_hours",
-     "L09_centro_operativo~actual_hours",
-     "L13_title_block_before_table~actual_hours",
-     "L14_summary_block_before_table~actual_hours",
-     "L15_summary_block_after_table~actual_hours",
-     "L16_total_row_correct~actual_hours",
-     "L17_subtotals_per_department~actual_hours",
-     "L20_department_as_section_lines~actual_hours",
-     "L21_sections_with_totals_and_notes~actual_hours",
-     "L21_sections_with_totals_and_notes~planned_hours",
-     "L39_known_italian_department_words~planned_hours",
-     "L39_known_italian_department_words~actual_hours",
-     "L40_vocabulary_restaurant_bar_governante~actual_hours",
-     "L41_pii_split_name_email_phone_taxcode~actual_hours",
-     "L42_pii_name_and_company_email~actual_hours",
-     "L45_dates_weekday_prefix_text~actual_hours",
-     "L47_rates_and_costs_columns~actual_hours",
-     "L50_hidden_draft_sheet_and_visible_sheet~actual_hours",
-     "L51_summary_sheet_first_then_detail~actual_hours",
-     "L52_dashboard_sheet_and_data_sheet~actual_hours",
-     "L53_header_on_row_nine_after_long_preamble~actual_hours",
-     "L58_office_names_in_two_columns_and_comments~actual_hours",
-     "L67_adv_prompt_injection_in_cells~planned_hours",
-     "L67_adv_prompt_injection_in_cells~actual_hours",
-     "L68_adv_formulas_html_and_unicode~actual_hours",
-     "L69_adv_very_long_cell_and_odd_headers~actual_hours",
-     "L70_adv_example_table_before_real_table~planned_hours",
-     "L72_large_three_months_roster~actual_hours",
-     "LO06_job_titles_in_qualifica_column~planned_hours",
-     "LO06_job_titles_in_qualifica_column~actual_hours",
-     "LO07_department_in_a_label_value_block~planned_hours",
-     "LO07_department_in_a_label_value_block~actual_hours",
-     "LO09_legend_block_drawn_beside_the_table~actual_hours",
-     "LO11_department_cells_merged_down_the_column~actual_hours",
-     "LO12_blank_row_between_every_record~planned_hours",
-     "LO12_blank_row_between_every_record~actual_hours",
-     "LO13_hours_written_with_a_unit~actual_hours",
-     "B07_room_revenue_and_total_stay_both~room_revenue"
-    ],
-    "shadow_lexicon": [
-     "L03_alias_settore_pianificate_lavorate~actual_hours",
-     "L07_reparto_slash_mansione_ore_prog~planned_hours",
-     "L07_reparto_slash_mansione_ore_prog~actual_hours",
-     "L08_reparto_o_mansione_with_hourly_rate~actual_hours",
-     "L09_centro_operativo~actual_hours",
-     "L13_title_block_before_table~actual_hours",
-     "L14_summary_block_before_table~actual_hours",
-     "L15_summary_block_after_table~actual_hours",
-     "L16_total_row_correct~actual_hours",
-     "L17_subtotals_per_department~actual_hours",
-     "L20_department_as_section_lines~actual_hours",
-     "L21_sections_with_totals_and_notes~actual_hours",
-     "L21_sections_with_totals_and_notes~planned_hours",
-     "L39_known_italian_department_words~planned_hours",
-     "L39_known_italian_department_words~actual_hours",
-     "L40_vocabulary_restaurant_bar_governante~actual_hours",
-     "L41_pii_split_name_email_phone_taxcode~actual_hours",
-     "L42_pii_name_and_company_email~actual_hours",
-     "L45_dates_weekday_prefix_text~actual_hours",
-     "L47_rates_and_costs_columns~actual_hours",
-     "L50_hidden_draft_sheet_and_visible_sheet~actual_hours",
-     "L51_summary_sheet_first_then_detail~actual_hours",
-     "L52_dashboard_sheet_and_data_sheet~actual_hours",
-     "L53_header_on_row_nine_after_long_preamble~actual_hours",
-     "L58_office_names_in_two_columns_and_comments~actual_hours",
-     "L67_adv_prompt_injection_in_cells~planned_hours",
-     "L67_adv_prompt_injection_in_cells~actual_hours",
-     "L68_adv_formulas_html_and_unicode~actual_hours",
-     "L69_adv_very_long_cell_and_odd_headers~actual_hours",
-     "L70_adv_example_table_before_real_table~planned_hours",
-     "L72_large_three_months_roster~actual_hours",
-     "LO06_job_titles_in_qualifica_column~planned_hours",
-     "LO06_job_titles_in_qualifica_column~actual_hours",
-     "LO07_department_in_a_label_value_block~planned_hours",
-     "LO07_department_in_a_label_value_block~actual_hours",
-     "LO09_legend_block_drawn_beside_the_table~actual_hours",
-     "LO11_department_cells_merged_down_the_column~actual_hours",
-     "LO12_blank_row_between_every_record~planned_hours",
-     "LO12_blank_row_between_every_record~actual_hours",
-     "LO13_hours_written_with_a_unit~actual_hours",
-     "B07_room_revenue_and_total_stay_both~room_revenue"
-    ]
+    "assist_failing": [],
+    "assist_hostile": [],
+    "assist_lexicon": [],
+    "assist_oracle": [],
+    "assist_wrong": [],
+    "deterministic": [],
+    "shadow_lexicon": []
    }
   },
   "official": {
@@ -2080,7 +1846,7 @@
       "UNAVAILABLE": 46
      },
      "scope_violations": 0,
-     "seconds": 40.34,
+     "seconds": 45.26,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -2130,7 +1896,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 48.34,
+     "seconds": 52.33,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 41400,
      "tokens_out_total": 11500,
@@ -2180,7 +1946,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 52.57,
+     "seconds": 52.63,
      "tokens_in_per_asked_document": 1759,
      "tokens_in_total": 80907,
      "tokens_out_total": 9398,
@@ -2230,7 +1996,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 52.11,
+     "seconds": 52.86,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 41400,
      "tokens_out_total": 11500,
@@ -2280,7 +2046,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 48.75,
+     "seconds": 52.58,
      "tokens_in_per_asked_document": 900,
      "tokens_in_total": 41400,
      "tokens_out_total": 11500,
@@ -2328,7 +2094,7 @@
      "questions_unnecessary": 1,
      "resolutions_by_reason": {},
      "scope_violations": 0,
-     "seconds": 41.24,
+     "seconds": 43.54,
      "tokens_in_per_asked_document": 0,
      "tokens_in_total": 0,
      "tokens_out_total": 0,
@@ -2378,7 +2144,7 @@
       "OK": 46
      },
      "scope_violations": 0,
-     "seconds": 49.01,
+     "seconds": 53.25,
      "tokens_in_per_asked_document": 1759,
      "tokens_in_total": 80907,
      "tokens_out_total": 9398,
@@ -2524,22 +2290,22 @@
    },
    "assist_lexicon": {
     "certain_and_wrong": 0,
-    "false_automation": -20,
+    "false_automation": 0,
     "junk_columns_mapped": 0,
-    "p0_findings": -20,
+    "p0_findings": 0,
     "pii_violations_in_what_the_model_was_sent": 0,
     "scope_violations": 0,
-    "unsafe_ready": -20,
+    "unsafe_ready": 0,
     "wrong_domain_ready": 0
    },
    "assist_oracle": {
     "certain_and_wrong": 0,
-    "false_automation": -40,
+    "false_automation": 0,
     "junk_columns_mapped": 0,
-    "p0_findings": -40,
+    "p0_findings": 0,
     "pii_violations_in_what_the_model_was_sent": 0,
     "scope_violations": 0,
-    "unsafe_ready": -40,
+    "unsafe_ready": 0,
     "wrong_domain_ready": 0
    },
    "assist_wrong": {
