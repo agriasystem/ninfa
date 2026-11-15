@@ -109,6 +109,37 @@ def test_the_two_ways_of_selecting_a_model_for_smart_import_are_not_combined() -
         )
 
 
+@pytest.mark.parametrize("mode", ["shadow", "assist"])
+def test_both_selections_together_are_a_startup_error_that_names_both(mode: str) -> None:
+    with pytest.raises(ValidationError) as raised:
+        settings(
+            smart_import_ai_mode=mode,
+            import_understanding_provider="anthropic",
+            anthropic_api_key="a-key-for-the-other-vendor",
+        )
+
+    message = str(raised.value)
+    assert "SMART_IMPORT_AI_MODE" in message and "IMPORT_UNDERSTANDING_PROVIDER" in message
+    assert "a-key-for-the-other-vendor" not in message
+
+
+def test_each_selection_alone_is_fine_and_off_is_not_a_selection() -> None:
+    settings(smart_import_ai_mode="assist", openai_api_key=KEY)
+    settings(import_understanding_provider="anthropic", anthropic_api_key="a-key")
+    # `off` selects nothing, so it can sit next to the original provider
+    settings(
+        smart_import_ai_mode="off", import_understanding_provider="anthropic", anthropic_api_key="k"
+    )
+    settings(smart_import_ai_mode="assist", import_understanding_provider="unconfigured")
+
+
+def test_the_environment_example_says_the_two_selections_are_not_combined() -> None:
+    example = (_REPO / ".env.example").read_text(encoding="utf-8")
+
+    assert "STARTUP ERROR" in example
+    assert "IMPORT_UNDERSTANDING_PROVIDER" in example
+
+
 def test_the_original_provider_selection_is_untouched() -> None:
     legacy = Settings(
         _env_file=None,

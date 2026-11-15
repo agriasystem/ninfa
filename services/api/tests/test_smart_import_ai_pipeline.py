@@ -734,3 +734,51 @@ def test_the_model_never_names_more_columns_than_a_person_can_be_asked_about() -
 
     assert traces[0].suggested <= MAX_ASSISTED
     assert result["level"] != "READY"  # every one of them is a question for the person
+
+
+def held_for_the_matching_screen() -> bytes:
+    """The room's revenue is read; an unread amount a little LARGER, row after row, may be the whole
+    stay: money is never a yes or no, so the file goes to the matching screen. A free-text column
+    a model may name sits beside them."""
+    header = [*header_of(status="Condizione"), "Incasso", "Dettaglio camera"]
+    body = [
+        [*row, round(row[6] * 1.2, 2), ("Doppia", "Singola")[i % 2]]
+        for i, row in enumerate(rows_of())
+    ]
+    return table(header, body)
+
+
+def test_a_model_hint_never_lowers_a_file_held_for_the_matching_screen_to_a_question() -> None:
+    content = held_for_the_matching_screen()
+    truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
+
+    without = without_a_model(content)
+    with_a_model, _, traces = read(Behaviour.ORACLE, content, truth)
+
+    assert without["level"] == "MANUAL"
+    assert traces[0].calls == 1  # (the model WAS asked, and named the column)
+    # the model's word on an optional column is a question - but not one that takes the person off
+    # the matching screen the file is held for
+    assert with_a_model["level"] == "MANUAL"
+    assert not any(q[0] == "CONFIRM:Dettaglio camera" for q in with_a_model["questions"])
+
+
+def test_the_same_rule_holds_for_the_original_assistant_whichever_model_it_is() -> None:
+    """Nothing about it is provider-specific: a column ANY model names on an optional field, and
+    nothing makes certain, is asked about; money is never placed by any model."""
+    from tests.import_ai_support import Scenario, ScenarioProvider, understand_with
+
+    content = with_an_optional_free_text_column()
+    truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
+
+    inspection = understand_with(ScenarioProvider(Scenario.CORRECT, truth), BOOKINGS, content)
+
+    info = inspection.understanding
+    assert info is not None and info.level.value == "ASK"
+    # (the original assistant certifies nothing, so the status it named is asked about too)
+    assert [q.id for q in info.questions] == ["CONFIRM:Condizione", "CONFIRM:Dettaglio camera"]
+    money = bookings(revenue="Corrispettivo")
+    placed = understand_with(
+        ScenarioProvider(Scenario.CORRECT, {"Corrispettivo": "room_revenue"}), BOOKINGS, money
+    )
+    assert ("Corrispettivo", None) in [(c.header, c.field) for c in placed.columns]
