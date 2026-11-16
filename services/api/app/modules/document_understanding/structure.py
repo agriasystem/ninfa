@@ -31,6 +31,7 @@ from app.modules.document_understanding.lexicon import (
     SECTION_WORDS,
     TOTAL_WORDS,
 )
+from app.modules.document_understanding.personal_shapes import is_personal_value
 from app.modules.document_understanding.text import fold, stem, tokens
 from app.modules.document_understanding.values import CellKind, kind_of, text_of
 from app.modules.ingestion.value_text import strip_currency, strip_hours_unit
@@ -277,7 +278,7 @@ def row_features(number: int, cells: list[Cell]) -> Row:
 # --- the header -----------------------------------------------------------------------------------
 
 
-def _col_letter(index: int) -> str:
+def column_letter(index: int) -> str:
     letters = ""
     number = index + 1
     while number:
@@ -356,8 +357,13 @@ def _build_columns(
         group_text = group if group and fold(group) != fold(sub) else ""
         label = f"{group_text} - {sub}" if group_text and sub else (sub or group_text)
         renamed = False
-        if not label:
-            label, renamed = f"Colonna {_col_letter(index)}", True
+        # A header that is itself a personal value (an address, a number) is no name of anything:
+        # it becomes "Colonna X" HERE, where the labels are made, so that what the browser is sent,
+        # what the decision keys the column by and what the import reads are the same safe word.
+        personal = is_personal_value(label)
+        if not label or personal:
+            label, renamed = f"Colonna {column_letter(index)}", True
+            group_text = ""
         key = fold(label)
         if key in seen:
             seen[key] += 1

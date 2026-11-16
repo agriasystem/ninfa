@@ -1,0 +1,4350 @@
+{
+ "benchmark": "smart-import-openai-real-pilot-shadow",
+ "classification": {
+  "calls_by_class": {},
+  "documents": 28,
+  "documents_asked": 0,
+  "manual_matching_avoided": 0,
+  "model_calls": 0,
+  "questions_added_by_the_model": 0,
+  "questions_by_class": {},
+  "questions_removed_by_the_model": 0,
+  "questions_rules": 20,
+  "questions_shown": 20,
+  "ready_files_turned_into_questions": 0,
+  "settings_set_aside_as_immaterial": 0,
+  "useful_question_rate": null,
+  "useful_questions": 0
+ },
+ "corpus": {
+  "by_card": {
+   "bookings": 15,
+   "costs": 13
+  },
+  "by_kind": {
+   "bookings": 11,
+   "costs": 2,
+   "expected": 1,
+   "invoices": 12,
+   "revenue": 1,
+   "snapshots": 1
+  },
+  "extension": {
+   ".csv": 28
+  },
+  "files": 28,
+  "rows_median": 3.0,
+  "rows_total": 982,
+  "tiny_files_up_to_3_rows": 20
+ },
+ "gate": "production",
+ "interaction": {
+  "assist_simulated": {
+   "blocked": 0,
+   "confirmations_in_total": 20,
+   "confirmations_per_file": 0.714,
+   "files": 28,
+   "manual_matching": 6,
+   "one_confirmation": 12,
+   "pct": {
+    "blocked": 0.0,
+    "manual": 0.2143,
+    "one": 0.4286,
+    "several": 0.1071,
+    "zero": 0.25
+   },
+   "several_confirmations": 3,
+   "zero_intervention": 7
+  },
+  "deterministic": {
+   "blocked": 0,
+   "confirmations_in_total": 20,
+   "confirmations_per_file": 0.714,
+   "files": 28,
+   "manual_matching": 6,
+   "one_confirmation": 12,
+   "pct": {
+    "blocked": 0.0,
+    "manual": 0.2143,
+    "one": 0.4286,
+    "several": 0.1071,
+    "zero": 0.25
+   },
+   "several_confirmations": 3,
+   "zero_intervention": 7
+  }
+ },
+ "latency": {
+  "calls": 0,
+  "max_ms": 0,
+  "mean_ms": 0,
+  "p50_ms": 0,
+  "p95_ms": 0,
+  "timeout_rate": 0,
+  "timeouts": 0,
+  "tokens_in_mean": 0,
+  "tokens_out_mean": 0
+ },
+ "preflight": {
+  "canary_values_checked": 1832,
+  "files": 28,
+  "largest_evidence_chars": 2790,
+  "problems": [],
+  "requests_built": 9
+ },
+ "price": {
+  "input_per_million": 2.0,
+  "output_per_million": 10.0
+ },
+ "results": [
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Check-in",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Check-in",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     }
+    ]
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "bookings/ambiguous_dates.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 2,
+   "seconds": 0.24,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrival",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrival",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "manual",
+   "effort_before": "manual",
+   "fallback": null,
+   "id": "bookings/changed_schema.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 1,
+   "seconds": 0.22,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "ID Prenotazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Data Arrivo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Data Partenza",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "ID Prenotazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Data Arrivo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Data Partenza",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "manual",
+   "effort_before": "manual",
+   "fallback": null,
+   "id": "bookings/cp1252.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 2,
+   "seconds": 0.26,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Booking ID",
+      "field": "source_record_id",
+      "id": "CONFIRM:Booking ID",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Booking ID",
+      "field": "source_record_id",
+      "id": "CONFIRM:Booking ID",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "bookings/duplicate_source_id.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.21,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Booked At",
+      "field": "booked_at",
+      "id": "CONFIRM:Booked At",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Booked At",
+      "field": "booked_at",
+      "id": "CONFIRM:Booked At",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "bookings/en_comma.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.24,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Room Revenue",
+      "field": "room_revenue",
+      "id": "CONFIRM:Room Revenue",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Room Revenue",
+      "field": "room_revenue",
+      "id": "CONFIRM:Room Revenue",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "bookings/invalid_row.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.23,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "ID Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Data Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Data Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "ID Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Data Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Data Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "zero",
+   "effort_before": "zero",
+   "fallback": null,
+   "id": "bookings/it_semicolon.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.13,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "zero",
+   "effort_before": "zero",
+   "fallback": null,
+   "id": "bookings/masseria_ninfa_bookings_v1.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 16,
+   "seconds": 0.22,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "manual",
+   "effort_before": "manual",
+   "fallback": null,
+   "id": "bookings/pii_unmapped_columns.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 2,
+   "seconds": 0.26,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": null,
+      "field": "status",
+      "id": "LABELS:status_mapping",
+      "kind": "VALUE_LABELS"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": null,
+      "field": "status",
+      "id": "LABELS:status_mapping",
+      "kind": "VALUE_LABELS"
+     }
+    ]
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "bookings/unknown_status.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 2,
+   "seconds": 0.26,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Booked At",
+      "field": "booked_at",
+      "id": "CONFIRM:Booked At",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Booking ID",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Booked At",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "check_in",
+      "header": "Check-in",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Check-out",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Status",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Rooms",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Room Revenue",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Channel",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Booked At",
+      "field": "booked_at",
+      "id": "CONFIRM:Booked At",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "bookings/utf8_bom.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "bookings",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.22,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Importo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "cost_category",
+      "header": "Categoria",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Importo",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     },
+     {
+      "column": "Data",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Importo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "cost_category",
+      "header": "Categoria",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Importo",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     },
+     {
+      "column": "Data",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "several",
+   "effort_before": "several",
+   "fallback": null,
+   "id": "costs/invoices/software.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "costs",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 11,
+   "seconds": 0.2,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "zero",
+   "effort_before": "zero",
+   "fallback": null,
+   "id": "costs/masseria_ninfa_cost_bookings_v1.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "costs",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 492,
+   "seconds": 0.78,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "zero",
+   "effort_before": "zero",
+   "fallback": null,
+   "id": "expected/masseria_ninfa_bookings_history_v1.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "expected",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 252,
+   "seconds": 0.53,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cost_category",
+      "header": "Categoria",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Imponibile",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": null,
+      "field": "cost_category",
+      "id": "LABELS:category_mapping",
+      "kind": "VALUE_LABELS"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cost_category",
+      "header": "Categoria",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Imponibile",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": null,
+      "field": "cost_category",
+      "id": "LABELS:category_mapping",
+      "kind": "VALUE_LABELS"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "invoices/golden/masseria_ninfa_cost_06_structured.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 13,
+   "seconds": 0.29,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cost_category",
+      "header": "Category",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cost_category",
+      "header": "Category",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "zero",
+   "effort_before": "zero",
+   "fallback": null,
+   "id": "invoices/golden/masseria_ninfa_cost_08_xlsx_rows.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 5,
+   "seconds": 0.09,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cost_category",
+      "header": "Category",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cost_category",
+      "header": "Category",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "invoices/structured/category_mapped.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.17,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Amount",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Amount",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Amount",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Amount",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "invoices/structured/changed_schema.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 1,
+   "seconds": 0.26,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_gross_amount",
+      "header": "Gross",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_gross_amount",
+      "header": "Gross",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "manual",
+   "effort_before": "manual",
+   "fallback": null,
+   "id": "invoices/structured/conflicting_repeated_total.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 2,
+   "seconds": 0.2,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Importo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Importo",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     },
+     {
+      "column": "Data",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     },
+     {
+      "column": "Numero Fattura",
+      "field": "invoice_number",
+      "id": "CONFIRM:Numero Fattura",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Importo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Importo",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     },
+     {
+      "column": "Data",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     },
+     {
+      "column": "Numero Fattura",
+      "field": "invoice_number",
+      "id": "CONFIRM:Numero Fattura",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "several",
+   "effort_before": "several",
+   "fallback": null,
+   "id": "invoices/structured/cp1252.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.17,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "manual",
+   "effort_before": "manual",
+   "fallback": null,
+   "id": "invoices/structured/duplicate_line_number.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 2,
+   "seconds": 0.19,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "invoices/structured/en_comma.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.19,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Importo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Importo",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     },
+     {
+      "column": "Data",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     },
+     {
+      "column": "Numero Fattura",
+      "field": "invoice_number",
+      "id": "CONFIRM:Numero Fattura",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Fornitore",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "P.IVA",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Numero Fattura",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Data",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Descrizione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Importo",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Importo",
+      "field": "line_total",
+      "id": "AMOUNT_BASIS",
+      "kind": "AMOUNT_BASIS"
+     },
+     {
+      "column": "Data",
+      "field": null,
+      "id": "DATE_ORDER",
+      "kind": "DATE_ORDER"
+     },
+     {
+      "column": "Numero Fattura",
+      "field": "invoice_number",
+      "id": "CONFIRM:Numero Fattura",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "several",
+   "effort_before": "several",
+   "fallback": null,
+   "id": "invoices/structured/it_semicolon.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.21,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     }
+    ],
+    "level": "MANUAL",
+    "questions": []
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "manual",
+   "effort_before": "manual",
+   "fallback": null,
+   "id": "invoices/structured/pii_unmapped_columns.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 1,
+   "seconds": 0.23,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_gross_amount",
+      "header": "Gross",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_gross_amount",
+      "header": "Gross",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "invoices/structured/repeated_invoice_header.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.17,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "supplier_name",
+      "header": "Supplier",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "supplier_vat_number",
+      "header": "VAT",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "invoice_number",
+      "header": "Invoice No",
+      "kind": "COLUMN",
+      "level": "MEDIUM"
+     },
+     {
+      "field": "invoice_date",
+      "header": "Invoice Date",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_description",
+      "header": "Description",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "line_total",
+      "header": "Line Total",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "ASK",
+    "questions": [
+     {
+      "column": "Invoice No",
+      "field": "invoice_number",
+      "id": "CONFIRM:Invoice No",
+      "kind": "COLUMN_MEANING"
+     }
+    ]
+   },
+   "card": "costs",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "one",
+   "effort_before": "one",
+   "fallback": null,
+   "id": "invoices/structured/utf8_bom.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "invoices",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 3,
+   "seconds": 0.16,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "zero",
+   "effort_before": "zero",
+   "fallback": null,
+   "id": "revenue/masseria_ninfa_bookings_revenue_v1.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "revenue",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 138,
+   "seconds": 0.42,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  },
+  {
+   "assist_would_show": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "base": {
+    "blockers": [],
+    "claims": [
+     {
+      "field": "source_record_id",
+      "header": "Codice Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "booked_at",
+      "header": "Data Prenotazione",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_in",
+      "header": "Arrivo",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "check_out",
+      "header": "Partenza",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "status",
+      "header": "Stato",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "rooms",
+      "header": "Camere",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "guests",
+      "header": "Ospiti",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "room_revenue",
+      "header": "Importo Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "total_revenue",
+      "header": "Importo Totale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "channel",
+      "header": "Canale",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "commission_amount",
+      "header": "Commissione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     },
+     {
+      "field": "room_type",
+      "header": "Tipologia Camera",
+      "kind": "COLUMN",
+      "level": "HIGH"
+     },
+     {
+      "field": "cancelled_at",
+      "header": "Data Cancellazione",
+      "kind": "COLUMN",
+      "level": "LOW"
+     }
+    ],
+    "level": "READY",
+    "questions": []
+   },
+   "card": "bookings",
+   "columns_named": {},
+   "domain_candidate": null,
+   "effort_assist": "zero",
+   "effort_before": "zero",
+   "fallback": null,
+   "id": "snapshots/masseria_ninfa_bookings_addendum_v1.csv",
+   "ignored": 0,
+   "judged": {
+    "right": 0,
+    "unjudged": 0,
+    "wrong": 0
+   },
+   "kind": "snapshots",
+   "latency_ms": 0,
+   "model_asked": false,
+   "outcome": "neutral",
+   "overall_confidence": null,
+   "pii_in_a_browser_screen": 0,
+   "request_violations": 0,
+   "rows": 7,
+   "seconds": 0.19,
+   "shadow_screen_is_the_rules_own": true,
+   "status": null,
+   "tokens_in": 0,
+   "tokens_out": 0
+  }
+ ],
+ "settings": {
+  "mode": "shadow",
+  "model": "gpt-6.1-sol",
+  "reasoning": "low",
+  "vocabulary_certainty": false
+ },
+ "spend": {
+  "calls_answered_in_the_closed_shape": 0,
+  "calls_answered_not_in_the_shape": 0,
+  "calls_failed_by_kind": {},
+  "cost_usd_at_list_price": 0.0,
+  "cost_usd_per_call_mean": 0,
+  "latency_ms_max": 0,
+  "latency_ms_mean": 0,
+  "latency_ms_p50": 0,
+  "latency_ms_p95": 0,
+  "models_reported_by_the_vendor": [],
+  "price_usd_per_million_tokens": {
+   "input": 2.0,
+   "output": 10.0
+  },
+  "real_calls": 0,
+  "reasoning_efforts": [],
+  "request_ids_recorded": 0,
+  "second_attempts": 0,
+  "tokens_in_per_call_mean": 0,
+  "tokens_in_total": 0,
+  "tokens_out_per_call_mean": 0,
+  "tokens_out_per_call_p95": 0,
+  "tokens_out_total": 0,
+  "transport_retries": 0
+ },
+ "stability": {
+  "files": 0,
+  "oscillating": 0,
+  "per_file": [],
+  "repeats": 2
+ },
+ "wire": {
+  "failed_checks": {},
+  "largest_request_bytes": 0,
+  "requests": 0
+ }
+}

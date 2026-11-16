@@ -6,7 +6,7 @@ so unmapped cells are never staged, logged or persisted.
 """
 
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import PurePath
@@ -105,6 +105,7 @@ def open_table(content: bytes, filename: str, options: FormatOptions | None = No
             "The file has more columns than the supported maximum",
             details={"max_columns": MAX_COLUMNS},
         )
+    table = _without_personal_headers(table)
     duplicates = find_duplicate_headers(table.headers)
     if duplicates:
         raise BookingImportError(
@@ -113,6 +114,21 @@ def open_table(content: bytes, filename: str, options: FormatOptions | None = No
             details={"duplicate_headers": duplicates},
         )
     return table
+
+
+def _without_personal_headers(table: SourceTable) -> SourceTable:
+    """A header cell that is itself a personal value (an address, a number) is read as "Colonna X"
+    - the word the structured reader gives it (`document_understanding.structure`) - so that no
+    path to the browser can carry it, and the import, which reads the file the same way, finds
+    the column by the same safe word."""
+    from app.modules.document_understanding.personal_shapes import is_personal_value
+    from app.modules.document_understanding.structure import column_letter
+
+    safe = [
+        f"Colonna {column_letter(index)}" if is_personal_value(header) else header
+        for index, header in enumerate(table.headers)
+    ]
+    return table if safe == table.headers else replace(table, headers=safe)
 
 
 def limit_rows(rows: Iterator[SourceRow]) -> Iterator[SourceRow]:

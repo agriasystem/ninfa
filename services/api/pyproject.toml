@@ -22,6 +22,7 @@ dependencies = [
     # Official Anthropic Python SDK (Gate 19): the ONLY vendor-specific runtime dependency in this
     # codebase, isolated to app/modules/ai/gateway/anthropic_provider.py - see ADR 0025.
     "anthropic>=1.8.0,<2",
+    "openai>=3.50,<4",
 ]
 
 [dependency-groups]

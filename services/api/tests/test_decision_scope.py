@@ -177,6 +177,9 @@ def test_no_new_runtime_dependency_was_added() -> None:
         # anthropic: added by Gate 19 (Ask NINFA provider), unrelated to the decision layer -
         # see ADR 0025 and `test_ask_ninfa_provider_boundary.py`.
         "anthropic",
+        # openai: added by Smart Import OpenAI Intelligence V1 (ADR 0050), unrelated to the
+        # decision layer - see `test_ai_boundary.py`.
+        "openai",
     }
     unexpected = dependencies - known
     assert unexpected == set(), f"unexpected new dependency: {unexpected}"

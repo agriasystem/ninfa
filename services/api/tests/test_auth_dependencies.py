@@ -36,7 +36,9 @@ def test_only_argon2_cffi_was_added_to_backend_dependencies() -> None:
         "openpyxl",
     }
     dependencies = _backend_dependencies()
-    unexpected = dependencies - known_before_gate_13 - {"argon2-cffi", "anthropic"}
+    # `openai`: the semantic layer's SDK (Smart Import OpenAI Intelligence V1, ADR 0050),
+    # allow-listed like `anthropic`, with the same isolation (`test_ai_boundary.py`).
+    unexpected = dependencies - known_before_gate_13 - {"argon2-cffi", "anthropic", "openai"}
     assert unexpected == set(), f"unexpected new dependency: {unexpected}"
     assert "argon2-cffi" in dependencies
 

@@ -67,3 +67,26 @@ Write a function in the right `corpus_*.py` with `@REGISTRY.case("slug", "tag", 
 document with `Sheet` / `write_table` (or describe its columns with `Col`), and build the `Golden`
 from the references the drawing returns. Never read a lexicon of Smart Import to decide the truth.
 `python -m pytest tests/test_smart_import_benchmark.py` checks the corpus against its own truth.
+
+## The OpenAI semantic layer: `openai_intelligence`
+
+`python -m tests.benchmarks.smart_import_v3.openai_intelligence` (from `services/api`, no network, a
+few tens of minutes) measures the semantic layer (`docs/architecture/smart-import-openai-intelligence-v1.md`)
+by running the SAME documents with the rules alone and with the layer, with stand-ins for the model
+(oracle, a calibrated lexicon reader, a wrong one, a hostile one, a provider that is down). It does
+not reuse a second infrastructure: the documents are the official corpus (`Doc`, `Golden`), the
+observer is `observe.run`, the scorer is `score_case`, the stand-ins are `tests/semantic_support.py`.
+
+Three populations: **challenge** (the official READY workbooks with one or two headers replaced by a
+word the rules do not know - verified: the rules alone must fail to read it - so every structure of
+the corpus is kept: preamble rows, merged cells, two-level headers, several sheets, hidden sheets),
+**official** (the 240 as they are) and **adversarial** (hand-built: not hospitality, the wrong card,
+injection in a header / cell / sheet name / title, a personal value as a header, twin columns...).
+
+**What it says and what it does not.** Every number is about what NINFA does with a reading that is
+right, partly right, confidently wrong or hostile. Nothing is known about any real model: the lexicon
+stand-in's two parameters (it knows 70% of the held-out vocabulary, confuses 10% of what it knows) are
+assumptions. Change a stand-in, never the truth, to ask another question.
+
+`tests/live_openai_acceptance.py` is the separate script that runs ONE real round trip on a
+synthetic file when a key exists; without one it says `NOT RUN` and exits 3.

@@ -12,6 +12,10 @@ confirms it.
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.modules.ai.import_understanding.interpretation import InterpretationSummary
 
 # What the model is shown of a personal-data column: this class, nothing else.
 PII_CLASSES = (
@@ -33,6 +37,65 @@ class Confidence(StrEnum):
 
     LOW = "LOW"
     MEDIUM = "MEDIUM"
+
+
+class AiMode(StrEnum):
+    """What NINFA does with the model's reading (`SMART_IMPORT_AI_MODE`).
+
+    OFF     no model is ever asked: Smart Import reads files exactly as it always did.
+    SHADOW  the model is asked and its reading is MEASURED against the rules' - nothing of it is
+            applied: the result, the questions, the mapping and the import are those of OFF.
+    ASSIST  the model's reading is applied as suggestions (and, where the file's own values prove
+            the name, as a confirmed column) AFTER every check of the port - never instead of them.
+    """
+
+    OFF = "off"
+    SHADOW = "shadow"
+    ASSIST = "assist"
+
+
+class FailureKind(StrEnum):
+    """Why a model did not contribute, as one stable word: the audit and the fallback are told this
+    and never the vendor's message (which can hold anything, a key included)."""
+
+    NOT_CONFIGURED = "NOT_CONFIGURED"  # a mode is on but there is no key / provider
+    TIMEOUT = "TIMEOUT"
+    RATE_LIMIT = "RATE_LIMIT"
+    QUOTA = "QUOTA"  # the account has run out of credit
+    CONNECTION = "CONNECTION"
+    SERVER = "SERVER"  # a 5xx of the vendor
+    AUTH = "AUTH"  # a refused key or a forbidden project
+    MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"  # the model does not exist (for this account)
+    REQUEST_TOO_LARGE = "REQUEST_TOO_LARGE"
+    REFUSAL = "REFUSAL"  # the model declined to answer
+    INCOMPLETE = "INCOMPLETE"  # the answer was cut short
+    SCHEMA = "SCHEMA"  # the answer is not the closed shape that was asked
+    EMPTY = "EMPTY"  # no answer at all
+    PROVIDER_ERROR = "PROVIDER_ERROR"  # anything else a vendor can do wrong
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderUsage:
+    """What ONE call to a model cost and what it was, as the vendor reports it. Counts and words,
+    never a content: this is what the audit keeps."""
+
+    model: str = ""
+    latency_ms: int = 0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    request_id: str | None = None
+    reasoning_effort: str | None = None
+    # how many times the adapter sent the request again after a transient failure
+    retries: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderAnswer:
+    """A provider may return its answer bare (the parsed JSON, as a test double does) or in this
+    envelope, when it can say what the call cost. The resolver reads both."""
+
+    payload: object
+    usage: ProviderUsage = field(default_factory=ProviderUsage)
 
 
 class ResolutionReason(StrEnum):
@@ -92,6 +155,10 @@ class UnderstandingEvidence:
     questions: tuple[OfferedQuestion, ...] = ()
     # opaque question id -> the real one. Never serialised: it stays on this side.
     aliases: Mapping[str, str] = field(default_factory=dict)
+    # Columns the rules placed on a field a vocabulary can prove, without being sure (a question
+    # for the person is about to be asked): a reading of their NAME is worth a call. The indexes
+    # only, never serialised: what the model is shown is unchanged.
+    confirmable: frozenset[int] = frozenset()
 
     def column(self, index: int) -> ColumnEvidence | None:
         return next((c for c in self.columns if c.index == index), None)
@@ -130,6 +197,9 @@ class ImportUnderstandingRequest:
     attempt: int = 1
     # The rules the previous answer broke, as stable codes - never the previous answer itself.
     retry_hints: tuple[str, ...] = ()
+    # Which closed shape the answer takes: "legacy" (domain / columns / answers) or "semantic-v1"
+    # (`interpretation.SemanticInterpretation`). A provider declares the one it speaks.
+    contract: str = "legacy"
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +223,13 @@ class AiResolution:
     output_tokens: int = 0
     reduced: bool = False
     redactions: int = 0
+    # What the model said that is not a mapping (status, ambiguities, conflicts with what NINFA
+    # already placed...): only with the `semantic-v1` contract.
+    interpretation: "InterpretationSummary | None" = None
+    # Why the model did not contribute, when it did not.
+    failure: FailureKind | None = None
+    # One entry per call, as the vendor reported it.
+    usages: tuple[ProviderUsage, ...] = ()
 
     @property
     def used(self) -> bool:
@@ -161,21 +238,73 @@ class AiResolution:
         )
 
 
-def empty(reason: ResolutionReason, calls: int = 0) -> AiResolution:
-    return AiResolution(reason, calls)
+def empty(
+    reason: ResolutionReason, calls: int = 0, failure: FailureKind | None = None
+) -> AiResolution:
+    return AiResolution(reason, calls, failure=failure)
+
+
+@dataclass(frozen=True, slots=True)
+class LevelCounts:
+    """How many columns are at each level of certainty (a way to see what a model changed)."""
+
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+    open: int = 0  # not placed at all
+
+
+@dataclass(frozen=True, slots=True)
+class AiTrace:
+    """One audit record per use of a model - for the log, the shadow comparison and the cost
+    report. Words, counts and ids only: never a header, a value, a request or an answer, and never
+    the model's reasoning (which is not asked for and not kept)."""
+
+    mode: str
+    provider: str
+    model: str
+    prompt_version: str
+    schema_version: str
+    outcome: str  # a `ResolutionReason`
+    calls: int = 0
+    retries: int = 0
+    latency_ms: int = 0
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    request_ids: tuple[str, ...] = ()
+    fallback_reason: str | None = None  # a `FailureKind`
+    status: str | None = None  # of the interpretation
+    before: LevelCounts = field(default_factory=LevelCounts)
+    after: LevelCounts = field(default_factory=LevelCounts)
+    questions_before: int = 0
+    questions_after: int = 0
+    level_before: str | None = None  # the verdict the rules alone gave
+    level_after: str | None = None  # the verdict with the model's reading (applied, or replayed)
+    suggested: int = 0  # columns / answers the model offered that survived every check
+    promoted: int = 0  # columns the file's own values confirmed (no question left for them)
+    ignored: int = 0  # readings that survived every check but change nothing: set aside, not asked
+    agreements: int = 0
+    conflicts: int = 0
+    source_learning_conflicts: int = 0
 
 
 __all__ = [
     "NO_FIELD",
     "PII_CLASSES",
     "UNKNOWN",
+    "AiMode",
     "AiResolution",
+    "AiTrace",
     "AnswerGuess",
     "ColumnEvidence",
     "ColumnGuess",
     "Confidence",
+    "FailureKind",
     "ImportUnderstandingRequest",
+    "LevelCounts",
     "OfferedQuestion",
+    "ProviderAnswer",
+    "ProviderUsage",
     "ResolutionReason",
     "UnderstandingEvidence",
     "UnderstandingGuess",

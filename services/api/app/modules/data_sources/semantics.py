@@ -149,6 +149,25 @@ class DomainSem:
     # lists people (their column is left out of the import) a value above it cannot be what the
     # column says, so the reading is demoted to a question instead of being taken on its name.
     person_limits: Mapping[str, int] = field(default_factory=dict)
+    # Fields that measure the SAME thing in two ways (hours planned and worked, what a room
+    # cost and what the whole stay cost). An import can run with one of them, so a file that
+    # reads one and holds an unread column moving with it must not be READY: see
+    # `understanding_siblings`.
+    siblings: tuple[tuple[str, ...], ...] = ()
+    # Among the siblings, (part, whole): the whole is never smaller than its part (what a stay
+    # costs is never less than what its room cost). A column that cannot be the whole, or the
+    # part, of what is read is not the other half.
+    parts: tuple[tuple[str, str], ...] = ()
+    # Words that name ANOTHER KIND of the same measure ("contract", "overtime", "holiday" hours):
+    # a column whose header says so is that other thing, whatever its numbers do, and is never
+    # the other half of a sibling pair. The header only ever rules a column OUT here, never in.
+    other_kinds: frozenset[str] = frozenset()
+    # Optional fields that are STORED with the record and read by nothing that measures or decides
+    # (checked in the code: no analysis, snapshot or decision reads them). A reading of a column as
+    # one of them, by anybody who is not sure, is never worth a question and never applied: leaving
+    # the column out loses no measure. Never a required field, money, a sibling, a field whose
+    # values are proved by a vocabulary, or one of which an analysis reads (`cancelled_at`).
+    descriptive: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)

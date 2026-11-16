@@ -15,62 +15,28 @@ Two things are looked for:
   to carry them. They exist only in memory while the file is read and are kept nowhere.
 
 Only the text meant to be shown is read: see `app.modules.data_sources.understanding_redaction`,
-which applies this guard to an answer. Headers, field names and codes are never touched, because
-the import matches the file by them.
+which applies this guard to an answer. Headers, field names and codes are never touched HERE,
+because the import matches the file by them - so a header cell that is itself a personal value
+(an address, a number) is made safe where the labels of the table are made
+(`structure._build_columns`), and the import, which reads the file the same way, finds the column
+by the same safe word.
 """
 
 import re
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Final
 
+from app.modules.document_understanding.personal_shapes import (
+    MARK,
+    SHAPE_RULES,
+    Rule,
+    is_personal_value,
+)
 from app.modules.document_understanding.pii import PiiKind, looks_like_person
 from app.modules.document_understanding.pii_text import mask_matches, normalize
 
-MARK: Final = "•••"
 _MAX_VALUES = 4000
 _MIN_VALUE_LENGTH = 4
-
-_EMAIL = re.compile(r"[\w.+'\-]+@[\w\-]+(?:\.[\w\-]+)+")
-_TAX_CODE = re.compile(
-    r"(?<![A-Za-z0-9])[A-Za-z]{6}\d{2}[A-Za-z]\d{2}[A-Za-z]\d{3}[A-Za-z](?![A-Za-z0-9])"
-)
-# An IBAN is two letters, two digits and the rest of the account: its LENGTH is fixed by country,
-# which is what tells it from an invoice number such as "FT20260101234567".
-_IBAN_LENGTHS: Final = {
-    "IT": 27,
-    "SM": 27,
-    "FR": 27,
-    "MC": 27,
-    "DE": 22,
-    "GB": 22,
-    "IE": 22,
-    "ES": 24,
-    "PT": 25,
-    "CH": 21,
-    "LI": 21,
-    "AT": 20,
-    "LU": 20,
-    "NL": 18,
-    "BE": 16,
-    "GR": 27,
-    "PL": 28,
-}
-_IBAN = re.compile(r"(?<![A-Za-z0-9])([A-Za-z]{2})\d{2}(?:\s?[A-Za-z0-9]){10,30}(?![A-Za-z0-9])")
-# An international number ("+39 333 1234567", "0039 06 1234567") and an Italian mobile one
-# ("333 1234567", "333-123-4567"). A landline without a country code is NOT looked for in text: a
-# month and a year ("09/2026") are written just like it.
-_PHONES: Final = (
-    re.compile(r"(?<![\w.])(?:\+|00)\d{1,3}[\s.\-]?\(?\d{1,4}\)?(?:[\s.\-]?\d{2,}){1,4}(?![\w])"),
-    re.compile(r"(?<!\d)3\d{2}[\s.\-/]\d{3}[\s.\-/]?\d{3,4}(?!\d)"),
-    re.compile(r"(?<!\d)3\d{2}[\s.\-/]\d{6,7}(?!\d)"),
-)
-
-
-def _iban_accepts(match: re.Match[str]) -> bool:
-    compact = re.sub(r"\s", "", match.group(0))
-    length = _IBAN_LENGTHS.get(match.group(1).upper())
-    return length is not None and len(compact) == length
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,12 +68,7 @@ class PersonalDataGuard:
             return text
         # Read as a person reads it - invisible characters gone, look-alike letters Latin - and
         # masked in the text as it was: a zero-width space inside an address hides nothing.
-        rules: list[tuple[re.Pattern[str], Callable[[re.Match[str]], bool] | None]] = [
-            (_EMAIL, None),
-            (_TAX_CODE, None),
-            (_IBAN, _iban_accepts),
-            *((pattern, None) for pattern in _PHONES),
-        ]
+        rules: list[Rule] = list(SHAPE_RULES)
         if self.known is not None:
             rules.append((self.known, None))
         return mask_matches(text, rules, MARK)
@@ -137,4 +98,4 @@ def _pattern(values: set[str]) -> re.Pattern[str] | None:
     return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)", re.IGNORECASE)
 
 
-__all__ = ["MARK", "PersonalDataGuard"]
+__all__ = ["MARK", "PersonalDataGuard", "is_personal_value"]

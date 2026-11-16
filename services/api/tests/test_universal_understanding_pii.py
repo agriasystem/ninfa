@@ -71,3 +71,49 @@ def test_a_credit_note_is_a_document_not_a_remark(header: str) -> None:
 @pytest.mark.parametrize("header", ["Reparto", "Descrizione", "Stato", "Canale", "Tariffa"])
 def test_other_text_columns_are_not_notes(header: str) -> None:
     assert detect_pii(header, stats_of(("Sala", "Bar", "Cucina", "Reception"))) is None
+
+
+# --- found by the real pilot shadow validation: "Street" was sent to the model as an example --
+
+
+@pytest.mark.parametrize("header", ["Street", "Street address", "Strada", "Viale", "Piazza"])
+def test_the_words_of_a_street_make_a_column_an_address(header: str) -> None:
+    finding = detect_pii(header, stats_of(("Via Inventata 12",)))
+    assert finding is not None and finding.kind == PiiKind.ADDRESS
+
+
+def test_a_street_of_a_customer_is_personal_whichever_word_decides() -> None:
+    assert detect_pii("Customer street", stats_of(("Via Inventata 12",))) is not None
+
+
+@pytest.mark.parametrize("header", ["Sede", "Luogo", "Dove", "Colonna 9", "X"])
+@pytest.mark.parametrize(
+    "values",
+    [
+        ADDRESSES,
+        ("Via Inventata 12",),
+        ("12 High Street", "221 Baker Street", "5 Station Road"),
+    ],
+)
+def test_values_written_as_street_addresses_are_personal_under_any_header(
+    header: str, values: tuple[str, ...]
+) -> None:
+    finding = detect_pii(header, stats_of(values))
+    assert finding is not None and finding.kind == PiiKind.ADDRESS and finding.by == "VALUES"
+
+
+@pytest.mark.parametrize(
+    ("header", "values"),
+    [
+        # "via" is the way a booking came, not a street
+        ("Prenotato via", ("Booking.com", "Expedia", "Diretto")),
+        ("Canale", ("Booking.com", "Via Booking", "Diretto")),
+        ("Reparto", ("Sala", "Bar", "Cucina", "Reception")),
+        ("Tipologia camera", ("Doppia", "Singola", "Suite Vista Mare")),
+        ("Tariffa", ("Best Available", "Non Rimborsabile", "Early Booking")),
+    ],
+)
+def test_a_text_column_that_is_not_an_address_stays_what_it_was(
+    header: str, values: tuple[str, ...]
+) -> None:
+    assert detect_pii(header, stats_of(values)) is None

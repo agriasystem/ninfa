@@ -1,5 +1,12 @@
 """Gate 18 review items 26-30: the provider boundary is a `Protocol`, never a concrete vendor SDK.
 
+**Update (Smart Import OpenAI Intelligence V1):** a SECOND vendor, `openai`, is now a deliberate
+dependency of Smart Import's semantic layer, isolated the same way - to exactly ONE adapter file
+(`app/modules/ai/gateway/openai_provider.py`), named only by the composition root (`factory.py`),
+which has to name it and read its settings. Everything below still holds for every OTHER vendor and
+for every other file: the scans exclude the two adapters, let `factory.py` say `openai`, and still
+refuse any third vendor anywhere. `test_ai_boundary.py` is the per-file, per-import version.
+
 Mirrors `test_recommendation_scope.py`'s own philosophy (Gate 16: "not by convention, by
 construction") - a source scan of every real file under `app/modules/ai/`, not a naming convention
 a future contributor could quietly violate.
@@ -27,9 +34,13 @@ _API_ROOT = Path(__file__).resolve().parents[1]
 _AI_MODULE_ROOT = _API_ROOT / "app" / "modules" / "ai"
 _REPO_ROOT = _API_ROOT.parents[1]
 
-# Gate 19's own, single, approved exception - see `test_anthropic_provider_isolation.py` for the
-# precise, per-file version of this same boundary.
+# The two approved adapters (Gate 19's anthropic, and the OpenAI semantic layer's openai) - see
+# `test_ai_boundary.py` for the precise, per-file version of this same boundary.
 _ALLOWED_ANTHROPIC_FILE = _AI_MODULE_ROOT / "gateway" / "anthropic_provider.py"
+_ALLOWED_OPENAI_FILE = _AI_MODULE_ROOT / "gateway" / "openai_provider.py"
+# The composition root names the adapters it builds and reads their settings: it, and only it, may
+# say `openai` (it already names `AnthropicLanguageModelProvider`).
+_COMPOSITION_ROOT = _AI_MODULE_ROOT / "gateway" / "factory.py"
 
 _FORBIDDEN_VENDOR_TOKENS = (
     "openai",
@@ -46,12 +57,10 @@ _FORBIDDEN_VENDOR_TOKENS = (
 )
 
 
-def _all_ai_module_source_except_the_approved_anthropic_adapter() -> str:
-    return "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in _AI_MODULE_ROOT.rglob("*.py")
-        if path != _ALLOWED_ANTHROPIC_FILE
-    )
+def _forbidden_in(path: Path) -> tuple[str, ...]:
+    if path == _COMPOSITION_ROOT:
+        return tuple(token for token in _FORBIDDEN_VENDOR_TOKENS if token != "openai")
+    return _FORBIDDEN_VENDOR_TOKENS
 
 
 # --- 26: AskNinfaService depends on the protocol, structurally -----------------------------------
@@ -80,25 +89,27 @@ def test_27_28_29_no_vendor_sdk_import_or_identifier_anywhere_under_ai_module() 
     cross-reference - e.g. `factory.py` naming the `AnthropicLanguageModelProvider` class, or a
     docstring discussing the `ask_ninfa_provider == "anthropic"` config value - could trip), by
     `test_anthropic_provider_isolation.py` instead."""
-    source = _all_ai_module_source_except_the_approved_anthropic_adapter().lower()
-    for token in _FORBIDDEN_VENDOR_TOKENS:
-        assert token not in source, token
+    for path in _AI_MODULE_ROOT.rglob("*.py"):
+        if path in (_ALLOWED_ANTHROPIC_FILE, _ALLOWED_OPENAI_FILE):
+            continue
+        source = path.read_text(encoding="utf-8").lower()
+        for token in _forbidden_in(path):
+            assert token not in source, (path.name, token)
 
 
 def test_no_other_llm_sdk_was_added_as_a_dependency() -> None:
-    """Gate 19 legitimately adds `anthropic` (see `pyproject.toml`'s own dependency comment) - this
-    now confirms it is EXACTLY the one vendor dependency, never a second one alongside it."""
-    manifests = [
-        _API_ROOT / "pyproject.toml",
-        _REPO_ROOT / "services" / "worker" / "pyproject.toml",
-    ]
-    for manifest in manifests:
+    """Gate 19 legitimately adds `anthropic` and the semantic layer `openai`: these are
+    EXACTLY the two vendor dependencies of the API (the worker has none), never a third."""
+    worker = _REPO_ROOT / "services" / "worker" / "pyproject.toml"
+    assert "openai" not in worker.read_text(encoding="utf-8").lower()
+    for manifest in (_API_ROOT / "pyproject.toml", worker):
         lowered = manifest.read_text(encoding="utf-8").lower()
-        for token in ("openai", "cohere", "langchain", "google-generativeai", "mistralai"):
+        for token in ("cohere", "langchain", "google-generativeai", "mistralai"):
             assert token not in lowered, (manifest, token)
 
     api_dependencies = (_API_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert '"anthropic>=' in api_dependencies
+    assert '"openai>=' in api_dependencies
 
 
 # --- 30: no provider-specific type leaks into the domain shape -----------------------------------

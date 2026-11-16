@@ -51,6 +51,34 @@ class Settings(BaseSettings):
     # needed: Smart Import reads files completely without it.
     import_understanding_provider: Literal["unconfigured", "anthropic"] = "unconfigured"
 
+    # Smart Import's semantic layer (OpenAI Responses API). `SMART_IMPORT_AI_MODE` says what NINFA
+    # does with a model's reading: `off` (the default: no model is ever asked, no network library is
+    # touched), `shadow` (the model is asked and MEASURED, nothing is applied) or `assist` (its
+    # reading is applied as suggestions, and where the file's own values prove it, as a confirmed
+    # column - after every check, never instead of one). A mode other than `off` with no
+    # `OPENAI_API_KEY` is NOT an error: Smart Import reads files exactly as it does with `off`
+    # (the app says so once, at startup). The key is a `SecretStr`: it never renders in a repr, a
+    # log line or an exception message.
+    smart_import_ai_mode: Literal["off", "shadow", "assist"] = "off"
+    openai_api_key: SecretStr | None = None
+    smart_import_openai_model: str = Field(default="gpt-6.1-sol", min_length=1, max_length=100)
+    # `none` sends no reasoning parameter at all (a model that has none).
+    # `gpt-6.1-sol` accepts low / medium / high / xhigh / max (NOT none or minimal: it refuses them,
+    # and the answer falls back to the rules). `low` reads as well as `medium` and takes about 40%
+    # less time (V1.1: p50 4.9 s against 8.3 s, no timeout in 50 calls against 1).
+    smart_import_openai_reasoning: Literal["none", "minimal", "low", "medium", "high"] = "low"
+    smart_import_openai_timeout_seconds: float = Field(default=25.0, ge=1.0, le=120.0)
+    # May a column a model named, whose VALUES NINFA's own vocabulary recognises, become certain
+    # (no question)? OFF: a model's reading is only ever a MEDIUM suggestion a person confirms. It
+    # is off because the live benchmark with the real model found three unsafe READY with it on
+    # (files carrying a sentence of orders, read correctly and not flagged by the model): ADR 0052.
+    smart_import_ai_vocabulary_certainty: bool = False
+    # A custom endpoint (a proxy, an Azure-style gateway) OR a regional one OpenAI itself offers
+    # (`eu`...), never both - the SDK refuses the pair. Nothing is hard-coded: a regional one is
+    # used only when the OpenAI project is set up for it.
+    openai_base_url: str | None = None
+    openai_data_residency: Literal["global", "us", "eu", "ae", "au", "in", "jp"] | None = None
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: Any) -> Any:
@@ -92,6 +120,27 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "ANTHROPIC_API_KEY is required when IMPORT_UNDERSTANDING_PROVIDER=anthropic"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _check_smart_import_ai_configuration(self) -> "Settings":
+        """Two selections of a model for the same job are a mistake, not a precedence rule; and a
+        custom endpoint receives the document the model is shown, so it must be a deliberate one."""
+        if (
+            self.smart_import_ai_mode != "off"
+            and self.import_understanding_provider != "unconfigured"
+        ):
+            raise ValueError(
+                "SMART_IMPORT_AI_MODE and IMPORT_UNDERSTANDING_PROVIDER both select a model for "
+                "Smart Import: set only one of them"
+            )
+        if self.openai_base_url is not None:
+            if self.openai_data_residency is not None:
+                raise ValueError("OPENAI_BASE_URL and OPENAI_DATA_RESIDENCY are mutually exclusive")
+            url = self.openai_base_url.strip().lower()
+            loopback = url.startswith(("http://127.0.0.1", "http://localhost"))
+            if not (url.startswith("https://") or loopback):
+                raise ValueError("OPENAI_BASE_URL must be an https:// URL")
         return self
 
     @property

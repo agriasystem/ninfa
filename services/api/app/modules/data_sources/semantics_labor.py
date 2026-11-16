@@ -166,6 +166,12 @@ LABOR = DomainSem(
     },
     financial=frozenset({F.PLANNED_COST.value, F.ACTUAL_COST.value}),
     person_limits={F.PLANNED_HOURS.value: 24, F.ACTUAL_HOURS.value: 24},
+    siblings=(
+        (F.PLANNED_HOURS.value, F.ACTUAL_HOURS.value),
+        (F.PLANNED_COST.value, F.ACTUAL_COST.value),
+    ),
+    # contract, overtime, holiday, break hours...: another thing, never "the other half"
+    other_kinds=stems(_OTHER_HOURS),
     # "Prev." and "Eff." together, both columns of hours: the plan and the time worked. Alone, each
     # is a maybe (one confirmation): they have no word for hours of their own.
     pairs=(((F.PLANNED_HOURS.value, "prev"), (F.ACTUAL_HOURS.value, "eff")),),
