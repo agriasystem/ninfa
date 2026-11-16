@@ -107,7 +107,8 @@ python -m tests.live_openai_acceptance                               # ONE real 
 - **There is no evidence on real pilot files.** Everything measured about the real model was measured on synthetic corpora (the 545 documents of the benchmarks) and on the 28 demo files; none is
   a hotel's own export, and 20 of those 28 have three rows or fewer. How the model reads a hotel's own words, abbreviations and layouts is **unmeasured**: that is the pending gate below, not a
   failure of the layer.
-- ASSIST has not met all of ADR 0053's conditions (the questions a person is shown fell 235 -> 227, not "significantly") and is not pilot-ready.
+- ASSIST is not pilot-ready: safety, intelligence and performance were measured and acceptable, but the questions a person is shown fell only 235 -> 227 (the V1.1 verdict, recorded in
+  [ADR 0054](adr/0054-real-hotel-shadow-validation-is-a-separate-pending-gate.md)).
 - The model cannot choose another header row or another table (rows never leave NINFA); it can only say the header looks like values, and then nothing is promoted.
 - Date order and decimal mark are not interpreted by the model: the evidence shows no values to read them from, and those questions stay the person's.
 - A plausible wrong suggestion on a column the layer does not certify (a date, an hours column) is still a question a person may confirm without looking. That risk is V3's, unchanged.
@@ -174,7 +175,7 @@ the default. Calls 283 -> 174, p50 9.4 s -> 4.3 s, no non-material question, eve
 | | State |
 |---|---|
 | **Implemented** | the OpenAI Responses API adapter; the `semantic-v1` Structured Output; the `off` / `shadow` / `assist` architecture; deterministic validation of every answer; PII minimisation (the model is never given a value of a personal column, a row or the file); address and personal-header safety; the provider-independent uncertainty rules (ADR 0051); the AI invocation gate (ADR 0053); Source Learning above the model; `low` reasoning; sanitised offline fixtures that replay the real model's answers for free |
-| **Validated** | live acceptance on the real endpoint (`gpt-6.1-sol`, `store=false`, strict Structured Output, 0 personal values on the wire, NINFA's validator applied; run again on 2026-11-16 with the rotated credential: PASS); the synthetic challenge / official / adversarial benchmarks with the production configuration: every safety number 0; the full regression |
+| **Validated** | live acceptance on the real endpoint (`gpt-6.1-sol`, `store=false`, strict Structured Output, 0 personal values on the wire, NINFA's validator applied; run again on 2026-11-16 with the rotated credential: PASS); the synthetic challenge / official / adversarial benchmarks with the production configuration: every safety number 0; the backend regression (7658 tests) and the frontend suite (lint, types, 1302 tests) |
 | **Not activated** | **ASSIST** (never turned on, not pilot-ready); **SHADOW in production** (never turned on globally) |
 | **Pending** | **`REAL HOTEL SHADOW VALIDATION = PENDING`** |
 
@@ -195,7 +196,7 @@ The gate is run when **at least one real export of an authorised pilot property*
 4. SHADOW only - through that harness for that file, never by turning `SMART_IMPORT_AI_MODE=shadow` on for the deployment;
 5. nothing visible and nothing imported changes because of the model: the screen is the rules' own and no import is run.
 
-ASSIST can be evaluated only after that gate, and still needs ADR 0053's own conditions.
+ASSIST can be evaluated only after that gate, starting from the V1.1 verdict above (not pilot-ready).
 
 **Work the gate needs first (not done here, on purpose).** The harness today reads only the CSV files of `tests/fixtures` (`discover()` has a `root` parameter that `main()` does not expose, and
 it does not read XLSX). Running it on a real export means first adding a `--root` that points OUTSIDE the repository and reading `.xlsx`, and reviewing that change; the real file is never

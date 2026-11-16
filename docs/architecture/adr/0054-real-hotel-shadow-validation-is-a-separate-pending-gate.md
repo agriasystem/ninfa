@@ -20,7 +20,7 @@ Everything else was measured: the live acceptance passes on the real endpoint (`
 `store=false`, strict Structured Output, 0 personal values on the wire; run again on 2026-11-16 with the
 rotated credential), the synthetic challenge / official / adversarial corpora (545 documents) give 0
 unsafe READY, 0 wrong-domain READY, 0 personal values sent and 0 scope violations with the production
-configuration, and the full regression is green.
+configuration, and the backend regression is green (7658 tests).
 
 ## Decision
 
@@ -37,8 +37,11 @@ configuration, and the full regression is green.
    * no raw row, no sensitive file name and no free text in a request;
    * SHADOW only, through the harness and for that file - not by configuring the deployment;
    * nothing visible and nothing imported changes because of the model.
-4. **ASSIST is evaluated only after that gate**, and must still meet ADR 0053's own conditions (one of
-   which, "reduce the questions a person is shown significantly", is not met: 235 -> 227).
+4. **ASSIST is evaluated only after that gate.** The verdict reached at the end of V1.1, kept here as
+   the record, is that ASSIST is not pilot-ready: safety, intelligence and performance were measured
+   and acceptable, but the questions a person is shown did not fall significantly (235 -> 227; the
+   count cannot fall further without the certainty ADR 0052 withdrew), so it was not judged ready even
+   before the question of real files arose. A new evaluation after the gate starts from that verdict.
 5. The file, and anything derived from it, stays outside the repository: no copy, no recording, no
    vendor request id is committed.
 
