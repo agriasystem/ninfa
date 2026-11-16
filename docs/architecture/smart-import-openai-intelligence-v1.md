@@ -26,7 +26,7 @@ deterministic understanding  ->  anything the model could add?  -> egress gate -
   -> off:    nothing is asked, nothing is loaded
   -> shadow: measured, nothing applied (the answer returned is the rules' own)
   -> assist: suggestions (MEDIUM, a question) + corroboration (a certain column, only where NINFA's own
-             vocabulary proves the values)
+             vocabulary proves the values) - the corroboration is OFF by default, ADR 0052
   -> the same deterministic checks as for any file: required fields, formats, scope, confirmation -> READY / ASK / MANUAL
   -> import (the server reads the file again WITH NO MODEL and accepts only what that reading gives)
   -> Source Learning
@@ -73,6 +73,8 @@ request at DEBUG). Every file's text is data: the instructions are static and sa
   VALUES of every column it names.
 - **Money is never placed by a model; a date, an hours column, an amount, a count or an identifier is only ever a suggestion** with a question for the person.
 - **A certain column** needs the model's clear reading AND NINFA's own proof in the values (see ADR 0050), and is a recorded answer (`assisted_fields`) the server re-derives with no model.
+  **This certainty is OFF by default** (`SMART_IMPORT_AI_VOCABULARY_CERTAINTY=false`, [ADR 0052](adr/0052-the-vocabulary-certainty-is-withdrawn-until-ninfa-sees-an-injection-itself.md)): the live
+  benchmark with the real model found three unsafe READY with it on, so a model's reading is only ever a MEDIUM suggestion a person confirms.
 - **Source Learning outranks the model.** A different reading of a confirmed column is counted, never applied.
 - **FULL / PARTIAL / DELTA.** The model is told it neither decides nor hints at whether a file replaces, completes or amends what NINFA holds. The suites of those rules (and of the
   remembered FULL confirmation, partial absence, the identical import, same-day revisions) run again unchanged with the layer on and a model that reads the columns right.

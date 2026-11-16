@@ -130,8 +130,11 @@ class ImportUnderstandingResolver:
     `mode` says what the caller does with the result (see `AiMode`); the resolver itself asks the
     same way in SHADOW and in ASSIST. `corroborate` says that a column the model named AND the
     file's own values prove may be taken as confirmed (see `understanding_ai.corroborate`); without
-    it the model's reading is only ever a suggestion to confirm. `observer` receives every audit
-    record (the benchmark and the shadow report use it; production only logs)."""
+    it the model's reading is only ever a suggestion to confirm. `vocabulary_certainty` is the
+    switch of that exception alone: with it off the semantic layer still asks the same questions of
+    the same model (`reads_confirmations` is unchanged), but whatever the model names stays a
+    MEDIUM suggestion a person confirms. Production builds it OFF (ADR 0052). `observer` receives
+    every audit record (the benchmark and the shadow report use it; production only logs)."""
 
     def __init__(
         self,
@@ -139,6 +142,7 @@ class ImportUnderstandingResolver:
         mode: AiMode = AiMode.ASSIST,
         *,
         corroborate: bool = False,
+        vocabulary_certainty: bool = True,
         observer: Callable[[AiTrace], None] | None = None,
         provider_name: str = "",
         model: str = "",
@@ -146,6 +150,7 @@ class ImportUnderstandingResolver:
         self._provider = provider
         self._mode = mode
         self._corroborate = corroborate
+        self._vocabulary_certainty = vocabulary_certainty
         self._observer = observer
         self._provider_name = provider_name or (
             type(provider).__name__ if provider is not None else ""
@@ -162,8 +167,9 @@ class ImportUnderstandingResolver:
 
     @property
     def corroborates(self) -> bool:
-        """Does a column the model named, and the values prove, become certain? (ASSIST only.)"""
-        return self._corroborate and self._mode == AiMode.ASSIST
+        """Does a column the model named, and the values prove, become certain? (ASSIST only, and
+        only while the vocabulary certainty is on: it is OFF in production, ADR 0052.)"""
+        return self._corroborate and self._vocabulary_certainty and self._mode == AiMode.ASSIST
 
     @property
     def reads_confirmations(self) -> bool:

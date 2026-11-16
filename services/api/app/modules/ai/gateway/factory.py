@@ -85,7 +85,10 @@ def _build_semantic_resolver(settings: Settings) -> ImportUnderstandingResolver:
     return ImportUnderstandingResolver(
         provider,
         mode,
-        corroborate=True,  # (it acts only in ASSIST: `ImportUnderstandingResolver.corroborates`)
+        corroborate=True,  # the semantic layer (it also reads the columns the rules placed unsure)
+        # ...but a model's reading is certain only if this is turned ON, and it is OFF by default:
+        # the live benchmark found three unsafe READY with it on (ADR 0052)
+        vocabulary_certainty=settings.smart_import_ai_vocabulary_certainty,
         provider_name="openai",
         model=settings.smart_import_openai_model,
     )

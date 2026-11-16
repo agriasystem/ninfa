@@ -79,8 +79,8 @@ def test_a_blank_key_is_no_key(blank: str) -> None:
     assert resolver.enabled is False
 
 
-@pytest.mark.parametrize(("mode", "corroborates"), [("shadow", False), ("assist", True)])
-def test_a_mode_with_a_key_builds_the_openai_semantic_layer(mode: str, corroborates: bool) -> None:
+@pytest.mark.parametrize("mode", ["shadow", "assist"])
+def test_a_mode_with_a_key_builds_the_openai_semantic_layer(mode: str) -> None:
     resolver = build_import_understanding_resolver(
         settings(
             smart_import_ai_mode=mode,
@@ -94,10 +94,39 @@ def test_a_mode_with_a_key_builds_the_openai_semantic_layer(mode: str, corrobora
     assert isinstance(provider, OpenAIImportUnderstandingProvider)
     assert resolver.enabled is True
     assert resolver.mode == AiMode(mode)
-    assert resolver.corroborates is corroborates
+    # the semantic layer asks about the columns the rules placed unsure, in either mode...
+    assert resolver.reads_confirmations is True
+    # ...but a model's reading is NEVER certain unless the switch is turned on (ADR 0052)
+    assert resolver.corroborates is False
     assert provider.model == "a-model"
     assert provider.contract == "semantic-v1"
     assert provider._effort == "low"
+
+
+def test_the_vocabulary_certainty_is_off_by_default() -> None:
+    assert settings().smart_import_ai_vocabulary_certainty is False
+
+
+@pytest.mark.parametrize(("mode", "certain"), [("shadow", False), ("assist", True)])
+def test_turning_the_vocabulary_certainty_on_applies_in_assist_only(
+    mode: str, certain: bool
+) -> None:
+    resolver = build_import_understanding_resolver(
+        settings(
+            smart_import_ai_mode=mode,
+            openai_api_key=KEY,
+            smart_import_ai_vocabulary_certainty=True,
+        )
+    )
+
+    assert resolver.reads_confirmations is True
+    assert resolver.corroborates is certain
+
+
+def test_the_environment_example_leaves_the_vocabulary_certainty_off() -> None:
+    example = (_REPO / ".env.example").read_text(encoding="utf-8")
+
+    assert re.search(r"^SMART_IMPORT_AI_VOCABULARY_CERTAINTY=false$", example, re.MULTILINE)
 
 
 def test_the_two_ways_of_selecting_a_model_for_smart_import_are_not_combined() -> None:

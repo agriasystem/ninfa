@@ -65,6 +65,11 @@ class Settings(BaseSettings):
     # `none` sends no reasoning parameter at all (a model that has none).
     smart_import_openai_reasoning: Literal["none", "minimal", "low", "medium", "high"] = "medium"
     smart_import_openai_timeout_seconds: float = Field(default=25.0, ge=1.0, le=120.0)
+    # May a column a model named, whose VALUES NINFA's own vocabulary recognises, become certain
+    # (no question)? OFF: a model's reading is only ever a MEDIUM suggestion a person confirms. It
+    # is off because the live benchmark with the real model found three unsafe READY with it on
+    # (files carrying a sentence of orders, read correctly and not flagged by the model): ADR 0052.
+    smart_import_ai_vocabulary_certainty: bool = False
     # A custom endpoint (a proxy, an Azure-style gateway) OR a regional one OpenAI itself offers
     # (`eu`...), never both - the SDK refuses the pair. Nothing is hard-coded: a regional one is
     # used only when the OpenAI project is set up for it.

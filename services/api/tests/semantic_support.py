@@ -254,15 +254,18 @@ def semantic_service(
     *,
     mode: AiMode = AiMode.ASSIST,
     corroborate: bool | None = None,
+    vocabulary_certainty: bool = True,
     observer: Callable[[AiTrace], None] | None = None,
 ) -> UnderstandingService:
-    """The real understanding service with this stand-in as its model: no database, no network."""
+    """The real understanding service with this stand-in as its model: no database, no network.
+    `vocabulary_certainty` is ON here (the mechanism's own tests); production builds it OFF."""
     tenant = TenantContext(UUID(int=1))
     session: Any = None
     resolver = ImportUnderstandingResolver(
         provider,  # type: ignore[arg-type]
         mode,
         corroborate=True if corroborate is None else corroborate,  # acts in ASSIST only
+        vocabulary_certainty=vocabulary_certainty,
         observer=observer,
     )
     return UnderstandingService(session, tenant, SmartImportService(session, tenant), resolver)
@@ -275,13 +278,18 @@ def understand_semantic(
     *,
     mode: AiMode = AiMode.ASSIST,
     corroborate: bool | None = None,
+    vocabulary_certainty: bool = True,
     observer: Callable[[AiTrace], None] | None = None,
     filename: str = "file.xlsx",
     confirmed: bool = False,
     **answers: Any,
 ) -> FileInspection:
     return semantic_service(
-        provider, mode=mode, corroborate=corroborate, observer=observer
+        provider,
+        mode=mode,
+        corroborate=corroborate,
+        vocabulary_certainty=vocabulary_certainty,
+        observer=observer,
     ).understand(
         domain,
         filename,
