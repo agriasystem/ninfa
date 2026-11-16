@@ -1,8 +1,13 @@
 # Smart Import - OpenAI semantic layer (V1)
 
-Status: implemented on `feature/smart-import-openai-intelligence-v1` (from `main` 02c5550), **off by default**, not run against a real model (`LIVE OPENAI ACCEPTANCE: NOT RUN -
-OPENAI_API_KEY NOT CONFIGURED`). Decisions and their reasons: [ADR 0050](adr/0050-the-semantic-layer-reads-names-ninfa-proves-values.md). Measurements:
-[benchmarks/smart-import-openai-intelligence-v1.md](../benchmarks/smart-import-openai-intelligence-v1.md). The base it extends:
+Status: implemented on `feature/smart-import-openai-intelligence-v1` (from `main` 02c5550), **off by default** (`SMART_IMPORT_AI_MODE=off`). The live acceptance against the real endpoint
+**PASSES** (`gpt-6.1-sol`, one synthetic file) and the real model was measured on the synthetic corpora; **ASSIST is not activated, SHADOW is not activated in production, and the validation
+on a real hotel's own exports is PENDING** - see [the status and the pending gate](#status-and-the-pending-gate) at the end. Decisions and their reasons:
+[ADR 0050](adr/0050-the-semantic-layer-reads-names-ninfa-proves-values.md), [0051](adr/0051-an-unread-column-that-moves-with-a-read-one-is-never-lost-in-silence.md),
+[0052](adr/0052-the-vocabulary-certainty-is-withdrawn-until-ninfa-sees-an-injection-itself.md), [0053](adr/0053-the-model-is-asked-only-when-it-can-change-what-a-person-sees.md),
+[0054](adr/0054-real-hotel-shadow-validation-is-a-separate-pending-gate.md). Measurements:
+[stand-ins](../benchmarks/smart-import-openai-intelligence-v1.md), [real model](../benchmarks/smart-import-openai-live-v1.md),
+[V1.1](../benchmarks/smart-import-openai-assist-v1-1.md), [real pilot SHADOW](../benchmarks/smart-import-openai-real-pilot-shadow.md). The base it extends:
 [smart-import-v3-ai-readiness](smart-import-v3-ai-readiness.md).
 
 **The engine calculates and validates. The model reads.** It can read meaning (a synonym, an abbreviation, a word in another language) and say what it cannot tell. It cannot invent or change
@@ -46,8 +51,9 @@ deterministic understanding  ->  anything the model could add?  -> egress gate -
 |---|---|---|
 | `SMART_IMPORT_AI_MODE` | `off` | `off`, `shadow`, `assist`. `off` builds a resolver with nothing in it and never loads the SDK. A mode with no key runs as `off` and says so once at startup |
 | `OPENAI_API_KEY` | unset | a `SecretStr`: never in a repr, a log, a dump or an error. A key alone is never enough: the mode decides |
-| `SMART_IMPORT_OPENAI_MODEL` | `gpt-6.1-sol` | not verified against the vendor here |
-| `SMART_IMPORT_OPENAI_REASONING` | `medium` | `none` sends no reasoning parameter; the one repeat uses `high` |
+| `SMART_IMPORT_OPENAI_MODEL` | `gpt-6.1-sol` | verified against the real endpoint by the live acceptance (the vendor echoes the id) |
+| `SMART_IMPORT_OPENAI_REASONING` | `low` | `none` sends no reasoning parameter (`gpt-6.1-sol` refuses `none` and `minimal`); the one repeat uses `high`. `low` reads as well as `medium` in about 60% of the time ([ADR 0053](adr/0053-the-model-is-asked-only-when-it-can-change-what-a-person-sees.md)) |
+| `SMART_IMPORT_AI_VOCABULARY_CERTAINTY` | `false` | `false`: a model's reading is only ever a MEDIUM suggestion a person confirms. `true` is withdrawn: three unsafe READY on the real model ([ADR 0052](adr/0052-the-vocabulary-certainty-is-withdrawn-until-ninfa-sees-an-injection-itself.md)) |
 | `SMART_IMPORT_OPENAI_TIMEOUT_SECONDS` | `25` | one request; transient failures are repeated once at most |
 | `OPENAI_BASE_URL` | unset | a custom https endpoint (or loopback) |
 | `OPENAI_DATA_RESIDENCY` | unset | `eu`, `us`, ... the SDK's regional endpoints; mutually exclusive with `OPENAI_BASE_URL`. The EU endpoint applies only if the OpenAI project is set up for it |
@@ -98,7 +104,10 @@ python -m tests.live_openai_acceptance                               # ONE real 
 
 ## Known limitations
 
-- The quality of any real model on these files is unmeasured.
+- **There is no evidence on real pilot files.** Everything measured about the real model was measured on synthetic corpora (the 545 documents of the benchmarks) and on the 28 demo files; none is
+  a hotel's own export, and 20 of those 28 have three rows or fewer. How the model reads a hotel's own words, abbreviations and layouts is **unmeasured**: that is the pending gate below, not a
+  failure of the layer.
+- ASSIST has not met all of ADR 0053's conditions (the questions a person is shown fell 235 -> 227, not "significantly") and is not pilot-ready.
 - The model cannot choose another header row or another table (rows never leave NINFA); it can only say the header looks like values, and then nothing is promoted.
 - Date order and decimal mark are not interpreted by the model: the evidence shows no values to read them from, and those questions stay the person's.
 - A plausible wrong suggestion on a column the layer does not certify (a date, an hours column) is still a question a person may confirm without looking. That risk is V3's, unchanged.
@@ -159,3 +168,35 @@ not asked about a file that is READY, about a gap only money could fill, or abou
 pair; a reading that changes nothing (a descriptive field, a count equal to what the import assumes)
 is neither applied nor asked about; a confirmed source is not asked about again; `low` reasoning is
 the default. Calls 283 -> 174, p50 9.4 s -> 4.3 s, no non-material question, every safety number 0.
+
+## Status and the pending gate
+
+| | State |
+|---|---|
+| **Implemented** | the OpenAI Responses API adapter; the `semantic-v1` Structured Output; the `off` / `shadow` / `assist` architecture; deterministic validation of every answer; PII minimisation (the model is never given a value of a personal column, a row or the file); address and personal-header safety; the provider-independent uncertainty rules (ADR 0051); the AI invocation gate (ADR 0053); Source Learning above the model; `low` reasoning; sanitised offline fixtures that replay the real model's answers for free |
+| **Validated** | live acceptance on the real endpoint (`gpt-6.1-sol`, `store=false`, strict Structured Output, 0 personal values on the wire, NINFA's validator applied; run again on 2026-11-16 with the rotated credential: PASS); the synthetic challenge / official / adversarial benchmarks with the production configuration: every safety number 0; the full regression |
+| **Not activated** | **ASSIST** (never turned on, not pilot-ready); **SHADOW in production** (never turned on globally) |
+| **Pending** | **`REAL HOTEL SHADOW VALIDATION = PENDING`** |
+
+`SMART_IMPORT_AI_MODE` is `off`, `SMART_IMPORT_AI_VOCABULARY_CERTAINTY` is `false` and the reasoning default is `low`. A key alone changes nothing: the mode decides.
+
+### `REAL HOTEL SHADOW VALIDATION = PENDING` is not a failure
+
+The real pilot SHADOW run ([report](../benchmarks/smart-import-openai-real-pilot-shadow.md)) found no technical problem in the layer. Its limit is only that **no real export of a hotel is
+available in this environment**, so the benefit of the model cannot be measured on what a hotel actually uploads: with the production gate the model was asked about 0 of the 28 demo files.
+([ADR 0054](adr/0054-real-hotel-shadow-validation-is-a-separate-pending-gate.md).)
+
+The gate is run when **at least one real export of an authorised pilot property** is available. **Before any OpenAI call on that file** all of this must be verified:
+
+1. the local PII preflight (`python -m tests.benchmarks.smart_import_v3.pilot_shadow --preflight-only --out <json> --cache <dir outside the repo>`): every request that file can produce is
+   built with no network and audited, and no personal value of it is found in any of them (anything found is a STOP);
+2. `store=false`, a strict schema, no tool, no state and no identifier on every request (the wire audit);
+3. no raw row, no sensitive file name and no free text in a request;
+4. SHADOW only - through that harness for that file, never by turning `SMART_IMPORT_AI_MODE=shadow` on for the deployment;
+5. nothing visible and nothing imported changes because of the model: the screen is the rules' own and no import is run.
+
+ASSIST can be evaluated only after that gate, and still needs ADR 0053's own conditions.
+
+**Work the gate needs first (not done here, on purpose).** The harness today reads only the CSV files of `tests/fixtures` (`discover()` has a `root` parameter that `main()` does not expose, and
+it does not read XLSX). Running it on a real export means first adding a `--root` that points OUTSIDE the repository and reading `.xlsx`, and reviewing that change; the real file is never
+copied into the repository, never committed, and its recording is never kept (the harness keeps neither a request, an answer nor a vendor id).

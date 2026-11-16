@@ -3,6 +3,8 @@
 Date 2026-11-13 - baseline `main` 02c5550 - branch `feature/smart-import-openai-intelligence-v1`.
 
 > **LIVE OPENAI ACCEPTANCE: NOT RUN - OPENAI_API_KEY NOT CONFIGURED.** Every number below is measured with STAND-INS for the model. They say what NINFA does with a reading that is right, partly right, confidently wrong or hostile. They say NOTHING about the quality of `gpt-6.1-sol` or of any real model, whose accuracy on these files is **unmeasured**.
+>
+> *Written 2026-11-13, before any live call; kept as the record of the stand-in run. Since then the live acceptance has PASSED and the real model has been measured on the same synthetic corpus ([live benchmark](smart-import-openai-live-v1.md), [V1.1](smart-import-openai-assist-v1-1.md)). It is still true that nothing has been measured on a hotel's own exports: `REAL HOTEL SHADOW VALIDATION = PENDING` ([ADR 0054](../architecture/adr/0054-real-hotel-shadow-validation-is-a-separate-pending-gate.md)).*
 
 Regenerate (from `services/api`): `python -m tests.benchmarks.smart_import_v3.openai_intelligence`.
 
