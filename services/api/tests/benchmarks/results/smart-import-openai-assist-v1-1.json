@@ -1,0 +1,999 @@
+{
+ "attribution": {
+  "adversarial": {
+   "gate_only": {
+    "automatic": 0,
+    "manual_matching": 8,
+    "mapping_recall": 0.8514,
+    "model_calls": 12,
+    "questions_asked": 10
+   },
+   "v1": {
+    "automatic": 0,
+    "manual_matching": 7,
+    "mapping_recall": 0.8649,
+    "model_calls": 12,
+    "questions_asked": 11
+   },
+   "v11": {
+    "automatic": 0,
+    "manual_matching": 7,
+    "mapping_recall": 0.8649,
+    "model_calls": 12,
+    "questions_asked": 11
+   }
+  },
+  "challenge": {
+   "gate_only": {
+    "automatic": 19,
+    "manual_matching": 58,
+    "mapping_recall": 0.8975,
+    "model_calls": 143,
+    "questions_asked": 227
+   },
+   "v1": {
+    "automatic": 12,
+    "manual_matching": 58,
+    "mapping_recall": 0.9246,
+    "model_calls": 225,
+    "questions_asked": 235
+   },
+   "v11": {
+    "automatic": 19,
+    "manual_matching": 58,
+    "mapping_recall": 0.9033,
+    "model_calls": 143,
+    "questions_asked": 227
+   }
+  },
+  "official": {
+   "gate_only": {
+    "automatic": 154,
+    "manual_matching": 52,
+    "mapping_recall": 0.9885,
+    "model_calls": 19,
+    "questions_asked": 48
+   },
+   "v1": {
+    "automatic": 154,
+    "manual_matching": 52,
+    "mapping_recall": 0.9885,
+    "model_calls": 46,
+    "questions_asked": 48
+   },
+   "v11": {
+    "automatic": 154,
+    "manual_matching": 52,
+    "mapping_recall": 0.9885,
+    "model_calls": 19,
+    "questions_asked": 48
+   }
+  }
+ },
+ "benchmark": "smart-import-openai-assist-v1-1",
+ "classification": {
+  "v1": {
+   "calls_by_class": {
+    "changed: relabelled, no question changed": 46,
+    "no change: still manual matching": 44,
+    "no change: the file was already READY": 22,
+    "no change: the screen is the rules' own": 32,
+    "noise: a question added to a READY file": 7,
+    "useful: a worse question replaced": 22,
+    "useful: manual matching avoided": 104,
+    "wasted: the call failed": 6
+   },
+   "documents": 545,
+   "documents_asked": 283,
+   "manual_matching_avoided": 104,
+   "model_calls": 283,
+   "questions_added_by_the_model": 145,
+   "questions_by_class": {
+    "noise: ignoring it changes nothing": 7,
+    "protects a measure": 2,
+    "replaces a manual matching": 114,
+    "replaces a worse question": 22
+   },
+   "questions_removed_by_the_model": 22,
+   "questions_rules": 170,
+   "questions_shown": 293,
+   "ready_files_turned_into_questions": 7,
+   "settings_set_aside_as_immaterial": 0,
+   "useful_question_rate": 0.9517,
+   "useful_questions": 138
+  },
+  "v11": {
+   "calls_by_class": {
+    "changed: relabelled, no question changed": 5,
+    "no change: still manual matching": 22,
+    "no change: the screen is the rules' own": 9,
+    "useful: a worse question replaced": 32,
+    "useful: manual matching avoided": 105,
+    "wasted: the call failed": 1
+   },
+   "documents": 545,
+   "documents_asked": 174,
+   "manual_matching_avoided": 105,
+   "model_calls": 174,
+   "questions_added_by_the_model": 148,
+   "questions_by_class": {
+    "protects a measure": 2,
+    "replaces a manual matching": 114,
+    "replaces a worse question": 32
+   },
+   "questions_removed_by_the_model": 32,
+   "questions_rules": 170,
+   "questions_shown": 286,
+   "ready_files_turned_into_questions": 0,
+   "settings_set_aside_as_immaterial": 1,
+   "useful_question_rate": 1.0,
+   "useful_questions": 148
+  }
+ },
+ "classification_by_population": {
+  "v1": {
+   "adversarial": {
+    "calls_by_class": {
+     "no change: still manual matching": 4,
+     "useful: manual matching avoided": 7,
+     "wasted: the call failed": 1
+    },
+    "documents": 15,
+    "documents_asked": 12,
+    "manual_matching_avoided": 7,
+    "model_calls": 12,
+    "questions_added_by_the_model": 8,
+    "questions_by_class": {
+     "replaces a manual matching": 8
+    },
+    "questions_removed_by_the_model": 0,
+    "questions_rules": 2,
+    "questions_shown": 10,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 8
+   },
+   "challenge": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 44,
+     "no change: still manual matching": 28,
+     "no change: the file was already READY": 5,
+     "no change: the screen is the rules' own": 18,
+     "noise: a question added to a READY file": 7,
+     "useful: a worse question replaced": 22,
+     "useful: manual matching avoided": 97,
+     "wasted: the call failed": 4
+    },
+    "documents": 290,
+    "documents_asked": 225,
+    "manual_matching_avoided": 97,
+    "model_calls": 225,
+    "questions_added_by_the_model": 136,
+    "questions_by_class": {
+     "noise: ignoring it changes nothing": 7,
+     "protects a measure": 1,
+     "replaces a manual matching": 106,
+     "replaces a worse question": 22
+    },
+    "questions_removed_by_the_model": 22,
+    "questions_rules": 121,
+    "questions_shown": 235,
+    "ready_files_turned_into_questions": 7,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 0.9485,
+    "useful_questions": 129
+   },
+   "official": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 2,
+     "no change: still manual matching": 12,
+     "no change: the file was already READY": 17,
+     "no change: the screen is the rules' own": 14,
+     "wasted: the call failed": 1
+    },
+    "documents": 240,
+    "documents_asked": 46,
+    "manual_matching_avoided": 0,
+    "model_calls": 46,
+    "questions_added_by_the_model": 1,
+    "questions_by_class": {
+     "protects a measure": 1
+    },
+    "questions_removed_by_the_model": 0,
+    "questions_rules": 47,
+    "questions_shown": 48,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 1
+   }
+  },
+  "v11": {
+   "adversarial": {
+    "calls_by_class": {
+     "no change: still manual matching": 4,
+     "useful: manual matching avoided": 8
+    },
+    "documents": 15,
+    "documents_asked": 12,
+    "manual_matching_avoided": 8,
+    "model_calls": 12,
+    "questions_added_by_the_model": 9,
+    "questions_by_class": {
+     "replaces a manual matching": 9
+    },
+    "questions_removed_by_the_model": 0,
+    "questions_rules": 2,
+    "questions_shown": 11,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 9
+   },
+   "challenge": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 4,
+     "no change: still manual matching": 5,
+     "no change: the screen is the rules' own": 4,
+     "useful: a worse question replaced": 32,
+     "useful: manual matching avoided": 97,
+     "wasted: the call failed": 1
+    },
+    "documents": 290,
+    "documents_asked": 143,
+    "manual_matching_avoided": 97,
+    "model_calls": 143,
+    "questions_added_by_the_model": 138,
+    "questions_by_class": {
+     "protects a measure": 1,
+     "replaces a manual matching": 105,
+     "replaces a worse question": 32
+    },
+    "questions_removed_by_the_model": 32,
+    "questions_rules": 121,
+    "questions_shown": 227,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 1,
+    "useful_question_rate": 1.0,
+    "useful_questions": 138
+   },
+   "official": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 1,
+     "no change: still manual matching": 13,
+     "no change: the screen is the rules' own": 5
+    },
+    "documents": 240,
+    "documents_asked": 19,
+    "manual_matching_avoided": 0,
+    "model_calls": 19,
+    "questions_added_by_the_model": 1,
+    "questions_by_class": {
+     "protects a measure": 1
+    },
+    "questions_removed_by_the_model": 0,
+    "questions_rules": 47,
+    "questions_shown": 48,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 1
+   }
+  }
+ },
+ "comparison": {
+  "adversarial": {
+   "asking": {
+    "rules": 0,
+    "v1": 8,
+    "v11": 8
+   },
+   "automatic": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "certain_and_wrong": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "claims_precision": {
+    "rules": 1.0,
+    "v1": 1.0,
+    "v11": 1.0
+   },
+   "documents": {
+    "rules": 15,
+    "v1": 15,
+    "v11": 15
+   },
+   "false_automation": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "manual_matching": {
+    "rules": 15,
+    "v1": 7,
+    "v11": 7
+   },
+   "mapping_recall": {
+    "rules": 0.7432,
+    "v1": 0.8649,
+    "v11": 0.8649
+   },
+   "model_calls": {
+    "rules": 0,
+    "v1": 12,
+    "v11": 12
+   },
+   "pii_values_in_the_browser_answer": {
+    "rules": 0,
+    "v1": 1,
+    "v11": 0
+   },
+   "pii_violations_in_what_the_model_was_sent": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "questions_asked": {
+    "rules": 2,
+    "v1": 11,
+    "v11": 11
+   },
+   "questions_unnecessary": {
+    "rules": 2,
+    "v1": 11,
+    "v11": 11
+   },
+   "scope_violations": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "unsafe_ready": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "wrong_domain_ready": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   }
+  },
+  "challenge": {
+   "asking": {
+    "rules": 116,
+    "v1": 220,
+    "v11": 213
+   },
+   "automatic": {
+    "rules": 19,
+    "v1": 12,
+    "v11": 19
+   },
+   "certain_and_wrong": {
+    "rules": 14,
+    "v1": 14,
+    "v11": 14
+   },
+   "claims_precision": {
+    "rules": 0.9903,
+    "v1": 0.9907,
+    "v11": 0.9912
+   },
+   "documents": {
+    "rules": 290,
+    "v1": 290,
+    "v11": 290
+   },
+   "false_automation": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "manual_matching": {
+    "rules": 155,
+    "v1": 58,
+    "v11": 58
+   },
+   "mapping_recall": {
+    "rules": 0.8261,
+    "v1": 0.9246,
+    "v11": 0.9033
+   },
+   "model_calls": {
+    "rules": 0,
+    "v1": 225,
+    "v11": 143
+   },
+   "pii_values_in_the_browser_answer": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "pii_violations_in_what_the_model_was_sent": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "questions_asked": {
+    "rules": 121,
+    "v1": 235,
+    "v11": 227
+   },
+   "questions_unnecessary": {
+    "rules": 113,
+    "v1": 214,
+    "v11": 205
+   },
+   "scope_violations": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "unsafe_ready": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "wrong_domain_ready": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   }
+  },
+  "official": {
+   "asking": {
+    "rules": 34,
+    "v1": 34,
+    "v11": 34
+   },
+   "automatic": {
+    "rules": 154,
+    "v1": 154,
+    "v11": 154
+   },
+   "certain_and_wrong": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "claims_precision": {
+    "rules": 0.9975,
+    "v1": 0.9975,
+    "v11": 0.9975
+   },
+   "documents": {
+    "rules": 240,
+    "v1": 240,
+    "v11": 240
+   },
+   "false_automation": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "manual_matching": {
+    "rules": 52,
+    "v1": 52,
+    "v11": 52
+   },
+   "mapping_recall": {
+    "rules": 0.9877,
+    "v1": 0.9885,
+    "v11": 0.9885
+   },
+   "model_calls": {
+    "rules": 0,
+    "v1": 46,
+    "v11": 19
+   },
+   "pii_values_in_the_browser_answer": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "pii_violations_in_what_the_model_was_sent": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "questions_asked": {
+    "rules": 47,
+    "v1": 48,
+    "v11": 48
+   },
+   "questions_unnecessary": {
+    "rules": 1,
+    "v1": 2,
+    "v11": 2
+   },
+   "scope_violations": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "unsafe_ready": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   },
+   "wrong_domain_ready": {
+    "rules": 0,
+    "v1": 0,
+    "v11": 0
+   }
+  }
+ },
+ "latency": {
+  "v1": {
+   "calls": 283,
+   "max_ms": 28110,
+   "mean_ms": 10098,
+   "p50_ms": 9360,
+   "p95_ms": 20932,
+   "timeout_rate": 0.0177,
+   "timeouts": 5,
+   "tokens_in_mean": 2205,
+   "tokens_out_mean": 361
+  },
+  "v11": {
+   "calls": 174,
+   "max_ms": 25033,
+   "mean_ms": 5001,
+   "p50_ms": 4294,
+   "p95_ms": 9178,
+   "timeout_rate": 0.0057,
+   "timeouts": 1,
+   "tokens_in_mean": 2195,
+   "tokens_out_mean": 242
+  }
+ },
+ "model": "gpt-6.1-sol",
+ "reasoning_effort": "low",
+ "source_learning": {
+  "V1": {
+   "calls_avoided_by_remembering": 39,
+   "calls_on_later_files_of_a_source_that_was_confirmed": 25,
+   "calls_on_the_same_files_of_a_source_nobody_confirmed": 64,
+   "calls_the_first_time_a_source_arrives": 2,
+   "families": 11,
+   "recognised_versions": 55,
+   "recognised_versions_that_asked_the_model": 13,
+   "versions_after_the_first": 77
+  },
+  "V1.1": {
+   "calls_avoided_by_remembering": 56,
+   "calls_on_later_files_of_a_source_that_was_confirmed": 2,
+   "calls_on_the_same_files_of_a_source_nobody_confirmed": 58,
+   "calls_the_first_time_a_source_arrives": 1,
+   "families": 11,
+   "recognised_versions": 55,
+   "recognised_versions_that_asked_the_model": 0,
+   "versions_after_the_first": 77
+  }
+ },
+ "spend": {
+  "v1": {
+   "calls_answered_in_the_closed_shape": 278,
+   "calls_answered_not_in_the_shape": 0,
+   "calls_failed_by_kind": {
+    "TIMEOUT": 5
+   },
+   "cost_usd_at_list_price": 2.2308,
+   "cost_usd_per_call_mean": 0.00788,
+   "latency_ms_max": 28110,
+   "latency_ms_mean": 10098,
+   "latency_ms_p50": 9360,
+   "latency_ms_p95": 20932,
+   "models_reported_by_the_vendor": [
+    "gpt-6.1-sol"
+   ],
+   "price_usd_per_million_tokens": {
+    "input": 2.0,
+    "output": 10.0
+   },
+   "real_calls": 283,
+   "reasoning_efforts": [
+    "medium"
+   ],
+   "request_ids_recorded": 278,
+   "second_attempts": 0,
+   "tokens_in_per_call_mean": 2205,
+   "tokens_in_total": 613006,
+   "tokens_out_per_call_mean": 361,
+   "tokens_out_per_call_p95": 559,
+   "tokens_out_total": 100481,
+   "transport_retries": 1
+  },
+  "v11": {
+   "calls_answered_in_the_closed_shape": 172,
+   "calls_answered_not_in_the_shape": 0,
+   "calls_failed_by_kind": {
+    "TIMEOUT": 1
+   },
+   "cost_usd_at_list_price": 1.1797,
+   "cost_usd_per_call_mean": 0.00682,
+   "latency_ms_max": 25033,
+   "latency_ms_mean": 5014,
+   "latency_ms_p50": 4294,
+   "latency_ms_p95": 9178,
+   "models_reported_by_the_vendor": [
+    "gpt-6.1-sol"
+   ],
+   "price_usd_per_million_tokens": {
+    "input": 2.0,
+    "output": 10.0
+   },
+   "real_calls": 173,
+   "reasoning_efforts": [
+    "low"
+   ],
+   "request_ids_recorded": 172,
+   "second_attempts": 0,
+   "tokens_in_per_call_mean": 2208,
+   "tokens_in_total": 379845,
+   "tokens_out_per_call_mean": 244,
+   "tokens_out_per_call_p95": 332,
+   "tokens_out_total": 42003,
+   "transport_retries": 0
+  },
+  "variants": {
+   "cost_usd_at_list_price": 1.7385,
+   "real_calls": 250,
+   "tokens_in_total": 543218,
+   "tokens_out_total": 65203
+  }
+ },
+ "v1_reproduced_from_its_recording": {
+  "model_calls": 283,
+  "recording_misses": 1
+ },
+ "variants": [
+  {
+   "classification": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 2,
+     "no change: still manual matching": 4,
+     "no change: the screen is the rules' own": 3,
+     "useful: a worse question replaced": 8,
+     "useful: manual matching avoided": 32,
+     "wasted: the call failed": 1
+    },
+    "documents": 50,
+    "documents_asked": 50,
+    "manual_matching_avoided": 32,
+    "model_calls": 50,
+    "questions_added_by_the_model": 43,
+    "questions_by_class": {
+     "protects a measure": 1,
+     "replaces a manual matching": 34,
+     "replaces a worse question": 8
+    },
+    "questions_removed_by_the_model": 8,
+    "questions_rules": 13,
+    "questions_shown": 48,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 43
+   },
+   "compact": false,
+   "effort": "medium",
+   "latency": {
+    "calls": 50,
+    "max_ms": 25011,
+    "mean_ms": 10066,
+    "p50_ms": 8307,
+    "p95_ms": 20415,
+    "timeout_rate": 0.02,
+    "timeouts": 1,
+    "tokens_in_mean": 2159,
+    "tokens_out_mean": 332
+   },
+   "quality": {
+    "automatic": 0,
+    "claims_precision": 0.9966,
+    "documents": 50,
+    "manual_matching": 6,
+    "mapping_recall": 0.9638,
+    "pii_sent": 0,
+    "questions_asked": 48,
+    "rules_alone": {
+     "manual_matching": 38,
+     "mapping_recall": 0.8257
+    },
+    "scope_violations": 0,
+    "suggestions_right": 36,
+    "suggestions_wrong": 7,
+    "unsafe_ready": 0,
+    "wrong_domain_ready": 0
+   },
+   "spend": {
+    "cost_usd_at_list_price": 0.3821,
+    "real_calls": 50,
+    "tokens_in_total": 107959,
+    "tokens_out_total": 16615
+   },
+   "variant": "v1-medium",
+   "wire_failed_checks": {}
+  },
+  {
+   "classification": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 2,
+     "no change: still manual matching": 3,
+     "no change: the screen is the rules' own": 1,
+     "useful: a worse question replaced": 10,
+     "useful: manual matching avoided": 32,
+     "wasted: the call failed": 2
+    },
+    "documents": 50,
+    "documents_asked": 50,
+    "manual_matching_avoided": 32,
+    "model_calls": 50,
+    "questions_added_by_the_model": 46,
+    "questions_by_class": {
+     "protects a measure": 2,
+     "replaces a manual matching": 34,
+     "replaces a worse question": 10
+    },
+    "questions_removed_by_the_model": 10,
+    "questions_rules": 13,
+    "questions_shown": 49,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 46
+   },
+   "compact": true,
+   "effort": "low",
+   "latency": {
+    "calls": 50,
+    "max_ms": 25037,
+    "mean_ms": 7462,
+    "p50_ms": 5821,
+    "p95_ms": 16132,
+    "timeout_rate": 0.04,
+    "timeouts": 2,
+    "tokens_in_mean": 2105,
+    "tokens_out_mean": 149
+   },
+   "quality": {
+    "automatic": 0,
+    "claims_precision": 0.9966,
+    "documents": 50,
+    "manual_matching": 6,
+    "mapping_recall": 0.9704,
+    "pii_sent": 0,
+    "questions_asked": 49,
+    "rules_alone": {
+     "manual_matching": 38,
+     "mapping_recall": 0.8257
+    },
+    "scope_violations": 0,
+    "suggestions_right": 35,
+    "suggestions_wrong": 10,
+    "unsafe_ready": 0,
+    "wrong_domain_ready": 0
+   },
+   "spend": {
+    "cost_usd_at_list_price": 0.285,
+    "real_calls": 50,
+    "tokens_in_total": 105232,
+    "tokens_out_total": 7452
+   },
+   "variant": "compact-low",
+   "wire_failed_checks": {}
+  },
+  {
+   "classification": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 2,
+     "no change: still manual matching": 4,
+     "no change: the screen is the rules' own": 2,
+     "useful: a worse question replaced": 9,
+     "useful: manual matching avoided": 33
+    },
+    "documents": 50,
+    "documents_asked": 50,
+    "manual_matching_avoided": 33,
+    "model_calls": 50,
+    "questions_added_by_the_model": 44,
+    "questions_by_class": {
+     "replaces a manual matching": 35,
+     "replaces a worse question": 9
+    },
+    "questions_removed_by_the_model": 9,
+    "questions_rules": 13,
+    "questions_shown": 48,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 44
+   },
+   "compact": false,
+   "effort": "low",
+   "latency": {
+    "calls": 50,
+    "max_ms": 15284,
+    "mean_ms": 5614,
+    "p50_ms": 4899,
+    "p95_ms": 10102,
+    "timeout_rate": 0.0,
+    "timeouts": 0,
+    "tokens_in_mean": 2202,
+    "tokens_out_mean": 239
+   },
+   "quality": {
+    "automatic": 0,
+    "claims_precision": 1.0,
+    "documents": 50,
+    "manual_matching": 5,
+    "mapping_recall": 0.9704,
+    "pii_sent": 0,
+    "questions_asked": 48,
+    "rules_alone": {
+     "manual_matching": 38,
+     "mapping_recall": 0.8257
+    },
+    "scope_violations": 0,
+    "suggestions_right": 36,
+    "suggestions_wrong": 8,
+    "unsafe_ready": 0,
+    "wrong_domain_ready": 0
+   },
+   "spend": {
+    "cost_usd_at_list_price": 0.3396,
+    "real_calls": 50,
+    "tokens_in_total": 110103,
+    "tokens_out_total": 11941
+   },
+   "variant": "v1-low",
+   "wire_failed_checks": {}
+  },
+  {
+   "classification": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 2,
+     "no change: still manual matching": 3,
+     "useful: a worse question replaced": 11,
+     "useful: manual matching avoided": 34
+    },
+    "documents": 50,
+    "documents_asked": 50,
+    "manual_matching_avoided": 34,
+    "model_calls": 50,
+    "questions_added_by_the_model": 49,
+    "questions_by_class": {
+     "protects a measure": 2,
+     "replaces a manual matching": 36,
+     "replaces a worse question": 11
+    },
+    "questions_removed_by_the_model": 11,
+    "questions_rules": 13,
+    "questions_shown": 51,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 49
+   },
+   "compact": true,
+   "effort": "medium",
+   "latency": {
+    "calls": 50,
+    "max_ms": 22016,
+    "mean_ms": 7804,
+    "p50_ms": 7241,
+    "p95_ms": 18763,
+    "timeout_rate": 0.0,
+    "timeouts": 0,
+    "tokens_in_mean": 2196,
+    "tokens_out_mean": 242
+   },
+   "quality": {
+    "automatic": 0,
+    "claims_precision": 0.9967,
+    "documents": 50,
+    "manual_matching": 4,
+    "mapping_recall": 0.9803,
+    "pii_sent": 0,
+    "questions_asked": 51,
+    "rules_alone": {
+     "manual_matching": 38,
+     "mapping_recall": 0.8257
+    },
+    "scope_violations": 0,
+    "suggestions_right": 39,
+    "suggestions_wrong": 9,
+    "unsafe_ready": 0,
+    "wrong_domain_ready": 0
+   },
+   "spend": {
+    "cost_usd_at_list_price": 0.3406,
+    "real_calls": 50,
+    "tokens_in_total": 109821,
+    "tokens_out_total": 12094
+   },
+   "variant": "compact-medium",
+   "wire_failed_checks": {}
+  },
+  {
+   "classification": {
+    "calls_by_class": {
+     "changed: relabelled, no question changed": 2,
+     "no change: still manual matching": 4,
+     "no change: the screen is the rules' own": 4,
+     "useful: a worse question replaced": 7,
+     "useful: manual matching avoided": 33
+    },
+    "documents": 50,
+    "documents_asked": 50,
+    "manual_matching_avoided": 33,
+    "model_calls": 50,
+    "questions_added_by_the_model": 43,
+    "questions_by_class": {
+     "replaces a manual matching": 36,
+     "replaces a worse question": 7
+    },
+    "questions_removed_by_the_model": 7,
+    "questions_rules": 13,
+    "questions_shown": 49,
+    "ready_files_turned_into_questions": 0,
+    "settings_set_aside_as_immaterial": 0,
+    "useful_question_rate": 1.0,
+    "useful_questions": 43
+   },
+   "compact": false,
+   "effort": "medium",
+   "latency": {
+    "calls": 50,
+    "max_ms": 20445,
+    "mean_ms": 8228,
+    "p50_ms": 7969,
+    "p95_ms": 13649,
+    "timeout_rate": 0.0,
+    "timeouts": 0,
+    "tokens_in_mean": 2202,
+    "tokens_out_mean": 342
+   },
+   "quality": {
+    "automatic": 0,
+    "claims_precision": 0.9966,
+    "documents": 50,
+    "manual_matching": 5,
+    "mapping_recall": 0.9638,
+    "pii_sent": 0,
+    "questions_asked": 49,
+    "rules_alone": {
+     "manual_matching": 38,
+     "mapping_recall": 0.8257
+    },
+    "scope_violations": 0,
+    "suggestions_right": 36,
+    "suggestions_wrong": 7,
+    "unsafe_ready": 0,
+    "wrong_domain_ready": 0
+   },
+   "spend": {
+    "cost_usd_at_list_price": 0.3912,
+    "real_calls": 50,
+    "tokens_in_total": 110103,
+    "tokens_out_total": 17101
+   },
+   "variant": "v1-medium-again",
+   "wire_failed_checks": {}
+  }
+ ],
+ "wire": {
+  "canaries_checked": 156,
+  "failed": {},
+  "largest_request_bytes": 10671,
+  "requests": 173
+ }
+}
