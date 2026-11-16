@@ -41,6 +41,12 @@ def settings() -> Settings:
             "session_cookie_secure": False,
             "ask_ninfa_provider": "unconfigured",
             "anthropic_api_key": None,
+            # The same for Smart Import's model layer: no provider, whatever the machine or the
+            # root `.env` selects (`services/conftest.py` also forces it in the environment, and
+            # `tests/offline_guard.py` fails any test that tries to leave the machine).
+            "smart_import_ai_mode": "off",
+            "import_understanding_provider": "unconfigured",
+            "openai_api_key": None,
         }
     )
 
