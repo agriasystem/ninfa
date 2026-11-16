@@ -162,6 +162,12 @@ class DomainSem:
     # a column whose header says so is that other thing, whatever its numbers do, and is never
     # the other half of a sibling pair. The header only ever rules a column OUT here, never in.
     other_kinds: frozenset[str] = frozenset()
+    # Optional fields that are STORED with the record and read by nothing that measures or decides
+    # (checked in the code: no analysis, snapshot or decision reads them). A reading of a column as
+    # one of them, by anybody who is not sure, is never worth a question and never applied: leaving
+    # the column out loses no measure. Never a required field, money, a sibling, a field whose
+    # values are proved by a vocabulary, or one of which an analysis reads (`cancelled_at`).
+    descriptive: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)

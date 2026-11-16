@@ -154,6 +154,25 @@ class Recorded:
         )
         return hashlib.sha256("\x00".join(parts).encode()).hexdigest()
 
+    def export_fixture(self, path: Path) -> int:
+        """The recording as a FIXTURE: what a replay needs and nothing more. A key (the hash of a
+        request, which cannot be turned back into it), the answer (closed vocabularies only:
+        indexes, field names, codes - no header, no value, no sentence), whether the call worked,
+        and the counts of what it cost. The vendor's request id, which identifies a call at the
+        vendor, is dropped. One entry per distinct request, sorted: the same recording gives the
+        same file."""
+        lines: list[str] = []
+        for entry in self._entries.values():
+            clean = {k: v for k, v in entry.items() if k != "usage"}
+            usage = entry.get("usage")
+            clean["usage"] = None if usage is None else {**usage, "request_id": None}
+            lines.append(
+                json.dumps(clean, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            )
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(sorted(lines)) + "\n", encoding="utf-8", newline="\n")
+        return len(lines)
+
     @property
     def entries(self) -> list[dict[str, Any]]:
         """Every real call (what the account was billed for), duplicates included."""
@@ -266,12 +285,14 @@ class CappedRecording(Recording):
         self._vocabulary_certainty = False
 
 
-def real_provider(key: str, model: str, wire: Wire) -> OpenAIImportUnderstandingProvider:
+def real_provider(
+    key: str, model: str, wire: Wire, effort: str = "medium"
+) -> OpenAIImportUnderstandingProvider:
     client = httpx2.Client(event_hooks={"request": [wire]}, timeout=TIMEOUT_SECONDS)
     return OpenAIImportUnderstandingProvider(
         key,
         model=model,
-        reasoning_effort="medium",
+        reasoning_effort=effort,  # type: ignore[arg-type]
         timeout_seconds=TIMEOUT_SECONDS,
         http_client=client,
     )
@@ -391,41 +412,67 @@ def spend(entries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 # --- measuring -----------------------------------------------------------------------------------
 
 
+PRODUCTION_CONFIGS = ("deterministic", "live_assist_capped", "live_shadow")
+
+
 def evaluate(
     name: str,
     docs: Sequence[Doc],
     recorded: Recorded,
     workers: int,
     progress: Callable[[str], None],
+    *,
+    production: bool = False,
+    keep: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    """`production`: the model is asked as production builds it (the certainty withdrawn, ADR 0052)
+    and the certainty-on configuration is not run; otherwise V1's four configurations."""
     progress(f"  {name}: {len(docs)} documents")
+    used = PRODUCTION_CONFIGS if production else CONFIGS
+    live = "live_assist_capped" if production else "live_assist"
     outcomes: dict[str, dict[str, Outcome]] = {}
     progress("    deterministic (no model)")
     outcomes["deterministic"] = run_config(docs, "deterministic")
-    progress("    live_assist (the real model)")
-    outcomes["live_assist"] = run_with(
-        docs, recorded, Recording, AiMode.ASSIST, workers, progress, "live_assist"
+    progress(f"    {live} (the real model)")
+    outcomes[live] = run_with(
+        docs,
+        recorded,
+        CappedRecording if production else Recording,
+        AiMode.ASSIST,
+        workers,
+        progress,
+        live,
     )
     replay = recorded.frozen_copy()
-    progress("    live_assist again, from the recording (determinism check)")
-    again = run_with(docs, replay, Recording, AiMode.ASSIST, workers, progress, "replay")
-    progress("    live_assist_capped (replay, certainty withdrawn)")
-    outcomes["live_assist_capped"] = run_with(
-        docs, replay, CappedRecording, AiMode.ASSIST, workers, progress, "capped"
+    progress(f"    {live} again, from the recording (determinism check)")
+    again = run_with(
+        docs,
+        replay,
+        CappedRecording if production else Recording,
+        AiMode.ASSIST,
+        workers,
+        progress,
+        "replay",
     )
+    if not production:
+        progress("    live_assist_capped (replay, certainty withdrawn)")
+        outcomes["live_assist_capped"] = run_with(
+            docs, replay, CappedRecording, AiMode.ASSIST, workers, progress, "capped"
+        )
     progress("    live_shadow (replay)")
+    shadow_cls = CappedRecording if production else Recording
     outcomes["live_shadow"] = run_with(
-        docs, replay, Recording, AiMode.SHADOW, workers, progress, "shadow"
+        docs, replay, shadow_cls, AiMode.SHADOW, workers, progress, "shadow"
     )
-    scored: dict[str, dict[str, CaseResult]] = {c: score_all(docs, outcomes[c]) for c in CONFIGS}
+    if keep is not None:
+        keep["deterministic"], keep["live"] = outcomes["deterministic"], outcomes[live]
+    scored: dict[str, dict[str, CaseResult]] = {c: score_all(docs, outcomes[c]) for c in used}
     base, base_scored = outcomes["deterministic"], scored["deterministic"]
-    metrics = {c: measure(docs, outcomes[c], scored[c], base, base_scored) for c in CONFIGS}
-    for config in CONFIGS[1:]:
+    metrics = {c: measure(docs, outcomes[c], scored[c], base, base_scored) for c in used}
+    for config in used[1:]:
         metrics[config]["latency"] = _latency_of(docs, outcomes[config])
     differs = [
-        d.id
-        for d in docs
-        if again[d.id].observed.payload != outcomes["live_assist"][d.id].observed.payload
+        d.id for d in docs if again[d.id].observed.payload != outcomes[live][d.id].observed.payload
     ]
     unsafe_ids = {
         c: [
@@ -434,7 +481,7 @@ def evaluate(
             if scored[c][d.id].level == "READY"
             and (scored[c][d.id].false_automation or not _no_wrong_claim(scored[c][d.id]))
         ]
-        for c in CONFIGS
+        for c in used
     }
     block: dict[str, Any] = {
         "documents": len(docs),
@@ -447,12 +494,12 @@ def evaluate(
             for d in docs
             if outcomes["live_shadow"][d.id].observed.payload != base[d.id].observed.payload
         ],
-        "fallbacks": _fallbacks(docs, outcomes["live_assist"]),
-        "levels_moved": _levels_moved(docs, base, outcomes["live_assist"]),
+        "fallbacks": _fallbacks(docs, outcomes[live]),
+        "levels_moved": _levels_moved(docs, base, outcomes[live]),
     }
     if name == "challenge":
-        block["by_field"] = _groups(docs, outcomes, scored, _field_groups)
-        block["by_structure"] = _groups(docs, outcomes, scored, _structure_groups)
+        block["by_field"] = _groups(docs, outcomes, scored, _field_groups, live)
+        block["by_structure"] = _groups(docs, outcomes, scored, _structure_groups, live)
     block["documents_ids"] = [d.id for d in docs]
     block["caused_and_fixed"] = {
         c: list(v) for c, v in caused_and_fixed({"unsafe_ready_ids": unsafe_ids}).items()
@@ -507,13 +554,14 @@ def _groups(
     outcomes: Mapping[str, Mapping[str, Outcome]],
     scored: Mapping[str, Mapping[str, CaseResult]],
     selector: Callable[[Doc], list[str]],
+    live: str = "live_assist",
 ) -> dict[str, dict[str, Any]]:
     members: dict[str, list[Doc]] = {}
     for d in docs:
         for g in selector(d):
             members.setdefault(g, []).append(d)
     return {
-        g: {c: _group_row(ds, outcomes[c], scored[c]) for c in ("deterministic", "live_assist")}
+        g: {c: _group_row(ds, outcomes[c], scored[c]) for c in ("deterministic", live)}
         for g, ds in sorted(members.items())
     }
 

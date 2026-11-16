@@ -282,6 +282,7 @@ class AiTrace:
     level_after: str | None = None  # the verdict with the model's reading (applied, or replayed)
     suggested: int = 0  # columns / answers the model offered that survived every check
     promoted: int = 0  # columns the file's own values confirmed (no question left for them)
+    ignored: int = 0  # readings that survived every check but change nothing: set aside, not asked
     agreements: int = 0
     conflicts: int = 0
     source_learning_conflicts: int = 0

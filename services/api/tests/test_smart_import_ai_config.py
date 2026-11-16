@@ -35,7 +35,7 @@ def test_the_default_is_off_and_no_model_is_configured() -> None:
     assert base.smart_import_ai_mode == "off"
     assert base.openai_api_key is None
     assert base.smart_import_openai_model == "gpt-6.1-sol"
-    assert base.smart_import_openai_reasoning == "medium"
+    assert base.smart_import_openai_reasoning == "low"
     assert base.openai_base_url is None and base.openai_data_residency is None
 
 

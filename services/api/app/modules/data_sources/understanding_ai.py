@@ -15,8 +15,9 @@ values. Dates, hours, amounts, identifiers and counts are never promoted: their 
 one such column from another, so the person still confirms them.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
+from decimal import Decimal
 
 from app.modules.ai.import_understanding.egress import EgressGuard
 from app.modules.ai.import_understanding.sanitize import clean_text
@@ -218,12 +219,27 @@ def needs_help(
     proposal: Proposal,
     groups: Sequence[tuple[str, ...]],
     questions: Sequence[Question],
-    confirmable: bool = False,
+    certainty: bool = False,
+    never: frozenset[str] = frozenset(),
 ) -> bool:
     """Is something unresolved that a model could help with: a required piece of information with
-    no column yet and a column left over, or a question about the kind of data?"""
+    no column yet and a column left over, or a question about the kind of data?
+
+    A model is asked ONLY when it can change what the person is shown (V1.1, measured on the 283
+    real calls of V1):
+
+    * a gap that only MONEY could fill is not one it can help with: a model never places money
+      (`never`), so asking it about a missing amount changes nothing;
+    * a column the rules placed without being sure (`doubtful`) is worth a question only when its
+      reading could make the column certain (`certainty`): with that certainty withdrawn (ADR 0052)
+      all it can say is "I agree", and none of the 23 such calls changed anything;
+    * a column left over beside a pair of alternatives that is half read (`other_half`: planned OR
+      actual hours) is no reason either: the sibling rule (ADR 0051) asks about it without any
+      model, and a model's reading only relabels the column that question is already about
+      (51 calls: no question, no level changed)."""
     assigned = {c.field for c in proposal.columns if c.field is not None}
-    missing = any(not any(field in assigned for field in group) for group in groups)
+    fillable = [group for group in groups if not all(field in never for field in group)]
+    missing = any(not any(field in assigned for field in group) for group in fillable)
     left_over = any(
         c.field is None
         and c.locked is None
@@ -234,22 +250,39 @@ def needs_help(
     )
     asks_kind = any(q.kind == QuestionKind.DOMAIN for q in questions)
     # (a column the rules placed without being sure, on a field a vocabulary can prove: the name,
-    # read by someone else, may be all that is missing)
-    doubtful = confirmable and bool(_confirmable(proposal))
-    # (a requirement that is met by ONE of its alternatives - planned OR actual hours - while a
-    # column nobody read is still there: it may be the other alternative, silently left out. Asked
-    # about, it becomes a question for the person; not asked, it is a file that looks complete)
-    other_half = (
-        confirmable
-        and left_over
-        and any(
-            len(group) > 1
-            and any(f in assigned for f in group)
-            and not all(f in assigned for f in group)
-            for group in groups
+    # read by someone else, may be all that is missing - and only if that can make it certain)
+    doubtful = certainty and bool(_confirmable(proposal))
+    return (missing and left_over) or asks_kind or doubtful
+
+
+def is_immaterial(
+    column: ColumnProposal, field: str, sem: DomainSem, defaults: Mapping[str, object]
+) -> bool:
+    """Would IGNORING a reading of this column as this field change anything NINFA imports or
+    decides? Whoever made the reading (a model, any model): nothing here knows about one.
+
+    Two cases, and only these:
+
+    * the field is DESCRIPTIVE (`DomainSem.descriptive`): stored with the record and read by no
+      measure, no analysis, no decision;
+    * the file may leave the field out and the import then assumes a value (`defaults`: the rooms
+      of a booking, one) and the column holds exactly that value in every row it has - it says
+      what the import already assumes. One row that says anything else, and it is not immaterial.
+
+    Never a required field, money, a measure of a pair, or a field a vocabulary proves."""
+    if field in sem.descriptive:
+        return True
+    default = defaults.get(field)
+    stats = column.stats
+    if default is None or not stats.enough():
+        return False
+    if isinstance(default, int | float):
+        return (
+            stats.numeric == stats.n
+            and stats.minimum is not None
+            and stats.minimum == stats.maximum == Decimal(str(default))
         )
-    )
-    return (missing and left_over) or asks_kind or doubtful or other_half
+    return stats.distinct == 1 and bool(stats.texts) and fold(stats.texts[0]) == fold(str(default))
 
 
 def apply_resolution(
@@ -259,17 +292,23 @@ def apply_resolution(
     expected: DataSourceDomain,
     domains: Sequence[str] = (),
     never: frozenset[str] = frozenset(),
-) -> tuple[Proposal, list[Question], frozenset[str]]:
+    immaterial: Callable[[ColumnProposal, str], bool] | None = None,
+) -> tuple[Proposal, list[Question], frozenset[str], int]:
     """What the model suggested, as suggestions: fields at MEDIUM on columns the rules left alone,
     a likely answer on the questions that were still open. Returns the headers it filled.
 
     `never` are fields a model does not place at all, whichever model it is: the fields that are
     MONEY. A choice about money is the person's, matched by hand, and never a yes or no on a model's
-    word (the same rule the rules themselves keep)."""
+    word (the same rule the rules themselves keep).
+
+    `immaterial` says that ignoring a reading changes nothing (`is_immaterial`): the reading is then
+    neither applied nor asked about - the file stays as sure as it was - and only counted, for the
+    audit. Returns the proposal, the questions, the headers it filled and that count."""
     if not resolution.used:
-        return proposal, questions, frozenset()
+        return proposal, questions, frozenset(), 0
     same_domain = resolution.domain in (None, expected.value)
     filled: set[str] = set()
+    ignored = 0
     columns: list[ColumnProposal] = []
     taken = {c.field for c in proposal.columns if c.field is not None}
     # a field that some OTHER column is still a candidate for (a hours/amount column that does not
@@ -288,6 +327,10 @@ def apply_resolution(
             and field not in contended
             and field not in never
         ):
+            if immaterial is not None and immaterial(column, field):
+                ignored += 1
+                columns.append(column)
+                continue
             taken.add(field)
             filled.add(column.header)
             columns.append(
@@ -330,7 +373,7 @@ def apply_resolution(
                 choices=tuple(Choice(value) for value in domains),
             )
         )
-    return Proposal(tuple(columns)), suggested, frozenset(filled)
+    return Proposal(tuple(columns)), suggested, frozenset(filled), ignored
 
 
 def levels_of(proposal: Proposal) -> LevelCounts:

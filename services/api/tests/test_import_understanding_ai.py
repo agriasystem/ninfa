@@ -696,6 +696,18 @@ def test_a_provider_that_fails_never_blocks_the_import(
     failing = FakeProvider([ImportUnderstandingUnavailableError("down")])
     _with_provider(api_client, failing)
 
+    # the model IS asked here (the department is nowhere), is down, and the answer is the rules' own
+    asked = understand(api_client, env, "LABOR", "t.csv", content, {"date_order": "DMY"})
+    assert len(failing.requests) == 1
+    _with_provider(api_client, None)
+    alone = understand(api_client, env, "LABOR", "t.csv", content, {"date_order": "DMY"})
+    assert asked["understanding"] == alone["understanding"]
+    assert asked["proposal"] == alone["proposal"]
+
+    # and the person's own answer is enough to import - a file the rules already read as READY is
+    # not asked about at all (V1.1: a model can only add a question to it)
+    failing_again = FakeProvider([ImportUnderstandingUnavailableError("down")])
+    _with_provider(api_client, failing_again)
     body = understand(
         api_client,
         env,
@@ -705,11 +717,11 @@ def test_a_provider_that_fails_never_blocks_the_import(
         {"date_order": "DMY", "department_value": "FRONT_OFFICE"},
     )
 
-    assert body["understanding"]["level"] == "READY"  # the person's own answer is enough
+    assert body["understanding"]["level"] == "READY"
     assert validation(api_client, env, "LABOR", content, body["proposal"], name="t.csv")[
         "can_import"
     ]
-    assert len(failing.requests) == 1
+    assert len(failing_again.requests) == 0
 
 
 def test_a_kind_of_file_nothing_points_at_is_asked_about_only_if_the_model_says_it_is_another(

@@ -294,11 +294,27 @@ def test_a_model_that_doubts_the_header_row_gets_a_suggestion_not_a_decision() -
 def test_money_is_never_placed_by_a_model() -> None:
     content = bookings(revenue="Corrispettivo")
 
-    result, _, traces = read(Behaviour.ORACLE, content, {"Corrispettivo": "room_revenue"})
+    result, provider, traces = read(Behaviour.ORACLE, content, {"Corrispettivo": "room_revenue"})
 
     assert result == without_a_model(content)
     assert result["level"] == "MANUAL"
-    assert traces[0].promoted == 0 and traces[0].suggested == 0
+    # a gap that only money could fill is not one a model can help with, so it is not even asked
+    # (V1.1: it used to be, and nothing it said could ever change the answer)
+    assert provider is not None and provider.calls == 0 and traces == []
+
+
+def test_money_is_never_placed_by_a_model_that_is_asked_for_another_reason() -> None:
+    content = bookings(revenue="Corrispettivo", status="Condizione")
+
+    result, provider, traces = read(
+        Behaviour.ORACLE, content, {"Corrispettivo": "room_revenue", **TRUTH_STATUS}
+    )
+
+    assert provider is not None and provider.calls == 1  # asked: nobody knows "Condizione"
+    assert result["level"] == "MANUAL"
+    assert all(field != "room_revenue" for _header, field, _level in result["columns"])
+    # what it placed is the status alone (a vocabulary proves it); the money stays the person's
+    assert traces[0].suggested == 1 and traces[0].promoted == 1
 
 
 def test_a_date_is_only_ever_a_suggestion_to_confirm() -> None:
@@ -698,17 +714,38 @@ def with_an_optional_free_text_column() -> bytes:
     return table(header, body)
 
 
+def with_an_optional_date_column() -> bytes:
+    """A cancellation date: optional, but read by an analysis - so it is NOT descriptive."""
+    header = [*header_of(status="Condizione"), "Chiusa il"]
+    body = [[*row, datetime(2026, 10, 20 + (i % 5))] for i, row in enumerate(rows_of())]
+    return table(header, body)
+
+
 def test_a_column_a_model_names_on_an_optional_field_is_asked_about_not_imported_silently() -> None:
+    content = with_an_optional_date_column()
+    truth = {**TRUTH_STATUS, "Chiusa il": "cancelled_at"}
+
+    result, _, traces = read(Behaviour.ORACLE, content, truth)
+
+    # the status (a vocabulary proves it) is certain; the cancellation date, which an analysis
+    # reads, is the model's word alone: a question, never imported on that word
+    assert traces[0].promoted == 1
+    assert result["level"] == "ASK"
+    assert [q[0] for q in result["questions"]] == ["CONFIRM:Chiusa il"]
+    assert ("Chiusa il", "cancelled_at", "TO_CHECK") in result["columns"]
+
+
+def test_a_descriptive_column_a_model_names_is_neither_imported_nor_asked_about() -> None:
     content = with_an_optional_free_text_column()
     truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
 
     result, _, traces = read(Behaviour.ORACLE, content, truth)
 
-    # the status (a vocabulary proves it) is certain; the room type is the model's word alone
-    assert traces[0].promoted == 1
-    assert result["level"] == "ASK"
-    assert [q[0] for q in result["questions"]] == ["CONFIRM:Dettaglio camera"]
-    assert ("Dettaglio camera", "room_type", "TO_CHECK") in result["columns"]
+    # nothing reads a room type: leaving the column out loses no measure, so it is set aside
+    # (counted in the audit), not applied and not a question
+    assert traces[0].promoted == 1 and traces[0].ignored == 1
+    assert result["questions"] == []
+    assert all(field != "room_type" for _header, field, _level in result["columns"])
 
 
 def test_a_wrong_model_cannot_slip_a_column_into_an_import_through_an_optional_field() -> None:
@@ -768,15 +805,15 @@ def test_the_same_rule_holds_for_the_original_assistant_whichever_model_it_is() 
     nothing makes certain, is asked about; money is never placed by any model."""
     from tests.import_ai_support import Scenario, ScenarioProvider, understand_with
 
-    content = with_an_optional_free_text_column()
-    truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
+    content = with_an_optional_date_column()
+    truth = {**TRUTH_STATUS, "Chiusa il": "cancelled_at"}
 
     inspection = understand_with(ScenarioProvider(Scenario.CORRECT, truth), BOOKINGS, content)
 
     info = inspection.understanding
     assert info is not None and info.level.value == "ASK"
     # (the original assistant certifies nothing, so the status it named is asked about too)
-    assert [q.id for q in info.questions] == ["CONFIRM:Condizione", "CONFIRM:Dettaglio camera"]
+    assert [q.id for q in info.questions] == ["CONFIRM:Condizione", "CONFIRM:Chiusa il"]
     money = bookings(revenue="Corrispettivo")
     placed = understand_with(
         ScenarioProvider(Scenario.CORRECT, {"Corrispettivo": "room_revenue"}), BOOKINGS, money

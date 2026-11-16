@@ -63,7 +63,10 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     smart_import_openai_model: str = Field(default="gpt-6.1-sol", min_length=1, max_length=100)
     # `none` sends no reasoning parameter at all (a model that has none).
-    smart_import_openai_reasoning: Literal["none", "minimal", "low", "medium", "high"] = "medium"
+    # `gpt-6.1-sol` accepts low / medium / high / xhigh / max (NOT none or minimal: it refuses them,
+    # and the answer falls back to the rules). `low` reads as well as `medium` and takes about 40%
+    # less time (V1.1: p50 4.9 s against 8.3 s, no timeout in 50 calls against 1).
+    smart_import_openai_reasoning: Literal["none", "minimal", "low", "medium", "high"] = "low"
     smart_import_openai_timeout_seconds: float = Field(default=25.0, ge=1.0, le=120.0)
     # May a column a model named, whose VALUES NINFA's own vocabulary recognises, become certain
     # (no question)? OFF: a model's reading is only ever a MEDIUM suggestion a person confirms. It

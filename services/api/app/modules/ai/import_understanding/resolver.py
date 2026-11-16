@@ -172,6 +172,13 @@ class ImportUnderstandingResolver:
         return self._corroborate and self._vocabulary_certainty and self._mode == AiMode.ASSIST
 
     @property
+    def wants_certainty(self) -> bool:
+        """Could what a model says about a column the rules placed unsure make it certain? Only
+        then is the model worth asking about such a column (in SHADOW as in ASSIST: SHADOW asks
+        what ASSIST would). With the vocabulary certainty off - production, ADR 0052 - it is not."""
+        return self._corroborate and self._vocabulary_certainty
+
+    @property
     def reads_confirmations(self) -> bool:
         """Is a model worth asking about a column the rules placed without being sure? Yes for the
         semantic layer in either mode (SHADOW must ask what ASSIST would); no for the original
@@ -229,6 +236,7 @@ class ImportUnderstandingResolver:
         level_after: str | None = None,
         suggested: int = 0,
         promoted: int = 0,
+        ignored: int = 0,
         source_learning_conflicts: int = 0,
     ) -> AiTrace:
         """The record of one use of the model. `before` / `after` / the counts are filled by the one
@@ -261,6 +269,7 @@ class ImportUnderstandingResolver:
             level_after=level_after,
             suggested=suggested,
             promoted=promoted,
+            ignored=ignored,
             agreements=len(summary.agreements) if summary else 0,
             conflicts=len(summary.conflicts) if summary else 0,
             source_learning_conflicts=source_learning_conflicts,
@@ -272,7 +281,8 @@ class ImportUnderstandingResolver:
             "import_understanding trace mode=%s provider=%s model=%s prompt=%s schema=%s "
             "outcome=%s fallback=%s status=%s calls=%d retries=%d latency_ms=%d in=%s out=%s "
             "request_ids=%s open_before=%d open_after=%d questions=%d->%d level=%s->%s "
-            "suggested=%d promoted=%d agreements=%d conflicts=%d source_learning_conflicts=%d",
+            "suggested=%d promoted=%d ignored=%d agreements=%d conflicts=%d "
+            "source_learning_conflicts=%d",
             trace.mode,
             trace.provider,
             trace.model,
@@ -295,6 +305,7 @@ class ImportUnderstandingResolver:
             trace.level_after or "-",
             trace.suggested,
             trace.promoted,
+            trace.ignored,
             trace.agreements,
             trace.conflicts,
             trace.source_learning_conflicts,

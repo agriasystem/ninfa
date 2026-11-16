@@ -149,3 +149,13 @@ Three defects were found by measuring, and closed in the SHARED understanding, w
 
 What the rules still do NOT ask about: an unread optional count (`rooms`, 12 challenge files) or any other column that moves with nothing the file reads. The benchmark's truth classes those as not
 critical, and the V1.1 decision for an absent `rooms` column ("one room per row") is unchanged. They are listed here, not hidden.
+
+## V1.1: ask the model only when it can change what a person is shown
+
+[ADR 0053](adr/0053-the-model-is-asked-only-when-it-can-change-what-a-person-sees.md), measured in
+[the report](../benchmarks/smart-import-openai-assist-v1-1.md): a header that is itself a personal
+value never reaches the browser (`Colonna X`, made where the table's labels are made); the model is
+not asked about a file that is READY, about a gap only money could fill, or about the other half of a
+pair; a reading that changes nothing (a descriptive field, a count equal to what the import assumes)
+is neither applied nor asked about; a confirmed source is not asked about again; `low` reasoning is
+the default. Calls 283 -> 174, p50 9.4 s -> 4.3 s, no non-material question, every safety number 0.

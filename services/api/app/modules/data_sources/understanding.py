@@ -104,6 +104,7 @@ from app.modules.data_sources.understanding_ai import (
     corroborate,
     egress_guard,
     fit_function,
+    is_immaterial,
     levels_of,
     needs_help,
     sole_candidates,
@@ -247,6 +248,29 @@ class _Reading:
     choice: FamilyChoice
 
 
+# The blockers that reading a column's NAME can lift (a day column nobody could name, a required
+# piece of information that is in the file under a word nobody knows). Every other blocker is about
+# the file itself - no table, a grid that is not hours, gross amounts, two ways of writing a date.
+_BLOCKERS_A_NAME_CAN_LIFT = frozenset(
+    {BlockerCode.MISSING_REQUIRED, BlockerCode.PERIOD_SUMMARY_ONLY}
+)
+
+
+def _a_model_can_help(inspection: FileInspection) -> bool:
+    """Is there anything a model could still improve in what the rules alone say? Not in a file
+    that is READY (a model can only add a question to it), nor in one that is BLOCKED for a reason
+    no column's name can lift (it cannot be imported as it is, whatever a column is called). A file
+    with no verdict is asked about."""
+    info = inspection.understanding
+    if info is None:
+        return True
+    if info.level == UnderstandingLevel.READY:
+        return False
+    if info.level == UnderstandingLevel.BLOCKED:
+        return any(b.code in _BLOCKERS_A_NAME_CAN_LIFT for b in info.blockers)
+    return True
+
+
 def _verdict(inspection: FileInspection | None) -> tuple[int, str | None]:
     """How many questions a reading leaves and its verdict, for the audit."""
     info = None if inspection is None else inspection.understanding
@@ -264,6 +288,8 @@ class _AiRun:
     questions_before: int
     suggested: int
     source_conflicts: int
+    # readings set aside because ignoring them changes nothing (`is_immaterial`)
+    ignored: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +306,7 @@ class _AiOutcome:
     questions_after: int
     promoted: int
     applied: bool
+    ignored: int = 0
 
 
 class UnderstandingService:
@@ -316,6 +343,26 @@ class UnderstandingService:
         replay: no second call) and only the comparison is kept - as an audit record, never in
         the answer."""
         resolver = self._resolver
+        # What the rules alone make of the file is read FIRST when a model is available: a file
+        # that is already READY (nothing to ask) or cannot be imported (BLOCKED) is not worth a
+        # call - a model can only add a question to the one, and has nothing to read in the other
+        # (measured: 0 of 34 such calls changed what a person is shown for the better). It is also
+        # the "before" of the audit, so it is read once.
+        rules_alone: FileInspection | None = None
+        if resolver is not None and resolver.enabled:
+            rules_alone, _ = self._read_document(
+                domain,
+                filename,
+                content,
+                answers,
+                confirmed_domain,
+                source,
+                already_imported,
+                currency,
+                None,
+            )
+            if not _a_model_can_help(rules_alone):
+                return rules_alone
         inspection, outcome = self._read_document(
             domain,
             filename,
@@ -354,17 +401,19 @@ class UnderstandingService:
         after: FileInspection | None
         try:
             if outcome.applied:
-                other, _ = self._read_document(
-                    domain,
-                    filename,
-                    content,
-                    answers,
-                    confirmed_domain,
-                    source,
-                    already_imported,
-                    currency,
-                    None,
-                )
+                other = rules_alone
+                if other is None:  # (not reachable with a resolver that asked, but never assume)
+                    other, _ = self._read_document(
+                        domain,
+                        filename,
+                        content,
+                        answers,
+                        confirmed_domain,
+                        source,
+                        already_imported,
+                        currency,
+                        None,
+                    )
                 before, after, counted = other, inspection, outcome
             else:
                 replayed, replayed_outcome = self._read_document(
@@ -397,6 +446,7 @@ class UnderstandingService:
                 level_after=level_after,
                 suggested=counted.suggested,
                 promoted=counted.promoted,
+                ignored=outcome.ignored,
                 source_learning_conflicts=outcome.source_conflicts,
             )
         )
@@ -581,7 +631,9 @@ class UnderstandingService:
             resolver is not None
             and resolver.enabled
             and not rules_contradict_card
-            and needs_help(proposal, adapter.groups, questions, resolver.reads_confirmations)
+            and needs_help(
+                proposal, adapter.groups, questions, resolver.wants_certainty, sem.financial
+            )
         ):
             # where the rules saw nothing at all, the model may say it is ANOTHER kind of data (the
             # person is asked only if it does: the card they chose is what NINFA goes by)
@@ -618,14 +670,30 @@ class UnderstandingService:
                 fit_function(_SEMANTICS, proposal),
                 egress_guard(guard_for(samples, proposal), _SEMANTICS),
             )
-            applied, applied_questions, applied_headers = apply_resolution(
-                proposal, questions, resolution, domain, offered, sem.financial
+            # what the import assumes when a column is absent ("one room per row"): a reading of a
+            # column that says exactly that changes nothing, so it is neither applied nor asked
+            absent_defaults = {
+                spec.key: spec.constant.default
+                for spec in adapter.fields
+                if spec.constant is not None
+                and spec.constant.when_absent
+                and spec.constant.default is not None
+            }
+            applied, applied_questions, applied_headers, ignored = apply_resolution(
+                proposal,
+                questions,
+                resolution,
+                domain,
+                offered,
+                sem.financial,
+                lambda column, field: is_immaterial(column, field, sem, absent_defaults),
             )
             ai_run = _AiRun(
                 resolution=resolution,
                 before=levels_of(proposal),
                 questions_before=len(questions),
                 suggested=len(applied_headers) + len(resolution.answers),
+                ignored=ignored,
                 # what a PERSON confirmed (an answer now, or this source remembers) is not to be
                 # changed by a model: where it reads that column differently, it is counted
                 source_conflicts=conflicts_with_confirmed(
@@ -953,6 +1021,7 @@ class UnderstandingService:
                 questions_after=len(questions),
                 promoted=len(promoted),
                 applied=resolver.mode == AiMode.ASSIST,
+                ignored=ai_run.ignored,
             )
         )
         # The last gate: nothing personal in this file goes out, whatever put it in the answer.

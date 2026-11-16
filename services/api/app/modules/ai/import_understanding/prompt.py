@@ -110,6 +110,30 @@ SEMANTIC_INSTRUCTIONS = (
 )
 
 
+# MEASURED AND NOT ADOPTED (V1.1: 50 documents x 5 settings on the real model). Asking the model to
+# leave out the columns NINFA has already placed ("say what you read anyway" -> "leave it out unless
+# you read it as a DIFFERENT field") and showing a placed column without examples cut the tokens
+# the model writes by a third and its cost by a sixth - and did not make it measurably faster: the
+# API's own drift between two runs of the SAME setting was larger than any gain. A lower reasoning
+# effort was the gain. Kept as a setting the efficiency benchmark can ask for, off in production.
+_SAY_WHAT_YOU_READ = (
+    'A column that already has an "assigned" field is only compared with your '
+    "reading, never changed: say what you read anyway.\n"
+)
+_ONLY_A_DIFFERENT_READING = (
+    'A column that already has an "assigned" field is not yours to read: leave it out, '
+    "unless you read it as a DIFFERENT field (then say so: it is counted, never changed).\n"
+)
+SEMANTIC_INSTRUCTIONS_COMPACT = SEMANTIC_INSTRUCTIONS.replace(
+    _SAY_WHAT_YOU_READ, _ONLY_A_DIFFERENT_READING
+)
+assert SEMANTIC_INSTRUCTIONS_COMPACT != SEMANTIC_INSTRUCTIONS  # the sentence is really there
+
+# True: a column NINFA already placed is shown by its name, its kind and its counts - no examples,
+# no range. False (production): shown as it always was.
+COMPACT_EVIDENCE = False
+
+
 def output_schema(fields: Mapping[str, tuple[str, ...]]) -> dict[str, Any]:
     """The closed shape of an answer. Structured outputs enforce shape, type and enum; the content
     is checked again by `validator.validate_guess` and never trusted as given."""
@@ -146,8 +170,9 @@ def output_schema(fields: Mapping[str, tuple[str, ...]]) -> dict[str, Any]:
     }
 
 
-def evidence_json(evidence: UnderstandingEvidence) -> str:
+def evidence_json(evidence: UnderstandingEvidence, compact: bool | None = None) -> str:
     """The evidence as compact JSON (the one place it is serialised)."""
+    compact = COMPACT_EVIDENCE if compact is None else compact
     document = {
         "expected_domain": evidence.expected_domain,
         "allowed": {
@@ -166,8 +191,12 @@ def evidence_json(evidence: UnderstandingEvidence) -> str:
                 "values": c.values,
                 "distinct": c.distinct,
                 "pii": c.pii,
-                "samples": list(c.samples),
-                "range": list(c.number_range) if c.number_range else None,
+                "samples": [] if compact and c.assigned is not None else list(c.samples),
+                "range": (
+                    list(c.number_range)
+                    if c.number_range and not (compact and c.assigned is not None)
+                    else None
+                ),
                 "assigned": c.assigned,
             }
             for c in evidence.columns
@@ -183,6 +212,7 @@ def evidence_json(evidence: UnderstandingEvidence) -> str:
 __all__ = [
     "PROMPT_VERSION",
     "SEMANTIC_INSTRUCTIONS",
+    "SEMANTIC_INSTRUCTIONS_COMPACT",
     "SEMANTIC_PROMPT_VERSION",
     "SYSTEM_INSTRUCTIONS",
     "evidence_json",
