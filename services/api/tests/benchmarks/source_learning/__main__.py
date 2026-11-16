@@ -7,7 +7,8 @@ timeline of files that comes and goes between them.
 
 It uses the TEST database (`TEST_DATABASE_URL`), inside a transaction that is rolled back: nothing
 is left behind, and the development database is never touched. No model, no embedding, no external
-service: `IMPORT_UNDERSTANDING_MODE` is off.
+service: the model layer is off (`SMART_IMPORT_AI_MODE=off`, forced for this process by
+`tests/offline_guard.py` whatever the machine holds).
 
     --json / --markdown   where to write the result (default: the versioned files)
     --only L1             only the families whose id contains this (no multi-source part)
@@ -22,6 +23,8 @@ from datetime import date
 from pathlib import Path
 
 from dotenv import dotenv_values
+
+from tests import offline_guard
 
 REPO = Path(__file__).resolve().parents[5]
 DEFAULT_JSON = REPO / "services/api/tests/benchmarks/results/source-learning-benchmark-v1.json"
@@ -55,9 +58,9 @@ def main(argv: list[str] | None = None) -> int:
             "APP_ENV": "test",
             "DEBUG": "false",
             "DATABASE_URL": url,
-            "IMPORT_UNDERSTANDING_MODE": "off",
         }
     )
+    offline_guard.isolate(os.environ)  # no model, whatever the machine selects
     from alembic import command
     from sqlalchemy.orm import Session
 

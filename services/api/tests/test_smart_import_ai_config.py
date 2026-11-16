@@ -6,6 +6,7 @@ runs exactly as with `off` instead of breaking. The key is a secret wherever it 
 """
 
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -310,3 +311,58 @@ def test_a_process_that_never_selects_the_mode_never_loads_the_openai_sdk() -> N
     )
 
     assert done.stdout.strip() == "ok", done.stderr[-400:]
+
+
+# --- the retired switch ------------------------------------------------------------------------
+# `IMPORT_UNDERSTANDING_MODE` belonged to a legacy branch that was never merged; `Settings` ignores
+# an unknown variable (`extra="ignore"`), so a file that "turned the assistant off" with it did
+# nothing - the Source Learning benchmarks did exactly that. The real switch is
+# `SMART_IMPORT_AI_MODE`. Only the note that records what that branch left behind, and this test,
+# may name the old one.
+_MAY_NAME_THE_RETIRED_SWITCH = frozenset(
+    {
+        "docs/architecture/smart-import-openai-intelligence-v1.md",
+        "services/api/tests/test_smart_import_ai_config.py",
+    }
+)
+_SKIPPED_DIRECTORIES = frozenset(
+    {".git", "node_modules", ".venv", "__pycache__", ".next", ".mypy_cache", ".ruff_cache"}
+)
+_TEXT_SUFFIXES = frozenset(
+    {".py", ".md", ".ts", ".tsx", ".js", ".mjs", ".json", ".yml", ".yaml", ".toml", ".ps1", ".sh"}
+    | {".example", ".service", ".conf", ".sql", ".txt", ".cfg", ".ini"}
+)
+
+
+def test_the_application_has_no_such_setting() -> None:
+    assert "import_understanding_mode" not in Settings.model_fields
+    assert "smart_import_ai_mode" in Settings.model_fields
+
+
+def test_no_current_configuration_names_the_retired_switch() -> None:
+    retired = re.compile(r"\bIMPORT_UNDERSTANDING_MODE\b", re.IGNORECASE)
+    offenders: list[str] = []
+    for root, directories, files in os.walk(_REPO):
+        directories[:] = [d for d in directories if d not in _SKIPPED_DIRECTORIES]
+        for name in files:
+            path = Path(root) / name
+            if path.suffix not in _TEXT_SUFFIXES and not name.startswith(".env"):
+                continue
+            relative = path.relative_to(_REPO).as_posix()
+            if relative in _MAY_NAME_THE_RETIRED_SWITCH:
+                continue
+            if retired.search(path.read_text(encoding="utf-8", errors="ignore")):
+                offenders.append(relative)
+
+    assert not offenders, offenders
+
+
+def test_the_scan_would_find_the_retired_switch_where_it_must_not_be(tmp_path: Path) -> None:
+    """The guard above is only worth something if its pattern matches what it is looking for (and
+    not the model-name constant that shares a prefix)."""
+    retired = re.compile(r"\bIMPORT_UNDERSTANDING_MODE\b", re.IGNORECASE)
+
+    assert retired.search('os.environ["IMPORT_UNDERSTANDING_MODE"] = "off"')
+    assert retired.search("works with `import_understanding_mode=off`")
+    assert not retired.search("IMPORT_UNDERSTANDING_MODELS: tuple[str, str]")
+    assert not retired.search("SMART_IMPORT_AI_MODE=off")

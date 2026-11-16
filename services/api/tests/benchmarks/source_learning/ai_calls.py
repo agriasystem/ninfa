@@ -26,6 +26,7 @@ from app.core.tenant import TenantContext
 from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
 from app.modules.ai.import_understanding.types import AiMode
 from app.modules.data_sources.service import DataSourcesService
+from tests import offline_guard
 from tests.benchmarks.source_learning.families import FAMILIES, Expect, Family, versions
 from tests.benchmarks.source_learning.runner import Bench
 from tests.semantic_support import Behaviour, SemanticStandIn
@@ -113,9 +114,9 @@ def main(argv: list[str] | None = None) -> int:
             "APP_ENV": "test",
             "DEBUG": "false",
             "DATABASE_URL": url,
-            "IMPORT_UNDERSTANDING_MODE": "off",
         }
     )
+    offline_guard.isolate(os.environ)  # the model is the counting stand-in, never a real one
     from alembic import command
 
     from app.db.session import create_db_engine
