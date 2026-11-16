@@ -55,7 +55,20 @@ _TAX_WORDS = stems("fiscale cf codfisc fisc")
 # "Tax" alone is the VAT of an invoice; "Tax Code" / "Tax ID" is a person's fiscal code.
 _TAX_QUALIFIERS = stems("code id codice")
 _IBAN_WORDS = stems("iban")
-_ADDRESS_WORDS = stems("indirizzo address residenza domicilio")
+# ("Via" alone is NOT here: "Prenotato via" is the channel a booking came through)
+_ADDRESS_WORDS = stems("indirizzo address residenza domicilio street strada viale piazza")
+# What a street address looks like: "Via Roma 12", "Piazza Garibaldi 3, Milano", "12 High Street".
+# A column of them is personal whatever its header says ("Sede", "Dove", nothing at all).
+_STREET_ADDRESSES = (
+    re.compile(
+        r"^(?:Via|Viale|V\.le|Piazza|Piazzale|P\.zza|Corso|C\.so|Vicolo|Largo|Strada|Lungomare)"
+        r"\s+[A-ZÀ-Ý'’]"
+    ),
+    re.compile(
+        r"^\d{1,5}[A-Za-z]?\s+(?:[A-Z][\w'’.-]*\s+){1,3}"
+        r"(?:Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Boulevard|Blvd|Drive|Dr|Way|Square)\b\.?"
+    ),
+)
 # Free text a person wrote ABOUT somebody: what a guest asked for, what was noted of an employee.
 # Its content is personal (an allergy, an anniversary, a health remark) even when no name is in it,
 # so the column is never shown, sampled or sent anywhere. "Nota di credito" is a document, not this.
@@ -134,6 +147,13 @@ def _fraction(texts: tuple[str, ...], pattern: re.Pattern[str]) -> float:
     ) / len(texts)
 
 
+def _street_addresses(texts: tuple[str, ...]) -> float:
+    """The share of the values written as a street address."""
+    if not texts:
+        return 0.0
+    return sum(1 for t in texts if any(p.match(t.strip()) for p in _STREET_ADDRESSES)) / len(texts)
+
+
 def _phone_numbers(stats: ColumnStats) -> bool:
     """Mostly cells written as telephone numbers."""
     strings = stats.strings
@@ -210,6 +230,8 @@ def _classify(words: frozenset[str], stats: ColumnStats) -> PiiFinding | None:
         return None
     if words & _ADDRESS_WORDS and stats.text_fraction >= 0.6:
         return PiiFinding(PiiKind.ADDRESS, "HEADER", True)
+    if _street_addresses(texts) >= 0.6 and stats.text_fraction >= 0.6:
+        return PiiFinding(PiiKind.ADDRESS, "VALUES", True)
     if words & _NOTE_WORDS and not words & _NOT_A_NOTE and stats.text_fraction >= 0.6:
         return PiiFinding(PiiKind.NOTE, "HEADER", True)
     if looks_like_names(stats):
