@@ -165,6 +165,26 @@ def verify_request(
     ]
 
 
+def production_resolver(
+    provider: OpenAIImportUnderstandingProvider,
+    mode: AiMode,
+    observer: Callable[[AiTrace], None],
+) -> ImportUnderstandingResolver:
+    """The resolver as `build_import_understanding_resolver` builds it from the default settings:
+    the semantic layer reads the columns the rules placed unsure (`corroborate`), and a model's
+    reading is NEVER certain - the vocabulary certainty is withdrawn (ADR 0052), so whatever the
+    model names stays a MEDIUM suggestion with a question. The acceptance has to show what
+    production does, not the mechanism ADR 0052 withdrew; `tests/test_live_openai_acceptance.py`
+    pins these flags to the factory's."""
+    return ImportUnderstandingResolver(
+        provider,
+        mode,
+        corroborate=True,
+        vocabulary_certainty=False,
+        observer=observer,
+    )
+
+
 def _service(resolver: ImportUnderstandingResolver | None) -> UnderstandingService:
     tenant = TenantContext(UUID(int=1))
     session: Any = None
@@ -229,9 +249,7 @@ def acceptance(
     content = fixture()
     rules_alone = _outline(_service(None), content)
     traces: list[AiTrace] = []
-    shadow = ImportUnderstandingResolver(
-        provider(timeout_seconds), AiMode.SHADOW, corroborate=True, observer=traces.append
-    )
+    shadow = production_resolver(provider(timeout_seconds), AiMode.SHADOW, traces.append)
     shadowed = _outline(_service(shadow), content)
 
     report.add("the model was asked", bool(captured), f"{len(captured)} request(s)")
@@ -249,9 +267,7 @@ def acceptance(
     report.add("in SHADOW the answer is exactly the rules' own", shadowed == rules_alone)
 
     assist_traces: list[AiTrace] = []
-    assist = ImportUnderstandingResolver(
-        provider(timeout_seconds), AiMode.ASSIST, corroborate=True, observer=assist_traces.append
-    )
+    assist = production_resolver(provider(timeout_seconds), AiMode.ASSIST, assist_traces.append)
     assisted = _outline(_service(assist), content)
     decided = bool(assist_traces) and assisted["scope"] is None
     report.add(
@@ -262,9 +278,7 @@ def acceptance(
     )
 
     timeouts: list[AiTrace] = []
-    impatient = ImportUnderstandingResolver(
-        provider(0.001), AiMode.ASSIST, corroborate=True, observer=timeouts.append
-    )
+    impatient = production_resolver(provider(0.001), AiMode.ASSIST, timeouts.append)
     fallen_back = _outline(_service(impatient), content)
     report.add(
         "a provider that times out leaves the rules' own answer",

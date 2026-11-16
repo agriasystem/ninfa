@@ -42,10 +42,14 @@ def assisted_run(
     behaviour: Behaviour = Behaviour.ORACLE,
     content: bytes = STATUS_UNKNOWN,
     truth: dict[str, str] | None = None,
+    # this file IS the mechanism ADR 0052 withdrew: on, and explicitly
+    vocabulary_certainty: bool = True,
     **kwargs: Any,
 ) -> FileInspection:
     provider = SemanticStandIn(behaviour, truth if truth is not None else TRUTH_STATUS)
-    return understand_semantic(provider, BOOKINGS, content, **kwargs)
+    return understand_semantic(
+        provider, BOOKINGS, content, vocabulary_certainty=vocabulary_certainty, **kwargs
+    )
 
 
 def mapping(result: dict[str, Any]) -> dict[str, Any]:

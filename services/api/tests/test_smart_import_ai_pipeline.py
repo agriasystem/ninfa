@@ -98,6 +98,7 @@ def read(
     domain: DataSourceDomain = BOOKINGS,
     mode: AiMode = AiMode.ASSIST,
     corroborate: bool | None = None,
+    vocabulary_certainty: bool = False,
     **answers: Any,
 ) -> tuple[dict[str, Any], SemanticStandIn | None, list[AiTrace]]:
     traces: list[AiTrace] = []
@@ -108,6 +109,7 @@ def read(
         content,
         mode=mode,
         corroborate=corroborate,
+        vocabulary_certainty=vocabulary_certainty,
         observer=traces.append,
         **answers,
     )
@@ -174,7 +176,9 @@ def test_a_clear_reading_of_a_status_column_turns_manual_into_ready_through_the_
     legacy = without_a_model(STATUS_UNKNOWN)
     assert legacy["level"] == "MANUAL" and legacy["blockers"] == ["MISSING_REQUIRED"]
 
-    result, provider, traces = read(Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS)
+    result, provider, traces = read(
+        Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS, vocabulary_certainty=True
+    )
 
     assert provider is not None and provider.calls == 1
     assert result["level"] == "READY" and result["questions"] == [] and result["blockers"] == []
@@ -185,7 +189,9 @@ def test_a_clear_reading_of_a_status_column_turns_manual_into_ready_through_the_
 def test_a_channel_column_is_read_the_same_way() -> None:
     content = bookings(channel="Distribuzione")
 
-    result, _, _ = read(Behaviour.ORACLE, content, {"Distribuzione": "channel"})
+    result, _, _ = read(
+        Behaviour.ORACLE, content, {"Distribuzione": "channel"}, vocabulary_certainty=True
+    )
 
     assert without_a_model(content)["level"] == "MANUAL"
     assert result["level"] == "READY"
@@ -195,7 +201,10 @@ def test_two_unknown_columns_are_both_read_when_both_are_recognised() -> None:
     content = bookings(status="Fase", channel="Distribuzione")
 
     result, _, traces = read(
-        Behaviour.ORACLE, content, {"Fase": "status", "Distribuzione": "channel"}
+        Behaviour.ORACLE,
+        content,
+        {"Fase": "status", "Distribuzione": "channel"},
+        vocabulary_certainty=True,
     )
 
     assert result["level"] == "READY"
@@ -307,7 +316,10 @@ def test_money_is_never_placed_by_a_model_that_is_asked_for_another_reason() -> 
     content = bookings(revenue="Corrispettivo", status="Condizione")
 
     result, provider, traces = read(
-        Behaviour.ORACLE, content, {"Corrispettivo": "room_revenue", **TRUTH_STATUS}
+        Behaviour.ORACLE,
+        content,
+        {"Corrispettivo": "room_revenue", **TRUTH_STATUS},
+        vocabulary_certainty=True,
     )
 
     assert provider is not None and provider.calls == 1  # asked: nobody knows "Condizione"
@@ -334,7 +346,7 @@ def test_a_count_is_never_promoted() -> None:
     content = bookings(status="Condizione", rooms="Unita")
     truth = {**TRUTH_STATUS, "Unita": "rooms"}
 
-    result, _, traces = read(Behaviour.ORACLE, content, truth)
+    result, _, traces = read(Behaviour.ORACLE, content, truth, vocabulary_certainty=True)
 
     # the status (a vocabulary) is certain; the count is not: it is asked about or left out
     assert traces[0].promoted == 1
@@ -345,7 +357,7 @@ def test_an_identifier_is_never_promoted() -> None:
     content = bookings(code="Chiave 9", status="Condizione")
     truth = {**TRUTH_STATUS, "Chiave 9": "source_record_id"}
 
-    result, _, traces = read(Behaviour.ORACLE, content, truth)
+    result, _, traces = read(Behaviour.ORACLE, content, truth, vocabulary_certainty=True)
 
     assert without_a_model(content)["level"] == "MANUAL"
     assert result["level"] == "ASK"
@@ -556,7 +568,7 @@ def test_a_workbook_with_an_introduction_sheet_is_still_read_through_its_data_sh
         }
     )
 
-    result, _, _ = read(Behaviour.ORACLE, content, TRUTH_STATUS)
+    result, _, _ = read(Behaviour.ORACLE, content, TRUTH_STATUS, vocabulary_certainty=True)
 
     assert without_a_model(content)["level"] == "MANUAL"
     assert result["level"] == "READY"
@@ -594,9 +606,15 @@ def test_shadow_returns_exactly_the_legacy_reading_and_records_what_assist_would
     legacy = without_a_model(STATUS_UNKNOWN)
 
     shadow, provider, shadow_traces = read(
-        Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS, mode=AiMode.SHADOW
+        Behaviour.ORACLE,
+        STATUS_UNKNOWN,
+        TRUTH_STATUS,
+        mode=AiMode.SHADOW,
+        vocabulary_certainty=True,
     )
-    assist, _, assist_traces = read(Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS)
+    assist, _, assist_traces = read(
+        Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS, vocabulary_certainty=True
+    )
 
     assert shadow == legacy  # nothing of the model's reading is applied
     assert provider is not None and provider.calls == 1  # asked once, the replay asks nobody
@@ -621,7 +639,7 @@ def test_shadow_never_changes_the_answer_whatever_the_model_says(behaviour: Beha
 
 
 def test_the_audit_record_holds_counts_words_and_ids_never_content() -> None:
-    _, _, traces = read(Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS)
+    _, _, traces = read(Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS, vocabulary_certainty=True)
 
     (trace,) = traces
     text = repr(trace)
@@ -671,7 +689,9 @@ def test_a_department_the_rules_were_unsure_of_is_confirmed_by_its_name_and_valu
     content = staff_with_unknown_department()
 
     legacy = without_a_model(content, domain=LABOR)
-    result, provider, traces = read(Behaviour.ORACLE, content, {STAFF: "role"}, domain=LABOR)
+    result, provider, traces = read(
+        Behaviour.ORACLE, content, {STAFF: "role"}, domain=LABOR, vocabulary_certainty=True
+    )
 
     # the rules alone ask one question about it; with the model's reading of its name there is none
     assert legacy["level"] == "ASK" and [q[0] for q in legacy["questions"]] == [f"CONFIRM:{STAFF}"]
@@ -686,7 +706,9 @@ def test_a_department_the_rules_were_unsure_of_is_confirmed_by_its_name_and_valu
 def test_a_model_that_disagrees_about_a_column_the_rules_placed_is_not_believed_over_them() -> None:
     content = staff_with_unknown_department()
 
-    result, _, traces = read(Behaviour.DISAGREES, content, {STAFF: "role"}, domain=LABOR)
+    result, _, traces = read(
+        Behaviour.DISAGREES, content, {STAFF: "role"}, domain=LABOR, vocabulary_certainty=True
+    )
 
     assert result == without_a_model(content, domain=LABOR)
     assert traces[0].promoted == 0 and traces[0].conflicts >= 1
@@ -696,7 +718,12 @@ def test_shadow_measures_the_same_confirmation_without_applying_it() -> None:
     content = staff_with_unknown_department()
 
     shadow, _, traces = read(
-        Behaviour.ORACLE, content, {STAFF: "role"}, domain=LABOR, mode=AiMode.SHADOW
+        Behaviour.ORACLE,
+        content,
+        {STAFF: "role"},
+        domain=LABOR,
+        mode=AiMode.SHADOW,
+        vocabulary_certainty=True,
     )
 
     assert shadow == without_a_model(content, domain=LABOR)
@@ -725,7 +752,7 @@ def test_a_column_a_model_names_on_an_optional_field_is_asked_about_not_imported
     content = with_an_optional_date_column()
     truth = {**TRUTH_STATUS, "Chiusa il": "cancelled_at"}
 
-    result, _, traces = read(Behaviour.ORACLE, content, truth)
+    result, _, traces = read(Behaviour.ORACLE, content, truth, vocabulary_certainty=True)
 
     # the status (a vocabulary proves it) is certain; the cancellation date, which an analysis
     # reads, is the model's word alone: a question, never imported on that word
@@ -739,7 +766,7 @@ def test_a_descriptive_column_a_model_names_is_neither_imported_nor_asked_about(
     content = with_an_optional_free_text_column()
     truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
 
-    result, _, traces = read(Behaviour.ORACLE, content, truth)
+    result, _, traces = read(Behaviour.ORACLE, content, truth, vocabulary_certainty=True)
 
     # nothing reads a room type: leaving the column out loses no measure, so it is set aside
     # (counted in the audit), not applied and not a question
@@ -790,7 +817,7 @@ def test_a_model_hint_never_lowers_a_file_held_for_the_matching_screen_to_a_ques
     truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
 
     without = without_a_model(content)
-    with_a_model, _, traces = read(Behaviour.ORACLE, content, truth)
+    with_a_model, _, traces = read(Behaviour.ORACLE, content, truth, vocabulary_certainty=True)
 
     assert without["level"] == "MANUAL"
     assert traces[0].calls == 1  # (the model WAS asked, and named the column)

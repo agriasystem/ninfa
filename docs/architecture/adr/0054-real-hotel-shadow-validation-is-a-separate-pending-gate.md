@@ -52,17 +52,46 @@ not expose, and `.xlsx` is not read (a hotel's export is likely to be one). Runn
 needs a `--root` that points outside the repository and an XLSX reader, reviewed as their own change.
 They are not made here: the gate is separate, and so is its tooling.
 
-## Warnings found while preparing the integration (not changed here)
+## The vocabulary certainty must never be on implicitly (found while preparing the integration, fixed)
 
-* **`ImportUnderstandingResolver`'s own constructor default for `vocabulary_certainty` is `True`.**
-  Production is not affected: the only production path is `build_import_understanding_resolver`, which
-  passes `SMART_IMPORT_AI_VOCABULARY_CERTAINTY` (`false`). But code that builds a resolver by hand runs
-  with the withdrawn certainty unless it says `False`: the live acceptance script does, so the
-  "MANUAL -> READY" its ASSIST step reports on its synthetic file is the mechanism ADR 0052 withdrew, not
-  what the production configuration does (`tests/test_smart_import_ai_vocabulary_certainty.py` proves that
-  files of this kind - a status column under a name the rules do not know - are READY with the certainty on
-  and ask one question with it off). Making the default `False` is the safer shape and is left as a
-  follow-up: it changes what the benchmarks that build the resolver by hand measure.
+`ImportUnderstandingResolver`'s own constructor default for `vocabulary_certainty` was `True`.
+Production was not affected: the only production path, `build_import_understanding_resolver`, passes
+`SMART_IMPORT_AI_VOCABULARY_CERTAINTY` (`false`). But every other way of building a resolver ran the
+mechanism ADR 0052 withdrew unless it remembered to say `False`, and two of them were not tests:
+
+* the **live acceptance** built its resolvers by hand, so the "MANUAL -> READY" its ASSIST step
+  reported on its synthetic file was the withdrawn mechanism, not what production does;
+* **`ReplayResolver`**, which SHADOW uses in production code to report what ASSIST would show, was
+  built with `corroborate=True` and the default, so its "after" applied the model's reading with the
+  certainty ON whatever the live resolver said. With the certainty off (the production setting) SHADOW
+  therefore reported READY for the adversarial files where production ASSIST asks a question. Nothing
+  reached a person (SHADOW shows the rules' own answer), but the measurement was not the thing it
+  claimed to measure.
+
+The fix: the default is `False`; the resolver exposes its switch (`vocabulary_certainty`); a
+`ReplayResolver` has to be handed the switch of the resolver it replays (a required keyword, no
+default); the live acceptance builds its resolvers through one helper that passes the production flags
+explicitly (a test pins them to the factory's). Every direct construction of the resolver was audited:
+
+| Construction | Kind | Certainty |
+|---|---|---|
+| `gateway/factory.py` (semantic layer) | production | the setting, `false` by default |
+| `gateway/factory.py` (Anthropic assistant, `off`, no key) | production | not read (no `corroborate`) |
+| `ReplayResolver` in `understanding.py` | production (SHADOW) | the live resolver's switch |
+| `live_openai_acceptance.py` | live acceptance | `False`, explicit, through `production_resolver` |
+| `benchmarks/.../openai_live.py` `CappedRecording`, `pilot_shadow.py`, `source_learning/ai_calls.py` | benchmark / tooling | `False` (production) |
+| `benchmarks/.../openai_intelligence.py` `Recording` | benchmark | `True`, explicit: the configuration it first measured, kept so its committed results stay what they were |
+| `semantic_support.py`, `test_smart_import_ai_pipeline.py`, `..._assisted_fields.py`, `..._failures_end_to_end.py`, `..._scope.py`, `..._scope_labor.py` | tests of the layer | `False` unless the test says `True`; the files that do are the tests of the withdrawn mechanism and the scope suites run against the strongest configuration the layer ever had |
+| the rest (`ImportUnderstandingResolver(provider)` of the original assistant) | tests / tooling | not read: it never sets `corroborate` |
+
+`tests/test_vocabulary_certainty_default.py` pins it: the default is off; with it the adversarial files
+are not READY and with an explicit `True` they are (so the check means something); the factory builds
+it off and on only from the setting; SHADOW's replay follows the resolver (it fails against the old
+hard-wired replay); no application code builds a corroborating resolver without saying the certainty or
+switches it on; and a test file may switch it on only if it is in a reviewed list.
+
+## Another difference, not changed here
+
 * `tests/live_openai_acceptance.py` asks for `reasoning="medium"` explicitly; the production default is
   `low`. The acceptance checks the transport, the shape and the safety checks, not the latency.
 

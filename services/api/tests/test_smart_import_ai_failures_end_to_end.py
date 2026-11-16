@@ -30,8 +30,11 @@ def run(
 ) -> tuple[dict[str, Any], list[AiTrace], int]:
     provider, exchange = provider_with(handler)
     traces: list[AiTrace] = []
+    # `vocabulary_certainty` ON on purpose: these tests are about what happens to a model's reading
+    # that WOULD be taken as certain when the model fails or answers badly (ADR 0052 withdrew it
+    # from production; it is switched on here, explicitly).
     resolver = ImportUnderstandingResolver(
-        provider, AiMode.ASSIST, corroborate=True, observer=traces.append
+        provider, AiMode.ASSIST, corroborate=True, vocabulary_certainty=True, observer=traces.append
     )
     service = semantic_service(None)
     service._resolver = resolver

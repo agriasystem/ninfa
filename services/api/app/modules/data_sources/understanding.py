@@ -425,7 +425,9 @@ class UnderstandingService:
                     source,
                     already_imported,
                     currency,
-                    ReplayResolver(outcome.resolution),
+                    ReplayResolver(
+                        outcome.resolution, vocabulary_certainty=resolver.vocabulary_certainty
+                    ),
                 )
                 before, after = inspection, replayed
                 counted = replayed_outcome or outcome

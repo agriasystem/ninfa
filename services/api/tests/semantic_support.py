@@ -254,11 +254,12 @@ def semantic_service(
     *,
     mode: AiMode = AiMode.ASSIST,
     corroborate: bool | None = None,
-    vocabulary_certainty: bool = True,
+    vocabulary_certainty: bool = False,
     observer: Callable[[AiTrace], None] | None = None,
 ) -> UnderstandingService:
     """The real understanding service with this stand-in as its model: no database, no network.
-    `vocabulary_certainty` is ON here (the mechanism's own tests); production builds it OFF."""
+    `vocabulary_certainty` is OFF, as in production (ADR 0052, ADR 0054): a test of the withdrawn
+    mechanism passes the switch on itself, so it is never on by accident."""
     tenant = TenantContext(UUID(int=1))
     session: Any = None
     resolver = ImportUnderstandingResolver(
@@ -278,7 +279,7 @@ def understand_semantic(
     *,
     mode: AiMode = AiMode.ASSIST,
     corroborate: bool | None = None,
-    vocabulary_certainty: bool = True,
+    vocabulary_certainty: bool = False,
     observer: Callable[[AiTrace], None] | None = None,
     filename: str = "file.xlsx",
     confirmed: bool = False,

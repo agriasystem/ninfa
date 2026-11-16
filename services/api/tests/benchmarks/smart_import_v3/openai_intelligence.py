@@ -645,12 +645,23 @@ CONFIGS: dict[str, tuple[Callable[[Doc], Any] | None, AiMode]] = {
 
 
 class Recording(ImportUnderstandingResolver):
-    """The real resolver (the semantic layer, as production builds it), remembering what it did."""
+    """The real resolver (the semantic layer), remembering what it did, WITH the vocabulary
+    certainty on: the configuration this benchmark first measured, which ADR 0052 withdrew. It is
+    explicit here so that no measurement runs the withdrawn mechanism by accident; the resolver as
+    production builds it is `CappedRecording` (openai_live), which turns it off."""
+
+    VOCABULARY_CERTAINTY = True
 
     def __init__(self, provider: Any, mode: AiMode) -> None:
         self.traces: list[AiTrace] = []
         self.resolutions: list[AiResolution] = []
-        super().__init__(provider, mode, corroborate=True, observer=self.traces.append)
+        super().__init__(
+            provider,
+            mode,
+            corroborate=True,
+            vocabulary_certainty=self.VOCABULARY_CERTAINTY,
+            observer=self.traces.append,
+        )
 
     def resolve(self, evidence: Any, fit_of: Any, guard: Any = None) -> AiResolution:
         resolution = super().resolve(evidence, fit_of, guard)

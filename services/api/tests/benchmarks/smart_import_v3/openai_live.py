@@ -280,9 +280,7 @@ class CappedRecording(Recording):
     whatever a model names stays a MEDIUM suggestion with a question. Requests are identical
     (`reads_confirmations` is unchanged), so the recorded answers apply as they are."""
 
-    def __init__(self, provider: Any, mode: AiMode) -> None:
-        super().__init__(provider, mode)
-        self._vocabulary_certainty = False
+    VOCABULARY_CERTAINTY = False
 
 
 def real_provider(

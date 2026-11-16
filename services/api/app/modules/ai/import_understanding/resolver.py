@@ -133,8 +133,10 @@ class ImportUnderstandingResolver:
     it the model's reading is only ever a suggestion to confirm. `vocabulary_certainty` is the
     switch of that exception alone: with it off the semantic layer still asks the same questions of
     the same model (`reads_confirmations` is unchanged), but whatever the model names stays a
-    MEDIUM suggestion a person confirms. Production builds it OFF (ADR 0052). `observer` receives
-    every audit record (the benchmark and the shadow report use it; production only logs)."""
+    MEDIUM suggestion a person confirms. It is OFF unless a caller says otherwise, here and in
+    production (ADR 0052, ADR 0054): withdrawn for safety, it must never be on implicitly in any
+    construction path. `observer` receives every audit record (the benchmark and the shadow report
+    use it; production only logs)."""
 
     def __init__(
         self,
@@ -142,7 +144,7 @@ class ImportUnderstandingResolver:
         mode: AiMode = AiMode.ASSIST,
         *,
         corroborate: bool = False,
-        vocabulary_certainty: bool = True,
+        vocabulary_certainty: bool = False,
         observer: Callable[[AiTrace], None] | None = None,
         provider_name: str = "",
         model: str = "",
@@ -164,6 +166,12 @@ class ImportUnderstandingResolver:
     @property
     def mode(self) -> AiMode:
         return self._mode
+
+    @property
+    def vocabulary_certainty(self) -> bool:
+        """The switch itself, whatever the mode: what a resolver made to REPLAY this one's answer
+        has to be built with, so that what it applies is what this one would apply."""
+        return self._vocabulary_certainty
 
     @property
     def corroborates(self) -> bool:
@@ -480,10 +488,16 @@ class ReplayResolver(ImportUnderstandingResolver):
     implementation of "applying" (which could drift from the real one), the service reads the file
     a second time through the real code with this resolver in place of the real one: no second
     call to a model, the same checks, the same outcome ASSIST would have produced. Nothing it
-    produces is ever returned to a person."""
+    produces is ever returned to a person.
 
-    def __init__(self, resolution: AiResolution) -> None:
-        super().__init__(None, AiMode.ASSIST, corroborate=True)
+    It applies the reading with the SAME vocabulary certainty as the resolver whose answer it
+    replays - never one of its own, and never a default: a replay with the certainty on, behind a
+    resolver that has it off, would report what ASSIST does with a switch production withdrew."""
+
+    def __init__(self, resolution: AiResolution, *, vocabulary_certainty: bool) -> None:
+        super().__init__(
+            None, AiMode.ASSIST, corroborate=True, vocabulary_certainty=vocabulary_certainty
+        )
         self._replayed = resolution
 
     @property

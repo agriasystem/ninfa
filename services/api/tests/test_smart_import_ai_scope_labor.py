@@ -38,8 +38,13 @@ def the_model_reads_the_department_column(
     monkeypatch.setattr(partial, "HEADERS", _renamed(partial.HEADERS))
     monkeypatch.setattr(remembered, "HEADERS", _renamed(remembered.HEADERS))
     provider = SemanticStandIn(Behaviour.ORACLE, {_UNKNOWN_TO_THE_RULES: "role"})
+    # The scope rules are run against the STRONGEST configuration the layer ever had - a model's
+    # reading accepted as certain (the withdrawn vocabulary certainty, ADR 0052): if FULL /
+    # PARTIAL / DELTA are not decided by the model even then, a model held to a question cannot
+    # decide them
+    # either. It is switched on HERE, explicitly; no default turns it on.
     cast(FastAPI, api_client.app).state.import_understanding_resolver = ImportUnderstandingResolver(
-        provider, AiMode.ASSIST, corroborate=True
+        provider, AiMode.ASSIST, corroborate=True, vocabulary_certainty=True
     )
     yield provider
 
