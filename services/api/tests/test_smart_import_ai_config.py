@@ -129,6 +129,13 @@ def test_the_environment_example_leaves_the_vocabulary_certainty_off() -> None:
     assert re.search(r"^SMART_IMPORT_AI_VOCABULARY_CERTAINTY=false$", example, re.MULTILINE)
 
 
+def test_the_environment_example_leaves_the_mode_off_and_no_key() -> None:
+    example = (_REPO / ".env.example").read_text(encoding="utf-8")
+
+    assert re.search(r"^SMART_IMPORT_AI_MODE=off$", example, re.MULTILINE)
+    assert re.search(r"^OPENAI_API_KEY=$", example, re.MULTILINE)  # a template holds no key
+
+
 def test_the_two_ways_of_selecting_a_model_for_smart_import_are_not_combined() -> None:
     with pytest.raises(ValidationError, match="set only one of them"):
         settings(

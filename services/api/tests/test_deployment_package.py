@@ -82,6 +82,7 @@ def test_01_env_templates_hold_no_secret_values() -> None:
     assert api["DATABASE_URL"].startswith("postgresql+psycopg://")
     assert "sslmode=require" in api["DATABASE_URL"]
     assert "ANTHROPIC_API_KEY" not in api  # only ever a commented line, set at enablement time
+    assert "OPENAI_API_KEY" not in api  # the same
     for text in (
         _read(DEPLOY / "env" / "api.env.example"),
         _read(DEPLOY / "env" / "web.env.example"),
@@ -102,6 +103,10 @@ def test_02_api_template_is_production_and_same_origin() -> None:
     assert api["API_HOST"] == "127.0.0.1"  # loopback behind the reverse proxy
     assert api["CORS_ORIGINS"] == ""  # same-origin topology: no cross-origin access
     assert api["ASK_NINFA_PROVIDER"] == "unconfigured"  # enabled only by the documented policy
+    # Smart Import's model layer: the code defaults to off and the deployment says it too
+    assert api["SMART_IMPORT_AI_MODE"] == "off"
+    assert "OPENAI_API_KEY" not in api  # only ever a commented line, set when a pilot decides
+    assert "IMPORT_UNDERSTANDING_PROVIDER" not in api  # the legacy selector: never both
     assert "TEST_DATABASE_URL" not in api
     assert "SESSION_COOKIE_SECURE" not in api
     # Only variables the code actually reads.
@@ -400,5 +405,8 @@ def test_20_cold_start_and_ask_policy_are_stated_where_operators_will_read_them(
     deployment = _read(OPERATIONS / "pilot-deployment-v1.md")
     for condition in ("spending limit", "ASK_NINFA_PROVIDER=anthropic", "unconfigured"):
         assert condition in deployment
+    # the Smart Import pin is stated where operators read it, not only in the template
+    assert "SMART_IMPORT_AI_MODE" in deployment and "`off`" in deployment
+    assert "REAL HOTEL SHADOW VALIDATION = PENDING" in deployment
     assert "chmod 600" in _read(DEPLOY / "env" / "api.env.example")
     assert "0600" in deployment or "**0600**" in deployment

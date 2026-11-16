@@ -70,8 +70,9 @@ without executing the file and never prints values.
 Two **separate** files, from [deploy/env/](../../deploy/env/):
 
 - `api.env` (from `api.env.example`): `APP_ENV=production`, `DEBUG=false`, `LOG_LEVEL`, `API_HOST`,
-  `API_PORT`, `CORS_ORIGINS` (empty), `DATABASE_URL`, `ASK_NINFA_PROVIDER` and, only when Ask NINFA
-  is enabled, `ANTHROPIC_API_KEY`. Read by the API, the worker, the daily wrapper and the CLIs.
+  `API_PORT`, `CORS_ORIGINS` (empty), `DATABASE_URL`, `ASK_NINFA_PROVIDER`, `SMART_IMPORT_AI_MODE`
+  (pinned `off`, see section 11) and, only when Ask NINFA is enabled, `ANTHROPIC_API_KEY`. Read by
+  the API, the worker, the daily wrapper and the CLIs.
 - `web.env` (from `web.env.example`): **only** `NEXT_PUBLIC_API_BASE_URL`, `WEB_HOST`, `WEB_PORT`.
   It never contains `DATABASE_URL`, `ANTHROPIC_API_KEY` or `TEST_DATABASE_URL`.
 
@@ -262,6 +263,15 @@ Ask NINFA **will be enabled for the first pilot, but only after all five conditi
 output cap are fixed in code. There is **no application-level rate limit** yet (a recorded P1): the
 provider-side spending limit is therefore mandatory, not optional. Enabling or disabling means
 editing `api.env` and restarting `ninfa-api`.
+
+### Smart Import model layer
+
+`api.env` pins `SMART_IMPORT_AI_MODE=off`: no part of a customer's file is sent to a model. The code
+defaults to `off` as well; the pin is the deployment saying so too. Leave it `off`. `shadow` and
+`assist` are decisions of their own: shadow on a real, authorised hotel export is still **pending**
+(`REAL HOTEL SHADOW VALIDATION = PENDING`) and assist is not pilot-ready. A key alone changes nothing
+and is never set in `api.env` because it exists. See
+[smart-import-openai-intelligence-v1](../architecture/smart-import-openai-intelligence-v1.md).
 
 ## 12. Access model
 
