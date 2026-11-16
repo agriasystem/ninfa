@@ -201,3 +201,31 @@ ASSIST can be evaluated only after that gate, starting from the V1.1 verdict abo
 **Work the gate needs first (not done here, on purpose).** The harness today reads only the CSV files of `tests/fixtures` (`discover()` has a `root` parameter that `main()` does not expose, and
 it does not read XLSX). Running it on a real export means first adding a `--root` that points OUTSIDE the repository and reading `.xlsx`, and reviewing that change; the real file is never
 copied into the repository, never committed, and its recording is never kept (the harness keeps neither a request, an answer nor a vendor id).
+
+## Ideas kept from the legacy Anthropic shadow branch (not implemented)
+
+Before this layer, a separate local branch (`feature/smart-import-v3-live-provider-shadow`: 5 commits of
+26 Oct 2026, tip `78c7a62`, never pushed, 120 commits behind) built a different SHADOW mode on the
+Anthropic assistant, behind a switch called `IMPORT_UNDERSTANDING_MODE` (`off|shadow|active`) that never
+existed on `main`. An audit against `main` found its product behaviour superseded by this layer (the
+egress gate, the closed contract, SHADOW with an exact replay, the failure kinds and usage on the port,
+the measurement harnesses) and its configuration incompatible (one switch here, `SMART_IMPORT_AI_MODE`;
+ASSIST exists and is off). Two concrete guards were recovered as fresh code: **the ordinary test suite
+is offline whatever the machine holds** (`tests/offline_guard.py`) and **the deployment template pins
+the mode off** (`deploy/env/api.env.example`). What follows is the rest worth remembering, recorded so
+that the branch can be deleted without losing it. **None of it is implemented, and none of it is needed
+for the pending real-hotel SHADOW gate.**
+
+| Idea | What it was | Why it is not here |
+|---|---|---|
+| **Non-blocking product SHADOW** | An observer asks the model AFTER the person's answer is final, in a small bounded background pool (2 workers, at most 8 waiting, more are dropped and not queued), never raises, and `submit` returns nothing: the person never waits. | Here SHADOW runs inside the request (the model is called in `understanding.py`, up to the 25 s timeout and one repeat), so SHADOW switched on in a deployment adds the provider's latency (p50 4.3 s) to an upload. The gate on real files runs through the offline harness and is not affected. Doing it here is a redesign on this resolver (modes plus the exact replay), not a port. |
+| **Evidence deduplication** | The same cleaned evidence (a hash of it) is not paid for twice: 256 remembered, outcome `SKIPPED_DUPLICATE`. | Nothing here memoises an identical evidence, in SHADOW or in ASSIST. (Source Learning avoids asking again about a *recognised source*, which is a different thing.) |
+| **Hard call and cost caps for pilot tooling** | `--max-calls` as a hard stop (a refused call never reaches the provider); prices typed from the provider's published pricing with cost per call, per 1,000 imports and per hotel and month, and "cost unavailable" instead of an invented price; live only when asked clearly and with a resumable cache; an exit code at the first screen a shadow changed. | The real-model harness here has a response cache and a one-call `--pilot`, assumes list-price constants and totals only, and has no hard cap or fail-fast code. |
+| **HTTP invariance test** | The route's JSON is byte for byte the same with and without a model observed, and judging or importing a decision never calls the provider. Plus a self-test of the detector: a deliberately leaking resolver must be noticed. | Judging and importing hold by construction here (`_settling` is built with no resolver), but no test pins it at the HTTP level with a counting model, and nothing tests the detector itself. |
+| **Adapter tests over the real HTTP stack** | The real SDK against a server on the loopback interface: a real timeout, a slow answer, a closed port. | The adapter tests here use a fake transport (`httpx2.MockTransport`) that raises by hand. |
+| **Smaller observability** | A short hash of the evidence as a correlation `ref` (ties the records of one document without any content); what the model named per column index, as closed vocabulary. | `AiTrace` here is richer in outcomes but has no such reference. |
+
+Deliberately NOT carried over, because they contradict decisions taken since: refusing `active` at
+startup (ASSIST exists here, off and not pilot-ready); leaving files whose only blocker is a period
+summary out of the model's reach (here the model is asked, because a name can lift that blocker); and the
+Anthropic adapter's upgrades (the model layer is OpenAI's; Anthropic stays the suggest-only assistant).
