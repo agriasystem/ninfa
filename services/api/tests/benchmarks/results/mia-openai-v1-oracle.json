@@ -365,7 +365,7 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 10,
+   "elapsed_ms_p95": 9,
    "cost_per_turn_usd": null
   },
   "data_aware": {
@@ -377,7 +377,7 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 81,
+   "elapsed_ms_p95": 82,
    "cost_per_turn_usd": null
   },
   "multi_tool": {
@@ -389,7 +389,7 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 37,
+   "elapsed_ms_p95": 41,
    "cost_per_turn_usd": null
   },
   "all": {
@@ -401,7 +401,7 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 79,
+   "elapsed_ms_p95": 80,
    "cost_per_turn_usd": null
   }
  },

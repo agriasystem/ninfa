@@ -93,6 +93,12 @@ GAP_METRICS: Mapping[str, GapMetric] = {
             "costo camera",
             "costi per camera",
             "costo medio per camera",
+            "costo medio a camera",
+            "costo a camera",
+            "camera occupata",
+            "ogni camera",
+            "costa una camera",
+            "costo di una camera",
         ),
         named_by=(
             "cpor",

@@ -93,6 +93,21 @@ def test_a_question_for_the_component_or_for_something_else_is_not_an_ask_for_th
     assert asked_for("metric.occupancy", question) is False
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Quanto costa in media ogni camera occupata?",  # not recognised in the first live run
+        "Qual è il costo medio a camera?",
+        "Quanto mi costa una camera occupata?",
+        "Com'è il CPOR di luglio?",
+    ],
+)
+def test_the_ways_a_person_asks_for_the_cost_per_occupied_room_are_all_asks_for_it(
+    question: str,
+) -> None:
+    assert asked_for("metric.cpor", question) is True
+
+
 def test_a_follow_up_with_no_metric_of_its_own_continues_the_question_before_it() -> None:
     assert asked_for("metric.occupancy", "E sabato?", "Quanto siamo pieni venerdì?") is True
     assert asked_for("metric.occupancy", "E sabato?") is False  # nothing to continue
@@ -513,6 +528,27 @@ def test_the_rule_is_not_about_occupancy_a_staff_incidence_without_revenue_is_sa
     assert (
         "Non posso però calcolare l'incidenza del costo del personale sui ricavi" in result.answer
     )
+    assert result.metrics.gap_disclosures == 1
+
+
+def test_a_block_with_no_figures_at_all_names_what_it_lacks_even_when_the_model_does_not(
+    world: MiaWorld,
+) -> None:
+    """No personnel source at all: "non è calcolabile" is true and names nothing, so the reason the
+    Dati page gives (no source of data) is added."""
+    result, _ = _turn(
+        world,
+        "Che incidenza ha il personale sui ricavi?",
+        [
+            tools(("get_staff_metrics", {})),
+            answer(
+                "L'incidenza del personale sui ricavi non è calcolabile.", refs=("dati:personale",)
+            ),
+        ],
+    )
+
+    assert result.answer is not None
+    assert result.answer.endswith("Il dato che manca: nessuna origine dati disponibile.")
     assert result.metrics.gap_disclosures == 1
 
 

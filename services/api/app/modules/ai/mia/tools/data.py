@@ -278,10 +278,27 @@ def _clause(text: str) -> str:
     return body
 
 
+# The words that name WHAT a block lacks, by the reason the Dati page gives (`Gap.needs`):
+# "L'incidenza non è calcolabile." names nothing; "... perché non c'è un'origine dati" does.
+_UNAVAILABLE_NEEDS: dict[UnavailableReason, tuple[str, ...]] = {
+    UnavailableReason.NO_ANALYSIS: ("analisi",),
+    UnavailableReason.NO_BOOKING_SOURCE: ("origine", "fonte"),
+    UnavailableReason.NO_BOOKING_DATA: ("prenotazion",),
+    UnavailableReason.COVERAGE_UNKNOWN: ("copertura",),
+    UnavailableReason.NOT_ANALYZED: ("analisi", "analizzat"),
+    UnavailableReason.EVALUATION_FAILED: ("non è stato possibile", "errore", "momento"),
+    UnavailableReason.NO_DATA: ("dati sufficienti", "nessun dato", "non ci sono dati"),
+    UnavailableReason.NO_OCCUPANCY: ("occupazione", "prenotazion"),
+    UnavailableReason.NO_SOURCE: ("origine", "fonte"),
+    UnavailableReason.SEVERAL_SOURCES: ("origini", "origine"),
+}
+
+
 def _gap_because(metric: str, reason: UnavailableReason | None) -> Gap:
     """A block that has no figures at all (no analysis, no source, no data): the metric is missing
     for the reason the Dati page gives."""
-    return Gap(metric, _clause(_unavailable(reason)))
+    needs = _UNAVAILABLE_NEEDS.get(reason, ()) if reason is not None else ()
+    return Gap(metric, _clause(_unavailable(reason)), needs=needs)
 
 
 _NO_INVENTORY = (
