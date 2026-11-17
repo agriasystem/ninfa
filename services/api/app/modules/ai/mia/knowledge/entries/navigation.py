@@ -276,18 +276,27 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
         "Mia, l'assistente di NINFA",
         "Mia è l'assistente di NINFA: risponde a domande sulla struttura, sui dati e sul "
         "funzionamento "
-        "della piattaforma, e può essere interpellata da Oggi e dal dettaglio di una decisione.",
+        "della piattaforma, e può essere interpellata da Oggi, dal dettaglio di una decisione e, "
+        "con il pulsante Parla con Mia, da ogni altra pagina.",
         copy("Chiedi a Mia"),
         copy("Chiedi a Mia..."),
+        copy("Parla con Mia"),
         api("POST", "/ask"),
+        api("POST", "/mia/messages"),
         details=(
             "Mia legge i dati che NINFA ha già calcolato e li spiega: non calcola e non inventa "
             "dati.",
             "Può spiegare una decisione, dire da dove arrivano i dati, aiutare a trovare una "
             "funzione.",
             "Nella pagina Oggi c'è Nuova conversazione per ricominciare da zero.",
+            "Nelle altre pagine il pulsante Parla con Mia, in basso a destra, la apre in un "
+            "pannello: Mia sa su quale pagina sei, così una domanda come perché è così alto? "
+            "si riferisce a ciò che stai guardando.",
         ),
-        where="Pagina Oggi (Chiedi a Mia...) e dettaglio di una decisione (Chiedi a Mia)",
+        where=(
+            "Pagina Oggi (Chiedi a Mia...), dettaglio di una decisione (Chiedi a Mia) e il "
+            "pulsante Parla con Mia sulle altre pagine"
+        ),
         related=("decision.vs_insight", "state.mia_unavailable", "state.mia_insufficient_context"),
         keywords=("mia", "assistente", "chat", "domande", "chiedere", "aiuto", "supporto"),
         not_available=(
