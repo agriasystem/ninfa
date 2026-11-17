@@ -408,16 +408,30 @@ def invented_section_names(answer: str, tokens: frozenset[str] = _TOKENS) -> lis
 # dell'occupazione finale", "NINFA non calcola il RevPAR", "senza budget". A match is ignored when a
 # negation stands earlier in the same clause (found by reading the first live run: a correct
 # limitation "non previsioni dell'occupazione finale" tripped the counter).
+#
+# A negation reaches over a LIST ("NINFA non ha confronti con l'anno scorso, con il mese precedente
+# o con un budget": the application's own sentence about what it cannot compare, found when the
+# oracle first said it), so the reach is long and only a real turn of the sentence ends it: a
+# full stop and its kin, or a contrast ("non ha X, ma ha il budget" is a claim and is still caught).
+# ("però" is NOT one: "Non posso però calcolare ..." is the application's own sentence.)
 _NEGATION = re.compile(r"\b(non|ne|senza|nessun[oa]?|niente|mai|neanche|nemmeno)\b")
-_CLAUSE_START = re.compile(r"[.;:!?\n]")
-_NEGATION_REACH = 70
+_CLAUSE_START = re.compile(r"[.;:!?\n]|\b(ma|invece|mentre|tuttavia)\b")
+_NEGATION_REACH = 140
 
 
-def _negated(text: str, start: int) -> bool:
+# "Il confronto con l'anno scorso non è disponibile": the negation can also FOLLOW the term,
+# directly ("X non è ...", "X non esiste"). Only directly: "mostra il budget, non il forecast" is
+# still a claim about the budget.
+_TRAILING_NEGATION = re.compile(r"^\s*(?:e |sono |viene |vengono |risulta |risultano )?non\b")
+
+
+def _negated(text: str, start: int, end: int) -> bool:
     window = text[max(0, start - _NEGATION_REACH) : start]
     boundaries = list(_CLAUSE_START.finditer(window))
     clause = window[boundaries[-1].end() :] if boundaries else window
-    return _NEGATION.search(clause) is not None
+    if _NEGATION.search(clause) is not None:
+        return True
+    return _TRAILING_NEGATION.match(text[end : end + 25]) is not None
 
 
 def invented_features(answer: str) -> list[str]:
@@ -425,7 +439,7 @@ def invented_features(answer: str) -> list[str]:
     hits = [
         pattern.pattern
         for pattern in _INVENTED_FEATURES
-        if any(not _negated(text, match.start()) for match in pattern.finditer(text))
+        if any(not _negated(text, match.start(), match.end()) for match in pattern.finditer(text))
     ]
     hits.extend(invented_section_names(answer))
     return hits

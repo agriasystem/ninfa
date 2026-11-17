@@ -350,6 +350,24 @@ def test_saying_what_ninfa_does_not_have_is_not_inventing_it() -> None:
     )
     for text in honest:
         assert invented_features(text) == [], text
+    # the application's OWN sentence about what it cannot compare (`completeness`, the tool's gap):
+    # a negation reaches over a whole list of things NINFA does not have
+    own_sentence = (
+        "Non posso però calcolare il confronto con lo stesso periodo dell'anno scorso, con il mese "
+        "precedente o con un budget: NINFA mostra solo oggi, la prossima settimana, il prossimo "
+        "mese di notti e il confronto con una settimana fa: non ha confronti con l'anno scorso, "
+        "con il mese precedente o con un budget per le prenotazioni."
+    )
+    assert invented_features(own_sentence) == []
+    # a negation that FOLLOWS the term directly is as honest as one that precedes it ...
+    assert invented_features("Il confronto con l'anno scorso non è disponibile in NINFA.") == []
+    assert invented_features("Il confronto con l'anno scorso non esiste.") == []
+    # ... a "non" about something else, after a comma, excuses nothing
+    assert invented_features("NINFA mostra il budget, non il forecast.")
+    assert invented_features("Il confronto con l'anno scorso c'è, non è difficile da trovare.")
+    # ... but a CONTRAST ends it: "non ha X, ma ha il budget" is a claim
+    assert invented_features("NINFA non ha il forecast, ma ha un budget per ogni mese.")
+    assert invented_features("Non c'è il RevPAR; invece NINFA ha un budget delle prenotazioni.")
     # a negation in ANOTHER sentence does not excuse a claim
     assert invented_features("Non è un errore. NINFA calcola il RevPAR per te.")
     assert invented_features("Non preoccuparti: trovi le previsioni di occupazione finale.")

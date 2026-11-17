@@ -43,6 +43,27 @@ def build() -> list[Scenario]:
             follow_up=True,
         ),
     )
+    # Truthfulness closure: with no room inventory, the follow-up must be as honest as the question.
+    add(
+        "no_inventory",
+        T(
+            "Quanto siamo pieni venerdì?",
+            [C("get_occupancy_revenue", night=friday)],
+            "Venerdì 7 agosto ci sono {truth.rooms_fri} camere prenotate, ma non posso dirti la "
+            "percentuale di occupazione perché manca l'inventario camere.",
+            mention=[["{truth.rooms_fri}"], ["inventario"]],
+            must_state_missing=True,
+        ),
+        T(
+            "E sabato?",
+            [C("get_occupancy_revenue", night={"kind": "date", "date": "2026-08-08"})],
+            "Sabato 8 agosto ci sono {truth.rooms_sat8} camere prenotate, ma non posso dirti la "
+            "percentuale di occupazione perché manca l'inventario camere.",
+            mention=[["{truth.rooms_sat8}"], ["inventario"]],
+            must_state_missing=True,
+            follow_up=True,
+        ),
+    )
     add(
         "full",
         T(

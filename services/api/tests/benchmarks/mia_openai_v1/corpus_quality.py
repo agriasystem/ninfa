@@ -280,6 +280,43 @@ MISSING = (
         tool_failure=frozenset({"get_occupancy_revenue", "get_distribution"}),
         max_calls=6,
     ),
+    # --- truthfulness closure: the metric asked for is NOT what the tool could give (ADR 0055) ---
+    # Each of these used to be answered with the nearest figure; the application now says what is
+    # missing when the answer does not (`completeness`), so they pin the rule on live answers too.
+    _missing(
+        "partial",
+        "Che incidenza ha il personale sui ricavi?",
+        [C("get_staff_metrics")],
+        "L'incidenza del costo del personale sui ricavi non è calcolabile: non ci sono ricavi "
+        "on-books confrontabili per tutti i giorni del piano. Le ore pianificate ci sono.",
+        [["non è calcolabile", "non posso calcolare", "non è disponibile", "manca"], ["ricavi"]],
+    ),
+    _missing(
+        "partial",
+        "Quanto costa in media ogni camera occupata?",
+        [C("get_cpor")],
+        "Il costo per camera occupata non è calcolabile: manca l'occupazione del mese, quindi il "
+        "costo del mese da solo non dice quanto costa ogni camera.",
+        [["non è calcolabile", "non posso calcolare", "non è disponibile", "manca"], ["occupa"]],
+    ),
+    _missing(
+        "full",
+        "Com'è l'occupazione rispetto all'anno scorso?",
+        [C("compare_windows")],
+        "Il confronto con l'anno scorso non è disponibile: NINFA non ha confronti con lo stesso "
+        "periodo dell'anno scorso, con il mese precedente o con un budget. Nei prossimi 30 giorni "
+        "l'occupazione sulle prenotazioni attuali è del {truth.occ30} %.",
+        [["anno scorso", "anno precedente"], ["{truth.occ30}"]],
+        tools=[{"compare_windows"}, {"get_occupancy_revenue"}],
+    ),
+    _missing(
+        "ota_insufficient",
+        "Com'è il pickup della prossima settimana?",
+        [C("get_pickup", window=7)],
+        "Il pickup non è calcolabile: serve un dato sia di oggi sia di una settimana fa per ogni "
+        "notte, e la variazione non è zero ma non è nota.",
+        [["non è calcolabile", "non è noto", "non è nota", "non posso calcolare"], ["non è zero"]],
+    ),
 )
 
 _STALE_NOTE = (

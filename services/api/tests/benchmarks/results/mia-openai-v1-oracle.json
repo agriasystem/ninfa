@@ -1,9 +1,9 @@
 {
  "mode": "oracle",
  "model": "oracle (scripted)",
- "scenarios_selected": 312,
- "scenarios_run": 312,
- "turns": 334,
+ "scenarios_selected": 317,
+ "scenarios_run": 317,
+ "turns": 340,
  "budget_exhausted": false,
  "provider_calls": {
   "made": 0,
@@ -46,13 +46,13 @@
  "known_gaps": {},
  "rates": {
   "status_ok": {
-   "passed": 334,
-   "applicable": 334,
+   "passed": 340,
+   "applicable": 340,
    "rate": 1.0
   },
   "correct_tool_selection": {
-   "passed": 325,
-   "applicable": 325,
+   "passed": 331,
+   "applicable": 331,
    "rate": 1.0
   },
   "no_tool_when_unnecessary": {
@@ -66,8 +66,8 @@
    "rate": 1.0
   },
   "factual_correctness": {
-   "passed": 231,
-   "applicable": 231,
+   "passed": 237,
+   "applicable": 237,
    "rate": 1.0
   },
   "decision_data_consistency": {
@@ -81,8 +81,8 @@
    "rate": 1.0
   },
   "missing_data_honesty": {
-   "passed": 31,
-   "applicable": 31,
+   "passed": 37,
+   "applicable": 37,
    "rate": 1.0
   },
   "tool_failures_graceful": {
@@ -91,8 +91,8 @@
    "rate": 1.0
   },
   "calls_within_budget": {
-   "passed": 334,
-   "applicable": 334,
+   "passed": 340,
+   "applicable": 340,
    "rate": 1.0
   },
   "general_knowledge_pure": {
@@ -107,8 +107,8 @@
   }
  },
  "multi_turn_reference_accuracy": {
-  "passed": 22,
-  "applicable": 22
+  "passed": 23,
+  "applicable": 23
  },
  "gates": {
   "status_ok": 0.95,
@@ -229,28 +229,28 @@
   },
   "missing_data": {
    "status_ok": {
-    "passed": 26,
-    "applicable": 26
+    "passed": 30,
+    "applicable": 30
    },
    "correct_tool_selection": {
-    "passed": 26,
-    "applicable": 26
+    "passed": 30,
+    "applicable": 30
    },
    "factual_correctness": {
-    "passed": 26,
-    "applicable": 26
+    "passed": 30,
+    "applicable": 30
    },
    "missing_data_honesty": {
-    "passed": 26,
-    "applicable": 26
+    "passed": 30,
+    "applicable": 30
    },
    "tool_failures_graceful": {
     "passed": 6,
     "applicable": 6
    },
    "calls_within_budget": {
-    "passed": 26,
-    "applicable": 26
+    "passed": 30,
+    "applicable": 30
    }
   },
   "data_quality_stale": {
@@ -325,28 +325,32 @@
   },
   "conversation_follow_up": {
    "status_ok": {
-    "passed": 45,
-    "applicable": 45
+    "passed": 47,
+    "applicable": 47
    },
    "correct_tool_selection": {
-    "passed": 44,
-    "applicable": 44
+    "passed": 46,
+    "applicable": 46
    },
    "no_tool_when_unnecessary": {
     "passed": 1,
     "applicable": 1
    },
    "factual_correctness": {
-    "passed": 44,
-    "applicable": 44
+    "passed": 46,
+    "applicable": 46
    },
    "decision_data_consistency": {
     "passed": 4,
     "applicable": 4
    },
+   "missing_data_honesty": {
+    "passed": 2,
+    "applicable": 2
+   },
    "calls_within_budget": {
-    "passed": 45,
-    "applicable": 45
+    "passed": 47,
+    "applicable": 47
    }
   }
  },
@@ -356,7 +360,7 @@
    "turns": 85,
    "model_calls_mean": 2.0,
    "tool_calls_mean": 1.0,
-   "input_tokens_mean": 22111,
+   "input_tokens_mean": 22220,
    "output_tokens_mean": 300,
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
@@ -365,39 +369,39 @@
    "cost_per_turn_usd": null
   },
   "data_aware": {
-   "turns": 239,
-   "model_calls_mean": 1.96,
-   "tool_calls_mean": 1.19,
-   "input_tokens_mean": 22197,
-   "output_tokens_mean": 293,
+   "turns": 245,
+   "model_calls_mean": 1.95,
+   "tool_calls_mean": 1.18,
+   "input_tokens_mean": 22176,
+   "output_tokens_mean": 292,
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 79,
+   "elapsed_ms_p95": 82,
    "cost_per_turn_usd": null
   },
   "multi_tool": {
    "turns": 10,
    "model_calls_mean": 2.0,
    "tool_calls_mean": 3.3,
-   "input_tokens_mean": 23973,
+   "input_tokens_mean": 24082,
    "output_tokens_mean": 300,
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 35,
+   "elapsed_ms_p95": 43,
    "cost_per_turn_usd": null
   },
   "all": {
-   "turns": 334,
-   "model_calls_mean": 1.97,
+   "turns": 340,
+   "model_calls_mean": 1.96,
    "tool_calls_mean": 1.2,
-   "input_tokens_mean": 22229,
-   "output_tokens_mean": 295,
+   "input_tokens_mean": 22243,
+   "output_tokens_mean": 294,
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 78,
+   "elapsed_ms_p95": 79,
    "cost_per_turn_usd": null
   }
  },

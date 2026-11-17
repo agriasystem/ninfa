@@ -1,6 +1,6 @@
 # Mia evaluation - oracle run (oracle (scripted))
 
-312 of 312 scenarios, 334 turns. Provider calls made: 0; replayed from cache: 0.
+317 of 317 scenarios, 340 turns. Provider calls made: 0; replayed from cache: 0.
 
 ## Zero counters (each must be 0)
 
@@ -22,29 +22,29 @@
 
 | Metric | Rate | Bar | |
 |---|---|---|---|
-| status_ok | 100.0% (334/334) | 95% | ok |
-| correct_tool_selection | 100.0% (325/325) | 90% | ok |
+| status_ok | 100.0% (340/340) | 95% | ok |
+| correct_tool_selection | 100.0% (331/331) | 90% | ok |
 | no_tool_when_unnecessary | 100.0% (9/9) | 90% | ok |
 | product_knowledge_correctness | 100.0% (85/85) | 90% | ok |
-| factual_correctness | 100.0% (231/231) | 85% | ok |
+| factual_correctness | 100.0% (237/237) | 85% | ok |
 | decision_data_consistency | 100.0% (42/42) | 95% | ok |
 | stale_data_honesty | 100.0% (10/10) | 90% | ok |
-| missing_data_honesty | 100.0% (31/31) | 95% | ok |
+| missing_data_honesty | 100.0% (37/37) | 95% | ok |
 | tool_failures_graceful | 100.0% (6/6) | 95% | ok |
-| multi_turn_reference_accuracy | 100.0% (22/22) | 85% | ok |
-| calls_within_budget | 100.0% (334/334) | 95% | ok |
+| multi_turn_reference_accuracy | 100.0% (23/23) | 85% | ok |
+| calls_within_budget | 100.0% (340/340) | 95% | ok |
 
 ## By category
 
 | Category | status_ok | correct_tool_selection | no_tool_when_unnecessary | product_knowledge_correctness | factual_correctness | decision_data_consistency | stale_data_honesty | missing_data_honesty | tool_failures_graceful | calls_within_budget |
 |---|---|---|---|---|---|---|---|---|---|---|
-| conversation_follow_up | 100.0% (45/45) | 100.0% (44/44) | 100.0% (1/1) | - | 100.0% (44/44) | 100.0% (4/4) | - | - | - | 100.0% (45/45) |
+| conversation_follow_up | 100.0% (47/47) | 100.0% (46/46) | 100.0% (1/1) | - | 100.0% (46/46) | 100.0% (4/4) | - | 100.0% (2/2) | - | 100.0% (47/47) |
 | data_interpretation | 100.0% (50/50) | 100.0% (50/50) | - | - | 100.0% (50/50) | 100.0% (2/2) | - | - | - | 100.0% (50/50) |
 | data_quality_stale | 100.0% (20/20) | 100.0% (20/20) | - | - | 100.0% (20/20) | - | 100.0% (10/10) | 100.0% (2/2) | - | 100.0% (20/20) |
 | decision_explanation | 100.0% (30/30) | 100.0% (30/30) | - | - | 100.0% (30/30) | 100.0% (30/30) | - | - | - | 100.0% (30/30) |
 | how_to | 100.0% (31/31) | 100.0% (31/31) | - | 100.0% (31/31) | - | - | - | - | - | 100.0% (31/31) |
 | import_smart_import | 100.0% (31/31) | 100.0% (31/31) | - | - | 100.0% (31/31) | - | - | - | - | 100.0% (31/31) |
-| missing_data | 100.0% (26/26) | 100.0% (26/26) | - | - | 100.0% (26/26) | - | - | 100.0% (26/26) | 100.0% (6/6) | 100.0% (26/26) |
+| missing_data | 100.0% (30/30) | 100.0% (30/30) | - | - | 100.0% (30/30) | - | - | 100.0% (30/30) | 100.0% (6/6) | 100.0% (30/30) |
 | multi_domain | 100.0% (25/25) | 100.0% (25/25) | - | - | 100.0% (25/25) | 100.0% (6/6) | - | - | - | 100.0% (25/25) |
 | product_knowledge | 100.0% (54/54) | 100.0% (54/54) | - | 100.0% (54/54) | - | - | - | - | - | 100.0% (54/54) |
 | security_adversarial | 100.0% (22/22) | 100.0% (14/14) | 100.0% (8/8) | - | 100.0% (5/5) | - | - | 100.0% (3/3) | - | 100.0% (22/22) |
@@ -53,10 +53,10 @@
 
 | Family | Turns | Model calls | Tool calls | Input tok | Output tok | p50 ms | p95 ms | Cost/turn |
 |---|---|---|---|---|---|---|---|---|
-| simple_product | 85 | 2.0 | 1.0 | 22111 | 300 | 0 | 0 | cost unavailable |
-| data_aware | 239 | 1.96 | 1.19 | 22197 | 293 | 0 | 0 | cost unavailable |
-| multi_tool | 10 | 2.0 | 3.3 | 23973 | 300 | 0 | 0 | cost unavailable |
-| all | 334 | 1.97 | 1.2 | 22229 | 295 | 0 | 0 | cost unavailable |
+| simple_product | 85 | 2.0 | 1.0 | 22220 | 300 | 0 | 0 | cost unavailable |
+| data_aware | 245 | 1.95 | 1.18 | 22176 | 292 | 0 | 0 | cost unavailable |
+| multi_tool | 10 | 2.0 | 3.3 | 24082 | 300 | 0 | 0 | cost unavailable |
+| all | 340 | 1.96 | 1.2 | 22243 | 294 | 0 | 0 | cost unavailable |
 
 No price was given (`--price MODEL=IN:OUT`): cost is unavailable, never invented.
 
