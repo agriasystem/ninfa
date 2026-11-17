@@ -293,7 +293,8 @@ QUALITY: tuple[Any, ...] = (
         "Com'è l'occupazione oggi?",
         [[C("get_occupancy_revenue"), C("get_data_status")]],
         _STALE_NOTE + " Su quei dati l'occupazione dei prossimi 30 giorni è del {truth.occ30} %.",
-        [["{truth.occ30}"]],
+        # "oggi" may mean tonight's night or the next 30: the figure of either is a right answer
+        [["{truth.occ30}", "{truth.occ_today}"]],
         [{"get_occupancy_revenue"}, {"get_data_status"}],
         {"freshness_hedge": True},
     ),

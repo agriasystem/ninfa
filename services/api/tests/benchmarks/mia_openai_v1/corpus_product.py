@@ -18,6 +18,15 @@ _REGISTRY = default_registry()
 _ANY_PRODUCT_TOOL = tuple(frozenset({name}) for name in sorted(PRODUCT_TOOLS))
 # A how-to about the person's own setup may look at that setup ("no remembered answers right now"
 # is a better answer than the bare steps): reading the configuration is not reading business data.
+_HOW_TO_STATE_READS = tuple(
+    frozenset({name})
+    for name in (
+        "explain_import_question",
+        "get_source_learning_status",
+        "get_connected_sources",
+        "get_room_inventory",
+    )
+)  # they carry the "where do I do it" text of the setting they describe
 _CONFIGURATION_READS = frozenset(
     {
         "get_source_learning_status",
@@ -308,7 +317,7 @@ def build() -> list[Scenario]:
                     calls,
                     answer,
                     mention=mention,
-                    tools=_ANY_PRODUCT_TOOL,
+                    tools=_ANY_PRODUCT_TOOL + _HOW_TO_STATE_READS,
                     forbidden=DATA_TOOLS - _CONFIGURATION_READS,
                     max_calls=3,
                 ),

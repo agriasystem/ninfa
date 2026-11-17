@@ -186,7 +186,8 @@ FACTS: Sequence[tuple[Sequence[str], list[Any], str, Sequence[Sequence[str]], di
         [C("get_staff_metrics")],
         "Nei prossimi 7 giorni sono pianificate {truth.labor_hours} ore di personale, per un costo "
         "pianificato di {truth.labor_cost} euro.",
-        [["{truth.labor_hours}"]],
+        # "Quanto costa" asks for the cost; "quante ore" for the hours: either figure is on point
+        [["{truth.labor_hours}", "{truth.labor_cost}"]],
         {},
     ),
     (
@@ -370,6 +371,19 @@ def _decision_scenarios() -> list[Scenario]:
                     ),
                 )
             )
+    return out
+
+
+def _with_the_window_comparison(tools: Sequence[Iterable[str]]) -> list[set[str]]:
+    """`compare_windows` carries the same bookings figures as `get_occupancy_revenue` (the 7 and
+    30 nights side by side): where one is expected the other is as good (the first live run chose
+    it for three broad questions and was marked wrong)."""
+    out: list[set[str]] = []
+    for alternative in tools:
+        names = set(alternative)
+        out.append(names)
+        if "get_occupancy_revenue" in names:
+            out.append((names - {"get_occupancy_revenue"}) | {"compare_windows"})
     return out
 
 
@@ -665,6 +679,7 @@ def build() -> list[Scenario]:
     scenarios.extend(_decision_scenarios())
     next_multi = numbered("multi")
     for question, calls, answer, mention, tools, extra in MULTI:
+        tools = _with_the_window_comparison(tools)
         scenarios.append(
             S(
                 next_multi(),

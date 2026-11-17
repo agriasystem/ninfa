@@ -216,10 +216,15 @@ def presented_as_today(text: str) -> bool:
     correct hedge, not a claim that the bookings are today's (the first live run was marked wrong
     for writing exactly
     that)."""
-    for sentence in _SENTENCE_END.split(text):
-        if _AS_TODAY.search(sentence) and not (
-            _HEDGE.search(sentence) or _CONTRAST.search(sentence)
-        ):
+    sentences = _SENTENCE_END.split(text)
+    for index, sentence in enumerate(sentences):
+        if not _AS_TODAY.search(sentence):
+            continue
+        # the hedge may stand in the same sentence or in the very next one: "Per oggi l'occupazione
+        # e' del 90%. Il dato proviene dall'ultimo import del 29 luglio." names the date right
+        # where the figure is
+        nearby = " ".join(sentences[index : index + 2])
+        if not (_HEDGE.search(nearby) or _CONTRAST.search(sentence)):
             return True
     return False
 

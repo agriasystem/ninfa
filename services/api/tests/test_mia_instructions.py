@@ -141,3 +141,8 @@ def test_a_question_about_a_signal_or_decision_checks_todays_decisions_first() -
 def test_only_the_open_property_is_shown_and_another_one_is_not_asked_about() -> None:
     assert "solo la struttura attualmente aperta" in TEXT
     assert "non chiedere se sia quella aperta" in TEXT
+
+
+def test_a_metric_ninfa_shows_is_explained_from_the_product_knowledge_not_in_general() -> None:
+    assert "si spiega con gli strumenti di conoscenza del prodotto" in TEXT
+    assert "la definizione di ninfa può differire" in TEXT

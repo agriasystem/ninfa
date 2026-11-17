@@ -7,7 +7,7 @@ turn) and keeps the reference (the same area, the same period, the same decision
 leaves no trace, and a correction ("no, intendevo i prossimi 7 giorni") is understood.
 """
 
-from tests.benchmarks.mia_openai_v1.dsl import DATA_TOOLS, C, S, T, numbered
+from tests.benchmarks.mia_openai_v1.dsl import C, S, T, numbered
 from tests.benchmarks.mia_openai_v1.model import Scenario
 
 _PRODUCT_ANY = [{"get_feature_explanation"}, {"search_ninfa_knowledge"}, {"get_ninfa_glossary"}]
@@ -293,19 +293,14 @@ def build() -> list[Scenario]:
             [C("get_feature_explanation", entry_id="metric.adr")],
             "L'ADR è la tariffa media sulle camere prenotate.",
             mention=[["adr", "tariffa media"]],
-            # a general concept: the model may answer "in generale" or look it up in the product
-            # knowledge; what it may not do is read the property (first live run: it answered
-            # in general and was marked wrong for not calling a product tool)
-            tools=[],
-            forbidden=DATA_TOOLS,
+            tools=_PRODUCT_ANY,
         ),
         T(
             "E come si calcola l'occupazione?",
             [C("get_feature_explanation", entry_id="metric.occupancy")],
             "L'occupazione è il rapporto tra le camere prenotate e quelle vendibili.",
             mention=[["occupazione"]],
-            tools=[],
-            forbidden=DATA_TOOLS,
+            tools=_PRODUCT_ANY,
             follow_up=True,
         ),
     )

@@ -482,6 +482,7 @@ def truth_of(world: World) -> dict[str, Any]:
         )
     by_day = {n.stay_date: n for n in o30.occupancy.nights}
     for label, day in (
+        ("today", date(2026, 8, 1)),
         ("fri", date(2026, 8, 7)),
         ("sat8", date(2026, 8, 8)),
         ("sun", date(2026, 8, 2)),

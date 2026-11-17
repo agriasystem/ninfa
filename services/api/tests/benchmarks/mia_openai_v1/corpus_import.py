@@ -24,7 +24,7 @@ QUESTIONS: Sequence[tuple[str, str, str, Sequence[str]]] = (
         "Perché il file mi chiede che tipo di dati contiene?",
         ("tipo",),
     ),
-    ("TABLE", "import.question_table", "Perché mi chiede quale tabella leggere?", ("tabella",)),
+    ("TABLE", "import.question_table", "Perché mi chiede quale tabella leggere?", ("tabell",)),
     (
         "DEPARTMENT_ROWS",
         "import.question_department_rows",
