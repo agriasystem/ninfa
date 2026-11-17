@@ -1,17 +1,17 @@
 """Mia: the bounded, NINFA-owned conversations of a user with Mia about one property.
 
-Adds ONE new table, `mia_conversations` (many rows per workspace, property and user, each with its own
-id): the title, the text of the conversation (a JSON array of at most 200 entries; the service keeps
-fewer), a short digest of what aged out of it, and the time of its last message. Additive: no existing
-table or constraint is touched, no row is inserted, nothing is backfilled - every user starts with no
-conversation.
+Adds ONE new table, `mia_conversations` (many rows per workspace, property and user, each with
+its own id): the title, the text of the conversation (a JSON array of at most 200 entries; the
+service keeps fewer), a short digest of what aged out of it, and the time of its last message.
+Additive: no existing table or constraint is touched, no row is inserted, nothing is backfilled -
+every user starts with no conversation.
 
 Tenant, property and user integrity is enforced by the database with composite foreign keys that
 reuse the existing `properties (workspace_id, id)` and `workspace_memberships (workspace_id,
-user_id)` unique constraints. The link to the property is RESTRICT like every other operational table;
-the link to the MEMBERSHIP is `ON DELETE CASCADE` on purpose: a conversation is ephemeral text, and
-revoking a user's membership must delete what that user said and was told with it (and must not be
-blocked by it).
+user_id)` unique constraints. The link to the property is RESTRICT like every other operational
+table; the link to the MEMBERSHIP is `ON DELETE CASCADE` on purpose: a conversation is ephemeral
+text, and revoking a user's membership must delete what that user said and was told with it (and
+must not be blocked by it).
 
 Written by hand; the model tests keep the ORM metadata in sync with it. Migrations 0001-0016 are
 untouched (the head before this one was `0016_remembered_scope`). An earlier, unmerged branch of Mia
