@@ -1,6 +1,6 @@
 # Smart Import V3 — Source Learning
 
-Status: **implemented.** No model, no embedding, no external service: it works with `IMPORT_UNDERSTANDING_MODE=off`.
+Status: **implemented.** No model, no embedding, no external service: it works with the model layer off (`SMART_IMPORT_AI_MODE=off`, the default).
 Decisions: ADR 0033 (what a person confirmed is remembered), ADR 0034 (a source remembers several recurring families) and ADR 0035
 (how a family is read belongs to the family). Measured by
 the Source Learning Benchmark V1 and its multi-source extension (`docs/benchmarks/source-learning-benchmark-v1.md`).

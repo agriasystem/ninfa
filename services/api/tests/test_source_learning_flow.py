@@ -6,7 +6,8 @@ the explicit import writes and remembers what the person confirmed. The next fil
 is recognised and the question that was answered is not asked again - unless THIS file contradicts
 the memory, in which case the current document wins.
 
-No model, no embedding, no external service: `IMPORT_UNDERSTANDING_MODE` is off for the whole suite.
+No model, no embedding, no external service: the model layer is off for the whole suite
+(`SMART_IMPORT_AI_MODE=off`, forced by `services/conftest.py`).
 """
 
 import json

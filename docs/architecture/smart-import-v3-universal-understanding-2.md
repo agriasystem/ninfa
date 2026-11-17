@@ -2,7 +2,7 @@
 
 ADR: `docs/architecture/adr/0036-smart-import-unseen-files.md`. Benchmark: `docs/benchmarks/smart-import-v3-universal-understanding-2.md`
 (results) and `services/api/tests/benchmarks/universal_understanding_v2/README.md` (method). AI stays **off**
-(`IMPORT_UNDERSTANDING_MODE=off`, provider `unconfigured`); nothing here calls a model, a cloud service or an embedding, and nothing was added
+(`SMART_IMPORT_AI_MODE=off`, provider `unconfigured`); nothing here calls a model, a cloud service or an embedding, and nothing was added
 to the dependencies or the database.
 
 ## The pipeline (unchanged order) and where this gate acts

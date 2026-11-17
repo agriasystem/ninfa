@@ -7,7 +7,8 @@ is then recognised whenever it comes back, whichever of the others came in betwe
 asked again.
 
 Real files through the real API and the real database (rolled back). No model, no embedding, no
-external service: `IMPORT_UNDERSTANDING_MODE` is off for the whole suite.
+external service: the model layer is off for the whole suite (`SMART_IMPORT_AI_MODE=off`,
+forced by `services/conftest.py`).
 """
 
 import json

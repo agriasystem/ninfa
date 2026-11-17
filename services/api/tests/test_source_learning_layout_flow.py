@@ -7,7 +7,8 @@ is what a person decided about THAT structure. It is remembered with the family 
 only once a file has been recognised as it: never inherited from whichever family was imported last.
 
 Real files through the real API and the real database (rolled back). No model, no embedding, no
-external service: `IMPORT_UNDERSTANDING_MODE` is off for the whole suite.
+external service: the model layer is off for the whole suite (`SMART_IMPORT_AI_MODE=off`,
+forced by `services/conftest.py`).
 """
 
 import json
