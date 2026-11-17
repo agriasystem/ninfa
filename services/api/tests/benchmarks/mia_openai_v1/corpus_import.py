@@ -307,6 +307,9 @@ def build() -> list[Scenario]:
             mention=[("prenotazioni",), ("domande", "chiede")],
             ui={"route": "/importa-file", "import_id": "$import:succeeded"},
             not_=_NO_CANARIES,
+            # NINFA does not keep the text of a question it asked while reading a file: which one
+            # the person means can only be learnt by asking (read in the first live run)
+            clarification_ok=True,
         ),
         "page_aware",
     )

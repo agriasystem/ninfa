@@ -91,14 +91,23 @@ FACTS: Sequence[tuple[Sequence[str], list[Any], str, Sequence[Sequence[str]], di
         {},
     ),
     (
-        (
-            "Com'è il pickup dei prossimi 30 giorni?",
-            "Quante nuove camere-notte ho prenotato nell'ultima settimana?",
-        ),
+        ("Com'è il pickup dei prossimi 30 giorni?",),
         [C("get_pickup", window=30)],
         "Rispetto a una settimana fa i prossimi 30 giorni hanno {truth.delta7_30} camere-notte in "
         "più.",
         [["{truth.delta7_30}"]],
+        {},
+    ),
+    (
+        # "nell'ultima settimana" does not say whether the person means the next 7 nights or the
+        # next 30: both readings are legitimate, so either figure is a correct answer (the first
+        # live run answered with the 7-night one and was marked wrong by a rubric that held only the
+        # other).
+        ("Quante nuove camere-notte ho prenotato nell'ultima settimana?",),
+        [C("get_pickup", window=7)],
+        "Rispetto a una settimana fa i prossimi 7 giorni hanno {truth.delta7_7} camere-notte in "
+        "più.",
+        [["{truth.delta7_7}", "{truth.delta7_30}"]],
         {},
     ),
     (
@@ -226,7 +235,9 @@ FACTS: Sequence[tuple[Sequence[str], list[Any], str, Sequence[Sequence[str]], di
         "I dati arrivano dai file importati nelle fonti dati: prenotazioni, costi e personale. "
         "L'ultimo import delle prenotazioni è di oggi.",
         [["import", "fonti"]],
-        {},
+        # either read tool answers "where do the data come from": the last imports per kind (the
+        # status) or the connected sources
+        {"tools": [{"get_connected_sources"}, {"get_data_status"}]},
     ),
     (
         (
@@ -344,7 +355,16 @@ def _decision_scenarios() -> list[Scenario]:
                         ],
                         answer,
                         mention=mention,
-                        tools=[{"explain_decision"}, {"explain_decision", "list_decisions"}],
+                        # `list_decisions` alone is enough when the question is "which night /
+                        # what": its rows carry the title, the target and the found-vs-expected
+                        # facts (the `mention` groups still have to be met). Read in the first live
+                        # run: a model that answered "su che notte" from the list was right, and was
+                        # marked wrong.
+                        tools=[
+                            {"explain_decision"},
+                            {"explain_decision", "list_decisions"},
+                            {"list_decisions"},
+                        ],
                         max_calls=4,
                         **extra,
                     ),

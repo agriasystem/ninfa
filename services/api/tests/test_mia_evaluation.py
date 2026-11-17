@@ -339,6 +339,25 @@ def test_the_invented_feature_detector_fires() -> None:
     assert invented_features("Trovi tutto in Struttura, nel blocco Inventario camere.") == []
 
 
+def test_saying_what_ninfa_does_not_have_is_not_inventing_it() -> None:
+    """Found by the first live run: a correct limitation tripped the zero counter. A negation in the
+    same clause makes a mention honest; the same words with no negation still fire."""
+    honest = (
+        "I valori riguardano le prenotazioni attuali, non previsioni dell'occupazione finale.",
+        "NINFA non calcola il RevPAR e non mostra previsioni di occupazione finale.",
+        "Non esiste un budget in NINFA: senza forecast, restano i dati osservati.",
+        "Nessun report PDF: i dati si leggono in Dati.",
+    )
+    for text in honest:
+        assert invented_features(text) == [], text
+    # a negation in ANOTHER sentence does not excuse a claim
+    assert invented_features("Non è un errore. NINFA calcola il RevPAR per te.")
+    assert invented_features("Non preoccuparti: trovi le previsioni di occupazione finale.")
+    assert invented_features(
+        "NINFA prevede l'occupazione finale: vedi previsioni di occupazione finale."
+    )
+
+
 def test_the_invented_property_figure_detector_fires_and_does_not_on_a_grounded_one() -> None:
     observed = ('{"dati": {"occupazione_percentuale": "62.33"}}',)
     bad = run_of("L'occupazione è del 71 %.", outcomes=observed)

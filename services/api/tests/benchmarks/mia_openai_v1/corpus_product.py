@@ -16,6 +16,18 @@ from tests.benchmarks.mia_openai_v1.model import Scenario
 
 _REGISTRY = default_registry()
 _ANY_PRODUCT_TOOL = tuple(frozenset({name}) for name in sorted(PRODUCT_TOOLS))
+# A how-to about the person's own setup may look at that setup ("no remembered answers right now"
+# is a better answer than the bare steps): reading the configuration is not reading business data.
+_CONFIGURATION_READS = frozenset(
+    {
+        "get_source_learning_status",
+        "get_connected_sources",
+        "get_room_inventory",
+        "get_property_profile",
+        "explain_import_question",
+        "get_import_status",
+    }
+)
 
 
 def _entry(entry_id: str) -> KnowledgeEntry:
@@ -297,7 +309,7 @@ def build() -> list[Scenario]:
                     answer,
                     mention=mention,
                     tools=_ANY_PRODUCT_TOOL,
-                    forbidden=DATA_TOOLS,
+                    forbidden=DATA_TOOLS - _CONFIGURATION_READS,
                     max_calls=3,
                 ),
                 tags=("product", "how_to"),

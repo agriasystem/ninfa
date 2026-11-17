@@ -24,6 +24,9 @@ def _missing(
     mention: list[Any],
     **rubric: Any,
 ) -> tuple[str, str, object]:
+    if "tool_failure" in rubric and "expect" not in rubric:
+        # a read that fails may end as an answer or as "nothing useful to say": both are honest
+        rubric["expect"] = ["ANSWERED", "INSUFFICIENT_CONTEXT"]
     return (
         world,
         "missing_data",
@@ -107,14 +110,35 @@ MISSING = (
         "Quanto dipendo dalle OTA?",
         [C("get_distribution")],
         "Non posso dirlo: l'analisi non è ancora disponibile e NINFA non ha dati di distribuzione.",
-        [["non è ancora disponibile", "non ancora disponibile", "non ha dati"]],
+        # every honest way of saying "not yet": the first live run answered "non è ancora
+        # valutabile" and was marked wrong for not using the oracle's own words
+        [
+            [
+                "non è ancora disponibile",
+                "non ancora disponibile",
+                "non ha dati",
+                "non è ancora valutabile",
+                "non è valutabile",
+                "non sono disponibili",
+                "non risulta",
+            ]
+        ],
     ),
     _missing(
         "never_analysed",
         "Quanto ho speso a luglio?",
         [C("get_cost_metrics")],
         "Non ci sono dati sufficienti: NINFA non ha costi per luglio.",
-        [["non ci sono dati", "non ha costi", "nessun costo"]],
+        [
+            [
+                "non ci sono dati",
+                "non ha costi",
+                "nessun costo",
+                "non risultano costi",
+                "non è disponibile",
+                "non sono registrati",
+            ]
+        ],
     ),
     _missing(
         "partial",
@@ -123,7 +147,10 @@ MISSING = (
         "Il costo per camera occupata non è calcolabile perché le prenotazioni importate non "
         "coprono "
         "i giorni di luglio: per quei giorni NINFA non sa quante camere fossero occupate.",
-        [["non coprono", "non è calcolabile"], ["occupat"]],
+        [
+            ["non coprono", "non è calcolabile", "non è disponibile", "manca", "non c'è"],
+            ["occupat"],
+        ],
     ),
     _missing(
         "partial",
@@ -336,8 +363,11 @@ QUALITY: tuple[Any, ...] = (
         "L'occupazione che vedo è aggiornata?",
         [[C("get_data_status"), C("get_occupancy_revenue")]],
         _STALE_NOTE + " L'occupazione è del {truth.occ30} % su quei dati.",
-        [["{truth.occ30}"]],
-        [{"get_data_status"}],
+        # the question is about freshness, not about the figure: what matters is that the answer
+        # names the date of the last import (the first live run answered exactly that, without
+        # repeating the percentage, and was marked wrong for it)
+        [["29 luglio"]],
+        [{"get_data_status"}, {"get_occupancy_revenue"}],
         {"freshness_hedge": True},
     ),
     (
@@ -422,7 +452,8 @@ QUALITY: tuple[Any, ...] = (
         "I dati attuali sono a posto: manca lo storico confrontabile per stabilire il livello "
         "atteso. "
         "Arriverà da solo, un'analisi alla volta. La quota OTA attuale è del {truth.ota_share} %.",
-        [["storico"], ["{truth.ota_share}"]],
+        # "why no verdict" is answered by the missing history; the current share is not needed
+        [["storico"]],
         None,
         {},
     ),

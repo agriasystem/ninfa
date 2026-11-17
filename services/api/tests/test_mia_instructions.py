@@ -121,3 +121,23 @@ def test_the_correction_never_repeats_more_than_a_few_figures() -> None:
     message = correction_message([str(n) for n in range(100, 140)], incomplete=False)
 
     assert "139" not in message
+
+
+def test_the_date_of_the_last_import_is_named_next_to_the_numbers_when_it_is_not_today() -> None:
+    assert "nominala sempre vicino ai numeri" in TEXT
+    assert "non vanno presentati come di oggi" in TEXT
+
+
+def test_an_uncomputable_metric_is_said_even_when_a_nearby_figure_can_be_given() -> None:
+    assert "dichiarano non calcolabile" in TEXT
+    assert "anche quando puoi dare un dato vicino" in TEXT
+
+
+def test_a_question_about_a_signal_or_decision_checks_todays_decisions_first() -> None:
+    assert "controlla le decisioni di oggi con gli strumenti" in TEXT
+    assert "prima di dire che ninfa non ha segnalato nulla" in TEXT
+
+
+def test_only_the_open_property_is_shown_and_another_one_is_not_asked_about() -> None:
+    assert "solo la struttura attualmente aperta" in TEXT
+    assert "non chiedere se sia quella aperta" in TEXT

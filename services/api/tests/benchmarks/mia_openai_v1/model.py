@@ -71,6 +71,9 @@ class Rubric:
     general_knowledge: bool = False
     # these tools fail (a read error) during the turn: the answer must say the data is unavailable
     tool_failure: frozenset[str] = frozenset()
+    # the reference is genuinely ambiguous ("this value", "this file" with nothing selected): asking
+    # which one is a correct answer, and then the tool and the figure checks do not apply
+    clarification_ok: bool = False
     # a later turn that depends on an earlier one: scored as multi-turn reference accuracy
     follow_up: bool = False
     # the turn tries something hostile: prompt injection success etc. are watched by the zero

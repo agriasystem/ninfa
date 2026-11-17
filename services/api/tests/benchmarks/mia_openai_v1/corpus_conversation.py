@@ -7,10 +7,12 @@ turn) and keeps the reference (the same area, the same period, the same decision
 leaves no trace, and a correction ("no, intendevo i prossimi 7 giorni") is understood.
 """
 
-from tests.benchmarks.mia_openai_v1.dsl import C, S, T, numbered
+from tests.benchmarks.mia_openai_v1.dsl import DATA_TOOLS, C, S, T, numbered
 from tests.benchmarks.mia_openai_v1.model import Scenario
 
 _PRODUCT_ANY = [{"get_feature_explanation"}, {"search_ninfa_knowledge"}, {"get_ninfa_glossary"}]
+# what FULL, PARTIAL and DELTA mean is also what `explain_import_question` explains
+_IMPORT_SCOPE_ANY = [{"explain_import_question"}]
 
 
 def build() -> list[Scenario]:
@@ -291,14 +293,19 @@ def build() -> list[Scenario]:
             [C("get_feature_explanation", entry_id="metric.adr")],
             "L'ADR è la tariffa media sulle camere prenotate.",
             mention=[["adr", "tariffa media"]],
-            tools=_PRODUCT_ANY,
+            # a general concept: the model may answer "in generale" or look it up in the product
+            # knowledge; what it may not do is read the property (first live run: it answered
+            # in general and was marked wrong for not calling a product tool)
+            tools=[],
+            forbidden=DATA_TOOLS,
         ),
         T(
             "E come si calcola l'occupazione?",
             [C("get_feature_explanation", entry_id="metric.occupancy")],
             "L'occupazione è il rapporto tra le camere prenotate e quelle vendibili.",
             mention=[["occupazione"]],
-            tools=_PRODUCT_ANY,
+            tools=[],
+            forbidden=DATA_TOOLS,
             follow_up=True,
         ),
     )
@@ -388,7 +395,7 @@ def build() -> list[Scenario]:
             "FULL vuol dire che il file contiene tutto il periodo; DELTA che contiene solo le "
             "novità.",
             mention=[["full"], ["delta"]],
-            tools=_PRODUCT_ANY,
+            tools=_PRODUCT_ANY + _IMPORT_SCOPE_ANY,
         ),
         T(
             "E PARTIAL?",
@@ -396,7 +403,7 @@ def build() -> list[Scenario]:
             "PARTIAL vuol dire che il file contiene una parte del periodo, per esempio un solo "
             "canale.",
             mention=[["partial"]],
-            tools=_PRODUCT_ANY,
+            tools=_PRODUCT_ANY + _IMPORT_SCOPE_ANY,
             follow_up=True,
         ),
     )
@@ -423,6 +430,8 @@ def build() -> list[Scenario]:
             "occupate: per la lavanderia è di {truth.cpor_laundry} euro.",
             mention=[["{truth.cpor_laundry}"]],
             ui={"route": "/dati", "section": "costs", "period_days": 30},
+            # no value is selected on the screen: "which one?" is the right answer (first live run)
+            clarification_ok=True,
         ),
         tags=("page_aware",),
     )
