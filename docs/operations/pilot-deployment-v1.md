@@ -71,7 +71,7 @@ Two **separate** files, from [deploy/env/](../../deploy/env/):
 
 - `api.env` (from `api.env.example`): `APP_ENV=production`, `DEBUG=false`, `LOG_LEVEL`, `API_HOST`,
   `API_PORT`, `CORS_ORIGINS` (empty), `DATABASE_URL`, `ASK_NINFA_PROVIDER`, `SMART_IMPORT_AI_MODE`
-  (pinned `off`, see section 11) and, only when Ask NINFA is enabled, `ANTHROPIC_API_KEY`. Read by
+  (pinned `off`, see section 11), `MIA_PROVIDER` (pinned `unconfigured`, see section 11) and, only when Ask NINFA is enabled, `ANTHROPIC_API_KEY`. Read by
   the API, the worker, the daily wrapper and the CLIs.
 - `web.env` (from `web.env.example`): **only** `NEXT_PUBLIC_API_BASE_URL`, `WEB_HOST`, `WEB_PORT`.
   It never contains `DATABASE_URL`, `ANTHROPIC_API_KEY` or `TEST_DATABASE_URL`.
@@ -174,11 +174,11 @@ startup**: they are this explicit step.
    ```
 7. **Verify the schema.** The current revision must equal the head, and there must be one head:
    ```bash
-   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" current   # 0016_remembered_scope (head)
-   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" heads     # 0016_remembered_scope
+   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" current   # 0017_mia_conversations (head)
+   ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" heads     # 0017_mia_conversations
    ninfa-py -m alembic -c "$NINFA_APP/services/api/alembic.ini" check     # No new upgrade operations detected.
    ```
-   The required head at this release is **`0016_remembered_scope`**. If a later release
+   The required head at this release is **`0017_mia_conversations`**. If a later release
    adds migrations, this document is updated with it.
 8. **Start the API:** `sudo systemctl start ninfa-api`; confirm `GET /api/v1/health` returns 200.
 9. **Start the worker:** `sudo systemctl start ninfa-worker`; confirm "Starting worker" in its log.
@@ -272,6 +272,20 @@ defaults to `off` as well; the pin is the deployment saying so too. Leave it `of
 (`REAL HOTEL SHADOW VALIDATION = PENDING`) and assist is not pilot-ready. A key alone changes nothing
 and is never set in `api.env` because it exists. See
 [smart-import-openai-intelligence-v1](../architecture/smart-import-openai-intelligence-v1.md).
+
+### Mia, the assistant of NINFA
+
+`api.env` pins `MIA_PROVIDER=unconfigured`: Mia answers "unavailable" and every other screen of NINFA is
+unaffected (nothing else depends on her route). She is a separate switch from the Smart Import layer
+above and shares only the account: the key (`OPENAI_API_KEY`), the endpoint and the data residency.
+Enable her by editing `api.env` (`MIA_PROVIDER=openai`, the key) and restarting `ninfa-api`, **only**
+when: the provider-side hard spending limit is set (there is no application-level rate limit yet: a
+recorded P1, so the limit is mandatory); the key is in the API environment and nowhere else; the live
+acceptance (`python -m tests.live_mia_acceptance`, from `services/api`, test database only) has
+passed; and the per-turn log line (model, effort, tools, tokens, latency: never the question or the
+answer) is seen in the logs. Mia reads only: she never writes a business row, and the only thing she
+stores is the person's own conversation (retained 60 days). See
+[mia-openai-intelligence-v1](../architecture/mia-openai-intelligence-v1.md).
 
 ## 12. Access model
 

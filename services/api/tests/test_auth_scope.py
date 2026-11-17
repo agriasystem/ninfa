@@ -45,6 +45,15 @@ _ROOM_INVENTORY_METHODS = {
     "/api/v1/properties/{property_id}/room-inventory": {"get", "put"},
 }
 
+# Mia, the assistant of NINFA (ADR 0055): a message (a POST, because it carries a question and calls
+# a provider, never because it mutates business state), and the person's own conversations.
+_MIA = "/api/v1/properties/{property_id}/mia"
+_MIA_METHODS = {
+    f"{_MIA}/messages": {"post"},
+    f"{_MIA}/conversations": {"get"},
+    f"{_MIA}/conversations/{{conversation_id}}": {"get", "delete"},
+}
+
 _EXPECTED_PATHS = {
     "/api/v1/health",
     "/api/v1/auth/login",
@@ -60,6 +69,7 @@ _EXPECTED_PATHS = {
     *_SOURCES_METHODS,
     *_ANALYSIS_METHODS,
     *_ROOM_INVENTORY_METHODS,
+    *_MIA_METHODS,
 }
 
 
@@ -94,6 +104,8 @@ def test_decision_routes_remain_get_only_except_the_two_ask_posts(client: TestCl
             assert set(methods) == _ANALYSIS_METHODS[path], path
         elif path in _ROOM_INVENTORY_METHODS:
             assert set(methods) == _ROOM_INVENTORY_METHODS[path], path
+        elif path in _MIA_METHODS:
+            assert set(methods) == _MIA_METHODS[path], path
         elif path in (_ASK_PATH, _HOME_ASK_PATH):
             assert set(methods) == {"post"}, path
         else:
