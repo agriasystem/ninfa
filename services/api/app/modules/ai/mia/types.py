@@ -8,7 +8,7 @@ from app.modules.ai.ask_ninfa.types import AskStatus
 
 # A wording change of the system policy bumps this string, never a silent edit
 # (`test_mia_instructions.py` pins the invariants a future wording change must keep).
-MIA_INSTRUCTIONS_VERSION = "mia-v1-5"
+MIA_INSTRUCTIONS_VERSION = "mia-v1-6"
 
 # --- bounds of ONE user turn --------------------------------------------------------------------
 # A bounded, read-only assistant - never an autonomous agent. The model may ask for NINFA facts in
@@ -49,6 +49,27 @@ ObservationKind = Literal["fact", "product"]
 
 
 @dataclass(frozen=True, slots=True)
+class Gap:
+    """A figure a tool is ABOUT and cannot (fully) give, and why - the structured form of "NINFA has
+    only part of what this metric needs".
+
+    `metric` names one of the metrics of `completeness.GAP_METRICS` (a closed table: the words a
+    person uses to ask for it, the words an honest answer uses to say it cannot be given, and its
+    label). `reason` is ONE clause, written by the tool from what it really read, that reads after a
+    colon ("per quella notte NINFA non sa quante camere ci sono"). `partial` is False when the
+    figure cannot be given at all and True when it is given but rests on only part of what was
+    asked.
+
+    It is evidence, not decoration: `completeness.undisclosed_gaps` checks, in code, that an answer
+    to a person who ASKED for that metric says it, and the orchestrator adds the sentence itself
+    when the answer did not (ADR 0055, "truthfulness closure")."""
+
+    metric: str
+    reason: str
+    partial: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class Observation:
     """What a tool returns: a small, labelled, semantic aggregate - never a row, an id of a guest or
     SQL.
@@ -74,6 +95,7 @@ class Observation:
     notes: tuple[str, ...] = ()
     resolved: JsonObject = field(default_factory=dict)
     kind: ObservationKind = "fact"
+    gaps: tuple[Gap, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +128,10 @@ class TurnMetrics:
     elapsed_ms: int = 0
     failure_kind: str | None = None
     unavailable_reason: str | None = None
+    # How many missing figures the application had to ADD to the answer (the model had not said
+    # them), and whether the whole answer was the boundary of the open property. Counts only.
+    gap_disclosures: int = 0
+    boundary: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +165,7 @@ __all__ = [
     "MAX_TOOL_ROUNDS",
     "MIA_INSTRUCTIONS_VERSION",
     "TURN_DEADLINE_SECONDS",
+    "Gap",
     "JsonObject",
     "MiaTurnResult",
     "Observation",

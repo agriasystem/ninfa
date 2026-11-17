@@ -6,6 +6,7 @@ person's own conversation or nothing; a refused message never reaches the model;
 a dignified `UNAVAILABLE` with nothing recorded; the browser can never send a history, a tool or a
 property; and the route writes the person's own conversation and no business row."""
 
+import json
 from collections.abc import Callable
 from typing import Any
 from uuid import UUID, uuid4
@@ -451,3 +452,116 @@ def test_the_observability_record_has_the_counts_and_the_conversation_and_no_con
     ):
         assert field in line, field
     assert "ZETA-4242" not in logged and "62,50" not in logged and "62.50" not in logged
+
+
+# --- truthfulness closure: what cannot be calculated is said, another structure is not read -----
+
+
+def test_a_follow_up_over_http_keeps_saying_the_percentage_cannot_be_calculated(
+    app: FastAPI, api_client: TestClient, db_session: Session, mia: Any
+) -> None:
+    """The real tools, the real data and the stored conversation: no room inventory, so "Quanto
+    siamo pieni venerdì?" and the follow-up "E sabato?" both get 14 rooms AND the missing
+    percentage."""
+    from app.modules.ai.mia.tools.catalog import build_tool_catalog
+    from tests.data_overview_support import seed_run, uniform_nights
+
+    app.dependency_overrides[get_tool_catalog] = build_tool_catalog
+    seed_run(
+        db_session,
+        mia.at.tenant,
+        as_of=D1,
+        nights=uniform_nights(D1, rooms=14, capacity=None, days=14),
+    )
+    friday = {"kind": "date", "date": "2026-08-07"}
+    saturday = {"kind": "date", "date": "2026-08-08"}
+    refs = ("dati:occupazione",)
+    provider = mia.script(
+        tools(("get_occupancy_revenue", {"night": friday})),
+        answer("Per venerdì risultano 14 camere prenotate.", refs=refs),
+        tools(("get_occupancy_revenue", {"night": saturday})),
+        answer("Per sabato risultano 14 camere prenotate.", refs=refs),
+    )
+    property_id = mia.at.tenant.property.id
+
+    first = api_client.post(_url(property_id), json=_body("Quanto siamo pieni venerdì?")).json()
+    second = api_client.post(
+        _url(property_id), json=_body("E sabato?", conversation_id=first["conversation_id"])
+    ).json()
+
+    for body, day in ((first, "venerdì"), (second, "sabato")):
+        assert body["status"] == "ANSWERED"
+        assert body["answer"].startswith(f"Per {day} risultano 14 camere prenotate.")
+        assert "Non posso però calcolare l'occupazione in percentuale" in body["answer"]
+        assert "manca l'inventario camere" in body["answer"]
+    assert second["conversation_id"] == first["conversation_id"]
+    # the model saw the first question when it answered the second
+    assert any("Quanto siamo pieni venerdì?" in str(r.history) for r in provider.requests[2:])
+    # and what the person reads after a refresh is what was said, the missing percentage included
+    stored = api_client.get(_url(property_id, f"conversations/{first['conversation_id']}")).json()
+    said = [m["content"] for m in stored["messages"] if m["role"] == "assistant"]
+    assert len(said) == 2 and all("non posso però calcolare" in text.lower() for text in said)
+
+
+def test_another_structure_is_never_read_and_the_answer_is_the_same_whatever_it_is(
+    api_client: TestClient, factory: BookingFactory, mia: Any
+) -> None:
+    from app.modules.ai.mia.boundary import OTHER_PROPERTY_ANSWER
+
+    # one the person may open, one of another account, one that does not exist
+    factory.property(mia.at.tenant.workspace, slug="hotel-quirino-zzyx")
+    factory.tenant()
+    provider = mia.script(answer("Non deve succedere."))
+    bodies = []
+
+    for name in ("Hotel Quirino Zzyx", "Hotel Fuoriporta Zzyx", "Hotel Inesistente Qwertyuiop"):
+        response = api_client.post(
+            _url(mia.at.tenant.property.id),
+            json=_body(f"Come va l'occupazione dell'{name}?"),
+        )
+        assert response.status_code == 200
+        bodies.append(response.json())
+
+    assert provider.requests == [] and mia.counter.calls == {}  # no model, no tool, no lookup
+    for body in bodies:
+        assert body["status"] == "ANSWERED" and body["answer"] == OTHER_PROPERTY_ANSWER
+        assert body["limitations"] == [] and body["grounding_refs"] == []
+        assert not any(w in body["answer"].lower() for w in ("quirino", "fuoriporta", "qwerty"))
+    assert len({body["answer"] for body in bodies}) == 1
+
+
+def test_a_conversation_that_is_not_yours_is_the_same_404_whoever_it_belongs_to(
+    api_client: TestClient,
+    factory: BookingFactory,
+    authenticated_as: Callable[[UUID], None],
+    mia: Any,
+) -> None:
+    """Another person's, another property's, another account's and an id nobody has: the same body,
+    so the answer cannot tell a conversation that exists from one that does not."""
+    from app.modules.tenancy.models import MembershipRole
+
+    workspace = mia.at.tenant.workspace
+    property_id = mia.at.tenant.property.id
+    mia.script(answer("Una risposta mia."))
+    mine = api_client.post(_url(property_id), json=_body()).json()["conversation_id"]
+    sibling = factory.property(workspace)
+    colleague = factory.user()
+    factory.membership(workspace, colleague, MembershipRole.MEMBER)
+    other = factory.tenant()
+    stranger = factory.user()
+    factory.membership(other.workspace, stranger, MembershipRole.MEMBER)
+
+    seen = []
+    authenticated_as(colleague.id)  # another person, same property
+    seen.append(api_client.get(_url(property_id, f"conversations/{mine}")))
+    authenticated_as(stranger.id)  # another account
+    seen.append(api_client.get(_url(other.property.id, f"conversations/{mine}")))
+    authenticated_as(mia.at.user.id)
+    seen.append(api_client.get(_url(sibling.id, f"conversations/{mine}")))  # another property
+    seen.append(api_client.get(_url(property_id, f"conversations/{uuid4()}")))  # nobody's
+
+    assert [r.status_code for r in seen] == [404, 404, 404, 404]
+    # everything but the per-request id is the same
+    shapes = {json.dumps({**r.json()["error"], "request_id": None}, sort_keys=True) for r in seen}
+    assert len(shapes) == 1
+    assert seen[0].json()["error"]["code"] == "MIA_CONVERSATION_NOT_FOUND"

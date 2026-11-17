@@ -47,6 +47,7 @@ from sqlalchemy.orm import Session
 from app.core.tenant import TenantContext
 from app.modules.ai.gateway.tool_protocol import ToolCall, ToolOutcome, ToolSpec
 from app.modules.ai.mia.access import AccessDomain, DomainAccessPolicy, UserContext
+from app.modules.ai.mia.completeness import gap_statement
 from app.modules.ai.mia.knowledge.registry import KnowledgeRegistry
 from app.modules.ai.mia.periods import PeriodError
 from app.modules.ai.mia.types import (
@@ -272,7 +273,12 @@ def observation_to_json(observation: Observation) -> str:
         payload["copertura"] = observation.coverage
     if observation.freshness is not None:
         payload["aggiornamento"] = observation.freshness
-    payload["non disponibile"] = list(observation.not_available)
+    # What the tool could not give, in one list: its own lines, then each gap as a sentence (the
+    # same sentences `completeness` checks the answer against).
+    payload["non disponibile"] = [
+        *observation.not_available,
+        *(gap_statement(gap) for gap in observation.gaps),
+    ]
     payload["note"] = list(observation.notes)
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, default=reject)
 

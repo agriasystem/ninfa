@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.ai.mia import tools as _tools_package  # noqa: F401  (the package must import)
 from app.modules.ai.mia.access import AccessDomain, UserContext
+from app.modules.ai.mia.completeness import gap_disclosure, gap_statement
 from app.modules.ai.mia.grounding import split_observation_numbers, ungrounded_numbers
 from app.modules.ai.mia.tools import data as data_tools
 from app.modules.ai.mia.tools.format import dec
@@ -52,6 +53,7 @@ from tests.data_overview_support import (
 )
 from tests.decision_support import CLEAR, INSUFFICIENT
 from tests.distribution_support import DistributionWorld, statements_of
+from tests.expected_support import add_snapshots, snapshot_row
 from tests.labor_support import labor_entry, labor_snapshot
 from tests.mia_data_support import (
     Evaluator,
@@ -92,6 +94,13 @@ def world(factory: BookingFactory, db_session: Session, tenant: Tenant) -> MiaWo
 
 def _json(observation: dict[str, Any]) -> str:
     return json.dumps(observation, ensure_ascii=False, sort_keys=True)
+
+
+def told(observed: dict[str, Any], reason: str) -> bool:
+    """The Dati page's `reason` is told, as the reason of a gap ("<Metric> non è calcolabile:
+    <reason>."), in what the tool says it could not give."""
+    clause = data_tools._clause(reason)  # noqa: SLF001
+    return any(clause in line for line in observed["non disponibile"])
 
 
 def _seed_bookings(db_session: Session, tenant: Tenant, **kwargs: Any) -> None:
@@ -348,11 +357,7 @@ def test_no_analysis_gives_no_figure_a_reason_and_zero_coverage(
 
     assert observed["dati"]["occupazione_percentuale"] is None
     assert observed["dati"]["ricavi_camera_on_books"] is None  # never a zero
-    assert UnavailableReason.NO_ANALYSIS in {
-        r
-        for r, text in data_tools.UNAVAILABLE_REASONS.items()
-        if text in observed["non disponibile"]
-    }
+    assert told(observed, data_tools.UNAVAILABLE_REASONS[UnavailableReason.NO_ANALYSIS])
     assert observed["copertura"]["completa"] is False
     assert observed["copertura"]["notti_con_prenotazioni_registrate"] == 0
     assert observed["aggiornamento"]["analisi_della_data"]["presente"] is False
@@ -609,7 +614,9 @@ def test_only_the_history_missing_is_told_apart_from_a_data_problem(
     assert observed["dati"]["tipo_di_insufficienza"].startswith("qualità dei dati")
     assert "periodi_confrontabili" not in observed["dati"]
     assert observed["dati"]["quota_ota_percentuale"] is None
-    assert "La quota OTA non è disponibile." in observed["non disponibile"]
+    assert any(
+        line.startswith("La quota OTA non è calcolabile:") for line in observed["non disponibile"]
+    )
 
 
 def test_a_clean_evaluation_is_not_called_fine_beyond_what_was_analysed(
@@ -629,9 +636,7 @@ def test_a_clean_evaluation_is_not_called_fine_beyond_what_was_analysed(
 def test_the_distribution_without_an_analysis_says_why(world: MiaWorld) -> None:
     observed = world.ok("get_distribution")
 
-    assert (
-        data_tools.UNAVAILABLE_REASONS[UnavailableReason.NO_ANALYSIS] in observed["non disponibile"]
-    )
+    assert told(observed, data_tools.UNAVAILABLE_REASONS[UnavailableReason.NO_ANALYSIS])
     assert observed["copertura"]["completa"] is False
 
 
@@ -736,7 +741,7 @@ def test_no_certain_bookings_means_no_breakdown(
     )
 
     assert observed["dati"]["canali"] == []
-    assert any("Nessuna prenotazione certa" in line for line in observed["non disponibile"])
+    assert any("non ha prenotazioni certe" in line for line in observed["non disponibile"])
 
 
 # --- get_cost_metrics / get_cpor ----------------------------------------------------------------
@@ -1002,7 +1007,7 @@ def test_without_revenue_for_the_same_days_the_ratio_is_missing_with_the_reason(
     economics = overview_for(world, 30).labor.economics
     assert economics.revenue_gap is not None
     assert observed["dati"]["incidenza_sui_ricavi_on_books_percentuale"] is None
-    assert data_tools.REVENUE_GAP_TEXT[economics.revenue_gap] in observed["non disponibile"]
+    assert told(observed, data_tools.REVENUE_GAP_TEXT[economics.revenue_gap])
     assert observed["dati"]["ore_pianificate"] == dec(economics.planned_hours)  # the hours stand
 
 
@@ -1010,9 +1015,7 @@ def test_no_labor_source_is_a_reason_not_a_zero(tenant: Tenant, world: MiaWorld)
     observed = world.ok("get_staff_metrics")
 
     assert observed["dati"].get("ore_pianificate") is None
-    assert (
-        data_tools.UNAVAILABLE_REASONS[UnavailableReason.NO_SOURCE] in observed["non disponibile"]
-    )
+    assert told(observed, data_tools.UNAVAILABLE_REASONS[UnavailableReason.NO_SOURCE])
     assert observed["copertura"]["giorni_con_ore_pianificate"] == 0
 
 
@@ -1032,6 +1035,300 @@ def test_freshness_is_the_domains_own_import(
     )
     bookings = observed["aggiornamento"]["ricavi_on_books_di_riferimento"]
     assert bookings["descrizione"].startswith("Ultimo import prenotazioni: oggi alle")
+
+
+# --- gaps: what a tool cannot give of the metric it is about ------------------------------------
+# A person who asks for a metric and gets only a component of it must be told (`completeness`). The
+# TOOL declares the gap from what it really read; these tests pin that declaration for the metric
+# people ask for most (occupancy) and for every other derived metric the tools return.
+
+FRIDAY = {"kind": "date", "date": "2026-08-07"}  # AS_OF is Saturday 2026-08-01
+
+
+def _gaps(
+    world: MiaWorld,
+    name: str,
+    arguments: dict[str, Any] | None = None,
+    *,
+    runtime: Any = None,
+) -> list[tuple[str, bool]]:
+    execution = world.call(name, arguments, runtime=runtime)
+    assert execution.observation is not None, execution.outcome.content
+    return [(gap.metric, gap.partial) for gap in execution.observation.gaps]
+
+
+def _said(observed: dict[str, Any], *words: str) -> bool:
+    """One line of what the tool says it could not give holds all of `words`."""
+    return any(all(w in line for w in words) for line in observed["non disponibile"])
+
+
+def test_a_night_with_bookings_and_no_inventory_is_a_missing_occupancy_not_a_missing_figure(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=14, capacity=None, days=14))
+
+    assert _gaps(world, "get_occupancy_revenue", {"night": FRIDAY}) == [("metric.occupancy", False)]
+    observed = world.ok("get_occupancy_revenue", {"night": FRIDAY})
+
+    night = observed["dati"]["notte"]
+    assert night["camere_prenotate"] == 14  # the component NINFA has stands
+    assert night["occupazione_percentuale"] is None  # the metric is never estimated
+    assert _said(observed, "non è calcolabile", "inventario camere")
+    assert len([line for line in observed["non disponibile"] if "inventario" in line]) == 1
+
+
+def test_a_night_with_bookings_and_an_inventory_has_no_gap(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=14, capacity=40, days=14))
+
+    assert _gaps(world, "get_occupancy_revenue", {"night": FRIDAY}) == []
+    observed = world.ok("get_occupancy_revenue", {"night": FRIDAY})
+
+    assert observed["dati"]["notte"]["occupazione_percentuale"] == "35.00"
+    assert observed["non disponibile"] == []
+
+
+def test_an_inventory_of_zero_rooms_is_not_a_percentage_and_says_it_must_be_corrected(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    # The snapshot stores a capacity of 0 (a "closed" night, or an inventory set to zero rooms) with
+    # bookings on it: there is no percentage, and a percentage over zero is not a number.
+    rows = []
+    for stay_date in night_range(AS_OF, 14):
+        row = snapshot_row(tenant, AS_OF, stay_date, rooms=14)
+        row["booking_count_on_books"] = 7
+        row["allocated_room_revenue_on_books"] = D("1400.00")
+        row["adr_on_books"] = D("100.00")
+        row["rooms_available"] = 0
+        rows.append(row)
+    add_snapshots(db_session, tenant, rows)
+    seed_run(db_session, tenant)
+
+    assert _gaps(world, "get_occupancy_revenue", {"night": FRIDAY}) == [("metric.occupancy", False)]
+    observed = world.ok("get_occupancy_revenue", {"night": FRIDAY})
+
+    assert observed["dati"]["notte"]["occupazione_percentuale"] is None
+    assert _said(observed, "zero camere", "va corretto")
+    window = world.ok("get_occupancy_revenue", {"window": 7})
+    assert window["dati"]["occupazione_percentuale"] is None
+    assert _said(window, "zero camere")
+
+
+def test_a_night_with_no_recorded_bookings_is_a_missing_figure_never_zero_rooms(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=14, capacity=40, days=3))
+
+    assert _gaps(world, "get_occupancy_revenue", {"night": FRIDAY}) == [("metric.occupancy", False)]
+    observed = world.ok("get_occupancy_revenue", {"night": FRIDAY})
+    assert _said(observed, "dato mancante", "non significa zero camere")
+
+
+def test_a_night_outside_the_window_is_a_gap_too(world: MiaWorld, db_session: Session) -> None:
+    seed_run(db_session, world.at.tenant, nights=uniform_nights(AS_OF, rooms=14, capacity=40))
+    past = {"kind": "date", "date": "2026-07-20"}
+
+    assert _gaps(world, "get_occupancy_revenue", {"night": past}) == [("metric.occupancy", False)]
+    assert _said(world.ok("get_occupancy_revenue", {"night": past}), "dalla data di analisi")
+
+
+def test_a_week_without_inventory_is_one_missing_occupancy_line(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=12, capacity=None, days=7))
+
+    assert _gaps(world, "get_occupancy_revenue", {"window": 7}) == [("metric.occupancy", False)]
+    observed = world.ok("get_occupancy_revenue", {"window": 7})
+
+    assert observed["dati"]["camere_notte_prenotate"] == 84
+    assert len([line for line in observed["non disponibile"] if "inventario" in line]) == 1
+
+
+def test_a_partial_inventory_is_a_partial_occupancy_with_its_own_numbers(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    nights = uniform_nights(AS_OF, rooms=20, capacity=40, days=7)
+    nights[AS_OF + timedelta(days=3)] = (20, None)
+    seed_run(db_session, tenant, nights=nights)
+
+    assert _gaps(world, "get_occupancy_revenue", {"window": 7}) == [("metric.occupancy", True)]
+    observed = world.ok("get_occupancy_revenue", {"window": 7})
+
+    assert observed["dati"]["occupazione_percentuale"] is not None  # given, on part of the nights
+    assert _said(observed, "è parziale", "solo per 6 delle 7 notti")
+
+
+def test_a_week_with_every_input_has_no_gap(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    _seed_bookings(db_session, tenant)
+
+    assert _gaps(world, "get_occupancy_revenue", {"window": 7}) == []
+    assert _gaps(world, "get_occupancy_revenue", {"window": 30}) == []
+
+
+def test_without_an_analysis_the_occupancy_is_missing_for_the_reason_the_page_gives(
+    world: MiaWorld,
+) -> None:
+    assert _gaps(world, "get_occupancy_revenue") == [("metric.occupancy", False)]
+
+
+def test_the_pickup_without_a_week_ago_observation_is_a_missing_pickup(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    _seed_bookings(db_session, tenant)
+
+    assert _gaps(world, "get_pickup", {"window": 7}) == [("metric.pickup", False)]
+    assert _said(world.ok("get_pickup", {"window": 7}), "non è zero", "non è nota")
+
+
+def test_the_window_comparison_always_declares_that_ninfa_has_no_year_or_budget_comparison(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    _seed_bookings(db_session, tenant)
+
+    assert _gaps(world, "compare_windows") == [("metric.period_comparison", False)]
+    observed = world.ok("compare_windows")
+    assert _said(observed, "anno scorso", "mese precedente", "budget")
+
+
+def test_the_window_comparison_also_declares_a_missing_occupancy(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=12, capacity=None, days=7))
+
+    assert _gaps(world, "compare_windows") == [
+        ("metric.period_comparison", False),
+        ("metric.occupancy", False),
+    ]
+
+
+def test_a_distribution_with_no_share_declares_the_missing_share_with_the_checks_reasons(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=2, capacity=None))
+    quality = evaluation(
+        tenant,
+        INSUFFICIENT,
+        reason_codes=(ReasonCode.OTA_BOOKING_VOLUME_LOW,),
+        ota_share_exact=None,
+        direct_share_exact=None,
+        expected_ota_share_exact=None,
+    )
+    runtime = runtime_with(world, Evaluator(quality))
+
+    assert _gaps(world, "get_distribution", runtime=runtime) == [("metric.ota_share", False)]
+    assert _said(
+        world.ok("get_distribution", runtime=runtime), "La quota OTA non è calcolabile", "troppo"
+    )
+
+
+def test_a_distribution_with_a_share_declares_nothing(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    _seed_bookings(db_session, tenant)
+    runtime = runtime_with(world, Evaluator(evaluation(tenant, CLEAR)))
+
+    assert _gaps(world, "get_distribution", runtime=runtime) == []
+
+
+def test_channel_weights_with_no_certain_bookings_are_a_missing_weight_no_denominator(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    _seed_bookings(db_session, tenant)
+    runtime = runtime_with(world, Evaluator(evaluation(tenant, CLEAR)))
+
+    assert _gaps(world, "get_channel_breakdown", runtime=runtime) == [
+        ("metric.channel_weight", False)
+    ]
+
+
+def test_a_cpor_without_the_occupancy_of_the_month_is_a_missing_cpor_not_a_cost(
+    db_session: Session, factory: BookingFactory, costs: CostWorld
+) -> None:
+    costs.invoice(date(2026, 7, 3), [(CostCategory.LAUNDRY, "700.00")])
+    costs.lead_zero(JULY, rooms=10, reconstructed=[1, 2, 3], missing=[5])
+    seed_run(db_session, costs.tenant)
+    world = mia_for(factory, db_session, costs.tenant)
+
+    observed = world.ok("get_cpor")
+
+    statuses = {
+        row.cpor_status for row in overview_for(world, 30).costs.categories if row.cpor is None
+    }
+    assert statuses, "the world must have a category with no cost per room"
+    assert _gaps(world, "get_cpor") == [("metric.cpor", False)]
+    assert _said(observed, "Il costo per camera occupata non è calcolabile")
+    # the cost of the month is still given: only the per-room figure is missing
+    assert world.ok("get_cost_metrics")["dati"] is not None
+
+
+def test_a_cpor_of_a_complete_month_declares_nothing(
+    db_session: Session, factory: BookingFactory, costs: CostWorld
+) -> None:
+    world = _cost_world(db_session, factory, costs)
+
+    assert _gaps(world, "get_cpor") == []
+
+
+def test_a_staff_incidence_without_revenue_is_a_missing_incidence_the_hours_still_given(
+    db_session: Session, factory: BookingFactory, tenant: Tenant, world: MiaWorld
+) -> None:
+    _full_week(factory, tenant)
+    seed_run(db_session, tenant)  # an analysis, but no booking snapshots at all
+
+    assert _gaps(world, "get_staff_metrics") == [("metric.labor_incidence", False)]
+    observed = world.ok("get_staff_metrics")
+    assert observed["dati"]["ore_pianificate"] is not None
+    assert _said(observed, "L'incidenza del costo del personale sui ricavi non è calcolabile")
+
+
+def test_a_plan_for_only_some_days_is_a_partial_incidence(
+    db_session: Session, factory: BookingFactory, tenant: Tenant, world: MiaWorld
+) -> None:
+    snapshot = _labor_source(factory, tenant)
+    for index in range(2):
+        _plan(
+            factory,
+            snapshot,
+            AS_OF + timedelta(days=index),
+            LaborCategory.KITCHEN,
+            600,
+            row=1 + index,
+        )
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=10, capacity=40))
+
+    gaps = _gaps(world, "get_staff_metrics")
+
+    assert gaps and gaps[0][0] == "metric.labor_incidence"
+    assert _said(world.ok("get_staff_metrics"), "incidenza")
+
+
+def test_every_gap_a_tool_can_declare_is_read_aloud_without_a_code_or_a_figure_it_lacks(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    """The sentences are said to the person: no snake_case, no enum code, no tool name."""
+    seed_run(db_session, tenant, nights=uniform_nights(AS_OF, rooms=14, capacity=None, days=14))
+    sentences: list[str] = []
+    for name, arguments in (
+        ("get_occupancy_revenue", {"night": FRIDAY}),
+        ("get_occupancy_revenue", {"window": 7}),
+        ("get_pickup", {"window": 7}),
+        ("compare_windows", {}),
+        ("get_staff_metrics", {}),
+        ("get_cpor", {}),
+    ):
+        execution = world.call(name, arguments)
+        if execution.observation is None:
+            continue
+        for gap in execution.observation.gaps:
+            sentences += [gap_statement(gap), gap_disclosure(gap)]
+    assert len(sentences) >= 6
+    for sentence in sentences:
+        assert not re.search(r"[a-z]+_[a-z]+", sentence), sentence
+        assert not re.search(r"\b[A-Z]{2,}_[A-Z_]+\b", sentence), sentence
+        assert "get_" not in sentence and sentence.endswith(".")
 
 
 # --- freshness ----------------------------------------------------------------------------------

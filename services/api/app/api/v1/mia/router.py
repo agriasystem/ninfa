@@ -152,7 +152,7 @@ def post_message(
     logger.info(
         "mia_turn conversation=%s status=%s model_calls=%d tool_calls=%d tool_failures=%d "
         "corrected=%s reasoning=%s input_tokens=%d output_tokens=%d reasoning_tokens=%d "
-        "elapsed_ms=%d failure_kind=%s",
+        "elapsed_ms=%d failure_kind=%s gap_disclosures=%d boundary=%s",
         recorded or "-",
         result.status.value,
         metrics.model_calls,
@@ -165,6 +165,8 @@ def post_message(
         metrics.reasoning_tokens,
         metrics.elapsed_ms,
         metrics.failure_kind or "-",
+        metrics.gap_disclosures,
+        metrics.boundary,
     )
     return MiaAnswerResponse(
         status=result.status.value,

@@ -52,7 +52,8 @@ from app.modules.ai.gateway.tool_protocol import (
 )
 from app.modules.ai.mia import policy
 from app.modules.ai.mia.access import AccessDomain
-from app.modules.ai.mia.completeness import looks_truncated
+from app.modules.ai.mia.boundary import OTHER_PROPERTY_ANSWER, asks_for_another_property
+from app.modules.ai.mia.completeness import looks_truncated, undisclosed_gaps, with_disclosures
 from app.modules.ai.mia.grounding import (
     observation_numbers,
     split_observation_numbers,
@@ -122,6 +123,11 @@ class _Turn:
     output_tokens: int = 0
     reasoning_tokens: int = 0
     provider_latency_ms: int = 0
+    # The person's previous message of this conversation: a follow-up ("E sabato?") asks for the
+    # same metric as the question before it, so a gap is judged against both.
+    earlier_question: str = ""
+    gap_disclosures: int = 0
+    boundary: bool = False
 
     def vocabulary(self) -> tuple[str, ...]:
         """The closed set of refs an answer may name: the general-knowledge marker and exactly the
@@ -158,6 +164,8 @@ class _Turn:
             elapsed_ms=int((now - self.started) * 1000),
             failure_kind=failure_kind,
             unavailable_reason=reason,
+            gap_disclosures=self.gap_disclosures,
+            boundary=self.boundary,
         )
 
 
@@ -196,7 +204,14 @@ class MiaOrchestrator:
             summary=summary,
             started=self._clock(),
             reasoning=policy.initial(question),
+            earlier_question=next(
+                (item.content for item in reversed(history) if item.role == "user"), ""
+            ),
         )
+        # A question for the data of ANOTHER structure is answered here, the same way whatever that
+        # structure is, before any lookup, model call or tool: nothing is read, nothing is revealed.
+        if asks_for_another_property(question, runtime.property_name):
+            return self._boundary(turn)
         executor = ToolExecutor(self._catalog, runtime)
         specs = self._catalog.specs()
         # Tool rounds + the final answer; one more call is added when the correction is spent.
@@ -314,6 +329,20 @@ class MiaOrchestrator:
             "trasversale" if definition.domain is None else definition.domain.value
         )
 
+    def _boundary(self, turn: _Turn) -> MiaTurnResult:
+        """The answer to a request for another structure's data (`boundary`): fixed text, no model
+        call, no tool, no lookup, so it is identical whatever the named structure is."""
+        turn.boundary = True
+        logger.info("mia turn status=ANSWERED boundary=other_property model_calls=0 tool_calls=0")
+        return MiaTurnResult(
+            status=AskStatus.ANSWERED,
+            answer=OTHER_PROPERTY_ANSWER,
+            grounding_refs=(),
+            limitations=(),
+            trace=(),
+            metrics=turn.metrics(self._clock()),
+        )
+
     def _unavailable(
         self, turn: _Turn, reason: str, *, failure_kind: str | None = None
     ) -> MiaTurnResult:
@@ -362,15 +391,28 @@ class MiaOrchestrator:
             )
             return _Rejected(offending, incomplete, raw)
 
+        # What the person ASKED for and the tools could not (fully) give: if the answer did not say
+        # so, the application does - from the tool's own reason, never an estimate (`completeness`).
+        undisclosed = undisclosed_gaps(
+            [gap for item in turn.observations for gap in item.gaps],
+            question=turn.question,
+            earlier_question=turn.earlier_question,
+            answer=validated.answer,
+        )
+        turn.gap_disclosures = len(undisclosed)
+        answer = with_disclosures(validated.answer, undisclosed)
+
         metrics = turn.metrics(self._clock())
         logger.info(
             "mia turn status=%s model_calls=%d tool_calls=%d tool_failures=%d corrected=%s "
-            "tools=%s reasoning=%s input_tokens=%d output_tokens=%d elapsed_ms=%d",
+            "gap_disclosures=%d tools=%s reasoning=%s input_tokens=%d output_tokens=%d "
+            "elapsed_ms=%d",
             validated.status.value,
             metrics.model_calls,
             metrics.tool_calls,
             metrics.tool_failures,
             metrics.corrected,
+            metrics.gap_disclosures,
             ",".join(trace.tool for trace in turn.traces) or "-",
             ",".join(metrics.reasoning),
             metrics.input_tokens,
@@ -379,7 +421,7 @@ class MiaOrchestrator:
         )
         return MiaTurnResult(
             status=validated.status,
-            answer=validated.answer,
+            answer=answer,
             grounding_refs=validated.grounding_refs,
             limitations=validated.limitations,
             trace=tuple(turn.traces),
