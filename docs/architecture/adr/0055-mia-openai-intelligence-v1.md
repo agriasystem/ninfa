@@ -50,6 +50,18 @@ product without a hand-written prompt that goes stale.
 10. **A failure of Mia is a dignified `UNAVAILABLE`.** HTTP 200, nothing recorded, no other screen depends on the route. Selecting
     `openai` with no key is a warning, not a startup error.
 
+11. **What cannot be calculated is said by the application, not requested of the model** (the "truthfulness closure", system policy
+    `mia-v1-6`). A live sample showed that "Quanto siamo pieni venerdì?" with 14 rooms booked and no room inventory was answered with
+    the 14 rooms and nothing else, in every run. A tool therefore declares the figure it is about and cannot give
+    (`Observation.gaps`); the gap is material only when the person asked for that metric (this question, or the one before it for a
+    follow-up); and when the answer does not say it, or does not say what is missing, the orchestrator adds one sentence written from the
+    tool's own reason, after every other check, with no estimate and no extra model call. The vocabulary that recognises the ask is a
+    closed, tested table and its limit is lexical.
+12. **Another structure is never read, and the answer does not depend on whether it exists.** A request for the data of a structure
+    other than the open one is answered before any model call, tool or lookup with one fixed text (an access boundary of NINFA, not a
+    limit of Mia; nothing was read; open that structure and ask from there), identical for a structure the person manages, one of
+    another account and one that does not exist, never repeating the typed name.
+
 ## Consequences
 
 * The pilot deployment template pins `MIA_PROVIDER=unconfigured`; enabling Mia is an operational decision with its own conditions
@@ -58,4 +70,6 @@ product without a hand-written prompt that goes stale.
 * The V2 closed-intent `POST /properties/{id}/ask` (Anthropic) is untouched and no longer used by the UI.
 * A new migration cascaded across the per-gate migration tests' head constants, as every migration does.
 * What the tests cannot prove (that a real model plans well and phrases well) is measured by the live acceptance and the evaluation
-  suite, with its limits stated in [mia-openai-intelligence-v1](../mia-openai-intelligence-v1.md).
+  suite, with its limits stated in [mia-openai-intelligence-v1](../mia-openai-intelligence-v1.md). The live acceptance and the live
+  100-scenario sample predate the final prompt `mia-v1-6`; only the offline oracle and a small targeted live check were run on it, and
+  the documents say so.

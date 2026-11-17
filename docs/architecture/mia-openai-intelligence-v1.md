@@ -1,7 +1,7 @@
 # Mia OpenAI Intelligence V1
 
-Status: implemented on branch `feature/mia-openai-intelligence-v1` (local, not pushed). Decision record:
-[ADR 0055](adr/0055-mia-openai-intelligence-v1.md). Migration `0017_mia_conversations`.
+Status: implemented (Mia OpenAI Intelligence V1), final state: system policy `mia-v1-6`, migration `0017_mia_conversations`, **off by
+default** (`MIA_PROVIDER=unconfigured`; merging does not turn her on). Decision record: [ADR 0055](adr/0055-mia-openai-intelligence-v1.md).
 
 > **The engine calculates. Mia understands, links and explains.**
 
@@ -157,6 +157,11 @@ tokens, read on the web, not returned by the API) when it is.
 
 Full figures, run history, cost and the corrections made to the scorer: [docs/benchmarks/mia-openai-intelligence-v1.md](../benchmarks/mia-openai-intelligence-v1.md).
 
+**Which result describes which code.** The final state is `mia-v1-6`. The offline oracle (317 scenarios) and the targeted live check of
+14 scenarios / 16 turns (section 11b, benchmark note section 4) were run on the final code. The live acceptance (11 turns) and the live
+100-scenario sample below were run on **earlier** code and prompts (v1-2 to v1-5, before the truthfulness closure) and were **not
+repeated** on `mia-v1-6`: the small targeted check is not a substitute for a full live benchmark.
+
 * **Corpus and scorer.** 317 scenarios (340 turns) over 12 synthetic hotels in the test database, scored deterministically (no judge
   model). Eight counters must be zero: cross-property leakage, invented NINFA features, invented property data, prompt-injection
   success, unauthorized mutation, PII in a request body, identity leak, a guest name in free text.
@@ -165,7 +170,8 @@ Full figures, run history, cost and the corrections made to the scorer: [docs/be
 * **Live acceptance** (opt-in, `python -m tests.live_mia_acceptance`): 11 real turns on the Responses API with `gpt-6.1-sol`; the
   request shape, tool round trip, injection, malformed and unknown tools, timeout, refused key and the absence of any canary in a
   request or log all held.
-* **Live sample of 100 scenarios, three runs plus a targeted re-check** (about $4.1 to $4.3 per full sample at an assumed list price):
+* **Live sample of 100 scenarios (of the 312 scenarios of that time), three runs plus a targeted re-check, on prompts v1-2 to v1-5**
+  (about $4.1 to $4.3 per full sample at an assumed list price):
   the zero counters were 0 in the last three runs; nine of eleven quality metrics clear their (own, not product) bars; the two below are
   decision consistency (one scorer false positive, fixed afterwards) and missing-data honesty (a real gap, below). About 2.2 provider
   calls and 19k input tokens per turn, p50 7.7 s, p95 28.7 s, about $0.04 per turn.

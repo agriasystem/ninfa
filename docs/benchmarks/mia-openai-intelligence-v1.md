@@ -5,6 +5,12 @@ database (every world lives in a transaction that is rolled back). Design: [mia-
 [ADR 0055](../architecture/adr/0055-mia-openai-intelligence-v1.md). Harness: `services/api/tests/benchmarks/mia_openai_v1/` (317
 scenarios, 340 turns, 12 worlds; 312 and 334 when the four runs of section 2 were made); acceptance script: `services/api/tests/live_mia_acceptance.py`.
 
+> **Which result describes which code.** The final state is system policy **`mia-v1-6`**. Only two things were measured on it:
+> the **offline oracle** (317 of 317 scenarios, every zero counter 0; sections 3 and 4) and a **targeted live check of 14 scenarios /
+> 16 turns** (section 4). Sections **1 and 2** (the live acceptance and the live 100-scenario sample) describe **earlier** code and
+> prompts (v1-2 to v1-5, before the truthfulness closure of section 4) and were **not repeated** on `mia-v1-6`. The small targeted
+> check is a check of two fixes, not an equivalent of a full live benchmark.
+
 **What this does and does not prove.** The scoring is deterministic (words, tools, figures, counters), not a judge model: a pass is
 evidence and a fail is a lead to read. A live run covers its sample (100 of the 312 scenarios, 106 of the 334 turns), not the whole
 corpus. The worlds are synthetic; real exports will differ and real-hotel validation is a separate gate. Several rates rest on a handful
@@ -12,7 +18,7 @@ of turns (stale data 4, missing data 11, decisions 14): one turn moves them by 7
 corrected after reading the first answers (below): that is the honest way to find a scorer that was wrong, and also a way to
 over-fit a benchmark, so the corrections are listed one by one.
 
-## 1. Live acceptance (`python -m tests.live_mia_acceptance`)
+## 1. Live acceptance (`python -m tests.live_mia_acceptance`), run on prompt v1-2 and the code before the closure
 
 11 real turns, 18 to 20 provider calls, about 157k to 173k input tokens (about $0.35 at the assumed price). All of these held:
 
@@ -34,7 +40,7 @@ over-fit a benchmark, so the corrections are listed one by one.
 Reasoning tokens were spent (about 1,000 over the 11 turns) but the API returned no reasoning items with a tool call, so the encrypted
 reasoning replay path is covered by the adapter tests against the real SDK and was **not exercised live**.
 
-## 2. Evaluation, stratified sample of 100 scenarios
+## 2. Evaluation, stratified sample of 100 scenarios (prompts v1-2 to v1-5, code before the closure)
 
 Four live runs, in order. Cost is at the assumed list price ($2.00 input, $10.00 output per million tokens, the figure the Smart Import
 benchmark used: read on the web, **not returned by the API**).
@@ -46,7 +52,8 @@ benchmark used: read on the web, **not returned by the API**).
 | 3 (final sample) | v1-4 | **8 of 8 zero** | 9 of 11 | $4.33 |
 | re-check of 12 related scenarios | v1-5 | **8 of 8 zero** | ten of the twelve scenarios pass | $0.59 |
 
-The delivered prompt is v1-5. The full sample was NOT repeated after v1-5 (another $4.3); only the twelve related scenarios were.
+v1-5 was the prompt at the time of these runs; the final prompt is **`mia-v1-6`** (section 4). The full sample was NOT repeated after v1-5
+(another $4.3); only the twelve related scenarios were, and nothing in this section was re-measured on `mia-v1-6`.
 
 ### Final sample (run 3, prompt v1-4)
 
@@ -126,7 +133,7 @@ Italian quality (the answers read by hand in the debug runs were natural and sho
 
 ## 3. Offline oracle run (every layer except the model)
 
-All 312 scenarios, 334 turns: every rubric is met by a scripted competent model through the REAL orchestrator, tools, worlds, guard and
+The first run, over 312 scenarios and 334 turns (the final run, over 317 and 340 turns, passes the same way; see section 4): every rubric is met by a scripted competent model through the REAL orchestrator, tools, worlds, guard and
 scorer; every zero counter is 0; no write outside `mia_conversations`; every observation under the size cap; about 15 s.
 Negative controls prove every detector fires (an invented feature, an ungrounded figure, a canary in an answer or in a request body, an
 obeyed injection, a revealed prompt, a stale answer presented as today's, a guessed missing figure, a wrong tool, a tool in a no-tool
