@@ -910,7 +910,7 @@ def _distribution(runtime: ToolRuntime, args: NoArgs) -> Observation:
     )
     notes = [
         "La quota OTA è sul totale OTA + diretto dei prossimi 30 giorni; gli altri canali non sono "
-        "nel totale. È una misura diversa dal peso di un canale (vedi get_channel_breakdown).",
+        "nel totale. È diversa dal peso di un canale (lo mostra il dettaglio per canale).",
         "Il riferimento di NINFA è il livello di quota OTA che NINFA si aspetta per questa "
         "struttura: non è un obiettivo.",
     ]

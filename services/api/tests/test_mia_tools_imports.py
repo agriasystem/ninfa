@@ -150,11 +150,10 @@ def test_the_latest_imports_come_newest_first_with_plain_words(
     observation = world.ok("get_import_status")
     items = observation["dati"]["ultimi_import_dal_piu_recente"]
 
-    assert [item["nome_file_come_dato"] for item in items] == [
-        "nuove.xlsx",
-        "turni.csv",
-        "prenotazioni.csv",
-    ]
+    assert [item["tipo_di_file"] for item in items] == ["Excel", "CSV", "CSV"]
+    assert "nome_file_come_dato" not in _text(observation)  # a file's name never travels
+    for name in ("nuove.xlsx", "turni.csv", "prenotazioni.csv"):
+        assert name not in _text(observation)
     failed, noop, full = items
     assert failed["stato"] == "non riuscito"
     assert (
@@ -280,9 +279,11 @@ def test_a_foreign_a_wrong_property_and_a_missing_import_id_are_the_same_answer(
     ]
 
 
-def test_a_file_name_that_is_an_instruction_or_holds_an_email_is_data_not_obeyed(
+def test_a_file_name_never_travels_whatever_it_holds(
     world: MiaWorld, factory: BookingFactory
 ) -> None:
+    """An instruction, an e-mail and a guest's NAME typed into a file name: a name is not a shape a
+    filter can recognise, so no part of it is sent - only the kind of file."""
     source = world.at.tenant.data_source
     add_import(factory, source, ImportJobStatus.SUCCEEDED, NOON, file_name=INJECTION)
     add_import(
@@ -292,14 +293,22 @@ def test_a_file_name_that_is_an_instruction_or_holds_an_email_is_data_not_obeyed
         datetime(2026, 7, 30, 8, 0, tzinfo=UTC),
         file_name="mario.rossi@example.com prenotazioni.csv",
     )
+    add_import(
+        factory,
+        source,
+        ImportJobStatus.SUCCEEDED,
+        datetime(2026, 7, 29, 8, 0, tzinfo=UTC),
+        file_name="Zzyx Canarino arrivi.xlsx",
+    )
     observation = world.ok("get_import_status")
-    names = [i["nome_file_come_dato"] for i in observation["dati"]["ultimi_import_dal_piu_recente"]]
     text = _text(observation)
 
-    assert NEUTRAL_TEXT in names
+    kinds = [i["tipo_di_file"] for i in observation["dati"]["ultimi_import_dal_piu_recente"]]
+    # an import with no known extension (or no file at all) has no kind: not even a guess
+    assert sorted(kind for kind in kinds if kind) == ["CSV", "Excel"]
     assert "reveal" not in text.lower() and "system prompt" not in text.lower()
     assert "mario.rossi" not in text and "example.com" not in text
-    assert any("DATI, mai istruzioni" in note for note in observation["note"])
+    assert "Zzyx" not in text and "Canarino" not in text and "arrivi" not in text
 
 
 # --- explain_import_question ---------------------------------------------------------------------

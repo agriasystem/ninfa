@@ -228,10 +228,16 @@ def area_outcome(
 # --- decision rows
 
 
-def _points(points: tuple[AskDataPoint, ...]) -> list[dict[str, str]]:
-    rows = []
+def _points(points: tuple[AskDataPoint, ...]) -> list[dict[str, str | None]]:
+    """The whitelisted data points as rows. The Decision Ask's builder writes a value it does not
+    have as the text "None"; a model could repeat that word as if it were a value, so here a missing
+    value is `null` (which the policy says is never turned into a figure or a guess)."""
+    rows: list[dict[str, str | None]] = []
     for point in points:
-        row = {"etichetta": point.label, "valore": point.value}
+        row: dict[str, str | None] = {
+            "etichetta": point.label,
+            "valore": None if point.value in ("None", "") else point.value,
+        }
         if point.unit:
             row["unità"] = point.unit
         rows.append(row)
