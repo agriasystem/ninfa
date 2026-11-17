@@ -26,6 +26,7 @@ import {
 } from "@/test/sources-support";
 
 import { ImportaFileScreen } from "./importa-file-screen";
+import { MIA_ANSWER, askMiaFromLauncher } from "@/test/mia-support";
 
 /**
  * The "Importa file" page, as the person lives it: the file is the only thing asked for; what it holds is the
@@ -33,6 +34,12 @@ import { ImportaFileScreen } from "./importa-file-screen";
  * screen. Every answer comes from a mocked backend - the page decides nothing about the data.
  */
 
+const sendMiaMock = vi.fn();
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMiaMock(...args),
+  listMiaConversations: () => Promise.resolve({ ok: true, data: { conversations: [] } }),
+  getMiaConversation: vi.fn(),
+}));
 const understandFileMock = vi.fn();
 const validateImportMock = vi.fn();
 const importMatchedFileMock = vi.fn();
@@ -148,6 +155,7 @@ function dragEvent(files: File[]) {
 }
 
 beforeEach(() => {
+  sendMiaMock.mockReset().mockResolvedValue(MIA_ANSWER);
   for (const mock of [
     understandFileMock,
     validateImportMock,
@@ -879,3 +887,19 @@ function textOf(node: Node): string {
 function flat(node: Node): string {
   return textOf(node).replace(/\s+/gu, " ").trim();
 }
+
+describe("the page - Mia knows which page this is", () => {
+  it("a message sent from the launcher carries the route, and no import until one is selected", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+
+    await askMiaFromLauncher(user, "Che file posso importare?");
+
+    expect(sendMiaMock).toHaveBeenCalledWith(PROPERTY_ID, {
+      message: "Che file posso importare?",
+      asOfLocalDate: "2026-10-23",
+      conversationId: null,
+      uiContext: { route: "/importa-file" },
+    });
+  });
+});

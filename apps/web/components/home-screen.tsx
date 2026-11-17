@@ -12,6 +12,7 @@ import { buildDomainSummary, decisionCountOf } from "@/lib/home/domain-summary";
 import { freshnessLineOf } from "@/lib/home/freshness";
 import { firstNameOf } from "@/lib/home/greeting";
 import { heroFragmentsOf, type HeroFragment } from "@/lib/home/hero-copy";
+import { PAGE_ROUTES, usePublishPage } from "@/lib/page-context/page-context";
 import { useLogoTransition } from "@/lib/motion/use-logo-transition";
 import { datiRoute, decisioniRoute, importaFileRoute, strutturaRoute } from "@/lib/routes";
 import { useSession } from "@/lib/session/session-context";
@@ -257,6 +258,7 @@ export interface HomeScreenProps {
  * property instead of showing a raw error.
  */
 export function HomeScreen({ propertyId, timeZone, onPropertyInvalid }: HomeScreenProps) {
+  usePublishPage({ route: PAGE_ROUTES.oggi });
   const { session } = useSession();
   const shellLogo = useShellLogo();
   const logo = useLogoTransition({ revealSidebarLogo: () => shellLogo.setHidden(false) });

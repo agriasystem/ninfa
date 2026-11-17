@@ -6,6 +6,7 @@ import { copy } from "@/lib/copy";
 import { decisioniCopy } from "@/lib/decisions/list-copy";
 import { buildDecisionRows } from "@/lib/decisions/list-view-model";
 import { useDecisionFeed } from "@/lib/feed/use-decision-feed";
+import { PAGE_ROUTES, usePublishPage } from "@/lib/page-context/page-context";
 
 import { DecisioniBoard } from "./decisioni-board";
 import { DecisioniHero } from "./decisioni-hero";
@@ -54,6 +55,7 @@ function DecisioniSkeleton() {
  * unless the reader chooses another sort); every other state keeps its dedicated card (`FeedStateView`), so
  * "Tutto sotto controllo" can still only ever appear for `NO_ACTION_REQUIRED`. */
 function DecisioniContent({ propertyId, timeZone, onPropertyInvalid }: DecisioniContentProps) {
+  usePublishPage({ route: PAGE_ROUTES.decisioni });
   const { busy, feed, failed, refresh } = useDecisionFeed({ propertyId, timeZone, onPropertyInvalid });
   const rows = useMemo(() => (feed === null ? [] : buildDecisionRows(feed)), [feed]);
   const onRefresh = () => void refresh();

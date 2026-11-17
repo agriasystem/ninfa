@@ -22,12 +22,16 @@ import {
   unknownCoverage,
 } from "@/test/home-support";
 
+import { PageContextProvider } from "@/lib/page-context/page-context";
+
 import { HomeScreen } from "./home-screen";
 import { ShellLogoContext } from "./shell-logo-context";
 
 const useSessionMock = vi.fn();
 const getDecisionFeedMock = vi.fn();
-const askMiaHomeMock = vi.fn();
+const sendMiaMock = vi.fn();
+const listMiaMock = vi.fn();
+const getMiaMock = vi.fn();
 
 vi.mock("@/lib/session/session-context", () => ({
   useSession: () => useSessionMock(),
@@ -35,8 +39,10 @@ vi.mock("@/lib/session/session-context", () => ({
 vi.mock("@/lib/api/decisions", () => ({
   getDecisionFeed: (...args: unknown[]) => getDecisionFeedMock(...args),
 }));
-vi.mock("@/lib/api/ask-ninfa", () => ({
-  askMiaHome: (...args: unknown[]) => askMiaHomeMock(...args),
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMiaMock(...args),
+  listMiaConversations: (...args: unknown[]) => listMiaMock(...args),
+  getMiaConversation: (...args: unknown[]) => getMiaMock(...args),
 }));
 const getAnalysisStatusMock = vi.fn();
 const requestAnalysisRefreshMock = vi.fn();
@@ -96,7 +102,9 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-10-08T12:00:00Z"));
   signedInAs("Giulia Rossi");
   getDecisionFeedMock.mockReset();
-  askMiaHomeMock.mockReset();
+  sendMiaMock.mockReset();
+  listMiaMock.mockReset().mockResolvedValue({ ok: true, data: { conversations: [] } });
+  getMiaMock.mockReset();
   resolveFeed(feed({ feed_state: "NO_ACTION_REQUIRED", as_of_local_date: TODAY }));
   getAnalysisStatusMock.mockReset();
   requestAnalysisRefreshMock.mockReset();
@@ -762,9 +770,15 @@ describe("Home - loading, error, refresh", () => {
 
 describe("Home - Mia is wired to the Home context", () => {
   it("asks about the SAME property-local business date as the feed on screen", async () => {
-    askMiaHomeMock.mockResolvedValue({
+    sendMiaMock.mockResolvedValue({
       ok: true,
-      data: { status: "ANSWERED", answer: "Una decisione.", grounding_refs: [], limitations: [] },
+      data: {
+        status: "ANSWERED",
+        answer: "Una decisione.",
+        grounding_refs: [],
+        limitations: [],
+        conversation_id: "conv-1",
+      },
     });
     const user = userEvent.setup();
     renderHome();
@@ -772,15 +786,57 @@ describe("Home - Mia is wired to the Home context", () => {
 
     await user.type(screen.getByRole("textbox", { name: "La tua domanda per Mia" }), "Quali dati ha usato NINFA oggi?{Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", TODAY, "Quali dati ha usato NINFA oggi?", []);
+    expect(sendMiaMock).toHaveBeenCalledWith("prop-1", {
+      message: "Quali dati ha usato NINFA oggi?",
+      asOfLocalDate: TODAY,
+      conversationId: null,
+      uiContext: {},
+    });
     expect(await screen.findByText("Una decisione.")).not.toBeNull();
+  });
+
+  it("tells Mia it is the Home: the screen publishes its route, and nothing else", async () => {
+    sendMiaMock.mockResolvedValue({
+      ok: true,
+      data: {
+        status: "ANSWERED",
+        answer: "Ecco.",
+        grounding_refs: [],
+        limitations: [],
+        conversation_id: "conv-1",
+      },
+    });
+    const user = userEvent.setup();
+    render(
+      <PageContextProvider>
+        <Shell>
+          <HomeScreen propertyId="prop-1" timeZone={TIME_ZONE} onPropertyInvalid={vi.fn()} />
+        </Shell>
+      </PageContextProvider>,
+    );
+    await heroHeading();
+
+    await user.type(screen.getByRole("textbox", { name: "La tua domanda per Mia" }), "Come va?{Enter}");
+
+    expect(sendMiaMock).toHaveBeenCalledWith("prop-1", {
+      message: "Come va?",
+      asOfLocalDate: TODAY,
+      conversationId: null,
+      uiContext: { route: "/oggi" },
+    });
   });
 
   it("keeps the hero context visible after an answer (no navigation away, no chat takeover)", async () => {
     resolveFeed(actionRequired(GOLDEN_FIVE_DECISION_TYPES, { as_of_local_date: TODAY }));
-    askMiaHomeMock.mockResolvedValue({
+    sendMiaMock.mockResolvedValue({
       ok: true,
-      data: { status: "ANSWERED", answer: "Sì, ce ne sono altre.", grounding_refs: [], limitations: [] },
+      data: {
+        status: "ANSWERED",
+        answer: "Sì, ce ne sono altre.",
+        grounding_refs: [],
+        limitations: [],
+        conversation_id: "conv-1",
+      },
     });
     const user = userEvent.setup();
     renderHome();

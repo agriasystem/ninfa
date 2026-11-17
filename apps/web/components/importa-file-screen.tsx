@@ -3,6 +3,7 @@
 import type { DataSourceDomain, PropertyAccess } from "@ninfa/contracts";
 
 import { strutturaRoute } from "@/lib/routes";
+import { PAGE_ROUTES, usePublishPage } from "@/lib/page-context/page-context";
 import { sourcesCopy } from "@/lib/sources/copy";
 import { useRecentImports } from "@/lib/sources/use-recent-imports";
 
@@ -23,6 +24,7 @@ function ImportaFileContent({
   onPropertyInvalid: () => void;
 }) {
   const recent = useRecentImports(property.id, onPropertyInvalid);
+  usePublishPage({ route: PAGE_ROUTES.importaFile });
 
   return (
     <div className="importa-screen">

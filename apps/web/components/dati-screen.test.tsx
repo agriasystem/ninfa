@@ -31,7 +31,14 @@ import {
 import { analysisStatusOf } from "@/test/sources-support";
 
 import { DatiScreen } from "./dati-screen";
+import { MIA_ANSWER, askMiaFromLauncher } from "@/test/mia-support";
 
+const sendMiaMock = vi.fn();
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMiaMock(...args),
+  listMiaConversations: () => Promise.resolve({ ok: true, data: { conversations: [] } }),
+  getMiaConversation: vi.fn(),
+}));
 const useSessionMock = vi.fn();
 const getDataOverviewMock = vi.fn();
 const miaMock = vi.fn();
@@ -123,6 +130,7 @@ const region = (name: string | RegExp) => screen.getByRole("region", { name });
 
 beforeEach(() => {
   getDataOverviewMock.mockReset();
+  sendMiaMock.mockReset().mockResolvedValue(MIA_ANSWER);
   miaMock.mockReset();
   signIn([property("p1", "Residenza Alba")]);
   getAnalysisStatusMock.mockReset();
@@ -1914,5 +1922,42 @@ describe("Dettaglio soggiorni - laid out to fit a desktop card", () => {
     const table = container.querySelector("table.dati-table--nights-wide");
     expect(table).not.toBeNull();
     expect(within(table as HTMLElement).getAllByRole("columnheader")).toHaveLength(10);
+  });
+});
+
+describe("Dati - Mia knows the tab and the period on screen", () => {
+  it("a message sent from the launcher carries the route, the tab and the period", async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+    await user.click(screen.getByRole("tab", { name: "Prenotazioni" }));
+    const periods = await screen.findByRole("region", { name: "Riepilogo per periodo" });
+    await user.click(within(periods).getByRole("button", { name: "7 giorni" }));
+    await user.click(screen.getByRole("tab", { name: "Costi" }));
+
+    await askMiaFromLauncher(user, "Perché è così alto?");
+
+    expect(sendMiaMock).toHaveBeenCalledWith("p1", {
+      message: "Perché è così alto?",
+      asOfLocalDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/u),
+      conversationId: null,
+      uiContext: { route: "/dati", section: "costs", period_days: 7 },
+    });
+    // Dati itself still never reaches Mia: only the person's own message, from the launcher, does.
+    expect(miaMock).not.toHaveBeenCalled();
+  });
+
+  it("follows the tab: the next message carries the new one", async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+    await askMiaFromLauncher(user, "Prima?");
+    await screen.findByText("Ecco.");
+
+    await user.click(screen.getByRole("tab", { name: "Personale" }));
+    await user.type(screen.getByRole("textbox", { name: "La tua domanda per Mia" }), "E qui?{Enter}");
+
+    await waitFor(() => expect(sendMiaMock).toHaveBeenCalledTimes(2));
+    expect(sendMiaMock).toHaveBeenLastCalledWith("p1", expect.objectContaining({
+      uiContext: { route: "/dati", section: "labor", period_days: 30 },
+    }));
   });
 });

@@ -20,7 +20,11 @@ vi.mock("@/lib/session/session-context", () => ({
 vi.mock("@/lib/api/decisions", () => ({
   getDecisionFeed: (...args: unknown[]) => getDecisionFeedMock(...args),
 }));
-vi.mock("@/lib/api/ask-ninfa", () => ({ askMiaHome: vi.fn() }));
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: vi.fn(),
+  listMiaConversations: vi.fn().mockResolvedValue({ ok: true, data: { conversations: [] } }),
+  getMiaConversation: vi.fn(),
+}));
 vi.mock("@/lib/motion/logo-trail", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/motion/logo-trail")>();
   return {

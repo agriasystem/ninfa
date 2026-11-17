@@ -12,11 +12,18 @@ import type {
 
 import { STRUTTURA_INVENTORY_ANCHOR, strutturaInventoryRoute } from "@/lib/routes";
 import { demoStructureOverview } from "@/lib/structure/demo-structure";
+import { MIA_ANSWER, askMiaFromLauncher } from "@/test/mia-support";
 import { nothingConfigured, ok } from "@/test/sources-support";
 
 import type { StrutturaActions } from "./struttura-parts";
 import { StrutturaScreen, type StructureOverviewSource } from "./struttura-screen";
 
+const sendMiaMock = vi.fn();
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMiaMock(...args),
+  listMiaConversations: () => Promise.resolve({ ok: true, data: { conversations: [] } }),
+  getMiaConversation: vi.fn(),
+}));
 const useSessionMock = vi.fn();
 const miaMock = vi.fn();
 const fetchMock = vi.fn();
@@ -149,6 +156,7 @@ const DEMO_VALUES =
 
 beforeEach(() => {
   miaMock.mockReset();
+  sendMiaMock.mockReset().mockResolvedValue(MIA_ANSWER);
   fetchMock.mockReset();
   getDataSourcesMock.mockReset();
   getDataSourcesMock.mockResolvedValue(ok(nothingConfigured()));
@@ -449,8 +457,16 @@ describe("/struttura - the profile and parameter buttons are ready but not wired
     const inventory = region("2. Inventario camere");
 
     for (const button of screen.getAllByRole("button")) {
-      // the shell's profile menu and the (fully wired) Fonti dati and inventory blocks are not under test here
-      if (button.closest(".app-sidebar") || sources.contains(button) || inventory.contains(button)) continue;
+      // the shell's profile menu and Mia's launcher, and the (fully wired) Fonti dati and inventory blocks, are
+      // not under test here
+      if (
+        button.closest(".app-sidebar") ||
+        button.classList.contains("mia-launcher") ||
+        sources.contains(button) ||
+        inventory.contains(button)
+      ) {
+        continue;
+      }
       await user.click(button);
     }
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -763,5 +779,22 @@ describe("/struttura - the room inventory, for real", () => {
     expect(await within(rooms()).findByRole("alert")).not.toBeNull();
     expect(within(rooms()).queryByRole("button", { name: "Configura inventario" })).toBeNull();
     expect(flat(rooms())).not.toContain("non è ancora configurato");
+  });
+});
+
+describe("Struttura - Mia knows which page this is", () => {
+  it("a message sent from the launcher carries the route", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { level: 1, name: "Struttura" });
+
+    await askMiaFromLauncher(user, "Come cambio il numero di camere?");
+
+    expect(sendMiaMock).toHaveBeenCalledWith("p1", {
+      message: "Come cambio il numero di camere?",
+      asOfLocalDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/u),
+      conversationId: null,
+      uiContext: { route: "/struttura" },
+    });
   });
 });

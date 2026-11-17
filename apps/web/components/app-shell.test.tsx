@@ -5,13 +5,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PropertyAccess } from "@ninfa/contracts";
 
+import { MIA_ANSWER } from "@/test/mia-support";
+import { PAGE_ROUTES, usePublishPage } from "@/lib/page-context/page-context";
+
 import { AppShell, type AppShellProps } from "./app-shell";
 import { useShellLogo } from "./shell-logo-context";
 
 const useSessionMock = vi.fn();
+const sendMiaMock = vi.fn();
 
 vi.mock("@/lib/session/session-context", () => ({
   useSession: () => useSessionMock(),
+}));
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMiaMock(...args),
+  listMiaConversations: () => Promise.resolve({ ok: true, data: { conversations: [] } }),
+  getMiaConversation: vi.fn(),
 }));
 
 function property(id: string, name: string, timezone = "Europe/Rome"): PropertyAccess {
@@ -51,6 +60,7 @@ function renderShell(props: Partial<AppShellProps> = {}) {
 beforeEach(() => {
   useSessionMock.mockReset();
   signedIn();
+  sendMiaMock.mockReset().mockResolvedValue(MIA_ANSWER);
 });
 
 describe("AppShell - structure and landmarks", () => {
@@ -377,5 +387,84 @@ describe("AppShell - logo slot", () => {
     expect(container.querySelector(".app-sidebar__logo-slot")?.getAttribute("data-hidden")).toBe(
       "false",
     );
+  });
+});
+
+describe("AppShell - Mia", () => {
+  const LAUNCHER = { name: "Apri la conversazione con Mia" };
+
+  function ScreenThatPublishes() {
+    usePublishPage({ route: PAGE_ROUTES.struttura });
+    return <div>page content</div>;
+  }
+
+  it("offers the launcher on every page, for the selected property", () => {
+    renderShell({ variant: "page" });
+    expect(screen.getByRole("button", LAUNCHER)).not.toBeNull();
+    expect(screen.getByRole("button", LAUNCHER).textContent).toBe("Parla con Mia");
+  });
+
+  it("offers it on the analytical workspace too", () => {
+    renderShell({ variant: "wide" });
+    expect(screen.getByRole("button", LAUNCHER)).not.toBeNull();
+  });
+
+  it("does not offer it on the Home: Mia is already there, with her own bar", () => {
+    renderShell({ variant: "home" });
+    expect(screen.queryByRole("button", LAUNCHER)).toBeNull();
+  });
+
+  it("does not offer it where there is no property to ask about", () => {
+    renderShell({ properties: [], selectedPropertyId: "" });
+    expect(screen.queryByRole("button", LAUNCHER)).toBeNull();
+  });
+
+  it("asks about the SELECTED property, with that property's own business date", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-08T22:30:00Z")); // already the 9th in Rome, still the 8th in Lisbon
+    try {
+      const user = userEvent.setup();
+      renderShell({
+        properties: [property("p1", "Hotel Quercia", "Europe/Lisbon"), property("p2", "Hotel Alba", "Europe/Rome")],
+        selectedPropertyId: "p2",
+      });
+
+      await user.click(screen.getByRole("button", LAUNCHER));
+      await user.type(screen.getByRole("textbox", { name: "La tua domanda per Mia" }), "Ciao{Enter}");
+
+      expect(sendMiaMock).toHaveBeenCalledWith("p2", expect.objectContaining({
+        message: "Ciao",
+        asOfLocalDate: "2026-10-09",
+      }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("holds what a screen publishes, and the panel sends it with the message", async () => {
+    const user = userEvent.setup();
+    render(
+      <AppShell
+        properties={[property("p1", "Hotel Quercia")]}
+        selectedPropertyId="p1"
+        onSelectProperty={vi.fn()}
+        onLoggedOut={vi.fn()}
+        activeSection="struttura"
+      >
+        <ScreenThatPublishes />
+      </AppShell>,
+    );
+
+    await user.click(screen.getByRole("button", LAUNCHER));
+    await user.type(screen.getByRole("textbox", { name: "La tua domanda per Mia" }), "Dove sono?{Enter}");
+
+    expect(sendMiaMock).toHaveBeenCalledWith("p1", expect.objectContaining({
+      uiContext: { route: "/struttura" },
+    }));
+  });
+
+  it("a launcher that is never pressed never calls Mia", () => {
+    renderShell();
+    expect(sendMiaMock).not.toHaveBeenCalled();
   });
 });

@@ -388,6 +388,88 @@ export interface AskResponse {
   limitations: string[];
 }
 
+// --- Mia (Mia OpenAI Intelligence V1, `app/api/v1/mia/schemas.py`) -------------------------------------
+//
+// POST/GET/DELETE under /api/v1/properties/{property_id}/mia. The browser sends ONE message, the
+// property-local business date it is looking at, optionally the id of the conversation it continues and
+// a small hint about the screen. It NEVER sends a history, a tool, a workspace or a property in the body:
+// the conversation is the server's own, and every fact is read through the backend's closed tools.
+
+/** What the browser may say about the SCREEN: a bounded hint, never DOM or free text. The backend
+ * validates every field (ids against the person's own property, routes and metrics against its product
+ * registry) and silently drops what does not check out, so a wrong value never breaks a question. */
+export interface MiaUiContext {
+  /** A canonical route TEMPLATE: "/oggi", "/decisioni", "/dati", "/importa-file", "/struttura",
+   * "/oggi/decisioni/[decisionId]". */
+  route?: string;
+  /** The section inside the page: the Dati tab id on "/dati". */
+  section?: string;
+  /** 7 or 30 on Dati. */
+  period_days?: number;
+  /** ISO dates (YYYY-MM-DD). */
+  date_from?: string;
+  date_to?: string;
+  /** A metric id of the backend's product registry (e.g. "metric.occupancy"). */
+  selected_metric?: string;
+  decision_id?: string;
+  import_id?: string;
+  /** "night" | "data_source" | "cost_category" | "labor_category" | "channel". */
+  entity_kind?: string;
+  entity_id?: string;
+}
+
+/** POST /api/v1/properties/{property_id}/mia/messages request body. */
+export interface MiaMessageRequest {
+  message: string;
+  /** ISO date (YYYY-MM-DD): the property-local business date on screen, never a server clock. */
+  as_of_local_date: string;
+  /** Absent = a NEW conversation. Present = continue one of this person's conversations about this
+   * property (anything else is a 404, the same as a missing one). */
+  conversation_id?: string | null;
+  ui_context?: MiaUiContext;
+}
+
+/** POST .../mia/messages response: the same closed `AskStatus` protocol as every Ask, plus the id of
+ * the conversation the exchange was recorded in (`null` when nothing was recorded: a refused or
+ * unavailable turn leaves no trace). */
+export interface MiaAnswerResponse {
+  status: AskStatus;
+  answer: string | null;
+  limitations: string[];
+  grounding_refs: string[];
+  conversation_id: string | null;
+}
+
+export interface MiaStoredMessage {
+  role: "user" | "assistant";
+  content: string;
+  created_at: string;
+  /** An assistant message's `AskStatus` ("ANSWERED" | "INSUFFICIENT_CONTEXT") - an open string on the
+   * wire; `null`/absent on a user message. */
+  status?: string | null;
+  limitations: string[];
+}
+
+export interface MiaConversationSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+  message_count: number;
+}
+
+/** GET .../mia/conversations: the person's recent conversations about this property, newest first. */
+export interface MiaConversationListResponse {
+  conversations: MiaConversationSummary[];
+}
+
+/** GET .../mia/conversations/{id}. */
+export interface MiaConversationResponse {
+  id: string;
+  title: string;
+  updated_at: string;
+  messages: MiaStoredMessage[];
+}
+
 // --- Dati overview API V1 (Dati UI V1, `app/api/v1/data/schemas.py`) ---------------------------------
 //
 // ONE read-only GET: GET /api/v1/properties/{property_id}/data/overview?as_of=YYYY-MM-DD&period=7|30.
