@@ -5,9 +5,11 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import type { PropertyAccess } from "@ninfa/contracts";
 
 import { copy } from "@/lib/copy";
+import { PageContextProvider } from "@/lib/page-context/page-context";
 import { useSession } from "@/lib/session/session-context";
 
 import { AppSidebar, type ShellSection } from "./app-sidebar";
+import { MiaLauncher } from "./mia-panel";
 import { PropertyHeader } from "./property-header";
 import { ShellLogoContext, type ShellLogoControl } from "./shell-logo-context";
 
@@ -33,6 +35,10 @@ export interface AppShellProps {
  * property header (name + local date) above the page. Impostazioni does not exist yet and is never a
  * link (see `AppSidebar`). Logout is the profile menu's "Esci" - the same
  * `logout()` Gate 14 wired, unchanged.
+ *
+ * It also holds what Mia needs to be page-aware: the provider that collects what the screen on display
+ * says it shows (`usePublishPage`), and - on every page but the Home, where Mia already is - the small
+ * "Parla con Mia" launcher (`MiaLauncher`).
  */
 export function AppShell({
   properties,
@@ -46,6 +52,7 @@ export function AppShell({
 }: AppShellProps) {
   const { session, logout } = useSession();
   const [logoHidden, setLogoHidden] = useState(logoInitiallyHidden);
+  const selectedProperty = properties.find((property) => property.id === selectedPropertyId);
   const logoSlotRef = useRef<HTMLDivElement>(null);
 
   const logoControl = useMemo<ShellLogoControl>(
@@ -59,35 +66,44 @@ export function AppShell({
   }
 
   return (
-    <ShellLogoContext.Provider value={logoControl}>
-      <div className="app-shell">
-        <a className="skip-link" href="#main-content">
-          {copy.nav.skipToContent}
-        </a>
-        <AppSidebar
-          selectedPropertyId={selectedPropertyId}
-          activeSection={activeSection}
-          logoHidden={logoHidden}
-          logoSlotRef={logoSlotRef}
-          displayName={session?.user.display_name ?? null}
-          email={session?.user.email ?? null}
-          onLogout={() => void handleLogout()}
-        />
-        <div className="app-shell__content">
-          <PropertyHeader
-            properties={properties}
+    <PageContextProvider>
+      <ShellLogoContext.Provider value={logoControl}>
+        <div className="app-shell">
+          <a className="skip-link" href="#main-content">
+            {copy.nav.skipToContent}
+          </a>
+          <AppSidebar
             selectedPropertyId={selectedPropertyId}
-            onSelect={onSelectProperty}
+            activeSection={activeSection}
+            logoHidden={logoHidden}
+            logoSlotRef={logoSlotRef}
+            displayName={session?.user.display_name ?? null}
+            email={session?.user.email ?? null}
+            onLogout={() => void handleLogout()}
           />
-          <main
-            id="main-content"
-            tabIndex={-1}
-            className={`app-shell__main app-shell__main--${variant}`}
-          >
-            {children}
-          </main>
+          <div className="app-shell__content">
+            <PropertyHeader
+              properties={properties}
+              selectedPropertyId={selectedPropertyId}
+              onSelect={onSelectProperty}
+            />
+            <main
+              id="main-content"
+              tabIndex={-1}
+              className={`app-shell__main app-shell__main--${variant}`}
+            >
+              {children}
+            </main>
+          </div>
+          {variant !== "home" && selectedProperty !== undefined ? (
+            <MiaLauncher
+              key={selectedProperty.id}
+              propertyId={selectedProperty.id}
+              timeZone={selectedProperty.timezone}
+            />
+          ) : null}
         </div>
-      </div>
-    </ShellLogoContext.Provider>
+      </ShellLogoContext.Provider>
+    </PageContextProvider>
   );
 }

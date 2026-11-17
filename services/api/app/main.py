@@ -10,6 +10,7 @@ from app.core.request_id import REQUEST_ID_HEADER, RequestIdMiddleware
 from app.modules.ai.gateway.factory import (
     build_import_understanding_resolver,
     build_language_model_provider,
+    build_mia_provider,
 )
 
 
@@ -40,6 +41,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.language_model_provider = build_language_model_provider(settings)
     # The optional assistant of Smart Import V3: no provider unless explicitly selected.
     app.state.import_understanding_resolver = build_import_understanding_resolver(settings)
+    # Mia, the assistant of NINFA (ADR 0055): a model only when `MIA_PROVIDER` says so, built once.
+    app.state.mia_provider = build_mia_provider(settings)
 
     # Middleware added last is outermost: RequestId must wrap CORS so every response carries the ID.
     if settings.cors_origins:

@@ -3,14 +3,25 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AskResponse } from "@ninfa/contracts";
+import type { MiaAnswerResponse } from "@ninfa/contracts";
+
+import {
+  PAGE_ROUTES,
+  PageContextProvider,
+  usePublishPage,
+  type PageState,
+} from "@/lib/page-context/page-context";
 
 import { MiaHome } from "./mia-home";
 
-const askMiaHomeMock = vi.fn();
+const sendMock = vi.fn();
+const listMock = vi.fn();
+const getMock = vi.fn();
 
-vi.mock("@/lib/api/ask-ninfa", () => ({
-  askMiaHome: (...args: unknown[]) => askMiaHomeMock(...args),
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMock(...args),
+  listMiaConversations: (...args: unknown[]) => listMock(...args),
+  getMiaConversation: (...args: unknown[]) => getMock(...args),
 }));
 
 const QUESTIONS = [
@@ -20,8 +31,27 @@ const QUESTIONS = [
   "Quali dati ha usato NINFA oggi?",
 ];
 
-function answered(answer: string, limitations: string[] = []): { ok: true; data: AskResponse } {
-  return { ok: true, data: { status: "ANSWERED", answer, grounding_refs: [], limitations } };
+function answered(
+  answer: string,
+  limitations: string[] = [],
+  conversationId: string | null = "conv-1",
+): { ok: true; data: MiaAnswerResponse } {
+  return {
+    ok: true,
+    data: {
+      status: "ANSWERED",
+      answer,
+      grounding_refs: [],
+      limitations,
+      conversation_id: conversationId,
+    },
+  };
+}
+
+/** What a message to Mia carries: the text, the business date, the conversation id (none for the
+ * first message) and the hint about the screen - NEVER a history. */
+function sentOf(message: string, conversationId: string | null = null) {
+  return { message, asOfLocalDate: "2026-10-08", conversationId, uiContext: {} };
 }
 
 function pending() {
@@ -58,8 +88,17 @@ function before(a: Node, b: Node) {
   return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 }
 
+/** Sends `question` with Enter and waits for the (mocked) answer text to show. */
+async function say(user: ReturnType<typeof userEvent.setup>, question: string, answer: string) {
+  sendMock.mockResolvedValueOnce(answered(answer));
+  await user.type(input(), `${question}{Enter}`);
+  await screen.findByText(answer);
+}
+
 beforeEach(() => {
-  askMiaHomeMock.mockReset().mockResolvedValue(answered("Una risposta fondata."));
+  sendMock.mockReset().mockResolvedValue(answered("Una risposta fondata."));
+  listMock.mockReset().mockResolvedValue({ ok: true, data: { conversations: [] } });
+  getMock.mockReset();
 });
 
 describe("MiaHome - the bar and its suggestions", () => {
@@ -110,7 +149,7 @@ describe("MiaHome - suggestions fill the input and NEVER submit", () => {
 
     expect(input().value).toBe(QUESTIONS[1]);
     expect(document.activeElement).toBe(input());
-    expect(askMiaHomeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
     expect(userMessage(container)).toBeNull();
   });
 
@@ -122,7 +161,7 @@ describe("MiaHome - suggestions fill the input and NEVER submit", () => {
       await user.click(screen.getByRole("button", { name: question }));
       expect(input().value).toBe(question);
     }
-    expect(askMiaHomeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it("the user confirms with Enter, and then it behaves exactly like typed text", async () => {
@@ -132,8 +171,8 @@ describe("MiaHome - suggestions fill the input and NEVER submit", () => {
 
     await user.keyboard("{Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", QUESTIONS[0], []);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf(QUESTIONS[0] as string));
     expect(input().value).toBe(""); // the bar is emptied...
     expect(userMessage(container)?.textContent).toContain(QUESTIONS[0]); // ...the question moved up
   });
@@ -145,7 +184,7 @@ describe("MiaHome - suggestions fill the input and NEVER submit", () => {
 
     await user.click(screen.getByRole("button", { name: "Invia la domanda a Mia" }));
 
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", QUESTIONS[3], []);
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf(QUESTIONS[3] as string));
     expect(input().value).toBe("");
     expect(userMessage(container)?.textContent).toContain(QUESTIONS[3]);
   });
@@ -158,8 +197,8 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
 
     await user.type(input(), "   Quali dati ha usato NINFA oggi?   {Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Quali dati ha usato NINFA oggi?", []);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf("Quali dati ha usato NINFA oggi?"));
   });
 
   it("the arrow button sends too", async () => {
@@ -169,8 +208,8 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
 
     await user.click(screen.getByRole("button", { name: "Invia la domanda a Mia" }));
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Ciao", []);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf("Ciao"));
   });
 
   it("an empty input sends nothing, and shows no arrow", async () => {
@@ -180,7 +219,7 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
     await user.click(input());
     await user.keyboard("{Enter}");
 
-    expect(askMiaHomeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Invia la domanda a Mia" })).toBeNull();
     expect(userMessage(container)).toBeNull();
   });
@@ -191,7 +230,7 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
 
     await user.type(input(), "     {Enter}");
 
-    expect(askMiaHomeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
     expect(userMessage(container)).toBeNull();
     expect(screen.queryByRole("button", { name: "Invia la domanda a Mia" })).toBeNull();
   });
@@ -203,13 +242,13 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
 
     await user.type(input(), "Prima riga{Shift>}{Enter}{/Shift}Seconda riga");
 
-    expect(askMiaHomeMock).not.toHaveBeenCalled(); // Shift+Enter did NOT send
+    expect(sendMock).not.toHaveBeenCalled(); // Shift+Enter did NOT send
     expect(input().value).toBe("Prima riga\nSeconda riga");
 
     await user.keyboard("{Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Prima riga\nSeconda riga", []);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf("Prima riga\nSeconda riga"));
     expect(input().value).toBe(""); // the composer is emptied, no stray new line left behind
   });
 
@@ -221,7 +260,7 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
     expect(input().value).toBe("");
     await user.type(input(), "   {Enter}");
     expect(input().value).toBe("   ");
-    expect(askMiaHomeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
   });
 
   it("Enter while composing text with an IME belongs to the composition and does not send", () => {
@@ -230,7 +269,7 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
 
     fireEvent.keyDown(input(), { key: "Enter", isComposing: true });
 
-    expect(askMiaHomeMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
     expect(input().value).toBe("ciao");
   });
 
@@ -241,7 +280,7 @@ describe("MiaHome - sending (Enter or the arrow)", () => {
     await user.type(input(), "  Prima{Shift>}{Enter}{/Shift}Seconda  ");
     await user.click(screen.getByRole("button", { name: "Invia la domanda a Mia" }));
 
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Prima\nSeconda", []);
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf("Prima\nSeconda"));
   });
 });
 
@@ -317,7 +356,7 @@ describe("MiaHome - the composer grows from 1 to 4 lines, then scrolls", () => {
       await user.click(screen.getByRole("button", { name: QUESTIONS[2] as string }));
 
       expect(input().value).toBe(QUESTIONS[2]);
-      expect(askMiaHomeMock).not.toHaveBeenCalled();
+      expect(sendMock).not.toHaveBeenCalled();
       expect(document.activeElement).toBe(input());
       await user.type(input(), " e altro");
       expect(input().value).toBe(`${QUESTIONS[2]} e altro`);
@@ -327,13 +366,13 @@ describe("MiaHome - the composer grows from 1 to 4 lines, then scrolls", () => {
 describe("MiaHome - the question leaves the bar and becomes the user's message", () => {
   it("empties the input IMMEDIATELY (before Mia has answered) and the placeholder is back", async () => {
     const request = pending();
-    askMiaHomeMock.mockReturnValue(request.promise);
+    sendMock.mockReturnValue(request.promise);
     const user = userEvent.setup();
     renderMia();
 
     await user.type(input(), "Ci sono altri problemi?{Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledTimes(1);
     expect(input().value).toBe(""); // still in flight, and already empty
     expect(input().placeholder).toBe("Chiedi a Mia...");
     request.resolve(answered("Fatto."));
@@ -343,7 +382,7 @@ describe("MiaHome - the question leaves the bar and becomes the user's message",
 
   it("shows the sent question above the bar as the user's own message - no 'LA TUA DOMANDA' card", async () => {
     const request = pending();
-    askMiaHomeMock.mockReturnValue(request.promise);
+    sendMock.mockReturnValue(request.promise);
     const user = userEvent.setup();
     const { container } = renderMia();
 
@@ -371,43 +410,44 @@ describe("MiaHome - the question leaves the bar and becomes the user's message",
 
   it("the request is made with the question as submitted, not from what is in the bar afterwards", async () => {
     const request = pending();
-    askMiaHomeMock.mockReturnValue(request.promise);
+    sendMock.mockReturnValue(request.promise);
     const user = userEvent.setup();
     renderMia();
 
     await user.type(input(), "Prima domanda{Enter}");
     await user.type(input(), "bozza della prossima");
 
-    expect(askMiaHomeMock).toHaveBeenCalledWith("prop-1", "2026-10-08", "Prima domanda", []);
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf("Prima domanda"));
     expect(input().value).toBe("bozza della prossima");
   });
 });
 
 describe("MiaHome - loading", () => {
-  it("shows a discreet 'Mia sta elaborando…' UNDER the question, not blocking anything", async () => {
-    askMiaHomeMock.mockReturnValue(new Promise(() => undefined));
+  it("shows a discreet 'Mia sta analizzando…' UNDER the question, not blocking anything", async () => {
+    sendMock.mockReturnValue(new Promise(() => undefined));
     const user = userEvent.setup();
     const { container } = renderMia();
 
     await user.type(input(), "Ciao{Enter}");
 
     const status = screen.getByRole("status");
-    expect(status.textContent).toContain("Mia sta elaborando…");
+    expect(status.textContent).toContain("Mia sta analizzando…");
     expect(before(userMessage(container) as HTMLElement, status)).toBe(true);
     expect(before(status, form())).toBe(true);
-    // Mia is named, and the old wording is gone.
+    // Mia is named, and the wording of the Decision Detail's own panel is not reused here.
     expect(within(reply(container) as HTMLElement).getByRole("heading", { name: "Mia" })).not.toBeNull();
-    expect(container.textContent).not.toContain("Mia sta analizzando");
+    expect(container.textContent).not.toContain("questa decisione");
+    expect(container.textContent).not.toMatch(/elaborando|ChatGPT|OpenAI|modello/iu);
   });
 
   it("makes the busy state perceptible: the arrow turns into a disabled spinner", async () => {
-    askMiaHomeMock.mockReturnValue(new Promise(() => undefined));
+    sendMock.mockReturnValue(new Promise(() => undefined));
     const user = userEvent.setup();
     const { container } = renderMia();
 
     await user.type(input(), "Ciao{Enter}");
 
-    const busy = screen.getByRole("button", { name: "Mia sta elaborando…" }) as HTMLButtonElement;
+    const busy = screen.getByRole("button", { name: "Mia sta analizzando…" }) as HTMLButtonElement;
     expect(busy.disabled).toBe(true);
     expect(busy.querySelector(".mia__send-spinner")).not.toBeNull();
     expect(form().getAttribute("aria-busy")).toBe("true");
@@ -416,7 +456,7 @@ describe("MiaHome - loading", () => {
   });
 
   it("keeps the input usable (and focused): the keyboard is never taken away", async () => {
-    askMiaHomeMock.mockReturnValue(new Promise(() => undefined));
+    sendMock.mockReturnValue(new Promise(() => undefined));
     const user = userEvent.setup();
     renderMia();
     await user.type(input(), "Ciao{Enter}");
@@ -426,7 +466,7 @@ describe("MiaHome - loading", () => {
   });
 
   it("locks the suggested questions while a request is in flight", async () => {
-    askMiaHomeMock.mockReturnValue(new Promise(() => undefined));
+    sendMock.mockReturnValue(new Promise(() => undefined));
     const user = userEvent.setup();
     renderMia();
 
@@ -440,7 +480,7 @@ describe("MiaHome - loading", () => {
 
 describe("MiaHome - exactly one request in flight", () => {
   it("blocks a double submit in the very same tick (Enter + click, key repeat)", async () => {
-    askMiaHomeMock.mockReturnValue(new Promise(() => undefined));
+    sendMock.mockReturnValue(new Promise(() => undefined));
     const user = userEvent.setup();
     renderMia();
     await user.type(input(), "Una sola volta");
@@ -451,34 +491,31 @@ describe("MiaHome - exactly one request in flight", () => {
       fireEvent.submit(form());
     });
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
   it("a draft typed while Mia answers cannot be sent until she has finished", async () => {
     const request = pending();
-    askMiaHomeMock.mockReturnValueOnce(request.promise);
+    sendMock.mockReturnValueOnce(request.promise);
     const user = userEvent.setup();
     renderMia();
     await user.type(input(), "Prima{Enter}");
     await user.type(input(), "Seconda");
 
     await user.keyboard("{Enter}"); // ignored: one request at a time
-    expect((screen.getByRole("button", { name: "Mia sta elaborando…" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
+    expect((screen.getByRole("button", { name: "Mia sta analizzando…" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(sendMock).toHaveBeenCalledTimes(1);
     expect(input().value).toBe("Seconda"); // the draft is untouched
 
-    askMiaHomeMock.mockResolvedValueOnce(answered("Risposta alla seconda."));
+    sendMock.mockResolvedValueOnce(answered("Risposta alla seconda."));
     request.resolve(answered("Risposta alla prima."));
     await screen.findByText("Risposta alla prima.");
 
     const arrow = screen.getByRole("button", { name: "Invia la domanda a Mia" }) as HTMLButtonElement;
     expect(arrow.disabled).toBe(false); // sending is available again
     await user.click(arrow);
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(2);
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "Seconda", [
-      { role: "user", content: "Prima" },
-      { role: "assistant", content: "Risposta alla prima." },
-    ]);
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", sentOf("Seconda", "conv-1"));
   });
 });
 
@@ -504,16 +541,16 @@ describe("MiaHome - focus stays with the user", () => {
 
     await user.keyboard("{Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(input());
   });
 
   it("Riprova hands the focus back to the input as well", async () => {
-    askMiaHomeMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    sendMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
     const user = userEvent.setup();
     renderMia();
     await user.type(input(), "La mia domanda{Enter}");
-    await screen.findByText("Non è stato possibile ottenere una risposta da Mia.");
+    await screen.findByText("Al momento non riesco a completare l'analisi con Mia.");
 
     await user.click(screen.getByRole("button", { name: "Riprova" }));
 
@@ -524,7 +561,7 @@ describe("MiaHome - focus stays with the user", () => {
 
 describe("MiaHome - Mia's reply", () => {
   it("appears BELOW the submitted question, under Mia's name, as open text (not a boxed card)", async () => {
-    askMiaHomeMock.mockResolvedValue(answered("Hai una decisione aperta.", ["Costi non analizzati."]));
+    sendMock.mockResolvedValue(answered("Hai una decisione aperta.", ["Costi non analizzati."]));
     const user = userEvent.setup();
     const { container } = renderMia();
 
@@ -586,14 +623,7 @@ describe("MiaHome - Mia's reply", () => {
   });
 });
 
-describe("MiaHome - a short conversation, not a chat page", () => {
-  /** Sends `question` with Enter and waits for the (mocked) answer text to show. */
-  async function say(user: ReturnType<typeof userEvent.setup>, question: string, answer: string) {
-    askMiaHomeMock.mockResolvedValueOnce(answered(answer));
-    await user.type(input(), `${question}{Enter}`);
-    await screen.findByText(answer);
-  }
-
+describe("MiaHome - a conversation, not a chat page", () => {
   it("a NEW question is ADDED under the previous exchange, which stays visible", async () => {
     const user = userEvent.setup();
     const { container } = renderMia();
@@ -612,67 +642,47 @@ describe("MiaHome - a short conversation, not a chat page", () => {
     expect(before(messages[0] as Node, messages[1] as Node)).toBe(true); // oldest first
   });
 
-  it("the first question carries no history; the next carries the exchange before it", async () => {
+  it("the first message starts a conversation; the next continues it BY ITS ID, never with a history", async () => {
     const user = userEvent.setup();
     renderMia();
 
     await say(user, "Qual è la priorità più urgente?", "La prima nell'ordine di NINFA.");
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith(
-      "prop-1",
-      "2026-10-08",
-      "Qual è la priorità più urgente?",
-      [],
-    );
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", sentOf("Qual è la priorità più urgente?"));
 
     await say(user, "Perché?", "Perché i dati mostrano un pickup basso.");
 
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "Perché?", [
-      { role: "user", content: "Qual è la priorità più urgente?" },
-      { role: "assistant", content: "La prima nell'ordine di NINFA." },
-    ]);
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", sentOf("Perché?", "conv-1"));
+    // The wire contract: the text, the date, the conversation id and the screen hint - nothing else.
+    for (const [, input] of sendMock.mock.calls as [string, Record<string, unknown>][]) {
+      expect(Object.keys(input).sort()).toEqual(["asOfLocalDate", "conversationId", "message", "uiContext"]);
+    }
   });
 
-  it("the history is the answers as Mia wrote them (not the rendered list), oldest first", async () => {
+  it("a message that left no trace on the server (unavailable, refused) never sets a conversation", async () => {
     const user = userEvent.setup();
     renderMia();
-    const listAnswer = "Sì, oltre alla prima:\n- Dipendenza OTA\n- Costo per camera";
-    askMiaHomeMock.mockResolvedValueOnce(answered(listAnswer));
-    await user.type(input(), "Altri problemi?{Enter}");
-    await screen.findByText("Dipendenza OTA");
-
-    await say(user, "Dimmi di più", "Ecco.");
-
-    const [, , , history] = askMiaHomeMock.mock.calls[1] as [string, string, string, unknown];
-    expect(history).toEqual([
-      { role: "user", content: "Altri problemi?" },
-      { role: "assistant", content: listAnswer },
-    ]);
-  });
-
-  it("an exchange that failed, was refused or was unavailable is never part of the history", async () => {
-    const user = userEvent.setup();
-    renderMia();
-    askMiaHomeMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    sendMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
     await user.type(input(), "Domanda persa{Enter}");
-    await screen.findByText("Non è stato possibile ottenere una risposta da Mia.");
-    askMiaHomeMock.mockResolvedValueOnce({
+    await screen.findByText("Al momento non riesco a completare l'analisi con Mia.");
+    sendMock.mockResolvedValueOnce({
       ok: true,
-      data: { status: "REFUSED", answer: null, grounding_refs: [], limitations: [] },
+      data: {
+        status: "REFUSED",
+        answer: null,
+        grounding_refs: [],
+        limitations: [],
+        conversation_id: null,
+      },
     });
     await user.type(input(), "Abbassa il prezzo{Enter}");
     await screen.findByText("Mia non può rispondere a questa domanda.");
 
     await say(user, "Una domanda buona", "Una risposta buona.");
-    await say(user, "E poi?", "Poi basta.");
 
-    expect(askMiaHomeMock).toHaveBeenNthCalledWith(3, "prop-1", "2026-10-08", "Una domanda buona", []);
-    expect(askMiaHomeMock).toHaveBeenNthCalledWith(4, "prop-1", "2026-10-08", "E poi?", [
-      { role: "user", content: "Una domanda buona" },
-      { role: "assistant", content: "Una risposta buona." },
-    ]);
+    expect(sendMock).toHaveBeenNthCalledWith(3, "prop-1", sentOf("Una domanda buona"));
   });
 
-  it("keeps only the newest four exchanges, and the history is exactly what is still on screen", async () => {
+  it("keeps only the newest four exchanges on screen (the rest stay in the server's conversation)", async () => {
     const user = userEvent.setup();
     const { container } = renderMia();
 
@@ -684,29 +694,21 @@ describe("MiaHome - a short conversation, not a chat page", () => {
     expect(messages).toHaveLength(4);
     expect(messages[0]).toContain("D2?");
     expect(messages[3]).toContain("D5?");
-    expect(screen.queryByText("R1.")).toBeNull(); // the oldest left the screen...
-    const [, , , history] = askMiaHomeMock.mock.calls[4] as [string, string, string, unknown[]];
-    expect(history).toEqual([
-      { role: "user", content: "D2?" },
-      { role: "assistant", content: "R2." },
-      { role: "user", content: "D3?" },
-      { role: "assistant", content: "R3." },
-      { role: "user", content: "D4?" },
-      { role: "assistant", content: "R4." },
-    ]); // ...and out of what the model is told: three exchanges + the new question = four
-    expect(history.length).toBeLessThanOrEqual(6);
+    expect(screen.queryByText("R1.")).toBeNull();
+    // ...and the fifth message still continued the same conversation
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", sentOf("D5?", "conv-1"));
   });
 
   it("while the new question runs, the earlier answers stay and only the newest shows loading", async () => {
     const user = userEvent.setup();
     const { container } = renderMia();
     await say(user, "Prima?", "Prima risposta.");
-    askMiaHomeMock.mockReturnValueOnce(new Promise(() => undefined));
+    sendMock.mockReturnValueOnce(new Promise(() => undefined));
 
     await user.type(input(), "Seconda?{Enter}");
 
     expect(screen.getByText("Prima risposta.")).not.toBeNull();
-    expect(screen.getByRole("status").textContent).toContain("Mia sta elaborando…");
+    expect(screen.getByRole("status").textContent).toContain("Mia sta analizzando…");
     expect(container.querySelectorAll(".mia__thinking")).toHaveLength(1);
   });
 
@@ -756,27 +758,23 @@ describe("MiaHome - a short conversation, not a chat page", () => {
     }
   });
 
-  it("a retry re-sends the SAME question with the history it originally had", async () => {
+  it("a retry re-sends the SAME message into the same conversation", async () => {
     const user = userEvent.setup();
     renderMia();
     await say(user, "Prima?", "Prima risposta.");
-    askMiaHomeMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    sendMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
     await user.type(input(), "Seconda?{Enter}");
-    await screen.findByText("Non è stato possibile ottenere una risposta da Mia.");
-    askMiaHomeMock.mockResolvedValueOnce(answered("Seconda risposta."));
+    await screen.findByText("Al momento non riesco a completare l'analisi con Mia.");
+    sendMock.mockResolvedValueOnce(answered("Seconda risposta."));
 
     await user.click(screen.getByRole("button", { name: "Riprova" }));
 
     await screen.findByText("Seconda risposta.");
-    const expectedHistory = [
-      { role: "user", content: "Prima?" },
-      { role: "assistant", content: "Prima risposta." },
-    ];
-    expect(askMiaHomeMock).toHaveBeenNthCalledWith(2, "prop-1", "2026-10-08", "Seconda?", expectedHistory);
-    expect(askMiaHomeMock).toHaveBeenNthCalledWith(3, "prop-1", "2026-10-08", "Seconda?", expectedHistory);
+    expect(sendMock).toHaveBeenNthCalledWith(2, "prop-1", sentOf("Seconda?", "conv-1"));
+    expect(sendMock).toHaveBeenNthCalledWith(3, "prop-1", sentOf("Seconda?", "conv-1"));
   });
 
-  it("'Nuova conversazione' clears the exchanges and the next question carries no history", async () => {
+  it("'Nuova conversazione' clears the exchanges and the next message starts a NEW conversation", async () => {
     const user = userEvent.setup();
     const { container } = renderMia();
     await say(user, "Prima?", "Prima risposta.");
@@ -788,13 +786,13 @@ describe("MiaHome - a short conversation, not a chat page", () => {
     expect(container.querySelector(".mia")?.getAttribute("data-answering")).toBe("false");
     expect(document.activeElement).toBe(input());
     await say(user, "Nuova?", "Nuova risposta.");
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "Nuova?", []);
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", sentOf("Nuova?")); // no conversation id
   });
 
   it("'Nuova conversazione' is not available while Mia is answering", async () => {
     const user = userEvent.setup();
     renderMia();
-    askMiaHomeMock.mockReturnValueOnce(new Promise(() => undefined));
+    sendMock.mockReturnValueOnce(new Promise(() => undefined));
     await user.type(input(), "Ciao{Enter}");
 
     expect((screen.getByRole("button", { name: "Nuova conversazione" }) as HTMLButtonElement).disabled).toBe(
@@ -802,24 +800,38 @@ describe("MiaHome - a short conversation, not a chat page", () => {
     );
   });
 
-  it("a different property or business date starts a different conversation", async () => {
+  it("a different property is a different conversation; a different business date is not", async () => {
     const user = userEvent.setup();
     const { container, rerender, onFirstInput } = renderMia();
     await say(user, "Prima?", "Prima risposta.");
     expect(container.querySelectorAll(".mia__exchange")).toHaveLength(1);
 
-    rerender(<MiaHome propertyId="prop-2" asOfLocalDate="2026-10-08" onFirstInput={onFirstInput} />);
+    // the same property on another business date: the conversation goes on, the date is just sent
+    rerender(<MiaHome propertyId="prop-1" asOfLocalDate="2026-10-09" onFirstInput={onFirstInput} />);
+    expect(container.querySelectorAll(".mia__exchange")).toHaveLength(1);
+    sendMock.mockResolvedValueOnce(answered("Domani."));
+    await user.type(input(), "E domani?{Enter}");
+    await screen.findByText("Domani.");
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", {
+      ...sentOf("E domani?", "conv-1"),
+      asOfLocalDate: "2026-10-09",
+    });
+
+    rerender(<MiaHome propertyId="prop-2" asOfLocalDate="2026-10-09" onFirstInput={onFirstInput} />);
 
     expect(container.querySelectorAll(".mia__exchange")).toHaveLength(0);
-    askMiaHomeMock.mockResolvedValueOnce(answered("Risposta nuova."));
+    sendMock.mockResolvedValueOnce(answered("Risposta nuova."));
     await user.type(input(), "Altra?{Enter}");
     await screen.findByText("Risposta nuova.");
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-2", "2026-10-08", "Altra?", []);
+    expect(sendMock).toHaveBeenLastCalledWith("prop-2", {
+      ...sentOf("Altra?"),
+      asOfLocalDate: "2026-10-09",
+    });
   });
 
-  it("an answer that lands after the conversation was reset is ignored", async () => {
+  it("an answer that lands after the property changed is ignored", async () => {
     const stale = pending();
-    askMiaHomeMock.mockReturnValueOnce(stale.promise);
+    sendMock.mockReturnValueOnce(stale.promise);
     const user = userEvent.setup();
     const { container, rerender, onFirstInput } = renderMia();
     await user.type(input(), "Lenta?{Enter}");
@@ -831,7 +843,7 @@ describe("MiaHome - a short conversation, not a chat page", () => {
     expect(screen.queryByText("Risposta tardiva della proprietà vecchia.")).toBeNull();
     expect(container.querySelectorAll(".mia__exchange")).toHaveLength(0);
     // and the new property is not blocked by the stale request
-    askMiaHomeMock.mockResolvedValueOnce(answered("Subito."));
+    sendMock.mockResolvedValueOnce(answered("Subito."));
     await user.type(input(), "Ora?{Enter}");
     await screen.findByText("Subito.");
   });
@@ -840,19 +852,167 @@ describe("MiaHome - a short conversation, not a chat page", () => {
     const user = userEvent.setup();
     renderMia();
     await say(user, "Prima?", "Prima risposta.");
-    askMiaHomeMock.mockReturnValueOnce(new Promise(() => undefined));
+    sendMock.mockReturnValueOnce(new Promise(() => undefined));
     await user.type(input(), "Seconda?{Enter}");
 
     await user.type(input(), "Terza?{Enter}");
 
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(2);
+    expect(sendMock).toHaveBeenCalledTimes(2);
     expect(input().value).toBe("Terza?");
+  });
+});
+
+describe("MiaHome - the conversation comes back from the server", () => {
+  const STORED = {
+    id: "conv-9",
+    title: "Perché venerdì è debole?",
+    updated_at: "2026-10-08T09:00:00Z",
+    messages: [
+      { role: "user", content: "Perché venerdì è debole?", created_at: "2026-10-08T08:59:00Z", limitations: [] },
+      {
+        role: "assistant",
+        content: "Perché le prenotazioni per venerdì sono poche.",
+        created_at: "2026-10-08T09:00:00Z",
+        status: "ANSWERED",
+        limitations: ["Solo prenotazioni attuali."],
+      },
+    ],
+  };
+
+  function storedConversationExists() {
+    listMock.mockResolvedValue({
+      ok: true,
+      data: {
+        conversations: [{ id: "conv-9", title: STORED.title, updated_at: STORED.updated_at, message_count: 2 }],
+      },
+    });
+    getMock.mockResolvedValue({ ok: true, data: STORED });
+  }
+
+  it("restores the latest conversation on mount and CONTINUES it with its id", async () => {
+    storedConversationExists();
+    const user = userEvent.setup();
+    const { container } = renderMia();
+
+    expect(await screen.findByText("Perché le prenotazioni per venerdì sono poche.")).not.toBeNull();
+    expect(userMessage(container)?.textContent).toContain("Perché venerdì è debole?");
+    expect(screen.getByText("Solo prenotazioni attuali.")).not.toBeNull();
+    expect(listMock).toHaveBeenCalledWith("prop-1");
+    expect(getMock).toHaveBeenCalledWith("prop-1", "conv-9");
+    expect(container.querySelector(".mia")?.getAttribute("data-answering")).toBe("true");
+
+    sendMock.mockResolvedValueOnce(answered("E sabato?", [], "conv-9"));
+    await user.type(input(), "E sabato?{Enter}");
+    await screen.findAllByText("E sabato?");
+    expect(sendMock).toHaveBeenCalledWith("prop-1", sentOf("E sabato?", "conv-9"));
+  });
+
+  it("restoring does not count as the person typing (the logo transition does not start)", async () => {
+    storedConversationExists();
+    const { onFirstInput } = renderMia();
+
+    await screen.findByText("Perché le prenotazioni per venerdì sono poche.");
+
+    expect(onFirstInput).not.toHaveBeenCalled();
+  });
+
+  it("shows nothing when there is no stored conversation, or when it cannot be read", async () => {
+    const { container } = renderMia();
+    await waitFor(() => expect(listMock).toHaveBeenCalled());
+    expect(container.querySelectorAll(".mia__exchange")).toHaveLength(0);
+
+    listMock.mockResolvedValue({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    const second = render(<MiaHome propertyId="prop-3" asOfLocalDate="2026-10-08" onFirstInput={vi.fn()} />);
+    await waitFor(() => expect(listMock).toHaveBeenCalledWith("prop-3"));
+    expect(second.container.querySelectorAll(".mia__exchange")).toHaveLength(0);
+    expect(screen.queryByRole("alert")).toBeNull(); // a failed restore is silent
+  });
+
+  it("never replaces what the person already sent with a conversation that arrives late", async () => {
+    const late = pending();
+    listMock.mockReturnValue(late.promise);
+    const user = userEvent.setup();
+    renderMia();
+    await say(user, "Subito?", "Risposta subito.");
+
+    late.resolve({
+      ok: true,
+      data: { conversations: [{ id: "conv-9", title: "t", updated_at: STORED.updated_at, message_count: 2 }] },
+    });
+    getMock.mockResolvedValue({ ok: true, data: STORED });
+    await act(async () => undefined);
+
+    expect(screen.getByText("Risposta subito.")).not.toBeNull();
+    expect(screen.queryByText("Perché le prenotazioni per venerdì sono poche.")).toBeNull();
+  });
+
+  it("replaces a conversation the server no longer has with a new one, once, without an error", async () => {
+    storedConversationExists();
+    const user = userEvent.setup();
+    renderMia();
+    await screen.findByText("Perché le prenotazioni per venerdì sono poche.");
+    sendMock
+      .mockResolvedValueOnce({ ok: false, status: 404, code: "CONVERSATION_NOT_FOUND", message: "x" })
+      .mockResolvedValueOnce(answered("Una nuova risposta.", [], "conv-new"));
+
+    await user.type(input(), "E sabato?{Enter}");
+
+    expect(await screen.findByText("Una nuova risposta.")).not.toBeNull();
+    expect(sendMock).toHaveBeenNthCalledWith(1, "prop-1", sentOf("E sabato?", "conv-9"));
+    expect(sendMock).toHaveBeenNthCalledWith(2, "prop-1", sentOf("E sabato?"));
+    expect(screen.queryByText("Al momento non riesco a completare l'analisi con Mia.")).toBeNull();
+  });
+});
+
+describe("MiaHome - page-aware: the screen's hint travels with the message", () => {
+  function Publisher({ state }: { state: PageState }) {
+    usePublishPage(state);
+    return null;
+  }
+
+  it("sends the context the screen published, at the moment of sending, and nothing else", async () => {
+    const user = userEvent.setup();
+    render(
+      <PageContextProvider>
+        <Publisher state={{ route: PAGE_ROUTES.dati, section: "costs", periodDays: 7 }} />
+        <MiaHome propertyId="prop-1" asOfLocalDate="2026-10-08" onFirstInput={vi.fn()} />
+      </PageContextProvider>,
+    );
+
+    await user.type(input(), "Perché è così alto?{Enter}");
+
+    expect(sendMock).toHaveBeenCalledWith("prop-1", {
+      ...sentOf("Perché è così alto?"),
+      uiContext: { route: "/dati", section: "costs", period_days: 7 },
+    });
+  });
+
+  it("follows the screen: a new publication is what the NEXT message carries", async () => {
+    const user = userEvent.setup();
+    const view = (state: PageState) => (
+      <PageContextProvider>
+        <Publisher state={state} />
+        <MiaHome propertyId="prop-1" asOfLocalDate="2026-10-08" onFirstInput={vi.fn()} />
+      </PageContextProvider>
+    );
+    const { rerender } = render(view({ route: PAGE_ROUTES.dati, section: "costs", periodDays: 30 }));
+    await user.type(input(), "Prima?{Enter}");
+    await screen.findByText("Una risposta fondata.");
+
+    rerender(view({ route: PAGE_ROUTES.dati, section: "labor", periodDays: 30 }));
+    await user.type(input(), "E qui?{Enter}");
+
+    await waitFor(() => expect(sendMock).toHaveBeenCalledTimes(2));
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", {
+      ...sentOf("E qui?", "conv-1"),
+      uiContext: { route: "/dati", section: "labor", period_days: 30 },
+    });
   });
 });
 
 describe("MiaHome - every answer status keeps the sent question visible", () => {
   async function ask(response: unknown, question = "La mia domanda") {
-    askMiaHomeMock.mockResolvedValue(response);
+    sendMock.mockResolvedValue(response);
     const user = userEvent.setup();
     const utils = renderMia();
     await user.type(input(), `${question}{Enter}`);
@@ -892,7 +1052,7 @@ describe("MiaHome - every answer status keeps the sent question visible", () => 
   it("INSUFFICIENT_CONTEXT without an answer text still reads cleanly", async () => {
     await ask({
       ok: true,
-      data: { status: "INSUFFICIENT_CONTEXT", answer: null, grounding_refs: [], limitations: [] },
+      data: { status: "INSUFFICIENT_CONTEXT", answer: null, grounding_refs: [], limitations: [], conversation_id: null },
     });
     expect(
       await screen.findByText(
@@ -971,22 +1131,22 @@ describe("MiaHome - every answer status keeps the sent question visible", () => 
   it("UNAVAILABLE offers a manual retry, never retries by itself, and keeps the question", async () => {
     const { container } = await ask({
       ok: true,
-      data: { status: "UNAVAILABLE", answer: null, grounding_refs: [], limitations: [] },
+      data: { status: "UNAVAILABLE", answer: null, grounding_refs: [], limitations: [], conversation_id: null },
     });
 
-    expect(await screen.findByText("Mia non è disponibile in questo momento.")).not.toBeNull();
+    expect(await screen.findByText("Al momento non riesco a completare l'analisi con Mia.")).not.toBeNull();
     expect(screen.getByRole("alert")).not.toBeNull();
     expect(userMessage(container)?.textContent).toContain("La mia domanda");
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1); // no automatic retry
+    expect(sendMock).toHaveBeenCalledTimes(1); // no automatic retry
   });
 
   it("a network/API error shows one calm line and a manual retry - never the raw message", async () => {
     const { container } = await ask({ ok: false, status: 0, code: "NETWORK_ERROR", message: "offline" });
 
-    expect(await screen.findByText("Non è stato possibile ottenere una risposta da Mia.")).not.toBeNull();
+    expect(await screen.findByText("Al momento non riesco a completare l'analisi con Mia.")).not.toBeNull();
     expect(screen.queryByText("offline")).toBeNull();
     expect(userMessage(container)?.textContent).toContain("La mia domanda");
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
   it("every status renders INSIDE Mia's reply region, under the sent question", async () => {
@@ -998,7 +1158,7 @@ describe("MiaHome - every answer status keeps the sent question visible", () => 
     for (const entry of statuses) {
       const { container, unmount } = await ask({
         ok: true,
-        data: { ...entry, grounding_refs: [], limitations: [] },
+        data: { ...entry, grounding_refs: [], limitations: [], conversation_id: null },
       });
       await waitFor(() => expect(reply(container)?.querySelector(".mia__reply-body")?.textContent).toBeTruthy());
       expect(before(userMessage(container) as HTMLElement, reply(container) as HTMLElement)).toBe(true);
@@ -1009,52 +1169,52 @@ describe("MiaHome - every answer status keeps the sent question visible", () => 
 
 describe("MiaHome - retry", () => {
   it("re-sends the SAME submitted question as a fresh call, without retyping it", async () => {
-    askMiaHomeMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    sendMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
     const user = userEvent.setup();
     const { container } = renderMia();
     await user.type(input(), "La mia domanda{Enter}");
-    await screen.findByText("Non è stato possibile ottenere una risposta da Mia.");
+    await screen.findByText("Al momento non riesco a completare l'analisi con Mia.");
     expect(input().value).toBe(""); // nothing to retype: the bar is empty
-    askMiaHomeMock.mockResolvedValueOnce(answered("Ora funziona."));
+    sendMock.mockResolvedValueOnce(answered("Ora funziona."));
 
     await user.click(screen.getByRole("button", { name: "Riprova" }));
 
     expect(await screen.findByText("Ora funziona.")).not.toBeNull();
-    expect(askMiaHomeMock).toHaveBeenCalledTimes(2);
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "La mia domanda", []);
-    expect(screen.queryByText("Non è stato possibile ottenere una risposta da Mia.")).toBeNull();
+    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", sentOf("La mia domanda"));
+    expect(screen.queryByText("Al momento non riesco a completare l'analisi con Mia.")).toBeNull();
     expect(container.querySelectorAll(".mia__user-message")).toHaveLength(1);
   });
 
   it("never touches a draft the user is typing meanwhile", async () => {
-    askMiaHomeMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
+    sendMock.mockResolvedValueOnce({ ok: false, status: 0, code: "NETWORK_ERROR", message: "x" });
     const user = userEvent.setup();
     renderMia();
     await user.type(input(), "La mia domanda{Enter}");
-    await screen.findByText("Non è stato possibile ottenere una risposta da Mia.");
+    await screen.findByText("Al momento non riesco a completare l'analisi con Mia.");
     await user.type(input(), "una bozza");
 
     await user.click(screen.getByRole("button", { name: "Riprova" }));
 
     await screen.findByText("Una risposta fondata.");
-    expect(askMiaHomeMock).toHaveBeenLastCalledWith("prop-1", "2026-10-08", "La mia domanda", []);
+    expect(sendMock).toHaveBeenLastCalledWith("prop-1", sentOf("La mia domanda"));
     expect(input().value).toBe("una bozza");
   });
 
   it("while the retry runs the question stays visible and the loading state shows again", async () => {
-    askMiaHomeMock.mockResolvedValueOnce({
+    sendMock.mockResolvedValueOnce({
       ok: true,
-      data: { status: "UNAVAILABLE", answer: null, grounding_refs: [], limitations: [] },
+      data: { status: "UNAVAILABLE", answer: null, grounding_refs: [], limitations: [], conversation_id: null },
     });
     const user = userEvent.setup();
     const { container } = renderMia();
     await user.type(input(), "La mia domanda{Enter}");
-    await screen.findByText("Mia non è disponibile in questo momento.");
-    askMiaHomeMock.mockReturnValueOnce(new Promise(() => undefined));
+    await screen.findByText("Al momento non riesco a completare l'analisi con Mia.");
+    sendMock.mockReturnValueOnce(new Promise(() => undefined));
 
     await user.click(screen.getByRole("button", { name: "Riprova" }));
 
-    expect(screen.getByRole("status").textContent).toContain("Mia sta elaborando…");
+    expect(screen.getByRole("status").textContent).toContain("Mia sta analizzando…");
     expect(userMessage(container)?.textContent).toContain("La mia domanda");
   });
 });

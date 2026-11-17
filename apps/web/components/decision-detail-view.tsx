@@ -16,6 +16,7 @@ import { formatMoney } from "@/lib/decisions/format";
 import { whySentence } from "@/lib/decisions/why-copy";
 import { formatLocalDateItalian } from "@/lib/date/local-date";
 import { decisioniRoute } from "@/lib/routes";
+import { PAGE_ROUTES, usePublishPage } from "@/lib/page-context/page-context";
 
 import { AskNinfaPanel } from "./ask-ninfa-panel";
 import { DecisionTimeline } from "./decision-timeline";
@@ -75,6 +76,7 @@ export interface DecisionDetailViewProps {
 }
 
 export function DecisionDetailView({ propertyId, decisionId }: DecisionDetailViewProps) {
+  usePublishPage({ route: PAGE_ROUTES.decisionDetail, decisionId });
   const [detailState, setDetailState] = useState<DetailLoadState>({ kind: "loading" });
   const [historyState, setHistoryState] = useState<HistoryLoadState>({ kind: "loading" });
   const [loadingMore, setLoadingMore] = useState(false);

@@ -14,7 +14,7 @@ from app.db.base import Base
 from app.db.migration_filters import include_object
 from tests.support import alembic_config
 
-HEAD = "0016_remembered_scope"  # V1.2.2's own migration, and the real current global head
+HEAD = "0017_mia_conversations"  # Mia's own migration, and the real current global head
 GATE_23B_HEAD = "0012_input_provenance"
 GATE_22_HEAD = "0011_analysis_coverage"
 GATE_13_HEAD = "0010_auth_session"
@@ -67,10 +67,13 @@ GATE_13_TABLES = {"user_credentials", "auth_sessions"}
 # V1.2 (0014_same_day_revisions) adds no table: a revision column on three, a flag on import jobs.
 # V1.2.1 (0015_import_scope) adds none either: what an import was known to be, and removed bookings.
 # V1.2.2 (0016_remembered_scope) adds none either: what was remembered when an import was read.
+# Mia (0017_mia_conversations) adds one: the conversations of a user with Mia about a property.
 GATE_26B_HEAD = "0013_property_analysis_policy"
 V1_2_HEAD = "0014_same_day_revisions"
 V1_2_1_HEAD = "0015_import_scope"
+V1_2_2_HEAD = "0016_remembered_scope"
 GATE_26B_TABLES = {"property_analysis_policies"}
+MIA_TABLES = {"mia_conversations"}
 MODEL_TABLES = (
     GATE_1_TABLES
     | GATE_2_TABLES
@@ -81,6 +84,7 @@ MODEL_TABLES = (
     | GATE_11_TABLES
     | GATE_13_TABLES
     | GATE_26B_TABLES
+    | MIA_TABLES
 )
 GATE_0_TABLES = {
     "alembic_version",
@@ -104,6 +108,7 @@ TENANT_OWNED_TABLES = (
     | GATE_8_TABLES
     | GATE_11_TABLES
     | GATE_26B_TABLES
+    | MIA_TABLES
     # GATE_13_TABLES is deliberately excluded: user_credentials/auth_sessions key off users.id,
     # a global identity, and carry no workspace_id at all.
 )
@@ -137,7 +142,7 @@ def at_head(db_engine: Engine, test_database_url: str) -> Iterator[None]:
 # --- revision history ------------------------------------------------------------------------
 
 
-def test_gate_0_to_v1_2_1_migrations_are_untouched_and_v1_2_2_sits_on_top(
+def test_gate_0_to_v1_2_2_migrations_are_untouched_and_mia_sits_on_top(
     test_database_url: str,
 ) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
@@ -145,7 +150,8 @@ def test_gate_0_to_v1_2_1_migrations_are_untouched_and_v1_2_2_sits_on_top(
     assert scripts.get_heads() == [HEAD]
     revisions = {rev.revision: rev.down_revision for rev in scripts.walk_revisions()}
     assert revisions == {
-        HEAD: V1_2_1_HEAD,
+        HEAD: V1_2_2_HEAD,
+        V1_2_2_HEAD: V1_2_1_HEAD,
         V1_2_1_HEAD: V1_2_HEAD,
         V1_2_HEAD: GATE_26B_HEAD,
         GATE_26B_HEAD: GATE_23B_HEAD,
@@ -299,13 +305,16 @@ def test_delete_policy_only_memberships_cascade(db_engine: Engine, at_head: None
         # credential and sessions with it, there is no history of a deleted user to protect.
         "fk_user_credentials_user_id_users",
         "fk_auth_sessions_user_id_users",
+        # Mia: a conversation is the person's own text; revoking the membership deletes it (and must
+        # not be blocked by it). Its link to the property stays RESTRICT, like every other table.
+        "fk_mia_conversations_workspace_id_workspace_memberships",
     }
     assert {name for name, rule in rules.items() if rule == "CASCADE"} == cascade_names
     assert {rule for name, rule in rules.items() if name not in cascade_names} == {"RESTRICT"}
     # 6 Gate 1 + 7 Gate 2 + 3 Gate 3 + 5 Gate 4 + 14 Gate 6 + 7 Gate 8 + 5 Gate 11 + 2 Gate 13
-    # + 2 Gate 26B + 2 Import Scope;
+    # + 2 Gate 26B + 2 Import Scope + 2 Mia;
     # classify a new FK here (user_credentials->users, auth_sessions->users: both CASCADE)
-    assert len(rules) == 53
+    assert len(rules) == 55
 
 
 def test_every_tenant_owned_table_has_a_not_null_workspace_id(

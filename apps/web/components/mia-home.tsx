@@ -10,13 +10,10 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import type { AskHomeHistoryMessage } from "@ninfa/contracts";
-
-import { askMiaHome } from "@/lib/api/ask-ninfa";
 import { miaHomeCopy } from "@/lib/ask-ninfa/copy";
-import { historyOf, retainRecent, type Exchange } from "@/lib/ask-ninfa/conversation";
-import { answerBlocksOf } from "@/lib/ask-ninfa/format-answer";
-import { MAX_QUESTION_LENGTH, stateFromResponse, type AskState } from "@/lib/ask-ninfa/state";
+import { MAX_QUESTION_LENGTH } from "@/lib/ask-ninfa/state";
+import { useMiaUiContextReader } from "@/lib/mia/ui-context";
+import { useMiaConversation } from "@/lib/mia/use-mia-conversation";
 
 import {
   ArrowUpIcon,
@@ -26,7 +23,7 @@ import {
   SpinnerIcon,
   TrendIcon,
 } from "./icons";
-import { NinfaLogo } from "./ninfa-logo";
+import { MiaExchangeView } from "./mia-exchange";
 
 const SUGGESTION_ICONS = [SearchIcon, ListIcon, TrendIcon, DatabaseIcon] as const;
 
@@ -47,64 +44,45 @@ export interface MiaHomeProps {
 }
 
 /**
- * "Chiedi a Mia..." on the Home: the suggested questions, a short conversation and the dark composer.
+ * "Chiedi a Mia..." on the Home: the suggested questions, the conversation and the dark composer.
  *
  * SEND EXPERIENCE (like a modern assistant): Enter (or the arrow) acquires the text as the submitted
  * question, EMPTIES the composer immediately, shows the question above the bar as the user's own
- * message and, under it, Mia's reply (a discreet "Mia sta elaborando…" while the request runs).
+ * message and, under it, Mia's reply (a discreet "Mia sta analizzando…" while the request runs).
  *
- * A SMALL CONVERSATION, not a chat page (Mia V2): the newest few exchanges of this page session stay
- * visible in a bounded area above the bar (it scrolls inside itself, so the operational Home is never
- * pushed away) and are sent back with each new question as `history`, so a follow-up such as
- * "Perché?" can be understood. The history is referential context only - the backend rebuilds every
- * fact fresh for each question. Nothing is persisted: it is lost on reload (or "Nuova conversazione").
- * Exactly one request may be in flight (guarded synchronously, not just through state); a retry
- * re-sends the SAME submitted question with the history it originally had.
+ * A CONVERSATION, not a chat page: the newest few exchanges stay visible in a bounded area above the
+ * bar (it scrolls inside itself, so the operational Home is never pushed away). The conversation
+ * itself is the SERVER's (`useMiaConversation`): it comes back after a refresh or a navigation, a
+ * follow-up such as "Perché?" is understood from what the server holds, and the browser never sends a
+ * history - only the message, the business date, the conversation id and a small hint about the screen
+ * (`ui_context`, published by the screens). Exactly one request may be in flight (guarded
+ * synchronously); a retry re-sends the SAME message.
  *
  * Suggested questions only ever FILL the composer - the user confirms with Enter / the arrow. The
  * composer is an auto-growing `<textarea>` (1 to 4 lines, then it scrolls): Enter sends, Shift+Enter
  * inserts a new line (and Enter during IME composition never sends). It is NEVER disabled while Mia
  * answers - focus must not be taken away from the user - only sending is blocked until the request
  * ends (the arrow turns into a spinner), and a draft of the next question can already be typed.
- * There is no microphone: no voice feature exists.
+ * There is no microphone: no voice feature exists. There is no streaming either: the backend checks
+ * the whole answer before it leaves, so the reply appears once, complete.
  *
- * ENGINE CALCULATES, MIA EXPLAINS: this component sends the question, the business date and the short
- * history, and renders the answer; the facts Mia answers from are built server-side, only from what
- * NINFA already decided or calculated for that property and date.
+ * ENGINE CALCULATES, MIA EXPLAINS: this component sends the message and renders the answer; every
+ * fact Mia answers from is read server-side, from what NINFA already decided or calculated.
  */
 export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProps) {
   const [question, setQuestion] = useState("");
-  const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inFlightRef = useRef(false);
-  const tokenRef = useRef(0);
-  const exchangesRef = useRef<Exchange[]>([]);
-  const nextIdRef = useRef(0);
   const inputId = useId();
 
+  const getUiContext = useMiaUiContextReader();
+  const conversation = useMiaConversation({ propertyId, asOfLocalDate, getUiContext });
+  const { exchanges } = conversation;
+
   const latest = exchanges[exchanges.length - 1];
-  const submitting = latest?.state.kind === "loading";
+  const submitting = conversation.status === "sending";
   const hasText = question.trim().length > 0;
   const canSubmit = !submitting && hasText;
-
-  function commit(next: Exchange[]) {
-    exchangesRef.current = next;
-    setExchanges(next);
-  }
-
-  // A different property or business date is a different analysis: the conversation does not carry
-  // over (and a late answer of the old one is ignored - see `settle`).
-  const scopeRef = useRef(`${propertyId}|${asOfLocalDate}`);
-  useEffect(() => {
-    const scope = `${propertyId}|${asOfLocalDate}`;
-    if (scopeRef.current === scope) return;
-    scopeRef.current = scope;
-    // The old analysis' request (if any) can no longer block, nor land on, the new conversation.
-    tokenRef.current += 1;
-    inFlightRef.current = false;
-    commit([]);
-  }, [propertyId, asOfLocalDate]);
 
   // The composer grows with its content (1-4 lines), and shrinks back when it is emptied.
   useLayoutEffect(() => {
@@ -126,54 +104,17 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
     if (value.trim().length > 0) onFirstInput();
   }
 
-  /** Sets the state of exchange `id`, unless it is gone (reset, or pushed out of the newest few). */
-  function settle(id: number, state: AskState, scope: string) {
-    if (scope !== scopeRef.current) return;
-    commit(
-      exchangesRef.current.map((exchange) => (exchange.id === id ? { ...exchange, state } : exchange)),
-    );
-  }
-
-  /** `retryOf`: the id of an exchange whose question is re-sent as it was (same history, any draft in
-   * the composer untouched). Otherwise `text` is a NEW question typed in the composer: it is emptied
-   * and a fresh exchange begins. */
-  async function send(text: string, retryOf?: number) {
-    if (inFlightRef.current) return; // blocks a double submit synchronously (Enter + click, key repeat)
-    const trimmed = text.trim();
-    if (trimmed.length === 0) return;
-    inFlightRef.current = true;
-    const token = ++tokenRef.current;
-    onFirstInput();
-
-    const scope = scopeRef.current;
-    let id: number;
-    let history: AskHomeHistoryMessage[];
-    if (retryOf === undefined) {
-      id = nextIdRef.current++;
-      const fresh: Exchange = { id, question: trimmed, state: { kind: "loading" } };
-      const retained = retainRecent([...exchangesRef.current, fresh]);
-      // What the model is told is exactly what is on screen BEFORE this question.
-      history = historyOf(retained.slice(0, -1));
-      commit(retained);
+  /** A NEW question typed in the composer: it is emptied only if it was really sent. */
+  function send(text: string) {
+    if (conversation.send(text)) {
+      onFirstInput();
       setQuestion("");
-    } else {
-      id = retryOf;
-      const position = exchangesRef.current.findIndex((exchange) => exchange.id === id);
-      history = historyOf(exchangesRef.current.slice(0, Math.max(position, 0)));
-      settle(id, { kind: "loading" }, scope);
-    }
-
-    try {
-      const result = await askMiaHome(propertyId, asOfLocalDate, trimmed, history);
-      settle(id, result.ok ? stateFromResponse(result.data) : { kind: "error" }, scope);
-    } finally {
-      if (tokenRef.current === token) inFlightRef.current = false;
     }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void send(question);
+    send(question);
     // The user stays in the field they were typing in - also when the arrow (a button that is about
     // to turn into a spinner) was what they pressed - so the keyboard is never lost after sending.
     inputRef.current?.focus();
@@ -183,7 +124,7 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
     // Enter sends; Shift+Enter is a new line. Enter while composing (IME) belongs to the composition.
     if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
     event.preventDefault();
-    void send(question);
+    send(question);
   }
 
   function pickSuggestedQuestion(text: string) {
@@ -192,9 +133,7 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
   }
 
   function startOver() {
-    if (inFlightRef.current) return;
-    commit([]);
-    inputRef.current?.focus();
+    if (conversation.startNew()) inputRef.current?.focus();
   }
 
   return (
@@ -240,13 +179,13 @@ export function MiaHome({ propertyId, asOfLocalDate, onFirstInput }: MiaHomeProp
             </div>
             <div className="mia__conversation-scroll" ref={scrollRef}>
               {exchanges.map((exchange, index) => (
-                <MiaExchange
+                <MiaExchangeView
                   key={exchange.id}
                   asked={exchange.question}
                   state={exchange.state}
                   isLatest={index === exchanges.length - 1}
                   onRetry={() => {
-                    void send(exchange.question, exchange.id);
+                    conversation.retry(exchange.id);
                     inputRef.current?.focus();
                   }}
                 />
@@ -309,160 +248,4 @@ function autosize(element: HTMLTextAreaElement) {
   const contentHeight = element.scrollHeight;
   element.style.height = `${Math.min(contentHeight, maxHeight)}px`;
   element.style.overflowY = contentHeight > maxHeight ? "auto" : "hidden";
-}
-
-/**
- * One exchange: the user's own message (right-aligned, softly tinted - clearly "mine", never a boxed
- * form summary) and, under it, Mia's reply (open text under her name, no card). Only the NEWEST
- * exchange's reply is the polite live region: loading and the answer are announced, older replies
- * and the rest of the Home are not read again.
- */
-function MiaExchange({
-  asked,
-  state,
-  isLatest,
-  onRetry,
-}: {
-  asked: string;
-  state: AskState;
-  isLatest: boolean;
-  onRetry: () => void;
-}) {
-  return (
-    <div className="mia__exchange" data-latest={isLatest ? "true" : "false"}>
-      <p className="mia__user-message">
-        <span className="visually-hidden">{miaHomeCopy.askedPrefix} </span>
-        {asked}
-      </p>
-
-      <section
-        className="mia__reply"
-        aria-live={isLatest ? "polite" : undefined}
-        aria-atomic={isLatest ? "false" : undefined}
-        aria-busy={state.kind === "loading"}
-      >
-        <div className="mia__reply-header">
-          <NinfaLogo className="mia__reply-logo" />
-          <h2 className="mia__reply-name">{miaHomeCopy.assistantName}</h2>
-        </div>
-        <div className="mia__reply-body" key={state.kind}>
-          <MiaReplyBody state={state} onRetry={onRetry} />
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function MiaReplyBody({ state, onRetry }: { state: AskState; onRetry: () => void }) {
-  switch (state.kind) {
-    case "idle":
-      return null;
-
-    case "loading":
-      return (
-        <p className="mia__thinking" role="status">
-          <span>{miaHomeCopy.submitting}</span>
-          <span className="mia__thinking-dots" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-        </p>
-      );
-
-    case "answered":
-      return (
-        <>
-          <AnswerText text={state.answer} />
-          <Limitations items={state.limitations} />
-        </>
-      );
-
-    case "insufficientContext": {
-      // Mia's own explanation of what she cannot say IS the answer: it stands alone, with her
-      // specific limits underneath. The generic "non ha abbastanza informazioni" lead and its
-      // "riformula la domanda" hint are only the fallback for a reply that carries no text - they
-      // are never put around a concrete explanation (that would be a generic disclaimer wrapped
-      // around the real answer).
-      if (state.answer !== null && state.answer.trim().length > 0) {
-        return (
-          <>
-            <AnswerText text={state.answer} />
-            <Limitations items={state.limitations} />
-          </>
-        );
-      }
-      return (
-        <>
-          <p className="mia__reply-lead">{miaHomeCopy.insufficientContextHeading}</p>
-          <p className="mia__note">{miaHomeCopy.insufficientContextSupporting}</p>
-          <Limitations items={state.limitations} />
-        </>
-      );
-    }
-
-    case "refused":
-      return (
-        <p className="mia__reply-text" role="status">
-          {miaHomeCopy.refused}
-        </p>
-      );
-
-    case "unavailable":
-      return (
-        <div role="alert">
-          <p className="mia__reply-lead">{miaHomeCopy.unavailableHeading}</p>
-          <p className="mia__note">{miaHomeCopy.unavailableSupporting}</p>
-          <button type="button" className="mia__retry" onClick={onRetry}>
-            {miaHomeCopy.retry}
-          </button>
-        </div>
-      );
-
-    case "error":
-      return (
-        <div role="alert">
-          <p className="mia__reply-lead">{miaHomeCopy.networkError}</p>
-          <button type="button" className="mia__retry" onClick={onRetry}>
-            {miaHomeCopy.retry}
-          </button>
-        </div>
-      );
-  }
-}
-
-/** Mia's answer as short paragraphs and, when she lists several decisions, a real list. Plain text
- * with line structure only - see `answerBlocksOf` (nothing is interpreted as Markdown or HTML). */
-function AnswerText({ text }: { text: string }) {
-  return (
-    <>
-      {answerBlocksOf(text).map((block, index) =>
-        block.kind === "paragraph" ? (
-          <p className="mia__reply-text" key={index}>
-            {block.text}
-          </p>
-        ) : (
-          <ul className="mia__reply-list" key={index}>
-            {block.items.map((item, itemIndex) => (
-              <li key={itemIndex}>{item}</li>
-            ))}
-          </ul>
-        ),
-      )}
-    </>
-  );
-}
-
-function Limitations({ items }: { items: string[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div className="mia__limitations">
-      <h3>{miaHomeCopy.limitationsHeading}</h3>
-      <ul>
-        {items.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-    </div>
-  );
 }

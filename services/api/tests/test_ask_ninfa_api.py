@@ -240,12 +240,20 @@ def test_62_recommendation_stays_unpersisted(
     assert decision_table_counts(db_session) == before
 
 
+# The ONE table of Mia, the assistant of NINFA (ADR 0055, migration 0017): the person's own
+# conversation with her. The single-turn Decision Ask this test is about still writes nothing and
+# has no such table.
+MIA_OWN_TABLE = "mia_conversations"
+
+
 def test_63_no_conversation_or_message_table_exists_to_write_to(db_session: Session) -> None:
     from sqlalchemy import inspect as sa_inspect
 
     table_names = set(sa_inspect(db_session.get_bind()).get_table_names())
     forbidden_substrings = ("conversation", "message", "chat", "ask_")
     for table_name in table_names:
+        if table_name == MIA_OWN_TABLE:
+            continue  # Mia's own, deliberate, NINFA-owned table (ADR 0055); the Ask itself has none
         lowered = table_name.lower()
         for forbidden in forbidden_substrings:
             assert forbidden not in lowered, table_name

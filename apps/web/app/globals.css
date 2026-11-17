@@ -7012,3 +7012,184 @@ a.nav-item[aria-current="page"] .nav-item__icon path:last-child {
   line-height: 1.5;
   color: var(--home-greeting);
 }
+
+/* --- Mia on every page but the Home: launcher + side panel (Mia OpenAI Intelligence V1) ------------- */
+
+/* Minimal on purpose: the full redesign of Mia comes with the new design system. The launcher is a quiet
+   capsule in the corner (the same ink as the Home's bar); the panel is a non-modal dialog above it. No
+   status colour is used anywhere: a reply is text, an error is one calm line. */
+.mia-launcher {
+  position: fixed;
+  z-index: 60;
+  right: clamp(16px, 2vw, 28px);
+  bottom: clamp(16px, 2vw, 28px);
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--home-bar);
+  color: #fff;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(26, 36, 80, 0.26);
+}
+
+.mia-launcher:hover {
+  background: #1f242d;
+}
+
+.mia-launcher:focus-visible {
+  outline: 3px solid var(--home-focus);
+  outline-offset: 3px;
+}
+
+.mia-panel {
+  position: fixed;
+  z-index: 60;
+  right: clamp(16px, 2vw, 28px);
+  bottom: calc(clamp(16px, 2vw, 28px) + 56px);
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 120px));
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--home-hairline);
+  border-radius: 20px;
+  background: var(--color-surface);
+  color: var(--home-ink);
+  box-shadow: 0 18px 48px rgba(26, 36, 80, 0.24);
+  overflow: hidden;
+}
+
+.mia-panel__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 10px 18px;
+  border-bottom: 1px solid var(--home-hairline);
+}
+
+.mia-panel__title {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mia-panel__tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mia-panel__close {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--home-muted);
+  cursor: pointer;
+}
+
+.mia-panel__close:hover {
+  color: var(--home-ink);
+  background: rgba(214, 227, 252, 0.45);
+}
+
+.mia-panel__close:focus-visible,
+.mia-panel__send:focus-visible {
+  outline: 3px solid var(--home-focus);
+  outline-offset: 2px;
+}
+
+.mia-panel__close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.mia-panel__messages {
+  position: relative; /* so the newest exchange's offsetTop is measured inside this area */
+  flex: 1 1 auto;
+  min-height: 140px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.mia-panel__intro {
+  margin: 0;
+  color: var(--home-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.mia-panel__form {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--home-hairline);
+}
+
+.mia-panel__input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--home-hairline);
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--home-ink);
+  font: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  resize: none;
+}
+
+.mia-panel__input:focus-visible {
+  outline: 3px solid var(--home-focus);
+  outline-offset: 1px;
+}
+
+.mia-panel__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--home-bar);
+  color: #fff;
+  cursor: pointer;
+}
+
+.mia-panel__send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.mia-panel__send svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 640px) {
+  .mia-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    bottom: calc(clamp(16px, 2vw, 28px) + 56px);
+    max-height: calc(100vh - 96px);
+  }
+}

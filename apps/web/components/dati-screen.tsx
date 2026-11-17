@@ -6,6 +6,7 @@ import { useAnalysisStatus } from "@/lib/analysis/use-analysis-status";
 import { datiCopy } from "@/lib/data/copy";
 import type { DatiTab } from "@/lib/data/tabs";
 import { useDataOverview } from "@/lib/data/use-data-overview";
+import { PAGE_ROUTES, usePublishPage } from "@/lib/page-context/page-context";
 
 import { AnalysisNotice } from "./analysis-notice";
 import { DatiSkeleton } from "./dati-skeleton";
@@ -77,6 +78,7 @@ function DatiContent({
   onSelectPeriod,
   onPropertyInvalid,
 }: DatiContentProps) {
+  usePublishPage({ route: PAGE_ROUTES.dati, section: tab, periodDays: period });
   const { busy, data, failed, refresh } = useDataOverview({
     propertyId,
     timeZone,

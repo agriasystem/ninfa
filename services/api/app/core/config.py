@@ -79,6 +79,20 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
     openai_data_residency: Literal["global", "us", "eu", "ae", "au", "in", "jp"] | None = None
 
+    # Mia, the assistant of NINFA (Mia OpenAI Intelligence V1, ADR 0055): the OpenAI Responses API
+    # with a closed catalog of read-only NINFA tools. SEPARATE from Smart Import's layer above: its
+    # own switch, its own model setting, no shared behaviour - only the key, the endpoint and the
+    # data residency are shared, because they describe the account, not a feature. `unconfigured`
+    # (the default) means Mia answers "unavailable" and NINFA works exactly as before; an API key
+    # alone never turns Mia on (the same rule as every provider here, ADR 0025). Selecting `openai`
+    # with no key is NOT a startup error: Mia stays unavailable and the app says so once (a failure
+    # of Mia must never stop NINFA).
+    mia_provider: Literal["unconfigured", "openai"] = "unconfigured"
+    mia_openai_model: str = Field(default="gpt-6.1-sol", min_length=1, max_length=100)
+    # Per model call. A whole turn has its own, longer deadline
+    # (`ai.mia.types.TURN_DEADLINE_SECONDS`).
+    mia_openai_timeout_seconds: float = Field(default=40.0, ge=1.0, le=120.0)
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: Any) -> Any:

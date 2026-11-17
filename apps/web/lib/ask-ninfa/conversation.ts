@@ -1,19 +1,15 @@
-import type { AskHomeHistoryMessage } from "@ninfa/contracts";
-
 import type { AskState } from "./state";
 
 /**
- * The short conversation of the Mia Home page session (Mia V2): a handful of exchanges kept ONLY in
- * the page's memory - never stored, lost on reload - and sent back with each new question so that a
- * follow-up ("Perché?", "Intendo gli OTA, sono a posto?") can be understood.
- *
- * It is referential context, not business truth: the backend rebuilds every fact fresh from NINFA for
- * each question, so an old answer on screen can never turn into a "known fact" for the next one.
+ * The exchanges Mia shows on screen: the newest few of the person's conversation. The conversation
+ * itself is the SERVER's (Mia OpenAI Intelligence V1): it is restored after a refresh or a navigation,
+ * and the browser never sends it back - a follow-up such as "Perché?" is understood from what the
+ * server holds, and every fact is read again through the backend's tools for each question. What is
+ * kept here is only what is drawn.
  */
 
-/** The newest exchanges kept (and shown), INCLUDING the one being asked. The history sent with a new
- * question is therefore at most `MAX_EXCHANGES - 1` complete exchanges (the backend accepts up to 4,
- * so there is headroom). */
+/** The newest exchanges shown, INCLUDING the one being asked: the area above the bar stays small, so
+ * the operational Home is never pushed away (older ones stay in the server's conversation). */
 export const MAX_EXCHANGES = 4;
 
 export interface Exchange {
@@ -24,33 +20,7 @@ export interface Exchange {
   state: AskState;
 }
 
-/** Mia's answer text of a finished exchange, or `null` when it has none worth remembering (still
- * loading, refused, unavailable, a network error, or a reply without text). */
-export function answerTextOf(state: AskState): string | null {
-  if (state.kind === "answered" || state.kind === "insufficientContext") {
-    const text = state.answer?.trim() ?? "";
-    return text.length > 0 ? text : null;
-  }
-  return null;
-}
-
 /** The newest `MAX_EXCHANGES` of `exchanges`. */
 export function retainRecent(exchanges: readonly Exchange[]): Exchange[] {
   return exchanges.slice(-MAX_EXCHANGES);
-}
-
-/** The history to send for a question that comes AFTER `prior`: only COMPLETE exchanges (a question
- * with Mia's answer text), oldest first, as alternating user/assistant messages. An exchange that
- * failed, was refused or is still loading contributes nothing - a lone question would break the
- * strict user/assistant alternation the backend requires, and a refusal must never be replayed as
- * context. */
-export function historyOf(prior: readonly Exchange[]): AskHomeHistoryMessage[] {
-  return prior.flatMap((exchange) => {
-    const answer = answerTextOf(exchange.state);
-    if (answer === null) return [];
-    return [
-      { role: "user" as const, content: exchange.question },
-      { role: "assistant" as const, content: answer },
-    ];
-  });
 }

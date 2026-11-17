@@ -19,9 +19,16 @@ import {
 } from "@/test/home-support";
 
 import { DecisioniScreen } from "./decisioni-screen";
+import { MIA_ANSWER, askMiaFromLauncher } from "@/test/mia-support";
 import { HomeScreen } from "./home-screen";
 import { ShellLogoContext } from "./shell-logo-context";
 
+const sendMiaMock = vi.fn();
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMiaMock(...args),
+  listMiaConversations: () => Promise.resolve({ ok: true, data: { conversations: [] } }),
+  getMiaConversation: vi.fn(),
+}));
 const useSessionMock = vi.fn();
 const getDecisionFeedMock = vi.fn();
 
@@ -83,6 +90,7 @@ function ranks(container: HTMLElement): (string | null | undefined)[] {
 
 beforeEach(() => {
   getDecisionFeedMock.mockReset();
+  sendMiaMock.mockReset().mockResolvedValue(MIA_ANSWER);
   signIn([property("p1", "Hotel Quercia")]);
   resolve(actionRequired(GOLDEN_FIVE_DECISION_TYPES));
 });
@@ -531,5 +539,22 @@ describe("/decisioni - loading, error, refresh, properties", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("/decisioni - Mia knows which page this is", () => {
+  it("a message sent from the launcher carries the route, and nothing else", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    await rowLinks(5);
+
+    await askMiaFromLauncher(user, "Quale decisione è più urgente?");
+
+    expect(sendMiaMock).toHaveBeenCalledWith("p1", {
+      message: "Quale decisione è più urgente?",
+      asOfLocalDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/u),
+      conversationId: null,
+      uiContext: { route: "/decisioni" },
+    });
   });
 });

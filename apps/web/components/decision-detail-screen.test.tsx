@@ -6,7 +6,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PropertyAccess, SessionContextResponse } from "@ninfa/contracts";
 
 import { DecisionDetailScreen } from "./decision-detail-screen";
+import { MIA_ANSWER, askMiaFromLauncher } from "@/test/mia-support";
 
+const sendMiaMock = vi.fn();
+vi.mock("@/lib/api/mia", () => ({
+  sendMiaMessage: (...args: unknown[]) => sendMiaMock(...args),
+  listMiaConversations: () => Promise.resolve({ ok: true, data: { conversations: [] } }),
+  getMiaConversation: vi.fn(),
+}));
 const useSessionMock = vi.fn();
 const getDecisionDetailMock = vi.fn();
 const getDecisionHistoryMock = vi.fn();
@@ -32,6 +39,7 @@ function session(properties: PropertyAccess[]): SessionContextResponse {
 }
 
 beforeEach(() => {
+  sendMiaMock.mockReset().mockResolvedValue(MIA_ANSWER);
   getDecisionDetailMock.mockReset().mockResolvedValue({
     ok: true,
     data: {
@@ -269,5 +277,60 @@ describe("DecisionDetailScreen - the sidebar shell (Home UI V1)", () => {
     await user.click(screen.getByRole("button", { name: "Profilo e account" }));
 
     expect(screen.getByRole("button", { name: "Esci" })).not.toBeNull();
+  });
+});
+
+describe("DecisionDetailScreen - Mia knows which decision is open", () => {
+  const DECISION_ID = "6f1c0a52-3b7e-4f1c-9d6a-0b8f5c2e7a11";
+
+  it("a message sent from the launcher carries the detail route and the decision id", async () => {
+    useSessionMock.mockReturnValue({
+      status: "authenticated",
+      session: session([property("prop-1", "Masseria Ninfa")]),
+      logout: vi.fn(),
+    });
+    const user = userEvent.setup();
+    render(
+      <DecisionDetailScreen
+        decisionId={DECISION_ID}
+        requestedPropertyId="prop-1"
+        onNavigateToOggi={vi.fn()}
+        onNavigateToLogin={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(getDecisionDetailMock).toHaveBeenCalled());
+
+    await askMiaFromLauncher(user, "Perché me lo stai dicendo?");
+
+    expect(sendMiaMock).toHaveBeenCalledWith("prop-1", {
+      message: "Perché me lo stai dicendo?",
+      asOfLocalDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/u),
+      conversationId: null,
+      uiContext: { route: "/oggi/decisioni/[decisionId]", decision_id: DECISION_ID },
+    });
+  });
+
+  it("a decision id that is not the shape the backend checks is simply not sent", async () => {
+    useSessionMock.mockReturnValue({
+      status: "authenticated",
+      session: session([property("prop-1", "Masseria Ninfa")]),
+      logout: vi.fn(),
+    });
+    const user = userEvent.setup();
+    render(
+      <DecisionDetailScreen
+        decisionId="dec-1"
+        requestedPropertyId="prop-1"
+        onNavigateToOggi={vi.fn()}
+        onNavigateToLogin={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(getDecisionDetailMock).toHaveBeenCalled());
+
+    await askMiaFromLauncher(user, "Perché me lo stai dicendo?");
+
+    expect(sendMiaMock).toHaveBeenCalledWith("prop-1", expect.objectContaining({
+      uiContext: { route: "/oggi/decisioni/[decisionId]" },
+    }));
   });
 });

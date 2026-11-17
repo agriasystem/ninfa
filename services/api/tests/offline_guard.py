@@ -34,6 +34,7 @@ FORCED = {
     "SMART_IMPORT_AI_MODE": "off",
     "IMPORT_UNDERSTANDING_PROVIDER": "unconfigured",
     "ASK_NINFA_PROVIDER": "unconfigured",
+    "MIA_PROVIDER": "unconfigured",
 }
 # Dropped: with the switches off they do nothing, and a test of a default must see the default.
 REMOVED = (
@@ -44,6 +45,8 @@ REMOVED = (
     "SMART_IMPORT_OPENAI_REASONING",
     "SMART_IMPORT_OPENAI_TIMEOUT_SECONDS",
     "SMART_IMPORT_AI_VOCABULARY_CERTAINTY",
+    "MIA_OPENAI_MODEL",
+    "MIA_OPENAI_TIMEOUT_SECONDS",
     "ANTHROPIC_API_KEY",
 )
 

@@ -15,7 +15,11 @@ from app.modules.ai.gateway.anthropic_provider import (
     AnthropicLanguageModelProvider,
 )
 from app.modules.ai.gateway.protocol import LanguageModelProvider
-from app.modules.ai.gateway.unconfigured import UnconfiguredLanguageModelProvider
+from app.modules.ai.gateway.tool_protocol import ToolCallingProvider
+from app.modules.ai.gateway.unconfigured import (
+    UnconfiguredLanguageModelProvider,
+    UnconfiguredToolProvider,
+)
 from app.modules.ai.import_understanding.resolver import (
     ImportUnderstandingProvider,
     ImportUnderstandingResolver,
@@ -94,4 +98,36 @@ def _build_semantic_resolver(settings: Settings) -> ImportUnderstandingResolver:
     )
 
 
-__all__ = ["build_import_understanding_resolver", "build_language_model_provider"]
+def build_mia_provider(settings: Settings) -> ToolCallingProvider:
+    """Mia's model, built ONCE when the app is built, selected by `MIA_PROVIDER` alone.
+    `unconfigured` (the default) builds a provider that only says "unavailable" and imports nothing
+    of the vendor. `openai` with no key is the same, with one warning: a failure of Mia must never
+    stop NINFA. The key, the endpoint and the data residency are the account's (`OPENAI_*`), shared
+    with Smart
+    Import's layer; the model and the timeout are Mia's own."""
+    if settings.mia_provider == "unconfigured":
+        return UnconfiguredToolProvider()
+    key = settings.openai_api_key
+    if key is None or not key.get_secret_value().strip():
+        logger.warning(
+            "MIA_PROVIDER=openai but OPENAI_API_KEY is not set: Mia is unavailable, NINFA works "
+            "as without her"
+        )
+        return UnconfiguredToolProvider()
+    # imported here, not at the top: a process that never selects Mia never loads the SDK
+    from app.modules.ai.gateway.mia_openai_provider import OpenAIMiaProvider
+
+    return OpenAIMiaProvider(
+        key.get_secret_value(),
+        model=settings.mia_openai_model,
+        base_url=settings.openai_base_url,
+        data_residency=settings.openai_data_residency,
+        timeout_seconds=settings.mia_openai_timeout_seconds,
+    )
+
+
+__all__ = [
+    "build_import_understanding_resolver",
+    "build_language_model_provider",
+    "build_mia_provider",
+]

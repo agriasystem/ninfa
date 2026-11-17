@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react";
 import type { PropertyAccess } from "@ninfa/contracts";
 
 import { STRUTTURA_INVENTORY_ANCHOR } from "@/lib/routes";
+import { PAGE_ROUTES, usePublishPage } from "@/lib/page-context/page-context";
 import { strutturaCopy } from "@/lib/structure/copy";
 import { getStructureOverview } from "@/lib/structure/overview";
 import type { StructureOverview } from "@/lib/structure/types";
@@ -32,6 +33,7 @@ function StrutturaContent({
   onPropertyInvalid: () => void;
 }) {
   const overview = useMemo(() => getOverview(property), [getOverview, property]);
+  usePublishPage({ route: PAGE_ROUTES.struttura });
   const { state: inventory, accept: acceptInventory } = useRoomInventory(property.id);
   // The profile's "Numero camere" and the inventory block say one number, the backend's.
   const roomCount =

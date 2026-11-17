@@ -8,8 +8,12 @@ here (or alongside it) and swaps the FastAPI dependency default; `AskNinfaServic
 route do not change at all when that happens.
 """
 
-from app.modules.ai.gateway.errors import LanguageModelUnavailableError
+from app.modules.ai.gateway.errors import (
+    LanguageModelUnavailableError,
+    ToolProviderUnavailableError,
+)
 from app.modules.ai.gateway.protocol import LanguageModelAnswer, LanguageModelRequest
+from app.modules.ai.gateway.tool_protocol import ToolTurnRequest, ToolTurnStep
 
 
 class UnconfiguredLanguageModelProvider:
@@ -20,4 +24,14 @@ class UnconfiguredLanguageModelProvider:
         raise LanguageModelUnavailableError("no language model provider is configured")
 
 
-__all__ = ["UnconfiguredLanguageModelProvider"]
+class UnconfiguredToolProvider:
+    """Mia with no model behind her (`MIA_PROVIDER=unconfigured`, the default, or a selected
+    provider without a key): every turn is `UNAVAILABLE` with the kind `NOT_CONFIGURED`, and NINFA
+    works exactly as
+    before. No SDK is imported, no network is touched."""
+
+    def next_step(self, request: ToolTurnRequest) -> ToolTurnStep:
+        raise ToolProviderUnavailableError("Mia has no model configured", "NOT_CONFIGURED")
+
+
+__all__ = ["UnconfiguredLanguageModelProvider", "UnconfiguredToolProvider"]

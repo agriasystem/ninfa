@@ -1,6 +1,7 @@
 """Migration 0016_remembered_scope: additive, one head, and it will not lose why an import acted.
 
-The current global head lives here (`test_01`); the older migration files name it as a constant.
+It is no longer the global head (`test_mia_conversations_migration.py` holds that test); it only
+pins that it sits on 0015 and that its downgrade still refuses to lose why an import acted.
 """
 
 import uuid
@@ -14,6 +15,7 @@ from sqlalchemy import Engine, inspect, text
 from tests.support import alembic_config
 
 HEAD = "0016_remembered_scope"
+CURRENT_GLOBAL_HEAD = "0017_mia_conversations"
 PREVIOUS_HEAD = "0015_import_scope"
 
 
@@ -76,10 +78,9 @@ def _purge(engine: Engine, workspace: uuid.UUID) -> None:
         connection.execute(text("DELETE FROM workspaces WHERE id = :w"), {"w": workspace})
 
 
-def test_01_there_is_exactly_one_head_and_it_sits_on_0015(test_database_url: str) -> None:
+def test_01_it_sits_on_0015(test_database_url: str) -> None:
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
-    assert scripts.get_heads() == [HEAD]
     assert scripts.get_revision(HEAD).down_revision == PREVIOUS_HEAD
 
 
@@ -103,7 +104,7 @@ def test_03_the_column_comes_and_goes_with_it(
     assert "remembered_file_scope" not in _columns(db_engine)
 
     command.upgrade(config, "head")
-    assert _revision(db_engine) == HEAD
+    assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     assert "remembered_file_scope" in _columns(db_engine)
 
 
@@ -114,7 +115,7 @@ def test_04_the_downgrade_refuses_to_lose_why_an_import_acted(
     try:
         with pytest.raises(RuntimeError, match="what was remembered"):
             command.downgrade(alembic_config(test_database_url), PREVIOUS_HEAD)
-        assert _revision(db_engine) == HEAD
+        assert _revision(db_engine) == CURRENT_GLOBAL_HEAD
     finally:
         _purge(db_engine, workspace)
 

@@ -38,6 +38,9 @@ _REPO_ROOT = _API_ROOT.parents[1]
 # `test_ai_boundary.py` for the precise, per-file version of this same boundary.
 _ALLOWED_ANTHROPIC_FILE = _AI_MODULE_ROOT / "gateway" / "anthropic_provider.py"
 _ALLOWED_OPENAI_FILE = _AI_MODULE_ROOT / "gateway" / "openai_provider.py"
+# Mia's adapter (ADR 0055) names its vendor too. It imports no SDK of its own
+# (`test_mia_boundary.py` pins that): the client comes from the file above.
+_ALLOWED_MIA_FILE = _AI_MODULE_ROOT / "gateway" / "mia_openai_provider.py"
 # The composition root names the adapters it builds and reads their settings: it, and only it, may
 # say `openai` (it already names `AnthropicLanguageModelProvider`).
 _COMPOSITION_ROOT = _AI_MODULE_ROOT / "gateway" / "factory.py"
@@ -90,7 +93,7 @@ def test_27_28_29_no_vendor_sdk_import_or_identifier_anywhere_under_ai_module() 
     docstring discussing the `ask_ninfa_provider == "anthropic"` config value - could trip), by
     `test_anthropic_provider_isolation.py` instead."""
     for path in _AI_MODULE_ROOT.rglob("*.py"):
-        if path in (_ALLOWED_ANTHROPIC_FILE, _ALLOWED_OPENAI_FILE):
+        if path in (_ALLOWED_ANTHROPIC_FILE, _ALLOWED_OPENAI_FILE, _ALLOWED_MIA_FILE):
             continue
         source = path.read_text(encoding="utf-8").lower()
         for token in _forbidden_in(path):

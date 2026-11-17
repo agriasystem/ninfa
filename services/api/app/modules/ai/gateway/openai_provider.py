@@ -115,6 +115,38 @@ def classify(error: Exception) -> FailureKind:
 # A failure that can pass by itself: worth one more try. (Not a timeout: waiting twice is worse than
 # the fallback; not a quota, a key or a model: nothing a second request changes.)
 _TRANSIENT = frozenset({FailureKind.RATE_LIMIT, FailureKind.SERVER, FailureKind.CONNECTION})
+# The same rule, public: Mia's adapter (`mia_openai_provider`) applies it instead of keeping a copy.
+TRANSIENT_FAILURES = _TRANSIENT
+
+# "Send nothing for this parameter" - re-exported so another adapter never has to import the SDK.
+OMIT: Any = openai.omit
+
+
+def build_openai_client(
+    api_key: str,
+    *,
+    timeout_seconds: float = _TIMEOUT_SECONDS,
+    base_url: str | None = None,
+    data_residency: DataResidency | None = None,
+    http_client: httpx2.Client | None = None,
+) -> OpenAI:
+    """THE way this codebase builds an OpenAI client, shared by every feature that talks to the
+    account (Smart Import's layer, Mia): the key, the endpoint, the regional data residency and the
+    timeout are decided here once. `max_retries=0`: the SDK never repeats a request by itself, so
+    every retry is counted by the adapter that makes the call. (An endpoint argument is passed only
+    when chosen: the SDK refuses `base_url=None` next to a regional endpoint.)"""
+    endpoint: dict[str, Any] = {}
+    if base_url is not None:
+        endpoint["base_url"] = base_url
+    if data_residency is not None:
+        endpoint["data_residency"] = data_residency
+    return OpenAI(
+        api_key=api_key,
+        timeout=timeout_seconds,
+        max_retries=0,
+        http_client=http_client,
+        **endpoint,
+    )
 
 
 def _vocabulary(request: ImportUnderstandingRequest) -> dict[str, list[str]]:
@@ -188,20 +220,12 @@ class OpenAIImportUnderstandingProvider:
         self._max_output_tokens = max_output_tokens
         self._retries = max(0, max_transport_retries)
         self._sleep = sleep
-        # `max_retries=0`: the SDK never repeats a request by itself, so every retry is counted here
-        # (an endpoint argument is passed only when chosen: the SDK refuses `base_url=None`
-        # next to a regional endpoint)
-        endpoint: dict[str, Any] = {}
-        if base_url is not None:
-            endpoint["base_url"] = base_url
-        if data_residency is not None:
-            endpoint["data_residency"] = data_residency
-        self._client = client or OpenAI(
-            api_key=api_key,
-            timeout=timeout_seconds,
-            max_retries=0,
+        self._client = client or build_openai_client(
+            api_key,
+            timeout_seconds=timeout_seconds,
+            base_url=base_url,
+            data_residency=data_residency,
             http_client=http_client,
-            **endpoint,
         )
 
     # --- the one call --------------------------------------------------------------------------
@@ -329,4 +353,13 @@ class OpenAIImportUnderstandingProvider:
         )
 
 
-__all__ = ["OpenAIImportUnderstandingProvider", "classify"]
+__all__ = [
+    "OMIT",
+    "TRANSIENT_FAILURES",
+    "DataResidency",
+    "FailureKind",
+    "OpenAIImportUnderstandingProvider",
+    "ReasoningEffort",
+    "build_openai_client",
+    "classify",
+]
