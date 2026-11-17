@@ -209,7 +209,7 @@ def test_the_page_context_reaches_the_model_validated(
 ) -> None:
     property_id = mia.at.tenant.property.id
     other = factory.tenant()
-    sync_feed(factory.session, other, five_triggered_evaluations(factory, other))  # type: ignore[attr-defined]
+    sync_feed(factory.session, other, five_triggered_evaluations(factory, other))
     provider = mia.script(answer("Ok."))
 
     api_client.post(

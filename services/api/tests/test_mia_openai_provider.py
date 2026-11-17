@@ -139,6 +139,11 @@ def _answering() -> Exchange:
     return Exchange(lambda _request: _response([_message(json.dumps(ANSWER))]))
 
 
+def _replying(reply: httpx2.Response) -> Callable[[httpx2.Request], httpx2.Response]:
+    """A handler that answers every request with `reply` (a closure: a loop can build several)."""
+    return lambda _request: reply
+
+
 # --- the request ------------------------------------------------------------------------------
 
 
@@ -390,7 +395,7 @@ def test_a_refusal_an_incomplete_answer_and_a_failed_response_have_their_own_kin
         (_response([_message(json.dumps(ANSWER))], status="failed"), "PROVIDER_ERROR"),
     ]
     for reply, kind in cases:
-        provider, _, _ = _provider(Exchange(lambda _request, r=reply: r))
+        provider, _, _ = _provider(Exchange(_replying(reply)))
         with pytest.raises(ToolProviderUnavailableError) as raised:
             provider.next_step(_request())
         assert raised.value.kind == kind
