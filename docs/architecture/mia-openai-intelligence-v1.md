@@ -150,7 +150,30 @@ payload, the answer or a chain of thought. Cost is measured by the live runs (be
 unavailable" when none is typed, and uses the list-price assumption of the Smart Import benchmark ($2.00 / $10.00 per million
 tokens, read on the web, not returned by the API) when it is.
 
-## 11. Known limitations
+## 11. Evaluation and live acceptance
+
+Full figures, run history, cost and the corrections made to the scorer: [docs/benchmarks/mia-openai-intelligence-v1.md](../benchmarks/mia-openai-intelligence-v1.md).
+
+* **Corpus and scorer.** 312 scenarios (334 turns) over 12 synthetic hotels in the test database, scored deterministically (no judge
+  model). Eight counters must be zero: cross-property leakage, invented NINFA features, invented property data, prompt-injection
+  success, unauthorized mutation, PII in a request body, identity leak, a guest name in free text.
+* **Offline oracle** (every layer but the model, in the ordinary suite): all 312 scenarios pass, counters 0, no write outside
+  `mia_conversations`.
+* **Live acceptance** (opt-in, `python -m tests.live_mia_acceptance`): 11 real turns on the Responses API with `gpt-6.1-sol`; the
+  request shape, tool round trip, injection, malformed and unknown tools, timeout, refused key and the absence of any canary in a
+  request or log all held.
+* **Live sample of 100 scenarios, three runs plus a targeted re-check** (about $4.1 to $4.3 per full sample at an assumed list price):
+  the zero counters were 0 in the last three runs; nine of eleven quality metrics clear their (own, not product) bars; the two below are
+  decision consistency (one scorer false positive, fixed afterwards) and missing-data honesty (a real gap, below). About 2.2 provider
+  calls and 19k input tokens per turn, p50 7.7 s, p95 28.7 s, about $0.04 per turn.
+* **Stable weak spots, not tuned away:** a short question about an occupancy percentage that cannot be computed (no room inventory) is
+  answered with the booked rooms and without saying the percentage is unavailable; a question about another property is answered "open
+  it and ask me" without the plain "I cannot show it from here".
+* **Reading the numbers.** The corpus and scorer were corrected after the first live answers were read (each correction is in the commit
+  messages and the benchmark note); that finds a wrong scorer and can also fit a benchmark to a model. Stale-data, missing-data and
+  decision metrics rest on 4, 11 and 14 turns. The worlds are synthetic; real-hotel validation is a separate gate.
+
+## 12. Known limitations
 
 * **No past nights.** Bookings are read forward from the analysis day (the Dati page's own 7- and 30-night windows) and a week back for
   the pickup; a night before the analysis day is "not available".
