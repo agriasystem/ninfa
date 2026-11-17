@@ -146,3 +146,15 @@ def test_only_the_open_property_is_shown_and_another_one_is_not_asked_about() ->
 def test_a_metric_ninfa_shows_is_explained_from_the_product_knowledge_not_in_general() -> None:
     assert "si spiega con gli strumenti di conoscenza del prodotto" in TEXT
     assert "la definizione di ninfa può differire" in TEXT
+
+
+def test_a_short_question_does_not_excuse_silence_about_what_the_results_say_they_do_not_know() -> (
+    None
+):
+    assert "una domanda breve non giustifica di tacere" in TEXT
+    assert "manca il numero di camere vendibili" in TEXT
+
+
+def test_the_last_analysis_is_given_together_with_the_import_it_rests_on() -> None:
+    assert "quando è stata l'ultima analisi" in TEXT
+    assert "da quale import dipendono i dati" in TEXT

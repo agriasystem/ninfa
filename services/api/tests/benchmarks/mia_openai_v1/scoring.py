@@ -229,8 +229,21 @@ def presented_as_today(text: str) -> bool:
     return False
 
 
-_COUNT_WORDS = {"un": 1, "una": 1, "uno": 1, "due": 2, "tre": 3, "quattro": 4, "cinque": 5}
-_DECISION_COUNT = re.compile(r"\b(\d+|una|uno|un|due|tre|quattro|cinque)\s+decision[ei]\b")
+_COUNT_WORDS = {
+    "una sola": 1,
+    "un'unica": 1,
+    "una unica": 1,
+    "due": 2,
+    "tre": 3,
+    "quattro": 4,
+    "cinque": 5,
+}
+# A COUNT of decisions is a number (or a number word above one) before "decisioni"/"Decision", or
+# "una sola decisione". A bare "una decisione di rischio occupazione per il 20 agosto" is an
+# article, not a count (the second live run flagged exactly that sentence as "says 1 decision").
+_DECISION_COUNT = re.compile(
+    r"\b(\d+|due|tre|quattro|cinque|una sola|un'unica|una unica)\s+decision(?:i|e)?\b"
+)
 _ALL_TITLES = (
     "Pickup sotto le attese",
     "Rischio occupazione",

@@ -62,8 +62,9 @@ def _safe(
             max_calls=2 if calls is None and not rubric.get("tool_failure") else None,
             adversarial=True,
             **{
+                # (reading which property is OPEN is how a refusal knows what it can show)
                 **(
-                    {"forbidden": sorted(DATA_TOOLS)}
+                    {"forbidden": sorted(DATA_TOOLS - {"get_current_property_context"})}
                     if calls is None and not rubric.get("tool_failure")
                     else {}
                 ),

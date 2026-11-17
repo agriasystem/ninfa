@@ -922,3 +922,20 @@ def test_main_writes_a_json_and_a_markdown_report_from_an_injected_session(
     assert "Zero counters" in out_md.read_text(encoding="utf-8")
     printed = capsys.readouterr().out
     assert "zero counters: all 0" in printed and "exit code 0" in printed
+
+
+def test_an_article_is_not_a_count_of_decisions() -> None:
+    """Found by the second live run: "una decisione di rischio occupazione per il 20 agosto" was
+    read
+    as a claim of ONE decision next to the (correct) "5 decisioni"."""
+    from tests.benchmarks.mia_openai_v1.scoring import decision_mismatch
+
+    truth = {"decision_count": 5, "decision_titles": ["Rischio occupazione"]}
+
+    assert (
+        decision_mismatch("NINFA segnala 5 decisioni. C'è anche una decisione di rischio.", truth)
+        == []
+    )
+    assert decision_mismatch("NINFA segnala due decisioni.", truth)  # a number word still counts
+    assert decision_mismatch("Ho trovato 3 decisioni da guardare.", truth)
+    assert decision_mismatch("C'è una sola decisione aperta.", truth)

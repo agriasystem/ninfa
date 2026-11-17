@@ -8,7 +8,7 @@ from app.modules.ai.ask_ninfa.types import AskStatus
 
 # A wording change of the system policy bumps this string, never a silent edit
 # (`test_mia_instructions.py` pins the invariants a future wording change must keep).
-MIA_INSTRUCTIONS_VERSION = "mia-v1-4"
+MIA_INSTRUCTIONS_VERSION = "mia-v1-5"
 
 # --- bounds of ONE user turn --------------------------------------------------------------------
 # A bounded, read-only assistant - never an autonomous agent. The model may ask for NINFA facts in
