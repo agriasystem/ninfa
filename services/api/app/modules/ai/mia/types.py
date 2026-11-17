@@ -67,6 +67,10 @@ class Gap:
     metric: str
     reason: str
     partial: bool = False
+    # Word starts that NAME the input that is missing ("inventar", "capienza"): an answer that says
+    # the metric cannot be calculated but not WHAT is missing has said two thirds of it, and gets
+    # the reason added. Empty when the metric's own label already is the reason.
+    needs: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -55,11 +55,13 @@ def build() -> list[Scenario]:
             must_state_missing=True,
         ),
         T(
-            "E sabato?",
-            [C("get_occupancy_revenue", night={"kind": "date", "date": "2026-08-08"})],
-            "Sabato 8 agosto ci sono {truth.rooms_sat8} camere prenotate, ma non posso dirti la "
+            # (not "E sabato?": the world's "today" IS a Saturday, so that is a real ambiguity and
+            # the model, rightly, asked which one; Sunday is the next day, whoever reads it)
+            "E domenica?",
+            [C("get_occupancy_revenue", night=sunday)],
+            "Domenica 2 agosto ci sono {truth.rooms_sun} camere prenotate, ma non posso dirti la "
             "percentuale di occupazione perché manca l'inventario camere.",
-            mention=[["{truth.rooms_sat8}"], ["inventario"]],
+            mention=[["{truth.rooms_sun}"], ["inventario"]],
             must_state_missing=True,
             follow_up=True,
         ),

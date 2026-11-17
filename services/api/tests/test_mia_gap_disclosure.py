@@ -32,8 +32,11 @@ from app.modules.ai.mia.completeness import (
     GAP_METRICS,
     acknowledges,
     asked_for,
+    disclosures_for,
     gap_disclosure,
+    gap_reason,
     gap_statement,
+    names_the_need,
     undisclosed_gaps,
     with_disclosures,
 )
@@ -49,9 +52,12 @@ FRIDAY = {"kind": "date", "date": "2026-08-07"}  # AS_OF is Saturday 2026-08-01
 SATURDAY = {"kind": "date", "date": "2026-08-08"}
 OCCUPANCY_REFS = ("dati:occupazione",)
 
-MISSING_OCCUPANCY = Gap("metric.occupancy", "manca l'inventario camere")
+MISSING_OCCUPANCY = Gap("metric.occupancy", "manca l'inventario camere", needs=("inventar",))
 PARTIAL_OCCUPANCY = Gap(
-    "metric.occupancy", "NINFA conosce le camere solo per 6 delle 7 notti", partial=True
+    "metric.occupancy",
+    "NINFA conosce le camere solo per 6 delle 7 notti",
+    partial=True,
+    needs=("inventar", "notti"),
 )
 
 
@@ -162,6 +168,34 @@ def test_only_the_gaps_the_person_asked_about_and_the_answer_did_not_say_remain(
         == []
     )
     assert undisclosed_gaps([], question=asked, answer=short) == []
+
+
+def test_saying_the_metric_is_missing_without_saying_what_is_missing_gets_the_reason_added() -> (
+    None
+):
+    """Found by the live run: "L'occupazione in percentuale non è calcolabile." and nothing more is
+    two thirds of the invariant (what we know / what we cannot calculate / what is missing)."""
+    question = "Qual è l'occupazione?"
+    half = "L'occupazione in percentuale non è calcolabile. Ci sono 748 camere-notte prenotate."
+    whole = half + " Manca l'inventario camere."
+
+    assert acknowledges("metric.occupancy", half) and not names_the_need(MISSING_OCCUPANCY, half)
+    assert disclosures_for([MISSING_OCCUPANCY], question=question, answer=half) == [
+        "Il dato che manca: manca l'inventario camere."
+    ]
+    assert disclosures_for([MISSING_OCCUPANCY], question=question, answer=whole) == []
+    assert disclosures_for(
+        [MISSING_OCCUPANCY], question=question, answer="Ci sono 748 camere-notte prenotate."
+    ) == [gap_disclosure(MISSING_OCCUPANCY)]
+    assert gap_reason(PARTIAL_OCCUPANCY).startswith("Nel dettaglio: NINFA conosce le camere")
+
+
+def test_a_gap_that_declares_no_need_is_explained_by_its_own_label() -> None:
+    comparison = Gap("metric.period_comparison", "NINFA mostra solo oggi e i prossimi giorni")
+    said = "Il confronto con l'anno scorso non è disponibile."
+
+    assert names_the_need(comparison, "qualsiasi testo")
+    assert disclosures_for([comparison], question="Rispetto all'anno scorso?", answer=said) == []
 
 
 def test_one_gap_per_metric_and_a_missing_figure_outranks_a_partial_one() -> None:
@@ -287,6 +321,30 @@ def test_the_real_case_14_rooms_and_no_inventory_says_the_percentage_cannot_be_c
         )
         is not None
     )
+
+
+def test_the_live_case_not_calculable_but_not_why_gets_the_missing_input_named(
+    db_session: Session, tenant: Tenant, world: MiaWorld
+) -> None:
+    """A real answer of the model: "L'occupazione in percentuale non è calcolabile." and 98
+    room-nights, with no word on what is missing. The application names the missing input."""
+    _seed(db_session, tenant, capacity=None)
+    half = "L'occupazione in percentuale non è calcolabile. Ci sono 98 camere-notte prenotate."
+
+    result, provider = _turn(
+        world,
+        "Qual è l'occupazione?",
+        [
+            tools(("get_occupancy_revenue", {"window": 7})),
+            answer(half, refs=OCCUPANCY_REFS),
+        ],
+    )
+
+    assert result.answer is not None and result.answer.startswith(half)
+    assert "Il dato che manca: NINFA non sa quante camere ha la struttura" in result.answer
+    assert "inventario camere" in result.answer
+    assert "Non posso però calcolare" not in result.answer  # it had said so itself
+    assert result.metrics.gap_disclosures == 1 and len(provider.requests) == 2
 
 
 def test_an_answer_that_already_says_it_is_left_exactly_as_the_model_wrote_it(

@@ -53,7 +53,7 @@ from app.modules.ai.gateway.tool_protocol import (
 from app.modules.ai.mia import policy
 from app.modules.ai.mia.access import AccessDomain
 from app.modules.ai.mia.boundary import OTHER_PROPERTY_ANSWER, asks_for_another_property
-from app.modules.ai.mia.completeness import looks_truncated, undisclosed_gaps, with_disclosures
+from app.modules.ai.mia.completeness import add_sentences, disclosures_for, looks_truncated
 from app.modules.ai.mia.grounding import (
     observation_numbers,
     split_observation_numbers,
@@ -393,14 +393,14 @@ class MiaOrchestrator:
 
         # What the person ASKED for and the tools could not (fully) give: if the answer did not say
         # so, the application does - from the tool's own reason, never an estimate (`completeness`).
-        undisclosed = undisclosed_gaps(
+        sentences = disclosures_for(
             [gap for item in turn.observations for gap in item.gaps],
             question=turn.question,
             earlier_question=turn.earlier_question,
             answer=validated.answer,
         )
-        turn.gap_disclosures = len(undisclosed)
-        answer = with_disclosures(validated.answer, undisclosed)
+        turn.gap_disclosures = len(sentences)
+        answer = add_sentences(validated.answer, sentences)
 
         metrics = turn.metrics(self._clock())
         logger.info(

@@ -281,11 +281,9 @@ def acknowledges(metric: str, answer: str, *, partial: bool = False) -> bool:
     return False
 
 
-def undisclosed_gaps(
-    gaps: Iterable[Gap], *, question: str, earlier_question: str = "", answer: str
-) -> list[Gap]:
-    """The gaps the person ASKED about that `answer` does not acknowledge: one per metric (the
-    most severe - a missing figure before a partial one - wins), in the order the tools reported."""
+def _material_gaps(gaps: Iterable[Gap], question: str, earlier_question: str) -> dict[str, Gap]:
+    """The gaps the person ASKED about: one per metric (the most severe - a missing figure before a
+    partial one - wins), in the order the tools reported."""
     chosen: dict[str, Gap] = {}
     for gap in gaps:
         if not asked_for(gap.metric, question, earlier_question):
@@ -293,9 +291,23 @@ def undisclosed_gaps(
         known = chosen.get(gap.metric)
         if known is None or (known.partial and not gap.partial):
             chosen[gap.metric] = gap
+    return chosen
+
+
+def undisclosed_gaps(
+    gaps: Iterable[Gap], *, question: str, earlier_question: str = "", answer: str
+) -> list[Gap]:
+    """The gaps the person ASKED about that `answer` does not acknowledge at all."""
+    chosen = _material_gaps(gaps, question, earlier_question)
     return [
         gap for gap in chosen.values() if not acknowledges(gap.metric, answer, partial=gap.partial)
     ]
+
+
+def names_the_need(gap: Gap, answer: str) -> bool:
+    """Does `answer` name WHAT is missing ("l'inventario camere")? A gap that declares no `needs` is
+    explained by its own label, and always passes."""
+    return not gap.needs or _mentions_any(answer.lower(), gap.needs)
 
 
 def _label(metric: str) -> str:
@@ -320,24 +332,59 @@ def gap_disclosure(gap: Gap) -> str:
     return f"Non posso però calcolare {label}: {gap.reason}."
 
 
-def with_disclosures(answer: str, gaps: Sequence[Gap]) -> str:
-    """`answer` followed by the sentence of each gap, as a short closing paragraph when the answer
-    is already several lines, else on the same line."""
-    if not gaps:
+def gap_reason(gap: Gap) -> str:
+    """Only the reason, for an answer that already said the metric is missing (or partial) but not
+    what is missing: a live run said "L'occupazione non è calcolabile." and stopped there."""
+    lead = "Nel dettaglio" if gap.partial else "Il dato che manca"
+    return f"{lead}: {gap.reason}."
+
+
+def disclosures_for(
+    gaps: Iterable[Gap], *, question: str, earlier_question: str = "", answer: str
+) -> list[str]:
+    """What the application must ADD to `answer`, as sentences, so that a person who asked for a
+    metric reads three things: what is known (the answer), that the metric cannot be calculated (or
+    is partial), and what is missing. For each gap the person asked about:
+
+    * the answer does not say the metric is missing -> the whole sentence (`gap_disclosure`);
+    * it says so but does not name what is missing -> the reason (`gap_reason`);
+    * it says both -> nothing."""
+    sentences: list[str] = []
+    for gap in _material_gaps(gaps, question, earlier_question).values():
+        if not acknowledges(gap.metric, answer, partial=gap.partial):
+            sentences.append(gap_disclosure(gap))
+        elif not names_the_need(gap, answer):
+            sentences.append(gap_reason(gap))
+    return sentences
+
+
+def add_sentences(answer: str, sentences: Sequence[str]) -> str:
+    """`answer` followed by `sentences`, as a short closing paragraph when the answer is already
+    several lines, else on the same line."""
+    if not sentences:
         return answer
     text = answer.rstrip()
     glue = "\n\n" if "\n" in text else " "
-    return text + glue + " ".join(gap_disclosure(gap) for gap in gaps)
+    return text + glue + " ".join(sentences)
+
+
+def with_disclosures(answer: str, gaps: Sequence[Gap]) -> str:
+    """`answer` followed by the whole sentence of each gap."""
+    return add_sentences(answer, [gap_disclosure(gap) for gap in gaps])
 
 
 __all__ = [
     "GAP_METRICS",
     "GapMetric",
     "acknowledges",
+    "add_sentences",
     "asked_for",
+    "disclosures_for",
     "gap_disclosure",
+    "gap_reason",
     "gap_statement",
     "looks_truncated",
+    "names_the_need",
     "undisclosed_gaps",
     "with_disclosures",
 ]

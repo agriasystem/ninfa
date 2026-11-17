@@ -315,7 +315,12 @@ MISSING = (
         [C("get_pickup", window=7)],
         "Il pickup non è calcolabile: serve un dato sia di oggi sia di una settimana fa per ogni "
         "notte, e la variazione non è zero ma non è nota.",
-        [["non è calcolabile", "non è noto", "non è nota", "non posso calcolare"], ["non è zero"]],
+        [
+            ["non è calcolabile", "non è noto", "non è nota", "non posso calcolare"],
+            # the same idea in the model's own words (found by reading the first live answer:
+            # "non va quindi interpretato come zero")
+            ["non è zero", "come zero", "non zero", "non significa zero", "non vuol dire zero"],
+        ],
     ),
 )
 

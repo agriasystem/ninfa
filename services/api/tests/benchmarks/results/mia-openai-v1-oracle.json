@@ -377,7 +377,7 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 82,
+   "elapsed_ms_p95": 81,
    "cost_per_turn_usd": null
   },
   "multi_tool": {
@@ -389,7 +389,7 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 43,
+   "elapsed_ms_p95": 36,
    "cost_per_turn_usd": null
   },
   "all": {
