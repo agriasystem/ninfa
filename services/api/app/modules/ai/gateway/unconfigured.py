@@ -25,8 +25,9 @@ class UnconfiguredLanguageModelProvider:
 
 
 class UnconfiguredToolProvider:
-    """Mia with no model behind her (`MIA_PROVIDER=unconfigured`, the default, or `openai` without
-    a key): every turn is `UNAVAILABLE` with the kind `NOT_CONFIGURED`, and NINFA works exactly as
+    """Mia with no model behind her (`MIA_PROVIDER=unconfigured`, the default, or a selected
+    provider without a key): every turn is `UNAVAILABLE` with the kind `NOT_CONFIGURED`, and NINFA
+    works exactly as
     before. No SDK is imported, no network is touched."""
 
     def next_step(self, request: ToolTurnRequest) -> ToolTurnStep:

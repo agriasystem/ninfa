@@ -13,7 +13,7 @@ TEXT = " ".join(MIA_SYSTEM_INSTRUCTIONS.split()).lower()
 
 
 def test_the_policy_is_versioned() -> None:
-    assert re.fullmatch(r"mia-openai-v\d+-\d+", MIA_INSTRUCTIONS_VERSION)
+    assert re.fullmatch(r"mia-v\d+-\d+", MIA_INSTRUCTIONS_VERSION)
 
 
 def test_the_policy_is_strong_but_not_a_manual() -> None:
@@ -25,10 +25,11 @@ def test_the_policy_is_strong_but_not_a_manual() -> None:
 def test_identity_mia_and_never_a_vendor() -> None:
     assert "sei mia" in TEXT
     assert "assistente intelligente di ninfa" in TEXT
-    # the policy names no vendor except to forbid naming one
-    assert "non dire" in TEXT and "chatgpt" in TEXT
-    for vendor in ("openai", "anthropic", "gpt-"):
-        assert vendor not in TEXT.replace('non dire "come modello openai"', "")
+    # the policy tells her never to name a vendor or a model - and names none itself
+    assert "non nominare alcun fornitore o modello" in TEXT
+    assert "chatgpt" in TEXT  # named only inside the rule that forbids saying it
+    for vendor in ("openai", "anthropic", "gpt-", "gemini", "llama"):
+        assert vendor not in TEXT
 
 
 def test_the_engine_calculates_and_mia_understands() -> None:

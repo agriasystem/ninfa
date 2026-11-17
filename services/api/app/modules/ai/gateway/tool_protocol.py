@@ -21,8 +21,8 @@ earlier conversation (untrusted text, never a source of facts); `question` is un
 results travel as `ToolOutcome`s, also DATA.
 
 `provider_state` is the one opaque thing: whatever a vendor needs handed back with the next request
-of the SAME turn (OpenAI's encrypted reasoning items, with `store=False`). The orchestrator keeps it
-in memory for the turn and returns it untouched; it is never persisted and never inspected.
+of the SAME turn (a vendor's encrypted reasoning items, with `store=False`). The orchestrator keeps
+it in memory for the turn and returns it untouched; it is never persisted and never inspected.
 """
 
 from collections.abc import Mapping

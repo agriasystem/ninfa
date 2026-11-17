@@ -1,1 +1,1 @@
-"""Mia, the assistant of NINFA (Mia OpenAI Intelligence V1, ADR 0055)."""
+"""Mia, the assistant of NINFA (ADR 0055)."""
