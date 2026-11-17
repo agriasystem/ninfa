@@ -18,6 +18,7 @@ POST /properties/{id}/mia/messages     (auth -> tenant -> property resolved BEFO
    |  conversation -> recent messages verbatim + a deterministic summary of the rest
    v
 MiaOrchestrator.run                       <= 3 tool rounds, <= 8 calls, <= 1 correction, 90 s, reasoning chosen by policy.py
+   |  boundary  (a request for ANOTHER structure's data) -> one fixed answer, no model, no tool, no lookup  (11b)
    |     +--------------- ToolCallingProvider.next_step (OpenAI Responses API, store=false) ---------------+
    |     |  model: ask for NINFA facts through the closed catalog, OR give the final structured answer      |
    |     +---------------------------------------------------------------------------------------------+
@@ -25,7 +26,9 @@ MiaOrchestrator.run                       <= 3 tool rounds, <= 8 calls, <= 1 cor
    |        handlers read existing services (DataOverviewService, DecisionMemoryService, AskDecisionContextBuilder, repositories,
    |        the Product Knowledge Registry): a closed read model, never a row, never SQL
    v
-validate_model_answer_core -> numeric grounding guard -> completeness check -> (one rewrite, no tools) -> result
+validate_model_answer_core -> numeric grounding guard -> completeness check -> (one rewrite, no tools)
+   |  -> what the person asked for and the tools could not give, if the answer did not say it: added by the application (11b)
+   v result
    v
 MiaConversationService.record_exchange    (only ANSWERED / INSUFFICIENT_CONTEXT turns; the person's own text only)
 ```
@@ -154,10 +157,10 @@ tokens, read on the web, not returned by the API) when it is.
 
 Full figures, run history, cost and the corrections made to the scorer: [docs/benchmarks/mia-openai-intelligence-v1.md](../benchmarks/mia-openai-intelligence-v1.md).
 
-* **Corpus and scorer.** 312 scenarios (334 turns) over 12 synthetic hotels in the test database, scored deterministically (no judge
+* **Corpus and scorer.** 317 scenarios (340 turns) over 12 synthetic hotels in the test database, scored deterministically (no judge
   model). Eight counters must be zero: cross-property leakage, invented NINFA features, invented property data, prompt-injection
   success, unauthorized mutation, PII in a request body, identity leak, a guest name in free text.
-* **Offline oracle** (every layer but the model, in the ordinary suite): all 312 scenarios pass, counters 0, no write outside
+* **Offline oracle** (every layer but the model, in the ordinary suite): all 317 scenarios pass, counters 0, no write outside
   `mia_conversations`.
 * **Live acceptance** (opt-in, `python -m tests.live_mia_acceptance`): 11 real turns on the Responses API with `gpt-6.1-sol`; the
   request shape, tool round trip, injection, malformed and unknown tools, timeout, refused key and the absence of any canary in a
@@ -166,12 +169,46 @@ Full figures, run history, cost and the corrections made to the scorer: [docs/be
   the zero counters were 0 in the last three runs; nine of eleven quality metrics clear their (own, not product) bars; the two below are
   decision consistency (one scorer false positive, fixed afterwards) and missing-data honesty (a real gap, below). About 2.2 provider
   calls and 19k input tokens per turn, p50 7.7 s, p95 28.7 s, about $0.04 per turn.
-* **Stable weak spots, not tuned away:** a short question about an occupancy percentage that cannot be computed (no room inventory) is
-  answered with the booked rooms and without saying the percentage is unavailable; a question about another property is answered "open
-  it and ask me" without the plain "I cannot show it from here".
+* **The two weak spots the sample showed, both closed in code** (section 11b): a short question about an occupancy percentage that cannot
+  be computed (no room inventory) was answered with the booked rooms and without saying the percentage was unavailable; a question about
+  another property was answered "open it and ask me" without the plain "I cannot show it from here".
 * **Reading the numbers.** The corpus and scorer were corrected after the first live answers were read (each correction is in the commit
   messages and the benchmark note); that finds a wrong scorer and can also fit a benchmark to a model. Stale-data, missing-data and
   decision metrics rest on 4, 11 and 14 turns. The worlds are synthetic; real-hotel validation is a separate gate.
+
+## 11b. Truthfulness closure: what cannot be calculated, and the boundary of the open property
+
+Two things the live sample showed a model did NOT do reliably when it was only asked to, so the application does them
+(`mia/completeness.py`, `mia/boundary.py`, the gaps in `mia/tools/data.py`; results in the benchmark note, section 4).
+
+**A metric asked for and only partly available.** When a person asks for a metric and NINFA holds only a component of it (14 rooms
+booked, no room inventory, so no occupancy percentage), the answer must say three things: what is known, that the metric cannot be
+calculated (or is partial), and what is missing. Enforced in this order, in code:
+
+1. the tool declares the gap (`Observation.gaps`: a metric of the closed table `completeness.GAP_METRICS`, one reason clause written
+   from what it really read, partial or missing, and the words that name the missing input). The gap also reaches the model as one
+   sentence in "non disponibile";
+2. the gap is material only when the person asked for that metric (`asked_for`: the words people use for it, in this question, or in the
+   one before for a follow-up that names no metric). Asking for the component (rooms booked) is not an ask for the metric: no answer
+   becomes a disclaimer;
+3. the answer acknowledges it when one sentence names the metric (or its missing input) and says it is missing or partial
+   (`acknowledges`), and names what is missing (`names_the_need`);
+4. what is not said is added by the orchestrator, after every other check, from the tool's own reason: the whole sentence, only the
+   reason, or nothing. No estimate, no model call. `TurnMetrics.gap_disclosures` counts them (counts only, never the text).
+
+Declared for occupancy (no inventory, inventory configured after the analysis, zero rooms, only some nights, no bookings for the night,
+a night outside the window), pickup, the comparison with last year / the previous month / a budget, OTA share, channel weight, cost per
+occupied room and staff cost-to-revenue incidence; a block with no figures at all names what it lacks by the reason the Dati page gives.
+The vocabulary is a closed table pinned by tests (every metric a tool declares is in it; all but the comparison NINFA does not have are
+metrics of the Product Knowledge Registry). Its limit is lexical: a metric asked in a word the table does not know is left to the policy.
+
+**Another structure.** A request for the data of a structure other than the open one ("l'altra struttura", "Hotel X" with a name that
+is not this property's) is answered by the application before any model call, tool or lookup, with one fixed text: it cannot be read
+from this conversation, it is an access boundary of NINFA and not a limit of Mia, nothing about it was read, open it in NINFA and ask from
+there. Because nothing is looked up and the typed name is never repeated, the text is identical whether that structure belongs to the
+person, to another account, or does not exist (the same equivalence the API applies to a foreign conversation or decision id). The
+detector is narrow and also requires that the person asks for data; what it misses reaches the model, whose policy (rule 18, `mia-v1-6`)
+states the same boundary.
 
 ## 12. Known limitations
 
