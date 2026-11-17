@@ -229,3 +229,96 @@ Deliberately NOT carried over, because they contradict decisions taken since: re
 startup (ASSIST exists here, off and not pilot-ready); leaving files whose only blocker is a period
 summary out of the model's reach (here the model is asked, because a name can lift that blocker); and the
 Anthropic adapter's upgrades (the model layer is OpenAI's; Anthropic stays the suggest-only assistant).
+
+## Additional principles preserved from legacy provider-shadow work
+
+The table above is engineering. Three more things in the same branch are *principles*: when a model may
+be asked at all, what "SHADOW does not interfere" has to mean, and what the old pilot measured itself
+against. A second, narrower read of the branch found that none of them was written down here. **None is
+implemented, none is required by the pending real-hotel SHADOW gate (ADR 0054), and none is a rule to
+copy**: each is a question to put again when a real SHADOW on the product, or a real ASSIST, is designed.
+No Anthropic code behind them is to be recovered.
+
+### A. Model eligibility
+
+**Principle.** A model should not be asked when the decision necessarily belongs to the person, or when
+NINFA has no structure reliable enough to put a useful semantic question. Such a call costs a request and
+sends a document's evidence out for an answer that cannot change the outcome.
+
+**Legacy reference** (`shadow_exclusion`, judged on the FINAL answer: a file was left out even when
+something else in it was unclear):
+
+* a decision that is a person's: which of two tables (`TABLE`); whether arrival and departure are swapped
+  (`DATES_REVERSED`); whether an amount includes VAT (`AMOUNT_BASIS`);
+* a file NINFA cannot read as it is: dates or numbers written two ways (`MIXED_FORMATS`); a grid that is
+  not hours (`GRID_NOT_SUPPORTED`, `GRID_NOT_HOURS`); amounts with no net (`AMOUNT_NOT_NET`); no
+  interpretable table (`NO_TABLE`); and a period summary (`PERIOD_SUMMARY_ONLY`), the one item already
+  recorded above as not carried over;
+* a blocker saying a required fact is *missing* was deliberately NOT on the list: a left-over column may
+  be exactly that fact.
+
+**Here today.** `needs_help` (`understanding_ai.py`) asks the model only when its answer can change what the
+person is shown (V1.1, measured on the 283 real calls): a required piece with no column and a column left
+over, a question about the kind of data, or a doubtful column that a reading could make certain. Nothing in
+it excludes a case because the open question is a person's decision or because the file is unreadable. That
+is not unsafe (with the vocabulary certainty off, a reading is only ever a MEDIUM suggestion, and judging and
+importing run with no model); the open point is cost and what leaves the machine, not correctness.
+
+**Not to be copied automatically.** The list belongs to the old Anthropic pilot and to rules nobody has
+re-measured with this model. Re-evaluate it when the real-hotel SHADOW or a real ASSIST is implemented. The
+question to answer is whether asking about such a file ever changes what the person is shown, or only costs a
+call.
+
+### B. Whole-conversation SHADOW parity
+
+**Principle.** When SHADOW is validated on the real product, non-interference must not be checked on the
+first screen only. SHADOW may be declared non-interfering only if the person's entire path stays identical to
+the deterministic path.
+
+**Legacy reference.** `shadow_standard` ran the official full-flow benchmark twice, with the rules alone and
+with a SHADOW observer whose stand-in answered confidently and, more often than not, wrongly. It compared case
+by case the first upload (screens, questions, levels, mappings), the dialog rounds (the answers a careful
+person gives, round after round), the wrong-card probe, and every score the benchmark computes. ONE
+difference stopped the run (exit code 3).
+
+**Here today.** This document records the parity of SHADOW against the rules per screen and population (the
+HTTP invariance idea above, if built, would add one response). It records no comparison of what follows the
+first screen.
+
+**Acceptance criterion for later (not implemented now).** The comparison must cover, where applicable:
+
+* the first upload;
+* the questions that follow;
+* the person's answer;
+* the re-evaluation;
+* a change of table or source, if one happens;
+* the final decision;
+* the import.
+
+### C. Historical pilot accuracy threshold
+
+**Recorded as history.** The old Anthropic shadow pilot (`gates()` in its `shadow_pilot`) set its bar before
+anyone talked about an active mode, and said so: met or not, nothing is switched on. The bar was:
+
+* semantic accuracy on the eligible documents (suggestions that are right, over all suggestions) **>= 90%**,
+  **desired >= 95%**;
+* zero screens changed by SHADOW;
+* zero personal data (provider payload violations, and personal values in the browser);
+* zero product impact of a provider failure.
+
+**This is NOT current policy.** The 90% / 95% figures are a historical reference only; they are not promoted
+to a norm for Smart Import OpenAI. One accuracy percentage is too coarse for this layer, which is judged on
+finer measures: unsafe READY (the measure that withdrew the vocabulary certainty, ADR 0052); wrong-domain
+READY; mapping recall; manual matching left to the person; the number of questions a person is shown (the
+interaction cost); PII egress (the egress gate and the local preflight); scope violations; and the
+behaviour with the provider down or failing. The three "zero" criteria carry over in spirit, and they are
+already measured here case by case.
+
+### The legacy branch, closed
+
+* Branch: `feature/smart-import-v3-live-provider-shadow` (local only, never pushed).
+* Final HEAD: `78c7a62`.
+* Status: **SUPERSEDED — SAFE TO DELETE AFTER THIS DOCUMENTATION IS MERGED.**
+* No code is to be recovered, and no Anthropic adapter code from this branch is to be kept (the Anthropic
+  assistant already on `main` is not touched by this note).
+* The capacities that are still useful are transcribed in this document: the table above and A, B and C.
