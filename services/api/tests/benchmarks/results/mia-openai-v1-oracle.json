@@ -365,14 +365,14 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 9,
+   "elapsed_ms_p95": 10,
    "cost_per_turn_usd": null
   },
   "data_aware": {
    "turns": 245,
    "model_calls_mean": 1.95,
    "tool_calls_mean": 1.18,
-   "input_tokens_mean": 22176,
+   "input_tokens_mean": 22175,
    "output_tokens_mean": 292,
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
@@ -389,7 +389,7 @@
    "reasoning_tokens_mean": 0,
    "latency_ms_p50": 0,
    "latency_ms_p95": 0,
-   "elapsed_ms_p95": 36,
+   "elapsed_ms_p95": 37,
    "cost_per_turn_usd": null
   },
   "all": {

@@ -285,11 +285,11 @@ def _gap_because(metric: str, reason: UnavailableReason | None) -> Gap:
 
 
 _NO_INVENTORY = (
-    "NINFA non sa quante camere ha la struttura: manca l'inventario camere e NINFA non lo deduce "
-    "dalle prenotazioni"
+    "NINFA non sa quante camere ha la struttura, perché manca l'inventario camere (e NINFA non lo "
+    "deduce dalle prenotazioni)"
 )
 _INVENTORY_AFTER_ANALYSIS = (
-    "l'inventario camere è stato configurato dopo l'ultima analisi delle prenotazioni: la "
+    "l'inventario camere è stato configurato dopo l'ultima analisi delle prenotazioni, quindi la "
     "percentuale sarà calcolata con la prossima analisi"
 )
 # the words that NAME the missing input of an occupancy percentage (`Gap.needs`)
@@ -303,7 +303,7 @@ _INVENTORY_NEEDS = (
     "camere totali",
 )
 _ZERO_INVENTORY = (
-    "l'inventario camere indica zero camere disponibili: va corretto prima che NINFA possa "
+    "l'inventario camere indica zero camere disponibili e va corretto prima che NINFA possa "
     "calcolare la percentuale"
 )
 
@@ -340,8 +340,8 @@ def _night_occupancy_gap(row: NightRow, overview: DataOverview) -> Gap | None:
     if not row.has_data:
         return Gap(
             "metric.occupancy",
-            "per quella notte NINFA non ha prenotazioni registrate, e questo è un dato mancante: "
-            "non significa zero camere prenotate",
+            "per quella notte NINFA non ha prenotazioni registrate, e questo è un dato mancante "
+            "(non significa zero camere prenotate)",
             needs=("prenotazion", "dato mancante", "registrat"),
         )
     if row.occupancy_pct is not None:
@@ -360,8 +360,8 @@ def _night_occupancy_gap(row: NightRow, overview: DataOverview) -> Gap | None:
         )
     return Gap(
         "metric.occupancy",
-        "per quella notte NINFA non sa quante camere sono disponibili: manca l'inventario camere e "
-        "NINFA non lo deduce dalle prenotazioni",
+        "per quella notte NINFA non sa quante camere sono disponibili, perché manca l'inventario "
+        "camere (e NINFA non lo deduce dalle prenotazioni)",
         needs=_INVENTORY_NEEDS,
     )
 
@@ -687,8 +687,8 @@ def _occupancy_revenue(runtime: ToolRuntime, args: OccupancyArgs) -> Observation
                 gaps=(
                     Gap(
                         "metric.occupancy",
-                        "la notte richiesta non è tra i prossimi 30 giorni dalla data di analisi: "
-                        "NINFA mostra le prenotazioni dalla data di analisi in avanti",
+                        "la notte richiesta non è tra i prossimi 30 giorni dalla data di analisi, "
+                        "perché NINFA mostra le prenotazioni dalla data di analisi in avanti",
                         needs=("30 giorni", "data di analisi", "in avanti", "passat"),
                     ),
                 ),
@@ -949,8 +949,7 @@ def _compare_windows(runtime: ToolRuntime, args: NoArgs) -> Observation:
         Gap(
             "metric.period_comparison",
             "NINFA mostra solo oggi, la prossima settimana, il prossimo mese di notti e il "
-            "confronto con una settimana fa: non ha confronti con l'anno scorso, con il mese "
-            "precedente o con un budget per le prenotazioni",
+            "confronto con una settimana fa",
         )
     ]
     gaps.extend(_bookings_gap(overview, "metric.occupancy"))
@@ -1509,8 +1508,18 @@ def _basis_lines(overview: DataOverview) -> tuple[list[str], dict[str, Any] | No
     return lines, detail
 
 
-# what a cost per occupied room lacks when it has no figure: the rooms occupied in the month
-_CPOR_NEEDS = ("occupazione", "occupat", "prenotazion", "inventar", "giorni")
+# what a cost per occupied room lacks when it has no figure: the occupancy of the month (the words
+# are NOT the metric's own, "camera occupata", or any answer would pass)
+_CPOR_NEEDS = (
+    "occupazione del mese",
+    "prenotazioni importate",
+    "origine di prenotazioni",
+    "inventar",
+    "non conosce quante camere",
+    "non coprono",
+    "nessun costo",
+    "giorni di",
+)
 _CPOR_OCCUPANCY_STATUSES = (
     CporStatus.NO_OCCUPANCY_SOURCE,
     CporStatus.INCOMPLETE,
@@ -1655,8 +1664,15 @@ def _cpor(runtime: ToolRuntime, args: CporArgs) -> Observation:
 # --- 8. get_staff_metrics -------------------------------------------------------------------------
 
 
-# what a cost-to-revenue incidence lacks: the revenue on the books (or the hours) of the same days
-_INCIDENCE_NEEDS = ("ricav", "prenotazion", "ore", "piano")
+# what a cost-to-revenue incidence lacks, by the reason the Dati page gives (the words are NOT the
+# metric's own, "ricavi": any answer about the incidence would pass)
+_INCIDENCE_NEEDS: dict[LaborRevenueGap, tuple[str, ...]] = {
+    LaborRevenueGap.NO_LABOR: ("ore pianificate", "nessuna ora", "non ci sono ore", "piano"),
+    LaborRevenueGap.NO_ANALYSIS: ("analis", "prenotazioni analizzate"),
+    LaborRevenueGap.PERIOD_NOT_COVERED: ("on-books", "confrontabil", "non coprono", "copertura"),
+    LaborRevenueGap.LABOR_INCOMPLETE: ("giorni del piano", "senza ore", "incomplet"),
+    LaborRevenueGap.NO_REVENUE: ("on-books", "non ci sono ricavi", "nessun ricavo", "prenotazion"),
+}
 
 
 def _staff_metrics(runtime: ToolRuntime, args: StaffArgs) -> Observation:
@@ -1718,7 +1734,7 @@ def _staff_metrics(runtime: ToolRuntime, args: StaffArgs) -> Observation:
             Gap(
                 "metric.labor_incidence",
                 _clause(REVENUE_GAP_TEXT[economics.revenue_gap]),
-                needs=_INCIDENCE_NEEDS,
+                needs=_INCIDENCE_NEEDS[economics.revenue_gap],
             ),
         )
     if economics.average_hourly_cost is None and economics.planned_hours is not None:

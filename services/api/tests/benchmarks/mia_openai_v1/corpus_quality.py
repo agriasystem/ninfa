@@ -43,7 +43,8 @@ MISSING = (
         "di "
         "camere vendibili non si sa quante siano occupate. Restano disponibili le prenotazioni, i "
         "ricavi camera ({truth.rev30} euro sulle prenotazioni attuali) e l'ADR.",
-        [["inventario"], ["{truth.rev30}"]],
+        # the component NINFA does have: its revenue, or its room-nights (the model gave the second)
+        [["inventario"], ["{truth.rev30}", "{truth.roomnights30}"]],
     ),
     _missing(
         "no_inventory",
@@ -289,7 +290,16 @@ MISSING = (
         [C("get_staff_metrics")],
         "L'incidenza del costo del personale sui ricavi non è calcolabile: non ci sono ricavi "
         "on-books confrontabili per tutti i giorni del piano. Le ore pianificate ci sono.",
-        [["non è calcolabile", "non posso calcolare", "non è disponibile", "manca"], ["ricavi"]],
+        [
+            [
+                "non è calcolabile",
+                "non è al momento calcolabile",
+                "non posso calcolare",
+                "non è disponibile",
+                "manca",
+            ],
+            ["ricavi"],
+        ],
     ),
     _missing(
         "partial",

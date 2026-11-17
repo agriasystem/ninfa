@@ -310,6 +310,12 @@ def names_the_need(gap: Gap, answer: str) -> bool:
     return not gap.needs or _mentions_any(answer.lower(), gap.needs)
 
 
+def _flat(reason: str) -> str:
+    """A reason is ONE clause: a colon inside it (the Dati page's own sentences have some) would
+    read as a second colon after the one that introduces it."""
+    return reason.replace(": ", ", ")
+
+
 def _label(metric: str) -> str:
     spec = GAP_METRICS.get(metric)
     return spec.label if spec is not None else "questo dato"
@@ -320,23 +326,23 @@ def gap_statement(gap: Gap) -> str:
     label = _label(gap.metric)
     head = label[:1].upper() + label[1:]
     if gap.partial:
-        return f"{head} è parziale: {gap.reason}."
-    return f"{head} non è calcolabile: {gap.reason}."
+        return f"{head} è parziale: {_flat(gap.reason)}."
+    return f"{head} non è calcolabile: {_flat(gap.reason)}."
 
 
 def gap_disclosure(gap: Gap) -> str:
     """The same gap as MIA says it to the person: one sentence, no figure that is not the tool's."""
     label = _label(gap.metric)
     if gap.partial:
-        return f"Tieni presente che {label} è parziale: {gap.reason}."
-    return f"Non posso però calcolare {label}: {gap.reason}."
+        return f"Tieni presente che {label} è parziale: {_flat(gap.reason)}."
+    return f"Non posso però calcolare {label}: {_flat(gap.reason)}."
 
 
 def gap_reason(gap: Gap) -> str:
     """Only the reason, for an answer that already said the metric is missing (or partial) but not
     what is missing: a live run said "L'occupazione non è calcolabile." and stopped there."""
     lead = "Nel dettaglio" if gap.partial else "Il dato che manca"
-    return f"{lead}: {gap.reason}."
+    return f"{lead}: {_flat(gap.reason)}."
 
 
 def disclosures_for(

@@ -54,7 +54,7 @@
 | Family | Turns | Model calls | Tool calls | Input tok | Output tok | p50 ms | p95 ms | Cost/turn |
 |---|---|---|---|---|---|---|---|---|
 | simple_product | 85 | 2.0 | 1.0 | 22220 | 300 | 0 | 0 | cost unavailable |
-| data_aware | 245 | 1.95 | 1.18 | 22176 | 292 | 0 | 0 | cost unavailable |
+| data_aware | 245 | 1.95 | 1.18 | 22175 | 292 | 0 | 0 | cost unavailable |
 | multi_tool | 10 | 2.0 | 3.3 | 24082 | 300 | 0 | 0 | cost unavailable |
 | all | 340 | 1.96 | 1.2 | 22243 | 294 | 0 | 0 | cost unavailable |
 
