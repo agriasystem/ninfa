@@ -104,10 +104,12 @@ FIELD_SEM: dict[tuple[DataSourceDomain, str], Sem] = {
 }
 
 # Fields whose values can name them with NO helpful header (never a number, never a free text).
+# A channel is deliberately NOT here: NINFA never makes a channel from its values alone (a product
+# decision pinned by `test_the_values_alone_never_make_a_channel_without_a_header_that_says_so`),
+# whatever the column holds. Its values still RULE OUT other fields and fit a channel header.
 PROVABLE = frozenset(
     {
         (B, "status"),
-        (B, "channel"),
         (B, "source_record_id"),
         (L, "role"),
         (L, "currency"),
@@ -191,8 +193,6 @@ def veto(profile: ColumnProfile, sem: Sem) -> str | None:
             return "booking statuses, not codes"
         if profile.channel_share >= 0.6:
             return "channel names, not codes"
-        if _repeats(profile):
-            return "repeats too much to be one per booking"
     elif sem == Sem.DOC_NUMBER:
         if _dated(profile) or profile.negative or profile.cents_share >= 0.3:
             return "dates or amounts, not document numbers"
@@ -245,12 +245,6 @@ def proof_of(profile: ColumnProfile, sem: Sem, *, vat_fit: float = 0.0) -> float
     if sem == Sem.STATUS:
         return (
             profile.status_share if profile.status_share >= PROOF_SHARE and _wordy(profile) else 0.0
-        )
-    if sem == Sem.CHANNEL:
-        return (
-            profile.channel_share
-            if profile.channel_share >= PROOF_SHARE and _wordy(profile)
-            else 0.0
         )
     if sem == Sem.DEPARTMENT:
         return (

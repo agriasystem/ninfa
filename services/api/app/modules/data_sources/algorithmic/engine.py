@@ -34,7 +34,13 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
 from app.modules.data_sources.algorithmic.assignment import assign
-from app.modules.data_sources.algorithmic.header import HeaderReading, Kind, read_header
+from app.modules.data_sources.algorithmic.header import (
+    HeaderReading,
+    Kind,
+    normalize,
+    read_header,
+    vocabulary_words,
+)
 from app.modules.data_sources.algorithmic.profile import ColumnProfile, profile_column
 from app.modules.data_sources.algorithmic.relational import Relational, relations_of
 from app.modules.data_sources.algorithmic.scoring import CandidateScore, combine
@@ -55,6 +61,7 @@ from app.modules.data_sources.semantics import (
     level_of,
     name_candidates,
     rule_index,
+    vocabulary,
 )
 from app.modules.document_understanding.pii import PiiKind
 from app.modules.document_understanding.stats import MIN_EVIDENCE, ColumnStats
@@ -129,6 +136,12 @@ class Trace:
     dropped: dict[int, str] = field(default_factory=dict)
     relations: dict[tuple[int, str], str] = field(default_factory=dict)
     findings: list[Finding] = field(default_factory=list)
+
+
+def known_words(sem: DomainSem) -> frozenset[str]:
+    """Every word a header can carry that NINFA already knows the meaning of: V3's rule and name
+    words (stemmed) and the vocabulary's (folded)."""
+    return frozenset(vocabulary(sem)) | vocabulary_words()
 
 
 class AlgorithmicEngine:
@@ -450,7 +463,14 @@ class AlgorithmicEngine:
             ]
             if len(fitting) == 1:
                 single[key] = fitting[0]
+        known = known_words(sem)
         for index in unnamed:
+            # A header that says something NINFA knows ("Centro di costo", "Data pagamento", "Stato
+            # pagamento") says it is something else: its values never make it a field. Only a header
+            # that says nothing at all ("Campo 3", "Dato B", "Condizione") leaves it to the values.
+            words = tokens(samples[index].header) | set(normalize(samples[index].header).words)
+            if words & known:
+                continue
             for key, spec in sem.fields.items():
                 if key in have_name:
                     continue

@@ -166,26 +166,73 @@ def test_a_spelling_mistake_is_read_but_never_made_certain() -> None:
 # -------------------------------------------------------------------
 
 
-def test_the_values_alone_name_a_status_a_channel_and_a_booking_code_at_medium() -> None:
+def test_the_values_alone_name_a_status_and_a_booking_code_at_medium() -> None:
     nameless = bookings(
         booked="Booking Date",
         **{"in": "Check in"},
         out="Check out",
         rooms="Rooms",
         revenue="Room Revenue",
+        channel="Channel",
     )
 
     proposal = read(BOOKINGS, nameless, DEFAULT)
     found = {c.field: c for c in proposal.columns if c.field}
 
     assert found["status"].level == Level.MEDIUM
-    assert found["channel"].level == Level.MEDIUM
     assert found["source_record_id"].level == Level.MEDIUM
     assert all(
         c.name and c.name.value == "VALUES"
         for f, c in found.items()
-        if f in {"status", "channel", "source_record_id"}
+        if f in {"status", "source_record_id"}
     )
+
+
+def test_a_channel_is_never_named_by_its_values_alone() -> None:
+    """A product decision of an earlier gate (`test_the_values_alone_never_make_a_channel_without_a_
+    header_that_says_so`): the values of a column may fit a channel, they never make one."""
+    nameless = bookings(
+        id="Reservation Code",
+        booked="Booking Date",
+        **{"in": "Check in"},
+        out="Check out",
+        status="Status",
+        rooms="Rooms",
+        revenue="Room Revenue",
+    )
+
+    found = {c.field for c in read(BOOKINGS, nameless, DEFAULT).columns if c.field}
+
+    assert "channel" not in found
+
+
+def test_a_known_header_is_never_read_as_another_thing_by_its_values() -> None:
+    """The header "Centro di costo" is where a cost is booked, not a department: its values may be
+    department words and still it is not one (a product decision pinned by `test_a_cost_centre_is_
+    not_an_operating_centre`). Only a header that says NOTHING leaves a column to its values."""
+    rota = {
+        "Data": [f"2026-10-{d:02d}" for d in range(1, 13)],
+        "Ore previste": [8, 6, 8, 7, 6, 8, 8, 6, 7, 8, 6, 8],
+        "Ore effettive": [8, 6, 8, 7, 6, 8, 8, 6, 7, 8, 6, 8],
+    }
+
+    cost_centre = {**rota, "Centro di costo": list(DEPARTMENTS)}
+    nameless = {**rota, "Campo 4": list(DEPARTMENTS)}
+
+    assert fields_of(read(LABOR, cost_centre, DEFAULT))["Centro di costo"] != "role"
+    assert fields_of(read(LABOR, nameless, DEFAULT))["Campo 4"] == "role"
+
+
+def test_a_bare_code_over_repeated_values_is_asked_about_not_dropped() -> None:
+    """V3 asks one question about a reference that repeats (a group, a company); V4 must not turn
+    that question into nothing (`test_a_bare_code_column_over_repeated_values_is_confirmed_with_one_
+    question`)."""
+    repeated = {"Pratica": ["A1", "A1", "A2", "A2", "A3", "A3"] * 2, "Stato": list(STATUSES)}
+
+    v3 = fields_of(read(BOOKINGS, repeated, None))["Pratica"]
+    v4 = fields_of(read(BOOKINGS, repeated, DEFAULT))["Pratica"]
+
+    assert v4 == v3
 
 
 def test_three_unnamed_dates_in_order_are_named_by_their_relation_at_medium() -> None:

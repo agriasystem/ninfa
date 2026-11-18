@@ -99,7 +99,6 @@ def test_the_profile_reads_how_numbers_are_written() -> None:
     ("values", "sem"),
     [
         (STATUSES, Sem.STATUS),
-        (CHANNELS, Sem.CHANNEL),
         (DEPARTMENTS, Sem.DEPARTMENT),
         (["EUR"] * 8, Sem.CURRENCY),
         (["Alimentari", "Bevande", "Pulizie", "Utenze", "Manutenzione"] * 2, Sem.CATEGORY),
