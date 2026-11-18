@@ -179,9 +179,7 @@ def test_no_dependency_was_added_for_gate_4() -> None:
 def test_the_dependency_manifests_do_not_mention_scientific_libraries() -> None:
     for manifest in PYPROJECTS:
         text = manifest.read_text(encoding="utf-8").lower()
-        # (`scipy` / `numpy`: Smart Import V4.1 development dependency, ADR 0056 - see
-        # `test_algorithmic_dependency_boundary.py`)
-        for library in ("pandas", "scikit", "sklearn", "statsmodels"):
+        for library in ("numpy", "pandas", "scipy", "scikit", "sklearn", "statsmodels"):
             assert library not in text, (manifest.name, library)
 
 

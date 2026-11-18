@@ -17,10 +17,8 @@ import pytest
 
 from app.modules.data_sources.algorithmic import selector
 from app.modules.data_sources.algorithmic.engine import (
-    ASSIGN,
     DEFAULT,
     HEADER_ONLY,
-    AlgorithmicConfig,
     AlgorithmicEngine,
     Trace,
 )
@@ -409,9 +407,18 @@ def test_every_certainty_v4_gives_is_one_v3_would_have_given_for_the_same_name()
 
 
 def test_the_configurations_are_cumulative() -> None:
-    assert (HEADER_ONLY.header, HEADER_ONLY.values, HEADER_ONLY.assignment) == (True, False, False)
-    assert (DEFAULT.header, DEFAULT.values, DEFAULT.assignment) == (True, True, False)
-    assert (ASSIGN.header, ASSIGN.values, ASSIGN.assignment) == (True, True, True)
+    assert (HEADER_ONLY.header, HEADER_ONLY.values) == (True, False)
+    assert (DEFAULT.header, DEFAULT.values) == (True, True)
+
+
+def test_only_the_engines_that_were_kept_can_be_selected() -> None:
+    """The SciPy assignment and the margin demotion were measured and removed (ADR 0056): they are
+    not engines, not configurations and not a name the setting accepts."""
+    assert set(selector.ENGINES) == {"v3", "v4", "v4-header"}
+    for removed in ("v4-assign", "v4-margin"):
+        with pytest.raises(ValueError):
+            selector.configure(removed)
+    assert not hasattr(DEFAULT, "assignment")
 
 
 def test_a_trace_explains_every_candidate_with_its_parts() -> None:
@@ -435,15 +442,6 @@ def test_a_reading_by_the_vocabulary_names_the_phrase_it_matched() -> None:
     date_ = next(s for s in seen[0].scores if s.field == "check_in" and s.column == 1)
     assert date_.header_kind == "TYPO"
     assert date_.phrase == "arrival date"
-
-
-def test_the_margin_is_configurable_and_zero_means_never_demote() -> None:
-    twin = {"Reservation Code": codes(), "Arrival": list(arrival), "Arrival date": list(arrival)}
-    loose = AlgorithmicConfig("v4-nomargin", margin=0.0)
-
-    levels = {c.header: c.level for c in read(BOOKINGS, twin, loose).columns if c.field}
-
-    assert levels  # a reading is still made
 
 
 # --- which engine reads ---------------------------------------------------------------------------
@@ -512,7 +510,8 @@ def test_the_algorithmic_package_imports_no_model_client() -> None:
         "urllib3",
         "socket",
     }
-    assert "app" in imported and "scipy" in imported and "rapidfuzz" in imported
+    assert "app" in imported and "rapidfuzz" in imported
+    assert not imported & {"scipy", "duckdb", "clevercsv", "fsspec"}
 
 
 def test_reading_a_file_with_v4_opens_no_connection(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -619,36 +618,6 @@ def test_the_default_settings_select_no_model_and_the_v3_engine() -> None:
     assert fields["smart_import_ai_mode"].default == "off"
     assert fields["import_understanding_provider"].default == "unconfigured"
     assert fields["smart_import_understanding_engine"].default == "v3"
-
-
-# --- the global assignment, when it is switched on
-# -------------------------------------------------
-
-
-def test_the_assignment_reads_what_the_default_reads_on_a_clean_file() -> None:
-    """Measured over 1,026 documents the assignment changes one reading: on a file where the two
-    agree it must change none."""
-    named = bookings(**CAMEL)
-
-    assert fields_of(read(BOOKINGS, named, ASSIGN)) == fields_of(read(BOOKINGS, named, DEFAULT))
-    assert levels_of(read(BOOKINGS, named, ASSIGN)) == levels_of(read(BOOKINGS, named, DEFAULT))
-
-
-def test_the_assignment_keeps_two_look_alike_columns_contested() -> None:
-    days = [f"2026-10-{d:02d}" for d in range(1, 13)]
-    register = {
-        "Billed By": ["Rossi Srl", "Bianchi Spa", "Verdi Snc"] * 4,
-        "Document No.": [f"2026/{100 + i}" for i in range(12)],
-        "Memo": ["Luce", "Acqua", "Gas"] * 4,
-        "Issue date": days,
-        "Invoice date": days,
-        "Net Amount": [100.0 + i for i in range(12)],
-    }
-
-    found = {c.header: c for c in read(COSTS, register, ASSIGN).columns}
-
-    assert found["Issue date"].ambiguous_group == "CONTESTED"
-    assert found["Invoice date"].ambiguous_group == "CONTESTED"
 
 
 # --- what V3 reads, V4 keeps reading --------------------------------------------------------------

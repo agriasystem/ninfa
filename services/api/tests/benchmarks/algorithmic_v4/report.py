@@ -23,6 +23,8 @@ SAFETY = (
     "scope_violations",
     "pii_values_in_the_browser_answer",
 )
+# `v4-assign` and `v4-margin` are not engines any more (ADR 0056): their labels stay so that the
+# stored evidence (`results/smart-import-v4-algorithmic-ablation.json`) still reads.
 LABELS = {
     "v3": "current (V3)",
     "v4-header": "V4 header only",

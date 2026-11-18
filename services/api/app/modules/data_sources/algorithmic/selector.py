@@ -16,13 +16,11 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import cache
 
-from app.modules.data_sources.algorithmic import dialect
 from app.modules.data_sources.algorithmic.engine import CONFIGS, AlgorithmicEngine
 from app.modules.data_sources.column_profile import ColumnSample
 from app.modules.data_sources.proposal import Proposal, SelectionEngine
 from app.modules.data_sources.proposal import propose as v3_propose
 from app.modules.data_sources.semantics import DomainSem
-from app.modules.document_understanding import grid
 
 ENV_NAME = "SMART_IMPORT_UNDERSTANDING_ENGINE"
 V3 = "v3"
@@ -70,7 +68,7 @@ def use_engine_instance(engine: SelectionEngine) -> Iterator[None]:
 
 @contextmanager
 def use_engine(name: str) -> Iterator[None]:
-    """Run the code inside the block with this engine (`v3`, `v4`, `v4-header`, `v4-values`)."""
+    """Run the code inside the block with this engine (`v3`, `v4`, or the ablation `v4-header`)."""
     token = _override.set(_check(name))
     try:
         yield
@@ -94,22 +92,6 @@ def propose(
     return v3_propose(sem, samples, excluded_reason=excluded_reason, engine=engine)
 
 
-def refine_delimiter(text: str, counted: str) -> str:
-    """V4's second opinion on a file's delimiter - asked ONLY when the counting rule is unsure.
-
-    With V3 selected, or when the first lines agree on a width, the counted delimiter stands and
-    nothing is run. A sniffer (DuckDB, then CleverCSV) overrules it only when it splits the sample
-    clearly more consistently, and only to a delimiter the importers read (`dialect.SUPPORTED`).
-    """
-    if current_name() == V3:
-        return counted
-    if dialect.consistency(dialect.sample_of(text), counted)[0] >= dialect.CONSISTENT:
-        return counted
-    return dialect.choose_delimiter(text, counted)[0]
-
-
-grid.delimiter_refiner = refine_delimiter
-
 __all__ = [
     "ENGINES",
     "ENV_NAME",
@@ -117,7 +99,6 @@ __all__ = [
     "configure",
     "current_name",
     "propose",
-    "refine_delimiter",
     "use_engine",
     "use_engine_instance",
 ]

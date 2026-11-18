@@ -18,10 +18,9 @@ the caller already holds:
 
 The rest of the rules the brief lists are already enforced where they are cheapest and exact:
 `net + VAT = total` (`understanding_costs.amounts_check`, shown as a warning), hours per person
-(`DomainSem.person_limits`), planned and actual hours as two columns (the assignment never gives two
-fields one column), a category that NINFA cannot read (the labels question), an unknown booking
-status
-(the labels question) and an identifier that repeats (`fit_unique_identifier`).
+(`DomainSem.person_limits`), planned and actual hours as two columns (the selection never gives
+one column two fields), a category that NINFA cannot read (the labels question), an unknown
+booking status (the labels question) and an identifier that repeats (`fit_unique_identifier`).
 """
 
 from collections.abc import Mapping, Sequence

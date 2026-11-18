@@ -1,11 +1,11 @@
-"""Smart Import V4.1: the new dependencies are few, isolated, and mostly not shipped (ADR 0056).
+"""Smart Import V4.1: ONE new library, and the four that were measured and left out (ADR 0056).
 
-The earlier scope guards forbid fuzzy-matching and scientific libraries in the manifests. V4.1 adds
-exceptions on purpose - RapidFuzz at run time; SciPy (with NumPy), DuckDB, CleverCSV and fsspec for
-development only, because the benchmark measured them as worth nothing the default engine needs -
-and
-this file is the precise guard of those exceptions: which manifest section holds each, which ONE
-module imports each, and that the production process never loads the development ones.
+The earlier scope guards forbid fuzzy-matching and scientific libraries in the manifests. V4.1 makes
+one exception on purpose - RapidFuzz, at run time, in one module - and this file is the precise
+guard of it. SciPy (global assignment), DuckDB and CleverCSV (CSV dialect sniffers) and fsspec (what
+DuckDB needs to read from memory) were built, measured over 1,026 documents and removed because they
+bought nothing the default engine needs; they are declared nowhere and imported by nothing, so that
+running NINFA never depends on them and nobody re-adds them by accident without reading the report.
 """
 
 import ast
@@ -15,21 +15,15 @@ import tomllib
 from pathlib import Path
 
 API = Path(__file__).resolve().parents[1]
-PACKAGE = API / "app" / "modules" / "data_sources" / "algorithmic"
 APP = API / "app"
+PACKAGE = APP / "modules" / "data_sources" / "algorithmic"
 PYPROJECT = tomllib.loads((API / "pyproject.toml").read_text(encoding="utf-8"))
 
-RUNTIME = {"rapidfuzz"}
-DEVELOPMENT = {"scipy", "duckdb", "clevercsv", "fsspec"}
-# the one module that may import each, and whether the import must sit inside a function
-HOME = {
-    "rapidfuzz": ("header.py", False),
-    "scipy": ("assignment.py", True),
-    "numpy": ("assignment.py", True),
-    "duckdb": ("dialect.py", True),
-    "fsspec": ("dialect.py", True),
-    "clevercsv": ("dialect.py", True),
-}
+# the one library V4 adds, and the one module that imports it (at module level)
+RUNTIME = "rapidfuzz"
+HOME = "header.py"
+# measured, not adopted
+EVALUATED_AND_LEFT_OUT = {"scipy", "numpy", "duckdb", "clevercsv", "fsspec"}
 
 
 def _names(entries: list[str]) -> set[str]:
@@ -42,17 +36,21 @@ def _names(entries: list[str]) -> set[str]:
     return out
 
 
-def test_only_rapidfuzz_is_a_runtime_dependency_of_v4() -> None:
-    runtime = _names(PYPROJECT["project"]["dependencies"])
+def _declared() -> set[str]:
+    declared = _names(PYPROJECT["project"]["dependencies"])
+    for entries in PYPROJECT.get("dependency-groups", {}).values():
+        declared |= _names([e for e in entries if isinstance(e, str)])
+    for entries in PYPROJECT["project"].get("optional-dependencies", {}).values():
+        declared |= _names(entries)
+    return declared
 
-    assert runtime >= RUNTIME
-    assert not (DEVELOPMENT | {"numpy"}) & runtime  # none of the development ones ships
+
+def test_rapidfuzz_is_the_runtime_dependency_v4_adds() -> None:
+    assert RUNTIME in _names(PYPROJECT["project"]["dependencies"])
 
 
-def test_the_development_ones_are_in_the_development_group() -> None:
-    development = _names(PYPROJECT["dependency-groups"]["dev"])
-
-    assert development >= DEVELOPMENT
+def test_the_libraries_that_were_measured_and_left_out_are_declared_nowhere() -> None:
+    assert not EVALUATED_AND_LEFT_OUT & _declared()
 
 
 def _imports(path: Path) -> list[tuple[str, bool]]:
@@ -68,29 +66,25 @@ def _imports(path: Path) -> list[tuple[str, bool]]:
     return found
 
 
-def test_each_library_is_imported_by_exactly_one_module_and_the_lazy_ones_inside_a_function() -> (
-    None
-):
+def test_rapidfuzz_is_imported_by_exactly_one_module() -> None:
+    importers = [
+        path
+        for path in sorted(APP.rglob("*.py"))
+        if any(root == RUNTIME for root, _top in _imports(path))
+    ]
+
+    assert importers == [PACKAGE / HOME]
+
+
+def test_no_module_of_the_app_imports_a_library_that_was_left_out() -> None:
     for path in sorted(APP.rglob("*.py")):
-        for root, at_top in _imports(path):
-            if root not in HOME:
-                continue
-            home, lazy = HOME[root]
-            assert path.name == home and path.parent == PACKAGE, f"{root} imported by {path}"
-            assert not (lazy and at_top), f"{root} must be imported inside a function in {path}"
+        for root, _top in _imports(path):
+            assert root not in EVALUATED_AND_LEFT_OUT, f"{root} imported by {path}"
 
 
-def test_every_library_is_still_imported_where_it_belongs() -> None:
-    seen = {root for path in PACKAGE.glob("*.py") for root, _top in _imports(path)}
-
-    assert set(HOME) <= seen
-
-
-def test_the_production_process_loads_no_development_library() -> None:
-    """Importing the app (its routes, its understanding, its V4 engine) must not load SciPy, DuckDB,
-    fsspec or CleverCSV: they are not installed in production, and the code that wants them asks for
-    them only when a configuration that needs them is selected. (NumPy is not checked: RapidFuzz
-    uses it when it happens to be installed, which is a fact about the machine, not about NINFA.)"""
+def test_the_production_process_loads_none_of_them() -> None:
+    """Importing the app (its routes, its understanding, its V4 engine) loads none of the libraries
+    that were left out, whatever happens to be installed on the machine."""
     script = (
         "import sys\n"
         "import app.main\n"
@@ -109,7 +103,11 @@ def test_the_production_process_loads_no_development_library() -> None:
     assert "LOADED []" in result.stdout, result.stdout
 
 
-def test_the_default_engine_never_needs_a_development_library() -> None:
-    from app.modules.data_sources.algorithmic.engine import DEFAULT
+def test_the_dialect_hook_and_the_assignment_are_gone_from_the_production_code() -> None:
+    """The second opinion on a CSV delimiter and the global assignment were removed: V3's reader is
+    the only one, and the selection is V3's greedy pick over V4's evidence."""
+    from app.modules.document_understanding import grid
 
-    assert DEFAULT.assignment is False  # greedy over V4's evidence: no SciPy
+    assert not hasattr(grid, "delimiter_refiner")
+    assert not (PACKAGE / "assignment.py").exists()
+    assert not (PACKAGE / "dialect.py").exists()

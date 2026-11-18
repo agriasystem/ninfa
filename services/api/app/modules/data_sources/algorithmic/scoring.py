@@ -11,7 +11,8 @@ Every (column, field) pair that could be a reading gets a `CandidateScore` made 
     relational  what other columns add: +0.15 for a role their relation explains
     veto        why the column CANNOT be this field - when set, the pair is not a candidate
 
-and one `total` in 0..1 that the global assignment maximises:
+and one `total` in 0..1, the figure that makes a pair auditable (the selection itself is V3's
+greedy pick over the pairs that survive):
 
     with a name   total = header x (0.55 + 0.45 x values) + relational
     no name       total = 0.62 x proof + relational          (the values alone never beat a name)

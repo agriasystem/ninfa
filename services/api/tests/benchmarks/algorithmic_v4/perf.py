@@ -7,7 +7,7 @@ understood end to end by V3 and by V4, repeated, and the median is reported with
 
     scan       reading the file into bounded grids (V3's reader; identical for both engines)
     mapping    `propose`: which column is which field - the step V4 replaces. Profiling, header
-               matching, value evidence, relations, scoring and the assignment all happen here
+               matching, value evidence, relations, scoring and the selection all happen here
     total      `UnderstandingService.understand`, the call the upload route makes
 
 Only the first `SCAN_ROWS` (2,000) rows are ever profiled, whatever the file's length, so the

@@ -3,12 +3,12 @@
 Smart Import V4.1: is the algorithmic reader better than the one in production, and no less safe?
 
 The SAME documents are read by each engine - `v3` (the greedy reader in production), and V4 with
-more and more of its parts (`v4-header`: vocabulary + RapidFuzz; `v4-values`: + value proof,
-negative
-evidence and relations; `v4`: + the global assignment) - through the real understanding service,
-with
+more and more of its parts (`v4-header`: vocabulary + RapidFuzz; `v4`: + value proof, negative
+evidence, relations and the domain validation) - through the real understanding service, with
 no database, no model, nothing leaving the process. Every number is computed by the benchmark's own
 scorer (`score_case`) from truth written next to each file; none of it is read from the engine.
+(The SciPy global assignment and the margin demotion were measured with the same harness and are
+no longer engines: ADR 0056 and the stored `smart-import-v4-algorithmic-ablation.json`.)
 
 Populations:
 
@@ -21,9 +21,9 @@ Populations:
     problem      the V4 problem corpus (`problem_corpus.py`): plausible headers that are no
                  importer's own name (reservation_code, BookingStatus, checkindate, Arival Date...)
 
-Hard requirements (a failure of any is a blocker, whatever the recall): unsafe READY = 0, wrong-
-domain
-READY = 0, scope violations = 0, no engine exception, no personal value in what the browser is sent.
+Hard requirements (a failure of any is a blocker, whatever the recall): unsafe READY = 0,
+wrong-domain READY = 0, scope violations = 0, no engine exception, no personal value in what
+the browser is sent.
 """
 
 import argparse

@@ -12,10 +12,7 @@ It replaces ONE step of the understanding (which column is which field) and noth
                                            they RULE OUT
                       3 relations          booked <= arrival < departure, net + VAT = total
                       4 candidate score    one total per (column, field), with its parts
-                      5 selection          V3's greedy pick over those scores (the DEFAULT) - or,
-                                           optionally, the best reading of the whole file with scipy
-                                           (`ASSIGN`), where a pair another reading matches within
-                                           `margin` is not firm (`MARGIN`: a HIGH becomes MEDIUM)
+                      5 selection          V3's greedy pick over those scores
                       6 validation         NINFA's domain rules applied to what was chosen
 
 The levels (HIGH / MEDIUM / LOW) still come from V3's `level_of`, so a reading is exactly as sure as
@@ -24,16 +21,16 @@ adds certainty a name and values did not already earn. What follows the selectio
 columns, partner columns, values no person could have, "hours" that do not say which, then every
 question, blocker and validator) is the same code for both engines.
 
-The configuration exists for ONE reason: to measure what each part is worth (`HEADER_ONLY`,
-`DEFAULT`, `ASSIGN`, `MARGIN`) and to switch back (`SMART_IMPORT_UNDERSTANDING_ENGINE=v3`). The
-global assignment is not the default because, measured over 1,026 documents, it changed one reading
-and for the worse (see the benchmark report).
+The configuration exists for ONE reason: to measure what each part is worth (`HEADER_ONLY` against
+`DEFAULT`) and to switch back (`SMART_IMPORT_UNDERSTANDING_ENGINE=v3`). A global assignment of
+columns to fields (SciPy) and a demotion of readings a close second one matches were built and
+measured: over 1,026 documents the first changed one reading, for the worse, and the second cost
+READY and bought no safety, so neither is in the product (ADR 0056).
 """
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 
-from app.modules.data_sources.algorithmic.assignment import assign
 from app.modules.data_sources.algorithmic.header import (
     HeaderReading,
     Kind,
@@ -83,37 +80,18 @@ class AlgorithmicConfig:
     name: str = "v4"
     header: bool = True  # the vocabulary + RapidFuzz, in place of V3's likeness of letters
     values: bool = True  # value proof, negative evidence, relations
-    assignment: bool = True  # scipy global assignment (False: V3's greedy over the same readings)
-    # a reading another one matches within this much is not firm (0: never judged by it)
-    margin: float = 0.10
-    # what a close second reading does to a reading that rests on a NAME: demotes a HIGH to a
-    # question (True) or leaves V3's own tie-break alone (False). A reading from the values alone is
-    # always dropped when another one is as likely: V3 has no tie-break there.
-    demote_names: bool = False
     # a column may be named by its values alone only in a file that already looks like this kind of
     # data: this many different fields named by their headers (or a relation between the dates)
     support: int = 3
 
 
-# `v4-header`   the vocabulary and RapidFuzz only
+# `v4-header`   the vocabulary and RapidFuzz only (an ablation: what the values add is measured
+#               against it)
 # `v4`          + what the values prove and rule out, the relations, the domain validation: what
 #               `SMART_IMPORT_UNDERSTANDING_ENGINE=v4` runs. V3's greedy pick over V4's evidence.
-# `v4-assign`   + SciPy's global assignment. MEASURED: over 1,026 documents it changed ONE reading,
-# for
-#               the worse (benchmark report), so it is not the default; the code stays, tested, for
-#               the day a file shows what greedy cannot. Needs SciPy (a development dependency).
-# `v4-margin`   `v4-assign` that also turns a NAME-based HIGH into a question when a close second
-# reading exists. Measured: it costs READY and buys no safety V4 does not already have.
-HEADER_ONLY = AlgorithmicConfig("v4-header", values=False, assignment=False)
-DEFAULT = AlgorithmicConfig("v4", assignment=False)
-ASSIGN = AlgorithmicConfig("v4-assign")
-MARGIN = AlgorithmicConfig("v4-margin", demote_names=True)
-CONFIGS = {config.name: config for config in (HEADER_ONLY, DEFAULT, ASSIGN, MARGIN)}
-
-# What a level is worth in the assignment. V3 took the pairs a name and values CONFIRM before the
-# ones they only partly confirm; a total that ignored the level would let a loose name over loose
-# values outbid a firm one ("Job Title" over "Operating Unit").
-LEVEL_BONUS = {Level.HIGH: 0.40, Level.MEDIUM: 0.20, Level.LOW: 0.0}
+HEADER_ONLY = AlgorithmicConfig("v4-header", values=False)
+DEFAULT = AlgorithmicConfig("v4")
+CONFIGS = {config.name: config for config in (HEADER_ONLY, DEFAULT)}
 
 
 @dataclass(slots=True)
@@ -130,9 +108,7 @@ class Trace:
     """Everything the engine weighed, for a test, a report or a person debugging a reading."""
 
     scores: list[CandidateScore] = field(default_factory=list)
-    selected: dict[int, tuple[str, float, Level]] = field(
-        default_factory=dict
-    )  # col -> field, margin
+    selected: dict[int, tuple[str, Level]] = field(default_factory=dict)  # col -> field, level
     dropped: dict[int, str] = field(default_factory=dict)
     relations: dict[tuple[int, str], str] = field(default_factory=dict)
     findings: list[Finding] = field(default_factory=list)
@@ -182,7 +158,6 @@ class AlgorithmicEngine:
         names = {key: spec.exact for key, spec in sem.fields.items()}
         scored: dict[tuple[int, str], tuple[Candidate, Level]] = {}
         fits: dict[tuple[int, str], float | None] = {}
-        totals: dict[tuple[int, str], float] = {}
         table: dict[tuple[int, str], CandidateScore] = {}
         named_columns: set[int] = set()
         have_name: set[str] = set()
@@ -230,7 +205,6 @@ class AlgorithmicEngine:
                 level = level_of(found.candidate.name, found.candidate.score, fit, stats[index])
                 scored[(index, name)] = (found.candidate, level)
                 fits[(index, name)] = fit
-                totals[(index, name)] = total + (LEVEL_BONUS[level] if config.assignment else 0.0)
                 named_columns.add(index)
                 have_name.add(name)
 
@@ -247,62 +221,32 @@ class AlgorithmicEngine:
                 have_name,
                 scored,
                 fits,
-                totals,
                 table,
                 trace,
             )
 
-        # 5. the best reading of the whole file
+        # 5. selection: V3's greedy pick over V4's evidence (levels still V3's `level_of`)
         order = list(sem.order) + [key for key in sem.fields if key not in sem.order]
-        chosen: dict[int, tuple[str, NameMatch, float | None, Level]] = {}
         notes_out: dict[int, list[str]] = {}
-        if config.assignment:
-            result = assign(totals, columns, order)
-            for column, name in result.pairs.items():
-                candidate, level = scored[(column, name)]
-                margin = result.margins[column]
-                about = table[(column, name)]
-                why = list(about.notes)
-                if about.relational:
-                    why.append(f"relation: {trace.relations.get((column, name), '')}")
-                if about.header_kind not in ("VALUES", "RULE"):
-                    why.append(f"header {about.header_kind.lower()} '{about.phrase}'")
-                if config.margin and margin < config.margin:
-                    if candidate.name == NameMatch.VALUES:
-                        trace.dropped[column] = (
-                            f"{name}: another reading is as likely (margin {margin:.2f})"
-                        )
-                        continue
-                    if config.demote_names and level == Level.HIGH:
-                        level = Level.MEDIUM
-                        why.append(
-                            f"not firm: another reading is nearly as likely (margin {margin:.2f})"
-                        )
-                chosen[column] = (name, candidate.name, fits.get((column, name)), level)
-                notes_out[column] = why
-                trace.selected[column] = (name, margin, level)
-            taken = {name for name, *_rest in chosen.values()}
-        else:
-            entries: list[Entry] = []
-            for (column, name), (candidate, level) in scored.items():
-                position = order.index(name) if name in order else 99
-                entries.append(
-                    (
-                        _LEVEL_RANK[level],
-                        candidate.score,
-                        -position,
-                        -column,
-                        name,
-                        candidate.name,
-                        fits.get((column, name)),
-                        level,
-                    )
+        entries: list[Entry] = []
+        for (column, name), (candidate, level) in scored.items():
+            position = order.index(name) if name in order else 99
+            entries.append(
+                (
+                    _LEVEL_RANK[level],
+                    candidate.score,
+                    -position,
+                    -column,
+                    name,
+                    candidate.name,
+                    fits.get((column, name)),
+                    level,
                 )
-            chosen, taken = greedy_pick(entries)
-            for column, (name, _name, _fit, level) in chosen.items():
-                trace.selected[column] = (name, float("nan"), level)
-                about = table[(column, name)]
-                notes_out[column] = list(about.notes)
+            )
+        chosen, taken = greedy_pick(entries)
+        for column, (name, _name, _fit, level) in chosen.items():
+            trace.selected[column] = (name, level)
+            notes_out[column] = list(table[(column, name)].notes)
 
         # NINFA's domain rules, applied to what was chosen: certainty can only go down
         if config.values:
@@ -313,11 +257,7 @@ class AlgorithmicEngine:
                 name, kind, fit, level = chosen[finding.column]
                 if _LEVEL_RANK[finding.level] < _LEVEL_RANK[level]:
                     chosen[finding.column] = (name, kind, fit, finding.level)
-                    trace.selected[finding.column] = (
-                        name,
-                        trace.selected.get(finding.column, (name, float("nan"), level))[1],
-                        finding.level,
-                    )
+                    trace.selected[finding.column] = (name, finding.level)
                 notes_out.setdefault(finding.column, []).append(finding.reason)
 
         trace.scores = list(table.values())
@@ -447,7 +387,6 @@ class AlgorithmicEngine:
         have_name: set[str],
         scored: dict[tuple[int, str], tuple[Candidate, Level]],
         fits: dict[tuple[int, str], float | None],
-        totals: dict[tuple[int, str], float],
         table: dict[tuple[int, str], CandidateScore],
         trace: Trace,
     ) -> None:
@@ -508,12 +447,10 @@ class AlgorithmicEngine:
                 )
                 scored[(index, key)] = (candidate, level)
                 fits[(index, key)] = fit
-                totals[(index, key)] = total
 
 
 __all__ = [
     "CONFIGS",
-    "ASSIGN",
     "DEFAULT",
     "HEADER_ONLY",
     "AlgorithmicConfig",

@@ -349,14 +349,16 @@ def test_the_xml_reader_uses_the_standard_library_and_the_dependency_set_is_unch
     # `openai` is deliberately absent here too (Smart Import OpenAI Intelligence V1, ADR 0050): the
     # semantic layer's SDK, isolated to one adapter file - `test_ask_ninfa_provider_boundary.py`
     # and `test_ai_boundary.py` are the precise guards for it.
-    # `rapidfuzz` / `scipy` / `numpy`: Smart Import V4.1 (ADR 0056). RapidFuzz is a runtime
-    # dependency, SciPy (and NumPy with it) a development one; each is imported by ONE module of
-    # `data_sources/algorithmic` - `test_algorithmic_dependency_boundary.py` is the precise guard.
+    # `rapidfuzz` is deliberately absent here too (Smart Import V4.1, ADR 0056): the header reader's
+    # one runtime dependency, imported by ONE module of `data_sources/algorithmic` -
+    # `test_algorithmic_dependency_boundary.py` is the precise guard for it.
     for manifest in PYPROJECTS:
         text = manifest.read_text(encoding="utf-8").lower()
         for library in (
+            "numpy",
             "pandas",
             "polars",
+            "scipy",
             "scikit",
             "sklearn",
             "langchain",

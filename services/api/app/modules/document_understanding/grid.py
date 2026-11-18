@@ -17,7 +17,7 @@ import io
 import warnings
 import zipfile
 from collections import Counter, deque
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -232,19 +232,8 @@ def _csv_text(content: bytes, encoding: str | None) -> str:
     return text
 
 
-# A second opinion on the delimiter of a file the counting rule is unsure about (Smart Import V4:
-# `data_sources.algorithmic.selector` registers it). It receives the text and the delimiter V3
-# counted and returns the one to read with; None means V3's rule alone decides, as it always did.
-DelimiterRefiner = Callable[[str, str], str]
-delimiter_refiner: DelimiterRefiner | None = None
-
-
 def _csv_delimiter(text: str, forced: str | None, hint: str | None) -> str:
-    known = forced or (hint if hint in _DELIMITERS else None)
-    if known:
-        return known
-    counted = detect_delimiter(text.splitlines())
-    return delimiter_refiner(text, counted) if delimiter_refiner is not None else counted
+    return forced or (hint if hint in _DELIMITERS else None) or detect_delimiter(text.splitlines())
 
 
 def _csv_records(text: str, delimiter: str) -> Iterator[list[str]]:

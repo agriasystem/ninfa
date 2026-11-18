@@ -25,7 +25,8 @@ dependencies = [
     "openai>=3.50,<4",
     # Smart Import V4.1 (algorithmic understanding, ADR 0056). RapidFuzz measures how alike two WORDS
     # are (header spelling mistakes). MIT, no dependencies, imported only by
-    # `data_sources/algorithmic`.
+    # `data_sources/algorithmic/header.py`. The other libraries the V4.1 brief approved were measured
+    # and left out: see ADR 0056 and the benchmark report.
     "rapidfuzz>=3.14,<4",
 ]
 
@@ -35,18 +36,6 @@ dev = [
     "httpx2>=2.13,<3",
     "ruff>=0.16,<0.17",
     "mypy>=2.3,<2.4",
-    # Smart Import V4.1: the CSV dialect readers (`data_sources/algorithmic/dialect.py`). DEV ONLY on
-    # purpose: measured, they added nothing for the delimiters NINFA's importers read (see the
-    # benchmark report), so production does not ship them. The reader imports them lazily and is a
-    # no-op without them; moving the three lines below to `dependencies` turns it on. fsspec lets
-    # DuckDB read the file from memory, so customer data is never written to a temporary file.
-    "duckdb>=2.0,<3",
-    "clevercsv>=0.8,<0.9",
-    "fsspec>=2026.9",
-    # Smart Import V4.1: SciPy's `linear_sum_assignment` (the `v4-assign` engine). DEV ONLY for the same
-    # reason: over 1,026 documents the global assignment changed ONE reading, for the worse, so the
-    # default engine is V3's greedy pick over V4's evidence. The assignment imports SciPy lazily.
-    "scipy>=1.18,<2",
 ]
 
 [build-system]
