@@ -61,7 +61,9 @@ def _stand_in(doc_id: str) -> tuple[Any, bytes]:
     return SemanticStandIn(Behaviour.ORACLE, _truth(doc), None, doc.golden.pii_values), doc.content
 
 
-def _level_with_the_constructor_default(doc_id: str) -> tuple[UnderstandingLevel, int]:
+def _level_with_the_constructor_default(
+    doc_id: str, engine: str = "v3"
+) -> tuple[UnderstandingLevel, int]:
     """The real service, with a resolver built with NO word about the certainty."""
     model, content = _stand_in(doc_id)
     resolver = ImportUnderstandingResolver(model, AiMode.ASSIST, corroborate=True)
@@ -80,7 +82,15 @@ def _level_with_the_constructor_default(doc_id: str) -> tuple[UnderstandingLevel
     )
     understanding = inspection.understanding
     assert understanding is not None
-    assert model.calls >= 1  # the model WAS asked: the difference is not "nothing happened"
+    if engine == "v3":
+        assert model.calls >= 1  # the model WAS asked: the difference is not "nothing happened"
+    else:
+        # V4 reads these files itself and leaves the person a question: the model has nothing to
+        # add, and the rules ALONE already hold the file back. That is what is asserted instead.
+        alone = understand_semantic(None, DataSourceDomain.BOOKINGS, content, mode=AiMode.OFF)
+        assert alone.understanding is not None
+        assert alone.understanding.level != UnderstandingLevel.READY
+        assert len(alone.understanding.questions) >= 1
     return understanding.level, len(understanding.questions)
 
 
@@ -106,8 +116,10 @@ def test_a_resolver_built_with_no_word_about_it_is_capped_in_every_mode(mode: Ai
 
 
 @pytest.mark.parametrize("doc_id", INJECTION_FILES)
-def test_with_the_default_a_file_with_a_sentence_of_orders_is_not_ready(doc_id: str) -> None:
-    level, questions = _level_with_the_constructor_default(doc_id)
+def test_with_the_default_a_file_with_a_sentence_of_orders_is_not_ready(
+    doc_id: str, rules_engine: str
+) -> None:
+    level, questions = _level_with_the_constructor_default(doc_id, rules_engine)
 
     assert level != UnderstandingLevel.READY
     assert questions >= 1
@@ -193,7 +205,7 @@ def test_a_replay_has_to_be_told_the_certainty_it_applies_the_reading_with() -> 
 @pytest.mark.parametrize("doc_id", INJECTION_FILES)
 @pytest.mark.parametrize("certainty", [False, True])
 def test_shadow_reports_what_assist_would_do_with_the_same_switch(
-    doc_id: str, certainty: bool
+    doc_id: str, certainty: bool, rules_engine: str
 ) -> None:
     """SHADOW applies nothing; it replays the model's reading through the ASSIST code and reports
     the verdict. With the certainty off that verdict is a question, as production ASSIST gives:
@@ -212,6 +224,11 @@ def test_shadow_reports_what_assist_would_do_with_the_same_switch(
 
     assert shown.understanding is not None
     assert shown.understanding.level != UnderstandingLevel.READY  # SHADOW shows the rules' own
+    if rules_engine == "v4" and not certainty:
+        # V4 reads the file itself and asks the person; the model is not consulted, so there
+        # is nothing for SHADOW to replay (and nothing to disagree with production ASSIST)
+        assert traces == []
+        return
     assert len(traces) == 1
     assert traces[0].level_after == ("READY" if certainty else "ASK")
 

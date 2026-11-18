@@ -192,6 +192,8 @@ def test_the_hostile_cells_are_still_cleaned_of_anything_personal() -> None:
     assert evidence_json(prepare(dirty, EgressGuard())[0]).count("[removed]") == 1
 
 
+@pytest.mark.usefixtures("rules_engine")
+@pytest.mark.rules_v3_only
 def test_the_real_adversarial_document_reaches_the_model_and_nothing_personal_with_it() -> None:
     corpus = build_corpus()
     source = next(d for d in corpus if d.id.startswith("B62_"))

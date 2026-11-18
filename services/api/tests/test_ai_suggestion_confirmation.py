@@ -98,8 +98,7 @@ def _open_decision(
 # --- while a question is open: MEDIUM, not automatic, nothing written ---
 
 
-@pytest.mark.parametrize("case", list(AI_CASES))
-def test_an_open_question_keeps_a_wrong_suggestion_medium_not_automatic_and_unwritten(
+def _an_open_question_keeps_a_wrong_suggestion(
     api_client: TestClient, env: SourcesEnv, db_session: Session, docs: dict[str, Doc], case: str
 ) -> None:
     domain, decoy, field, *_ = AI_CASES[case]
@@ -122,6 +121,24 @@ def test_an_open_question_keeps_a_wrong_suggestion_medium_not_automatic_and_unwr
     assert automatic is False
     assert writes(db_session, env) == writes_before and _row_counts(db_session) == rows_before
     assert len(model.requests) == 1 and model.violations == []
+
+
+@pytest.mark.usefixtures("rules_engine")
+@pytest.mark.parametrize("case", [c for c in AI_CASES if c != "BO05"])
+def test_an_open_question_keeps_a_wrong_suggestion_medium_not_automatic_and_unwritten(
+    api_client: TestClient, env: SourcesEnv, db_session: Session, docs: dict[str, Doc], case: str
+) -> None:
+    _an_open_question_keeps_a_wrong_suggestion(api_client, env, db_session, docs, case)
+
+
+# BO05's decoy is a column only V3's rules leave to the model: V4 reads it itself, so there is no
+# model and no suggestion to keep. The promise is V3's here; the other cases hold under both.
+@pytest.mark.usefixtures("rules_engine")
+@pytest.mark.rules_v3_only
+def test_an_open_question_keeps_a_wrong_suggestion_medium_not_automatic_and_unwritten_bo05(
+    api_client: TestClient, env: SourcesEnv, db_session: Session, docs: dict[str, Doc]
+) -> None:
+    _an_open_question_keeps_a_wrong_suggestion(api_client, env, db_session, docs, "BO05")
 
 
 # --- A, B, C: posting the proposal again is refused, and nothing is written ---
