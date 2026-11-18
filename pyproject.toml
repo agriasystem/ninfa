@@ -36,6 +36,12 @@ exclude = ['services[\\/]worker[\\/]tests[\\/]conftest\.py$']
 module = ["openpyxl", "openpyxl.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# SciPy and fsspec ship no type information (Smart Import V4: the global assignment and the
+# in-memory CSV sniffing); the few calls are wrapped in typed functions in `data_sources/algorithmic`.
+module = ["scipy", "scipy.*", "fsspec", "fsspec.*", "clevercsv", "clevercsv.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib -ra"
 testpaths = ["services"]
