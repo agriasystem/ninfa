@@ -3,80 +3,80 @@
   "rows": 100,
   "kind": "csv",
   "bytes": 8254,
-  "scan_ms": 0.6,
-  "mapping_v3_ms": 35.9,
-  "total_v3_ms": 206.9,
-  "mapping_v4_ms": 40.4,
-  "total_v4_ms": 253.2
+  "scan_ms": 0.5,
+  "mapping_v3_ms": 34.4,
+  "total_v3_ms": 204.4,
+  "mapping_v4_ms": 37.4,
+  "total_v4_ms": 252.2
  },
  {
   "rows": 100,
   "kind": "xlsx",
   "bytes": 9899,
-  "scan_ms": 14.5,
-  "mapping_v3_ms": 35.9,
-  "total_v3_ms": 316.3,
-  "mapping_v4_ms": 39.8,
-  "total_v4_ms": 343.3
+  "scan_ms": 13.7,
+  "mapping_v3_ms": 34.0,
+  "total_v3_ms": 280.2,
+  "mapping_v4_ms": 39.6,
+  "total_v4_ms": 320.3
  },
  {
   "rows": 1000,
   "kind": "csv",
   "bytes": 81705,
-  "scan_ms": 3.8,
-  "mapping_v3_ms": 103.7,
-  "total_v3_ms": 933.5,
-  "mapping_v4_ms": 134.1,
-  "total_v4_ms": 1156.9
+  "scan_ms": 4.0,
+  "mapping_v3_ms": 101.7,
+  "total_v3_ms": 909.6,
+  "mapping_v4_ms": 127.8,
+  "total_v4_ms": 1119.1
  },
  {
   "rows": 1000,
   "kind": "xlsx",
   "bytes": 51988,
-  "scan_ms": 114.8,
-  "mapping_v3_ms": 94.4,
-  "total_v3_ms": 1489.8,
-  "mapping_v4_ms": 120.9,
-  "total_v4_ms": 1631.8
+  "scan_ms": 109.0,
+  "mapping_v3_ms": 96.2,
+  "total_v3_ms": 1407.8,
+  "mapping_v4_ms": 118.3,
+  "total_v4_ms": 1591.6
  },
  {
   "rows": 10000,
   "kind": "csv",
   "bytes": 816696,
-  "scan_ms": 36.8,
-  "mapping_v3_ms": 170.9,
-  "total_v3_ms": 1632.5,
-  "mapping_v4_ms": 227.5,
-  "total_v4_ms": 2023.4
+  "scan_ms": 34.5,
+  "mapping_v3_ms": 166.8,
+  "total_v3_ms": 1604.7,
+  "mapping_v4_ms": 219.9,
+  "total_v4_ms": 1981.0
  },
  {
   "rows": 10000,
   "kind": "xlsx",
   "bytes": 440234,
-  "scan_ms": 1305.2,
-  "mapping_v3_ms": 167.1,
-  "total_v3_ms": 4919.9,
-  "mapping_v4_ms": 215.6,
-  "total_v4_ms": 5270.0
+  "scan_ms": 1263.3,
+  "mapping_v3_ms": 160.7,
+  "total_v3_ms": 4815.8,
+  "mapping_v4_ms": 208.8,
+  "total_v4_ms": 5193.5
  },
  {
   "rows": 40000,
   "kind": "csv",
   "bytes": 3265606,
-  "scan_ms": 144.3,
-  "mapping_v3_ms": 169.5,
-  "total_v3_ms": 1923.5,
-  "mapping_v4_ms": 222.0,
-  "total_v4_ms": 2301.9
+  "scan_ms": 144.5,
+  "mapping_v3_ms": 167.1,
+  "total_v3_ms": 1920.0,
+  "mapping_v4_ms": 220.0,
+  "total_v4_ms": 2226.6
  },
  {
   "rows": 40000,
   "kind": "xlsx",
   "bytes": 1796666,
-  "scan_ms": 3906.3,
-  "mapping_v3_ms": 161.2,
-  "total_v3_ms": 10073.0,
-  "mapping_v4_ms": 213.5,
-  "total_v4_ms": 10431.5
+  "scan_ms": 3821.6,
+  "mapping_v3_ms": 159.7,
+  "total_v3_ms": 9748.2,
+  "mapping_v4_ms": 208.7,
+  "total_v4_ms": 10100.9
  }
 ]
