@@ -191,9 +191,13 @@ class AlgorithmicEngine:
         for index in columns:
             readings = self._header_readings(sem, samples[index].header, names)
             blocked = readings.blocked if readings is not None else frozenset()
-            candidates = self._candidates(sem, samples[index].header, readings)
+            candidates, fuzzy = self._candidates(sem, samples[index].header, readings)
             says_which_is_missing = ambiguous_words(sem, samples[index].header)
-            for found in candidates.values():
+            pool = [(found, False) for found in candidates.values()]
+            pool += [(found, True) for found in fuzzy.values()]
+            for found, last_resort in pool:
+                if last_resort and (index in named_columns or found.candidate.field in candidates):
+                    continue  # a reading survived: V3's likeness of letters is a last resort
                 name = found.candidate.field
                 spec = sem.fields[name]
                 if name in blocked:
@@ -332,8 +336,9 @@ class AlgorithmicEngine:
 
     def _candidates(
         self, sem: DomainSem, raw: str, readings: HeaderReading | None
-    ) -> dict[str, _Reading]:
-        """Every field the NAME of this column could mean: V3's rules and names, and the phrases."""
+    ) -> tuple[dict[str, _Reading], dict[str, _Reading]]:
+        """Every field the NAME of this column could mean (V3's rules, names and the phrases) and,
+        apart, V3's likenesses of letters, which stand only when nothing else survives."""
         out: dict[str, _Reading] = {}
         fuzzy: dict[str, _Reading] = {}
         texts = [raw]
@@ -358,7 +363,7 @@ class AlgorithmicEngine:
                 if known is None or candidate.score > known.candidate.score:
                     target[candidate.field] = _Reading(candidate, kind, None)
         if readings is None:
-            return out
+            return out, fuzzy
         # WHO READS A HEADER, in order of authority:
         #   1. a name the kind of data already knows (V3 EXACT): "Imponibile" is a line amount in a
         #      register, "Totale soggiorno" a room revenue - product decisions, never overruled;
@@ -369,7 +374,7 @@ class AlgorithmicEngine:
         #   4. a phrase that is the header plus a word naming the kind of file, or a spelling
         #      mistake of one: only for a header nothing above read.
         if any(r.candidate.name == NameMatch.EXACT for r in out.values()):
-            return out
+            return out, fuzzy
         matches = {n: m for n, m in readings.matches.items() if n in sem.fields}
         strong = {n: m for n, m in matches.items() if m.kind in (Kind.EXACT, Kind.REORDERED)}
         weak = {n: m for n, m in matches.items() if n not in strong}
@@ -377,11 +382,11 @@ class AlgorithmicEngine:
             out = {n: r for n, r in out.items() if r.candidate.name != NameMatch.TOKEN}
             chosen = strong
         elif out:
-            return out
+            return out, fuzzy
         else:
             chosen = weak
             if not weak:
-                return fuzzy  # nothing the vocabulary reads: V3's likeness of letters, as it was
+                return fuzzy, {}  # nothing the vocabulary reads: V3's likeness of letters
         words = tokens(readings.header.text)
         for name, match in chosen.items():
             # The rule of V3 this header satisfies for the field (None if no rule does). Two columns
@@ -398,7 +403,7 @@ class AlgorithmicEngine:
                 match.kind.value,
                 match.phrase,
             )
-        return out
+        return out, fuzzy
 
     @staticmethod
     def _record(
@@ -469,11 +474,12 @@ class AlgorithmicEngine:
             # pagamento") says it is something else: its values never make it a field. Only a header
             # that says nothing at all ("Campo 3", "Dato B", "Condizione") leaves it to the values.
             words = tokens(samples[index].header) | set(normalize(samples[index].header).words)
-            if words & known:
-                continue
+            says_something = bool(words & known)
             for key, spec in sem.fields.items():
                 if key in have_name:
                     continue
+                if says_something and single.get(key) != index:
+                    continue  # V3's own rule below is the only reading such a header leaves
                 vat = spec.fit(stats[index]) if key == "supplier_vat_number" and spec.fit else 0.0
                 proof = 0.0
                 kind = semantic_of(domain, key)

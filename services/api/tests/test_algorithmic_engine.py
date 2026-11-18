@@ -649,3 +649,47 @@ def test_the_assignment_keeps_two_look_alike_columns_contested() -> None:
 
     assert found["Issue date"].ambiguous_group == "CONTESTED"
     assert found["Invoice date"].ambiguous_group == "CONTESTED"
+
+
+# --- what V3 reads, V4 keeps reading --------------------------------------------------------------
+
+
+def test_v3s_likeness_of_letters_stands_when_every_other_reading_is_ruled_out() -> None:
+    """`P.IVA forn.` over VAT numbers: its word rule reads a tax AMOUNT, which the values rule out;
+    V3 is left with its likeness of letters (a LOW supplier VAT number). V4 must not lose it."""
+    register = {
+        "Fornitore": ["Rossi Srl", "Bianchi Spa", "Verdi Snc"] * 4,
+        "P.IVA forn.": [f"IT0{1234567890 + i}" for i in range(12)],
+        "Descrizione": ["Luce", "Acqua", "Gas"] * 4,
+    }
+
+    v3 = fields_of(read(COSTS, register, None))["P.IVA forn."]
+    v4 = fields_of(read(COSTS, register, DEFAULT))["P.IVA forn."]
+
+    assert v3 == v4 == "supplier_vat_number"
+
+
+def test_v3s_lone_date_column_is_still_read_whatever_its_header_says() -> None:
+    """A lone "Data" over dates is probably the arrival (V3's own value-only rule, MEDIUM). The
+    "the header says nothing" gate is for the readings V4 ADDS, not for this one."""
+    file = {
+        "Reservation Code": codes(),
+        "Data": list(arrival),
+        "Stato": list(STATUSES),
+    }
+
+    v3 = {c.header: (c.field, c.level) for c in read(BOOKINGS, file, None).columns}
+    v4 = {c.header: (c.field, c.level) for c in read(BOOKINGS, file, DEFAULT).columns}
+
+    assert v4["Data"] == v3["Data"] == ("check_in", Level.MEDIUM)
+
+
+def test_a_vat_number_is_not_a_tax_amount() -> None:
+    """V3 reads `P.IVA forn.` over plain 11-digit numbers as an invoice TAX AMOUNT (HIGH); the
+    vocabulary and the values read a supplier VAT number."""
+    register = {
+        "Fornitore": ["Rossi Srl", "Bianchi Spa", "Verdi Snc"] * 4,
+        "P.IVA forn.": [f"0{1234567890 + i}" for i in range(12)],
+    }
+
+    assert fields_of(read(COSTS, register, DEFAULT))["P.IVA forn."] == "supplier_vat_number"
