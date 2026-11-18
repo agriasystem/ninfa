@@ -44,6 +44,7 @@ from app.modules.bookings.normalization import DateOrder
 from app.modules.bookings.parsers import Cell, SourceTable
 from app.modules.bookings.statuses import BUILTIN_STATUS_KEYS
 from app.modules.bookings.text import normalize_key
+from app.modules.data_sources.algorithmic.selector import propose
 from app.modules.data_sources.column_profile import (
     ColumnSample,
     NumberStyle,
@@ -68,7 +69,7 @@ from app.modules.data_sources.mapping_types import (
     SmartImportDecision,
     SuggestionLevel,
 )
-from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal, propose
+from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
 from app.modules.data_sources.semantics_bookings import BOOKINGS
 from app.modules.data_sources.semantics_costs import COSTS
