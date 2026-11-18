@@ -12,11 +12,11 @@ It replaces ONE step of the understanding (which column is which field) and noth
                                            they RULE OUT
                       3 relations          booked <= arrival < departure, net + VAT = total
                       4 candidate score    one total per (column, field), with its parts
-                      5 global assignment  the best reading of the whole file, with scipy
-                      6 firmness           a pair another reading matches within `margin` is
-                                           not firm:
-                                           a HIGH becomes MEDIUM (a question), a reading from the
-                                           values alone is dropped
+                      5 selection          V3's greedy pick over those scores (the DEFAULT) - or,
+                                           optionally, the best reading of the whole file with scipy
+                                           (`ASSIGN`), where a pair another reading matches within
+                                           `margin` is not firm (`MARGIN`: a HIGH becomes MEDIUM)
+                      6 validation         NINFA's domain rules applied to what was chosen
 
 The levels (HIGH / MEDIUM / LOW) still come from V3's `level_of`, so a reading is exactly as sure as
 it would have been in V3 for the same evidence; V4 adds readings and takes certainty AWAY, it never
@@ -25,7 +25,9 @@ columns, partner columns, values no person could have, "hours" that do not say w
 question, blocker and validator) is the same code for both engines.
 
 The configuration exists for ONE reason: to measure what each part is worth (`HEADER_ONLY`,
-`DEFAULT`, `ASSIGN`, `MARGIN`) and to switch back (`SMART_IMPORT_UNDERSTANDING_ENGINE=v3`).
+`DEFAULT`, `ASSIGN`, `MARGIN`) and to switch back (`SMART_IMPORT_UNDERSTANDING_ENGINE=v3`). The
+global assignment is not the default because, measured over 1,026 documents, it changed one reading
+and for the worse (see the benchmark report).
 """
 
 from collections.abc import Callable, Sequence

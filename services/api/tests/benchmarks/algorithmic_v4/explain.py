@@ -80,11 +80,11 @@ def explain(doc: Doc, headers: Sequence[str] | None = None) -> list[str]:
             for s in sorted(mine, key=lambda s: -s.total)[:3]
         )
         picked = trace.selected.get(column.position)
-        selected = (
-            f"`{picked[0]}` margin {picked[1]:.2f}, {picked[2].value}" if picked else "nothing"
-        )
+        firmness = "" if not picked or picked[1] != picked[1] else f"margin {picked[1]:.2f}, "
+        selected = f"`{picked[0]}` {firmness}{picked[2].value}" if picked else "nothing"
         was = v3[column.header]
-        validation = "-"
+        reasons = [f.reason for f in trace.findings if f.column == column.position]
+        validation = "; ".join(reasons) or "-"
         lines.append(
             f"| `{column.header}` | {v3_candidates(doc.card, column.header)} -> "
             f"`{was.field or '-'}` {was.level or ''} | {weighed or 'no candidate'} | "
