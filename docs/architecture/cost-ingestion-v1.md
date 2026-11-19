@@ -129,7 +129,7 @@ from one data source, import job and file, but it is **not identified by them**.
 
 | Field | Notes |
 | ----- | ----- |
-| identity | `(workspace, property, supplier, normalised invoice number, invoice date, document kind)` — **unique** |
+| identity | `(workspace, property, supplier, source_record_key, invoice date, document kind, revision)` — **unique**. For a real document `source_record_key` **is** the normalised invoice number, so this is the identity it always was; an operating cost with no document number has its own, technical key and a `NULL` number ([ADR 0057](adr/0057-cost-ingestion-identity-is-not-fiscal-document-identity.md), [operational-costs-without-document-number-v1](operational-costs-without-document-number-v1.md)) |
 | `invoice_number` / `normalized_invoice_number` | the source spelling / trimmed, Unicode-compatibility form, whitespace collapsed, upper case. Slash, dash and letters are **kept**: `123/A` is not `123A` |
 | `document_kind` | `INVOICE` or `CREDIT_NOTE` (FatturaPA TD04 and TD08); `document_type_code` keeps the source code |
 | `currency` | ISO 4217 (structured files default to the property's currency when unmapped) |
@@ -246,7 +246,7 @@ and rules, and nothing was bent).
 
 | | Fields |
 | - | ------ |
-| required | `supplier_name`, `invoice_number`, `invoice_date`, `line_description`, `line_total` |
+| required | `supplier_name`, `invoice_number`, `invoice_date`, `line_description`, `line_total` (the number is not required for operating costs a person confirmed have none, and only when the file is not a register of documents: no type, due date or line number; ADR 0057) |
 | optional | `supplier_vat_number`, `supplier_tax_code`, `supplier_iban`, `due_date`, `document_type`, `currency`, `invoice_net_amount`, `invoice_tax_amount`, `invoice_gross_amount`, `line_number`, `quantity`, `unit`, `unit_price`, `vat_rate`, `cost_category` |
 | may be a constant | `document_type`, `currency`, `cost_category` — **never** the invoice number, the dates, the supplier, the description or the amount |
 
