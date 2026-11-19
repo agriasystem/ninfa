@@ -341,7 +341,9 @@ class SmartImportService:
         adapter = self.domain(domain)
         problems, provided = self._structural_problems(adapter, mapping)
         missing = tuple(
-            group for group in adapter.groups if not any(key in provided for key in group)
+            group
+            for group in adapter.required_groups(mapping)
+            if not any(key in provided for key in group)
         )
         if not missing and not problems:
             documents = self._documents(adapter, mapping, _no_formats(), {})
@@ -569,6 +571,8 @@ class SmartImportService:
         if formats.decimal_separator:
             options["decimal_separator"] = formats.decimal_separator
             options["thousands_separator"] = formats.thousands_separator
+        if mapping.document_identity:
+            options["document_identity"] = mapping.document_identity
         documents: dict[str, dict[str, Any]] = {
             "column_mapping": column_mapping,
             "format_options": options,
@@ -828,6 +832,11 @@ class SmartImportService:
                 if fmt.decimal_separator == ","
                 else "POINT"
                 if fmt.decimal_separator == "."
+                else None
+            ),
+            document_identity=(
+                "SYNTHETIC_COST_RECORD"
+                if fmt.document_identity == "SYNTHETIC_COST_RECORD"
                 else None
             ),
         )

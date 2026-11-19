@@ -39,6 +39,7 @@ const REMEMBERED_ANSWERS: Readonly<Record<string, Readonly<Record<string, string
   date_order: { DMY: "Date scritte giorno/mese/anno", MDY: "Date scritte mese/giorno/anno" },
   decimal_style: { COMMA: "Decimali con la virgola", POINT: "Decimali con il punto" },
   amount_basis: { NET: "Importi senza IVA", GROSS: "Importi con IVA" },
+  document_identity: { SYNTHETIC_COST_RECORD: "Costi operativi senza numero documento" },
 };
 const REMEMBERED_SCOPES: Readonly<Record<string, string>> = {
   FULL: "Il file contiene tutto il periodo che copre",
@@ -698,6 +699,12 @@ export const sourcesCopy = {
         gross: "No, comprende l'IVA",
         why: "NINFA analizza i costi al netto di IVA, e non deve indovinare quale importo sia.",
       },
+      DOCUMENT_IDENTITY: {
+        title: "Questo file contiene costi senza numero documento.",
+        why: "NINFA può registrarli come costi operativi usando un riferimento interno. Non verrà creato né modificato alcun numero di fattura.",
+        yes: "Continua come costi operativi",
+        remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
+      },
       DATE_ORDER: { title: "Come sono scritte le date di questo file?" },
       DECIMAL_STYLE: { title: "Come sono scritti i numeri con i decimali?" },
       FILE_SCOPE: {
@@ -721,6 +728,16 @@ export const sourcesCopy = {
             count === 1
               ? "In NINFA c'è 1 giornata di reparto di questo periodo che in questo file non compare."
               : `In NINFA ci sono ${count} giornate di reparto di questo periodo che in questo file non compaiono.`,
+        },
+        COSTS: {
+          title: "Questo file contiene tutti i costi del periodo oppure solo una parte?",
+          FULL: "Tutti i costi del periodo",
+          PARTIAL: "Solo una parte (per esempio un reparto)",
+          DELTA: "Solo i costi nuovi o modificati",
+          absent: (count: number) =>
+            count === 1
+              ? "In NINFA c'è 1 costo di questo periodo che in questo file non compare."
+              : `In NINFA ci sono ${count} costi di questo periodo che in questo file non compaiono.`,
         },
         remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
       },
@@ -748,6 +765,18 @@ export const sourcesCopy = {
             count === 1
               ? "Se contiene tutto il piano, quella giornata non sarà più contata e resterà nello storico."
               : `Se contiene tutto il piano, quelle ${count} giornate non saranno più contate e resteranno nello storico.`,
+        },
+        COSTS: {
+          found: (count: number) =>
+            count === 1
+              ? "NINFA ha trovato 1 costo presente nei dati precedenti ma non in questo file."
+              : `NINFA ha trovato ${count} costi presenti nei dati precedenti ma non in questo file.`,
+          title: "Questo file contiene tutti i costi del periodo?",
+          yes: "Sì, contiene tutti i costi",
+          ifYes: (count: number) =>
+            count === 1
+              ? "Se li contiene tutti, quel costo non sarà più contato e resterà nello storico."
+              : `Se li contiene tutti, quei ${count} costi non saranno più contati e resteranno nello storico.`,
         },
         no: "No, contiene solo una parte",
         ifNo: "Se ne contiene solo una parte, NINFA non toglie nulla.",

@@ -909,3 +909,69 @@ describe("when NINFA is not sure enough", () => {
     expect(await within(panel()).findByText("Abbina le colonne del tuo file")).not.toBeNull();
   });
 });
+
+describe("a file of costs with no document number", () => {
+  const asksIdentity = () =>
+    ok(
+      understoodInspection(
+        { level: "ASK", questions: [questionOf("DOCUMENT_IDENTITY", { field: "invoice_number" })] },
+        { domain: "COSTS" },
+      ),
+    );
+
+  it("gets one plain confirmation instead of a hunt for a column that does not exist", async () => {
+    understandFileMock.mockResolvedValueOnce(asksIdentity());
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi_ottobre.csv"));
+
+    await within(panel()).findByRole("heading", {
+      level: 3,
+      name: "Questo file contiene costi senza numero documento.",
+    });
+    const text = flat(panel());
+    expect(text).toContain(
+      "NINFA può registrarli come costi operativi usando un riferimento interno. Non verrà creato né modificato alcun numero di fattura.",
+    );
+    expect(within(panel()).getByRole("button", { name: "Continua come costi operativi" })).not.toBeNull();
+    // nothing technical, and no matching screen asking for a document number that is not in the file
+    for (const technical of ["SYNTHETIC", "source_record_key", "invoice_number", "Numero del documento"]) {
+      expect(text).not.toContain(technical);
+    }
+    expect(text).not.toContain("Abbina le colonne");
+    expect(validateImportMock).not.toHaveBeenCalled();
+  });
+
+  it("the answer is the person's, is sent to be read again, and travels with the decision", async () => {
+    understandFileMock.mockResolvedValueOnce(asksIdentity());
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection(
+          {},
+          { domain: "COSTS", proposal: proposalOf({ document_identity: "SYNTHETIC_COST_RECORD" }) },
+        ),
+      ),
+    );
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    importMatchedFileMock.mockResolvedValue(ok(matchedResultOf({})));
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi_ottobre.csv"));
+    await user.click(await within(panel()).findByRole("button", { name: "Continua come costi operativi" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({
+      answers: { document_identity: "SYNTHETIC_COST_RECORD" },
+    });
+
+    await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" });
+    const sent = importMatchedFileMock.mock.calls[0]?.[0] as {
+      mapping: { document_identity: string };
+      saveConfiguration: boolean;
+    };
+    expect(sent.mapping.document_identity).toBe("SYNTHETIC_COST_RECORD"); // carried back as the server built it
+    expect(sent.saveConfiguration).toBe(true); // a person's answer is worth remembering for the source
+  });
+});

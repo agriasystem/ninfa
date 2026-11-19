@@ -604,6 +604,34 @@ QUESTIONS: dict[QuestionKind, _Explained] = {
         ),
         remembered="Puoi scegliere di ricordare la scelta per i prossimi file.",
     ),
+    QuestionKind.DOCUMENT_IDENTITY: _Explained(
+        asked=(
+            "Questo file contiene costi senza numero documento: li registro come costi operativi?"
+        ),
+        meaning=(
+            "Il file ha data, fornitore, descrizione e importo, ma nessun numero di documento. "
+            "NINFA non inventa mai un numero di fattura. Se dici che sono costi operativi "
+            "(utenze, lavanderia, manutenzione, commissioni, costi mensili) li registra con un "
+            "riferimento interno suo, che non compare mai come numero fattura. Un file che invece "
+            "è un registro di fatture, con tipo di documento, scadenza o numero di riga, continua "
+            "a richiedere il numero del documento."
+        ),
+        answers=(
+            (
+                "Continua come costi operativi",
+                "I costi vengono importati con un riferimento interno di NINFA: nessun numero di "
+                "fattura viene creato o modificato.",
+            ),
+        ),
+        remembered=(
+            "NINFA ricorda la risposta per i file fatti così e non la richiede; puoi correggerla "
+            "o farla dimenticare dalle risposte ricordate."
+        ),
+        note=(
+            "Si chiede solo quando al file manca soltanto il numero del documento. Lo stesso costo "
+            "importato due volte non si duplica; due righe uguali nel file restano due costi."
+        ),
+    ),
 }
 
 TOPICS: dict[ImportTopic, _Explained] = {
@@ -657,6 +685,7 @@ SHORT_NAMES: dict[str, str] = {
     "DATES_REVERSED": "date invertite",
     "FILE_SCOPE": "completo o parziale",
     "FILE_SCOPE_CONFIRM": "conferma completo",
+    "DOCUMENT_IDENTITY": "costi senza numero",
     "NO_NEW_DATA": "import senza novità",
     "SAME_DAY_FILES": "file nello stesso giorno",
     "ANALYSIS_AFTER_IMPORT": "analisi dopo import",

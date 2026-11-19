@@ -71,7 +71,12 @@ export function StrutturaScopeConfirmation({
   onAnswer: (patch: Partial<UnderstandAnswers>) => void;
 }) {
   const [remember, setRemember] = useState(false);
-  const words = domain === "LABOR" ? COPY.FILE_SCOPE_CONFIRM.LABOR : COPY.FILE_SCOPE_CONFIRM.BOOKINGS;
+  const words =
+    domain === "LABOR"
+      ? COPY.FILE_SCOPE_CONFIRM.LABOR
+      : domain === "COSTS"
+        ? COPY.FILE_SCOPE_CONFIRM.COSTS
+        : COPY.FILE_SCOPE_CONFIRM.BOOKINGS;
   return (
     <>
       <p className="struttura-flow__note">{words.found(absent)}</p>
@@ -387,7 +392,12 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
       );
       break;
     case "FILE_SCOPE": {
-      const scope = step.inspection.domain === "LABOR" ? COPY.FILE_SCOPE.LABOR : COPY.FILE_SCOPE.BOOKINGS;
+      const scope =
+        step.inspection.domain === "LABOR"
+          ? COPY.FILE_SCOPE.LABOR
+          : step.inspection.domain === "COSTS"
+            ? COPY.FILE_SCOPE.COSTS
+            : COPY.FILE_SCOPE.BOOKINGS;
       body = (
         <>
           {heading(scope.title)}
@@ -408,6 +418,25 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
       );
       break;
     }
+    case "DOCUMENT_IDENTITY":
+      // One plain confirmation, never a hunt for a column that does not exist. NINFA records these as
+      // operating costs with an internal reference and creates no invoice number.
+      body = (
+        <>
+          {heading(COPY.DOCUMENT_IDENTITY.title)}
+          <p className="struttura-flow__note">{COPY.DOCUMENT_IDENTITY.why}</p>
+          <div className="struttura-question__choices">
+            <StrutturaButton
+              variant="primary"
+              onClick={() => void flow.answer({ document_identity: "SYNTHETIC_COST_RECORD" })}
+            >
+              {COPY.DOCUMENT_IDENTITY.yes}
+            </StrutturaButton>
+          </div>
+          <p className="struttura-flow__note">{COPY.DOCUMENT_IDENTITY.remembered}</p>
+        </>
+      );
+      break;
     case "FILE_SCOPE_CONFIRM":
       body = (
         <StrutturaScopeConfirmation

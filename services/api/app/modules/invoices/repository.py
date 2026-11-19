@@ -208,8 +208,10 @@ class InvoiceRepository:
         """Take those records away: a removal row each, written with the import that did it. The
         invoices themselves are immutable and stay."""
         absent = self._synthetic_absent_from(data_source_id, held_keys, first, last).subquery()
-        result = self._session.execute(
-            insert(InvoiceRemoval).from_select(
+        # (RETURNING, not `rowcount`: an INSERT ... SELECT does not report how many rows it wrote)
+        removed = self._session.scalars(
+            insert(InvoiceRemoval)
+            .from_select(
                 [
                     "workspace_id",
                     "property_id",
@@ -231,8 +233,9 @@ class InvoiceRepository:
                     bindparam("job_id", import_job_id, type_=Uuid),
                 ),
             )
-        )
-        return int(getattr(result, "rowcount", 0) or 0)
+            .returning(InvoiceRemoval.id)
+        ).all()
+        return len(removed)
 
     def insert_invoices(self, rows: Sequence[dict[str, Any]]) -> None:
         for start in range(0, len(rows), _CHUNK):

@@ -393,7 +393,14 @@ class DataSourcesService:
         if reference is None:
             # (nobody was asked what a file matched by hand is: absence says nothing about it)
             by_hand = mapping.model_copy(
-                update={"file_scope": None, "remembered_file_scope": None, "expected_removals": 0}
+                update={
+                    "file_scope": None,
+                    "remembered_file_scope": None,
+                    "expected_removals": 0,
+                    # (nobody was asked whether these are operating costs: a matching built by hand
+                    # identifies its records by the document number it maps)
+                    "document_identity": None,
+                }
             )
             return by_hand, self._manual_confirmation(
                 property_id, domain, filename, content, by_hand
@@ -958,6 +965,7 @@ class DataSourcesService:
                 content=content,
                 property_id=property_id,
                 mapping_override=override,
+                scope=_scope_plan(mapped.mapping),
             )
             return (
                 ImportOutcome(
@@ -967,11 +975,14 @@ class DataSourcesService:
                     else problem_of_error_code(invoices.error_code, invoices.details),
                     rows_total=invoices.rows_total,
                     rows_invalid=invoices.rows_invalid,
-                    created=invoices.invoices_created,
+                    # (an operating cost that comes back after a complete file took it away counts
+                    # again, so it is new to the person)
+                    created=invoices.invoices_created + invoices.records_restored,
                     updated=invoices.invoices_revised,
                     unchanged=invoices.invoices_unchanged,
                     already_imported=invoices.duplicate_of_import_file_id is not None,
                     changed_data=invoices.changed_data,
+                    removed=invoices.records_removed,
                 ),
                 resolved,
             )

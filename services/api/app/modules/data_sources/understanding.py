@@ -221,6 +221,9 @@ class UnderstandAnswers(BaseModel):
     assisted_fields: dict[str, str] = Field(default_factory=dict, max_length=20)
     # What the person taught: {"role_mapping": {"HK": "HOUSEKEEPING"}}.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict, max_length=4)
+    # Costs: the file has no document number and the person said these are operating costs, to be
+    # recorded with an internal reference of NINFA's own (never an invoice number).
+    document_identity: Literal["SYNTHETIC_COST_RECORD"] | None = None
     # What THIS file says about the records it does not hold.
     file_scope: FileScope | None = None
     # That answer is also for the next files of this structure: only then does the memory change.
@@ -771,7 +774,23 @@ class UnderstandingService:
                 confirmed_domain=confirmed_domain,
             ),
         )
-        check = self._smart.check(domain, decision)
+        # --- operating costs with no document number (ADR 0057) ---------------------------------
+        # A file of costs that has everything an import needs EXCEPT a document number is not sent
+        # to the matching screen to look for a column that does not exist: one question asks whether
+        # these are operating costs. The answer (or the family's memory of it) is part of the
+        # decision. A file that is a register of fiscal documents never gets here.
+        identity_open = domain == DataSourceDomain.COSTS and _may_be_operating_costs(
+            adapter, proposal, decision, detection, confirmed_domain
+        )
+        if identity_open and effective.document_identity == "SYNTHETIC_COST_RECORD":
+            decision = decision.model_copy(update={"document_identity": "SYNTHETIC_COST_RECORD"})
+        # (the check is made as if it were said: until then the question stands in its place)
+        check = self._smart.check(
+            domain,
+            decision.model_copy(update={"document_identity": "SYNTHETIC_COST_RECORD"})
+            if identity_open
+            else decision,
+        )
 
         # --- what is still missing, as questions or as an honest "this is not in the file" --------
         extra_questions, extra_blockers = self._missing(
@@ -894,6 +913,7 @@ class UnderstandingService:
                 }
             )
             check = self._smart.check(domain, decision)
+            identity_open = identity_open and decision.document_identity is None
         if not recognized_by_profile and not blockers:
             decision = self._with_kept_formats(adapter, decision, samples, memory, match, reuse)
             formats = self._smart.formats_of(adapter, decision, samples)
@@ -923,6 +943,8 @@ class UnderstandingService:
                     questions.extend(_assisted_confirmations(proposal, ai_headers, questions))
                 if not recognized_by_family:
                     questions.extend(unread_questions)
+        if identity_open and decision.document_identity is None:
+            questions.append(_identity_question())
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         # (the same reading on every file of a source: the file still does not say)
@@ -1035,7 +1057,7 @@ class UnderstandingService:
                 sheet_name=table.sheet_name,
                 columns=columns,
                 fields=tuple(adapter.fields),
-                requirement_groups=tuple(adapter.groups),
+                requirement_groups=tuple(adapter.required_groups(decision)),
                 suggestion_complete=complete,
                 already_canonical=canonical,
                 profile=profile,
@@ -1183,6 +1205,12 @@ class UnderstandingService:
             and kept.get("amount_basis") in ("NET", "GROSS")
         ):
             update["amount_basis"] = kept["amount_basis"]
+        if (
+            domain == DataSourceDomain.COSTS
+            and answers.document_identity is None
+            and kept.get("document_identity") == "SYNTHETIC_COST_RECORD"
+        ):
+            update["document_identity"] = kept["document_identity"]
         return answers.model_copy(update=update) if update else answers
 
     def _with_kept_formats(
@@ -1620,7 +1648,7 @@ class UnderstandingService:
         if by_profile:
             return UnderstandingLevel.READY
         decided = {c.field: c for c in proposal.columns if c.field is not None}
-        for group in adapter.groups:
+        for group in adapter.required_groups(decision):
             fields = [f for f in group if f in decided]
             if fields:
                 if not all(decided[f].level == Level.HIGH for f in fields):
@@ -2052,6 +2080,50 @@ def _dedupe(questions: list[Question]) -> list[Question]:
     return out
 
 
+def _may_be_operating_costs(
+    adapter: FileDomain,
+    proposal: Proposal,
+    decision: MappingInput,
+    detection: DomainVerdict,
+    confirmed_domain: bool,
+) -> bool:
+    """A file that is clearly a register of COSTS and holds everything an import needs except a
+    document number, and says nothing that makes it a register of fiscal documents.
+
+    Never when a column may BE the number (it is asked about, never overruled), never when the file
+    says what kind of document a line belongs to, when it falls due or which line of a document it
+    is (those make it document-level, and a synthetic identity must never cover an incomplete fiscal
+    document), and never when something else the import needs is also missing."""
+    if not (detection.domain == DataSourceDomain.COSTS or confirmed_domain):
+        return False
+    assigned = proposal.assigned()
+    if "invoice_number" in assigned:
+        return False
+    if any(
+        column.ambiguous_group and "invoice_number" in column.ambiguous_fields
+        for column in proposal.columns
+    ):
+        return False
+    if {"document_type", "due_date", "line_number"} & set(assigned):
+        return False
+    provided = set(assigned) | set(decision.constants)
+    return all(
+        any(key in provided for key in group)
+        for group in adapter.required_groups(
+            decision.model_copy(update={"document_identity": "SYNTHETIC_COST_RECORD"})
+        )
+    )
+
+
+def _identity_question() -> Question:
+    return Question(
+        id="DOCUMENT_IDENTITY",
+        kind=QuestionKind.DOCUMENT_IDENTITY,
+        field="invoice_number",
+        choices=(Choice("SYNTHETIC_COST_RECORD"),),
+    )
+
+
 def _scope_question(absent_records: int) -> Question:
     return Question(
         id="FILE_SCOPE",
@@ -2088,6 +2160,7 @@ def confirmation_from(answers: UnderstandAnswers, learning: LearningInfo | None)
             ("decimal_style", answers.decimal_style),
             ("amount_basis", answers.amount_basis),
             ("department_value", answers.department_value),
+            ("document_identity", answers.document_identity),
         )
         if value
     }

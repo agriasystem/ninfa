@@ -1022,6 +1022,11 @@ export interface ImportMapping {
   decimal_style?: "COMMA" | "POINT" | null;
   /** Smart Import V3: how the document's structure is read. Carried back as the backend built it. */
   layout?: ImportLayout | null;
+  /**
+   * Costs only: the file has no document number and the person said these are operating costs, recorded with an
+   * internal reference of NINFA's own. Set by the server on the decisions it issues; never built here.
+   */
+  document_identity?: "SYNTHETIC_COST_RECORD" | null;
   /** The words the person taught NINFA: `{ role_mapping: { HK: "HOUSEKEEPING" } }`. */
   labels?: Record<string, Record<string, string>>;
   /** What the person said this file is. Set by the server on the decisions it issues; never built here. */
@@ -1109,7 +1114,9 @@ export type UnderstandingQuestionKind =
   /** Stored records of this file's period are not in it, and what that means changes what counts. */
   | "FILE_SCOPE"
   /** This kind of file is remembered as complete and would take something away: a memory does not do that alone. */
-  | "FILE_SCOPE_CONFIRM";
+  | "FILE_SCOPE_CONFIRM"
+  /** A file of costs with no document number: record them as operating costs, with an internal reference? */
+  | "DOCUMENT_IDENTITY";
 
 export type UnderstandingOriginKind =
   | "COLUMN"
@@ -1230,6 +1237,8 @@ export interface UnderstandAnswers {
   amount_basis?: "NET" | "GROSS" | null;
   date_order?: "DMY" | "MDY" | null;
   decimal_style?: "COMMA" | "POINT" | null;
+  /** Costs: "these are operating costs" for a file with no document number (never an invoice number). */
+  document_identity?: "SYNTHETIC_COST_RECORD" | null;
   column_fields?: Record<string, string>;
   /**
    * Set by the server in the decisions it issues, never built here: columns whose name the semantic

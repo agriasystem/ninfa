@@ -89,7 +89,13 @@ MIN_RESIDUAL_GAP = 2
 SCHEMA = 1  # a family
 LEARNING_SCHEMA = 2  # all the families of a source
 # The scalar answers worth remembering: closed vocabularies, nothing from a file.
-REMEMBERED_ANSWERS = ("date_order", "decimal_style", "amount_basis", "department_value")
+REMEMBERED_ANSWERS = (
+    "date_order",
+    "decimal_style",
+    "amount_basis",
+    "department_value",
+    "document_identity",
+)
 
 
 class Trust(StrEnum):

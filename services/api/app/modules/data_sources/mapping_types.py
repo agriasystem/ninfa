@@ -75,6 +75,10 @@ class MappingInput(BaseModel):
     date_order: Literal["DMY", "MDY"] | None = None
     # Only needed when the file writes amounts with a comma or a point as the decimal mark.
     decimal_style: Literal["COMMA", "POINT"] | None = None
+    # Costs only: the file has no document number and a person said these are operating costs, to be
+    # recorded with an internal reference (ADR 0057). Part of the decision the server issues and
+    # verifies; never taken from a matching built by hand, where nobody was asked.
+    document_identity: Literal["SYNTHETIC_COST_RECORD"] | None = None
     # Smart Import V3: how the STRUCTURE of the document is read (a department that is a line, a
     # sheet or the title; a grid of days) - saved with the configuration, minus this file's dates.
     layout: LayoutSpec | None = None

@@ -100,6 +100,9 @@ class ConfigFormat:
     layout: LayoutSpec | None = None
     # Source Learning: the raw JSON memory of this source (None: nothing remembered).
     learning: dict[str, Any] | None = None
+    # Costs: how the records of this source are identified when its files carry no document number
+    # (ADR 0057). None for every other kind of data and for a source identified by its numbers.
+    document_identity: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +130,11 @@ class FileDomain(ABC):
     def __init__(self, session: Session, tenant: TenantContext) -> None:
         self._session = session
         self._tenant = tenant
+
+    def required_groups(self, mapping: Any = None) -> tuple[tuple[str, ...], ...]:
+        """What an import of this kind of data cannot run without, for THIS decision. The same for
+        every decision, except where a person's word changes what identifies a record (costs)."""
+        return self.groups
 
     def update_profile_documents(
         self, data_source_id: UUID, documents: dict[str, dict[str, Any]]
@@ -640,6 +648,27 @@ class CostsDomain(FileDomain):
             options.thousands_separator,
             options.layout,
             options.learning,
+            None if options.document_identity is None else options.document_identity.value,
+        )
+
+    def required_groups(self, mapping: Any = None) -> tuple[tuple[str, ...], ...]:
+        """An operating cost a person said has no document number is not required to have one."""
+        if getattr(mapping, "document_identity", None) is None:
+            return self.groups
+        return tuple(
+            group for group in self.groups if group != (InvoiceField.INVOICE_NUMBER.value,)
+        )
+
+    def scope_effect(
+        self, source: DataSource, filename: str, content: bytes, config: InvoiceMappingConfig
+    ) -> int:
+        """Only for operating costs with no document number: how many of this source's records a
+        COMPLETE file would take away. A real invoice is never taken away by any file, so a source
+        identified by document numbers keeps the rule that a cost register may always be partial."""
+        return InvoiceImportService(
+            self._session, self._tenant
+        ).records_a_complete_file_would_remove(
+            source.id, source.property_id, filename=filename, content=content, mapping=config
         )
 
     def _profile_row(self, data_source_id: UUID) -> Any:

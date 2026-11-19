@@ -539,7 +539,10 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
             "La domanda compare solo quando la risposta cambia ciò che viene contato, e solo dopo "
             "le altre domande.",
             "Un primo file non la pone mai: non c'è nulla che possa mancare.",
-            "Un file dei costi non la pone mai: l'unità è il documento.",
+            "Un file dei costi con il numero del documento non la pone mai: l'unità è il "
+            "documento.",
+            "I costi operativi senza numero documento la pongono come le prenotazioni: un file "
+            "completo toglie i costi del periodo che non contiene, uno parziale no.",
         ),
         where=_IMPORT_PAGE,
         related=("import.scope", "import.scope_full", "import.scope_partial", "import.scope_delta"),
@@ -568,6 +571,32 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
         where=_IMPORT_PAGE,
         related=("import.scope", "import.remembered_scope_safety"),
         keywords=("conferma", "file completo", "ricorda questa scelta", "non compaiono più"),
+    ),
+    entry(
+        "import.question_document_identity",
+        FEATURE,
+        "Domanda: costi senza numero documento",
+        "Se un file di costi ha tutto quello che serve tranne il numero del documento, NINFA "
+        "chiede una sola conferma: registrarli come costi operativi con un riferimento interno, "
+        "senza creare né modificare alcun numero di fattura.",
+        copy("Questo file contiene costi senza numero documento."),
+        enum(f"{_QUESTION}.DOCUMENT_IDENTITY"),
+        details=(
+            "Il bottone è Continua come costi operativi: la risposta vale anche per i prossimi "
+            "file fatti così e si corregge o si fa dimenticare dalle risposte ricordate.",
+            "Lo stesso costo importato due volte non si duplica; due righe uguali nel file restano "
+            "due costi.",
+            "Un file che ha tipo di documento, scadenza o numero di riga è un registro di fatture: "
+            "il numero del documento resta obbligatorio.",
+        ),
+        where=_IMPORT_PAGE,
+        related=("import.blocker_missing_required", "import.scope"),
+        keywords=(
+            "costi operativi",
+            "senza numero documento",
+            "numero fattura",
+            "riferimento interno",
+        ),
     ),
     entry(
         "import.blocker_no_table",

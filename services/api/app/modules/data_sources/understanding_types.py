@@ -46,6 +46,10 @@ class QuestionKind(StrEnum):
     # This family of files is remembered as complete, and this file would take something away: a
     # memory does not do that by itself. Does THIS file hold everything of its period?
     FILE_SCOPE_CONFIRM = "FILE_SCOPE_CONFIRM"
+    # A file of costs that has no document number at all (utilities, laundry, a month of
+    # commissions): NINFA can record them as operating costs with an internal reference of its own,
+    # never inventing an invoice number. Asked only when everything else the import needs is there.
+    DOCUMENT_IDENTITY = "DOCUMENT_IDENTITY"
 
 
 class UnderstandingLevel(StrEnum):
