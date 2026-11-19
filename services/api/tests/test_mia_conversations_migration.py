@@ -16,7 +16,8 @@ from sqlalchemy import Engine, inspect, text
 
 from tests.support import alembic_config
 
-HEAD = "0017_mia_conversations"
+MIA = "0017_mia_conversations"
+HEAD = "0018_cost_record_identity"  # the real global head now; Mia's own migration sits below
 PREVIOUS_HEAD = "0016_remembered_scope"
 TABLE = "mia_conversations"
 
@@ -98,7 +99,7 @@ def test_01_there_is_exactly_one_head_and_it_sits_on_0016(test_database_url: str
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
     assert scripts.get_heads() == [HEAD]
-    assert scripts.get_revision(HEAD).down_revision == PREVIOUS_HEAD
+    assert scripts.get_revision(MIA).down_revision == PREVIOUS_HEAD
 
 
 def test_02_there_is_one_migration_numbered_0017_and_only_one_creates_the_table(
@@ -107,7 +108,7 @@ def test_02_there_is_one_migration_numbered_0017_and_only_one_creates_the_table(
     scripts = ScriptDirectory.from_config(alembic_config(test_database_url))
 
     numbered = [rev.revision for rev in scripts.walk_revisions() if rev.revision.startswith("0017")]
-    assert numbered == [HEAD]
+    assert numbered == [MIA]
     versions = pathlib.Path(__file__).resolve().parents[1] / "alembic" / "versions"
     creators = [
         path.name

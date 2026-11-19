@@ -31,6 +31,8 @@ class InvoiceErrorCode(StrEnum):
     VALIDATION_FAILED = "INVOICE_VALIDATION_FAILED"
     DOCUMENT_CONFLICT = "INVOICE_DOCUMENT_CONFLICT"
     CANONICALIZATION_FAILED = "INVOICE_CANONICALIZATION_FAILED"
+    # What a complete file would take away changed between its reading and its commit.
+    IMPORT_PLAN_CHANGED = "INVOICE_IMPORT_PLAN_CHANGED"
     INTERNAL_ERROR = "INVOICE_INTERNAL_ERROR"
     # --- row / document level (also used as job-level summary keys) ------------------------------
     REQUIRED_VALUE_MISSING = "INVOICE_REQUIRED_VALUE_MISSING"

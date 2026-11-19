@@ -43,6 +43,7 @@ from app.modules.ingestion.models import (
     DataSource,
     DataSourceDomain,
     DataSourceType,
+    FileScope,
     ImportJobStatus,
 )
 from app.modules.ingestion.repository import (
@@ -51,11 +52,13 @@ from app.modules.ingestion.repository import (
     ImportJobRepository,
 )
 from app.modules.ingestion.schemas import ImportFileCreate, ImportJobCreate
+from app.modules.ingestion.scope import NO_SCOPE, ScopePlan
 from app.modules.invoices.canonical import (
     CanonicalDocument,
     document_from_payloads,
     header_payload,
     line_payload,
+    record_key,
 )
 from app.modules.invoices.classification import classify_line
 from app.modules.invoices.documents import ParsedDocument
@@ -137,6 +140,11 @@ class InvoiceImportResult:
     invoices_created: int = 0
     invoices_unchanged: int = 0
     invoices_revised: int = 0
+    # Operating costs with no document number (ADR 0057): a record that a person's word had taken
+    # away and that this file holds again (it counts again, as the next revision), and the records
+    # this file took away because a person said it holds everything of its period.
+    records_restored: int = 0
+    records_removed: int = 0
     lines_created: int = 0
     suppliers_created: int = 0
     suppliers_matched: int = 0
@@ -156,7 +164,13 @@ class InvoiceImportResult:
 
     @property
     def changed_data(self) -> bool:
-        return self.invoices_created + self.invoices_revised > 0
+        return (
+            self.invoices_created
+            + self.invoices_revised
+            + self.records_restored
+            + self.records_removed
+            > 0
+        )
 
 
 @dataclass(frozen=True)
@@ -371,6 +385,51 @@ class InvoiceImportService:
             summary=_dry_run_summary(documents),
         )
 
+    def records_a_complete_file_would_remove(
+        self,
+        data_source_id: UUID,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: InvoiceMappingConfig,
+    ) -> int:
+        """How many operating costs of this source would stop counting if THIS file holds everything
+        of the period it covers (first to last date of its own rows). Read-only: nothing is written
+        and no supplier is created.
+
+        0 for a mapping that identifies its records by a document number (a real invoice is never
+        taken away by any file), for a file that cannot be read cleanly (what is wrong with it is
+        said when it is tried, not here), and when nothing would go."""
+        if not mapping.is_synthetic:
+            return 0
+        prop = self._properties.get(property_id)
+        if prop is None:
+            return 0
+        kind = detect_source(filename, content)
+        if kind == "xml":
+            return 0
+        source_format = SourceFormat.CSV if kind == "csv" else SourceFormat.XLSX
+        ids = _Ids(uuid4(), uuid4(), data_source_id, property_id)
+        parsed = self._parse_structured(
+            ids, filename, content, prop.currency, source_format, mapping
+        )
+        canonical = [document.canonical for document in parsed if document.valid]
+        if not parsed or len(canonical) != len(parsed):
+            return 0
+        documents = [document for document in canonical if document is not None]
+        plan = self._resolver.plan([document.supplier for document in documents])
+        keyed = _identify(
+            [(document, plan.resolutions[document.supplier.key]) for document in documents],
+            data_source_id,
+        )
+        return self._invoices.count_synthetic_absent_from(
+            data_source_id,
+            [identity[1] for identity, *_ in keyed],
+            min(document.invoice_date for document in documents),
+            max(document.invoice_date for document in documents),
+        )
+
     # --- import -------------------------------------------------------------------------------
 
     def import_file(
@@ -382,11 +441,18 @@ class InvoiceImportService:
         mime_type: str | None = None,
         property_id: UUID | None = None,
         mapping_override: InvoiceMappingConfig | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> InvoiceImportResult:
         """Import one invoice file into the canonical model, atomically and idempotently.
 
         `mapping_override` is a validated mapping used instead of the one saved for the data source
         (Smart Import: the person's own matching, saved only once this import has succeeded).
+
+        `scope` is what the caller knows this file to be. Only `FileScope.FULL`, and only for
+        operating costs with no document number, makes the absence of a record mean anything: the
+        records of the source the file does not hold, inside the period its own rows cover, stop
+        counting. With anything else, or nothing, nothing is ever taken away. A real invoice is
+        never taken away by any file.
 
         Raises InvoiceImportError(INVOICE_INVALID_DATA_SOURCE) when the data source cannot be used
         (nothing is created). Every later problem ends as a FAILED ImportJob and a returned result
@@ -415,7 +481,9 @@ class InvoiceImportService:
         self._log("invoice import started", ids)
 
         try:
-            result = self._run(ids, filename, content, currency, duplicate_of, mapping_override)
+            result = self._run(
+                ids, filename, content, currency, duplicate_of, mapping_override, scope
+            )
         except (InvoiceImportError, SupplierError) as error:
             result = self._fail(ids, error.code, error.message, _details(error), duplicate_of)
         except Exception as error:  # a bug or infrastructure problem: never leave the job RUNNING
@@ -452,6 +520,7 @@ class InvoiceImportService:
         currency: str,
         duplicate_of: UUID | None,
         mapping_override: InvoiceMappingConfig | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> InvoiceImportResult:
         kind = detect_source(filename, content)
         source_format = {
@@ -488,7 +557,7 @@ class InvoiceImportService:
                 warnings=warnings,
                 source_format=source_format,
             )
-        return self._canonicalize(ids, duplicate_of, counts, warnings, source_format)
+        return self._canonicalize(ids, duplicate_of, counts, warnings, source_format, scope)
 
     def _parse_structured(
         self,
@@ -568,8 +637,10 @@ class InvoiceImportService:
         counts: _Counts,
         warnings: dict[str, int],
         source_format: SourceFormat,
+        scope: ScopePlan = NO_SCOPE,
     ) -> InvoiceImportResult:
         """Every valid document becomes a canonical invoice (with its supplier), or none does."""
+        removed = 0
         try:
             # One canonicalisation per data source at a time, and one supplier registry writer per
             # workspace at a time, always in this order (no lock cycle is possible).
@@ -587,20 +658,13 @@ class InvoiceImportService:
             resolved = [
                 (document, plan.resolutions[document.supplier.key]) for document in documents
             ]
+            keyed = _identify(resolved, ids.data_source)
             identities: dict[InvoiceIdentity, CanonicalDocument] = {}
-            keyed: list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution]] = []
             duplicated: list[int] = []
-            for document, resolution in resolved:
-                identity = (
-                    resolution.supplier_id,
-                    document.normalized_invoice_number,
-                    document.invoice_date,
-                    document.document_kind,
-                )
+            for identity, document, _resolution, _fingerprint in keyed:
                 if identity in identities:  # the same document twice in one import
                     duplicated.append(document.source_document_index)
                 identities[identity] = document
-                keyed.append((identity, document, resolution))
             if duplicated:
                 raise InvoiceImportError(
                     InvoiceErrorCode.DOCUMENT_CONFLICT,
@@ -612,21 +676,34 @@ class InvoiceImportService:
             conflicts: list[int] = []
             new_invoices: list[dict[str, Any]] = []
             new_lines: list[dict[str, Any]] = []
-            unchanged = revised = 0
-            for identity, document, resolution in keyed:
-                fingerprint = document.fingerprint(str(resolution.supplier_id))
+            unchanged = revised = restored = 0
+            for identity, document, resolution, fingerprint in keyed:
                 stored = existing.get(identity)
                 revision = 1
                 if stored is not None:
-                    if stored.source_fingerprint == fingerprint:
-                        unchanged += 1
-                        continue
-                    if SourceFormat.FATTURAPA_XML in (stored.source_format, document.source_format):
-                        conflicts.append(document.source_document_index)
-                        continue
-                    # A row of a spreadsheet corrected: the older version stays, this one counts.
-                    revision = stored.revision + 1
-                    revised += 1
+                    if document.is_synthetic:
+                        # The key IS the content: the same key is the same record. One that still
+                        # counts is nothing new; one a person's word took away and this file holds
+                        # again counts again, as the next revision of the same identity.
+                        if not stored.removed:
+                            unchanged += 1
+                            continue
+                        revision = stored.revision + 1
+                        restored += 1
+                    else:
+                        if stored.source_fingerprint == fingerprint:
+                            unchanged += 1
+                            continue
+                        if SourceFormat.FATTURAPA_XML in (
+                            stored.source_format,
+                            document.source_format,
+                        ):
+                            conflicts.append(document.source_document_index)
+                            continue
+                        # A row of a spreadsheet corrected: the older version stays, this one
+                        # counts.
+                        revision = stored.revision + 1
+                        revised += 1
                 invoice_id = uuid4()
                 new_invoices.append(
                     self._invoice_row(
@@ -637,6 +714,7 @@ class InvoiceImportService:
                         fingerprint,
                         _resolution_story(resolution, created_by),
                         revision,
+                        identity[1],
                     )
                 )
                 new_lines.extend(self._line_rows(invoice_id, document, resolution))
@@ -648,10 +726,42 @@ class InvoiceImportService:
                     details={"reason": "different_content", "documents": conflicts[:50]},
                 )
 
+            # What a COMPLETE file of operating costs takes away: the records of this source it does
+            # not hold, inside the period its own rows cover. Computed here, under the lock: if it
+            # is not what the person was shown, nothing is imported. A real invoice is never in it.
+            synthetic = [doc for doc in documents if doc.is_synthetic]
+            complete = (
+                scope.file_scope is FileScope.FULL
+                and bool(synthetic)
+                and len(synthetic) == len(documents)
+            )
+            held = [identity[1] for identity in identities]
+            first = min((doc.invoice_date for doc in synthetic), default=None)
+            last = max((doc.invoice_date for doc in synthetic), default=None)
+            if complete and first is not None and last is not None:
+                absent = self._invoices.count_synthetic_absent_from(
+                    ids.data_source, held, first, last
+                )
+                if scope.is_stale(absent):
+                    raise InvoiceImportError(
+                        InvoiceErrorCode.IMPORT_PLAN_CHANGED,
+                        "What this file would take away changed after it was read: "
+                        "nothing was imported",
+                    )
+
             self._invoices.insert_invoices(new_invoices)
             self._invoices.insert_lines(new_lines)
+            if complete and first is not None and last is not None:
+                removed = self._invoices.remove_synthetic_absent_from(
+                    ids.data_source, ids.job, held, first, last
+                )
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job, changed_data=bool(new_invoices))
+            self._jobs.succeed(
+                ids.job,
+                changed_data=bool(new_invoices) or removed > 0,
+                file_scope=scope.file_scope,
+                remembered_file_scope=scope.remembered_file_scope,
+            )
             self._session.commit()
         except (InvoiceImportError, SupplierError):
             raise  # rolled back and recorded as FAILED by import_file
@@ -693,9 +803,11 @@ class InvoiceImportService:
             rows_total=counts.rows,
             rows_valid=counts.valid,
             rows_invalid=counts.invalid,
-            invoices_created=len(new_invoices) - revised,
+            invoices_created=len(new_invoices) - revised - restored,
             invoices_unchanged=unchanged,
             invoices_revised=revised,
+            records_restored=restored,
+            records_removed=removed,
             lines_created=len(new_lines),
             suppliers_created=len(created_suppliers),
             suppliers_matched=len(matched_suppliers),
@@ -730,6 +842,7 @@ class InvoiceImportService:
         fingerprint: str,
         method: ResolutionMethod,
         revision: int = 1,
+        key: str | None = None,
     ) -> dict[str, Any]:
         return {
             "id": invoice_id,
@@ -738,8 +851,11 @@ class InvoiceImportService:
             "property_id": ids.property,
             "data_source_id": ids.data_source,
             "supplier_id": resolution.supplier_id,
+            # the SOURCE's number: None for an operating cost that has none, never an invented one
             "invoice_number": document.invoice_number,
             "normalized_invoice_number": document.normalized_invoice_number,
+            "source_record_key": key or document.normalized_invoice_number,
+            "identity_origin": document.identity_origin,
             "invoice_date": document.invoice_date,
             "due_date": document.due_date,
             "document_type_code": document.document_type_code,
@@ -953,6 +1069,37 @@ def _stage(
 
 def _file_row(file_rows: list[int | None], position: int) -> int | None:
     return file_rows[position] if position < len(file_rows) else None
+
+
+def _identify(
+    resolved: list[tuple[CanonicalDocument, SupplierResolution]], data_source_id: UUID
+) -> list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution, str]]:
+    """The identity and the content fingerprint of every document, in file order.
+
+    A real document is identified by its number (as it always was). An operating cost with no
+    number is identified by its CONTENT inside its data source, and numbered among its identical
+    siblings: a MULTISET, so two equal rows are two costs, the same rows in another order are the
+    same records, and a fourth equal row is only `#4`. The number counts the copies, never the
+    position of a row (ADR 0057)."""
+    seen: Counter[str] = Counter()
+    keyed: list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution, str]] = []
+    for document, resolution in resolved:
+        if document.is_synthetic:
+            fingerprint = document.record_fingerprint(
+                str(resolution.supplier_id), str(data_source_id)
+            )
+            seen[fingerprint] += 1
+            key = record_key(fingerprint, seen[fingerprint])
+        else:
+            fingerprint = document.fingerprint(str(resolution.supplier_id))
+            if document.normalized_invoice_number is None:  # pragma: no cover - checked by the DB
+                raise InvoiceImportError(
+                    InvoiceErrorCode.VALIDATION_FAILED, "a document with no number and no identity"
+                )
+            key = document.normalized_invoice_number
+        identity = (resolution.supplier_id, key, document.invoice_date, document.document_kind)
+        keyed.append((identity, document, resolution, fingerprint))
+    return keyed
 
 
 def _dry_run_summary(documents: list[ParsedDocument]) -> dict[str, Any]:

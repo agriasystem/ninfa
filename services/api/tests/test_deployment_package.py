@@ -352,7 +352,7 @@ def test_15_the_documented_migration_head_is_the_real_head() -> None:
         alembic_config("postgresql+psycopg://unused/unused")
     ).get_heads()
 
-    assert head == "0017_mia_conversations"  # update the runbooks with every new migration
+    assert head == "0018_cost_record_identity"  # update the runbooks with every new migration
     for name in ("pilot-deployment-v1.md", "pilot-smoke-checklist-v1.md"):
         assert head in _read(OPERATIONS / name)
 

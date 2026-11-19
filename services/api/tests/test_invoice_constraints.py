@@ -158,12 +158,14 @@ def test_the_identity_has_no_data_source_in_it(db_session: Session) -> None:
             " WHERE c.conname = 'uq_invoices_identity_revision' ORDER BY a.attname"
         )
     ).scalars()
+    # (the TECHNICAL identity: the normalised number for a real document, a content key for an
+    # operating cost with none - ADR 0057 - and still no data source)
     assert sorted(columns) == [
         "document_kind",
         "invoice_date",
-        "normalized_invoice_number",
         "property_id",
         "revision",
+        "source_record_key",
         "supplier_id",
         "workspace_id",
     ]
@@ -248,8 +250,8 @@ def test_a_supplier_has_no_property_but_an_invoice_has_exactly_one() -> None:
 @pytest.mark.parametrize(
     ("column", "value", "constraint"),
     [
-        ("invoice_number", " ", "ck_invoices_invoice_number_not_blank"),
-        ("normalized_invoice_number", "", "ck_invoices_normalized_invoice_number_not_blank"),
+        ("invoice_number", " ", "ck_invoices_identity_consistent"),
+        ("normalized_invoice_number", "", "ck_invoices_identity_consistent"),
         ("currency", "eur", "ck_invoices_currency_format"),
         ("source_fingerprint", "xyz", "ck_invoices_source_fingerprint_format"),
         ("document_type_code", " ", "ck_invoices_document_type_code_not_blank"),
@@ -275,10 +277,11 @@ def test_closed_sets_are_stored_as_text_with_a_check(
         db_session.execute(
             text(
                 "INSERT INTO invoices (id, workspace_id, property_id, data_source_id, supplier_id,"
-                " invoice_number, normalized_invoice_number, invoice_date, document_kind, currency,"
-                " source_format, source_import_job_id, source_import_file_id, source_fingerprint,"
-                " supplier_resolution_method) VALUES (gen_random_uuid(), :w, :p, :d, :s, 'N', 'N',"
-                " '2026-01-01', :kind, 'EUR', :fmt, :j, :f, :fp, :res)"
+                " invoice_number, normalized_invoice_number, source_record_key, invoice_date,"
+                " document_kind, currency, source_format, source_import_job_id,"
+                " source_import_file_id, source_fingerprint, supplier_resolution_method)"
+                " VALUES (gen_random_uuid(), :w, :p, :d, :s, 'N', 'N', 'N', '2026-01-01', :kind,"
+                " 'EUR', :fmt, :j, :f, :fp, :res)"
             ),
             {
                 "w": a.workspace.id,
@@ -710,7 +713,7 @@ def test_a_supplier_can_evolve_but_an_invoice_and_its_lines_cannot(
     assert db_session.get(Supplier, supplier.id).is_verified is True  # type: ignore[union-attr]
 
 
-def test_the_triggers_live_on_invoices_and_lines_only(db_session: Session) -> None:
+def test_the_triggers_live_on_the_invoice_evidence_tables_only(db_session: Session) -> None:
     triggers = set(
         db_session.execute(
             text(
@@ -722,6 +725,8 @@ def test_the_triggers_live_on_invoices_and_lines_only(db_session: Session) -> No
     assert triggers == {
         "invoices.trg_invoices_immutable",
         "invoice_lines.trg_invoice_lines_immutable",
+        # 0018: a removal is evidence of what a person said a file held, and is never edited
+        "invoice_removals.trg_invoice_removals_immutable",
     }
     assert not db_session.scalar(
         text(

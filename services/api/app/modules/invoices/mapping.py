@@ -26,7 +26,7 @@ from app.modules.bookings.text import normalize_key
 from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.errors import InvoiceErrorCode, InvoiceImportError
-from app.modules.invoices.models import DocumentKind
+from app.modules.invoices.models import DocumentKind, IdentityOrigin
 
 __all__ = ["compute_header_signature", "header_index", "normalize_header"]
 
@@ -66,6 +66,13 @@ REQUIRED_FIELDS = frozenset(
 # A constant is only safe where it cannot invent facts about one invoice or one line: never the
 # invoice number, the dates, the supplier, the description or the amount.
 CONSTANT_FIELDS = frozenset({F.DOCUMENT_TYPE, F.CURRENCY, F.COST_CATEGORY})
+# What makes a file DOCUMENT-LEVEL, a register of fiscal documents and not of costs: a column that
+# says what kind of document a line belongs to, when it falls due, or which line of a multi-line
+# document it is. A file that carries any of them identifies its records by the document number,
+# and without one it stays an error (ADR 0057): a synthetic identity must never cover a fiscal
+# document that is incomplete. (Supplier VAT / tax code / IBAN are NOT here: they only say who the
+# supplier is, which an operating-cost register may well say.)
+DOCUMENT_LEVEL_FIELDS = frozenset({F.DOCUMENT_TYPE, F.DUE_DATE, F.LINE_NUMBER})
 DATE_FIELDS = frozenset({F.INVOICE_DATE, F.DUE_DATE})
 DECIMAL_FIELDS = frozenset(
     {
@@ -126,6 +133,10 @@ class InvoiceFormatOptions(BaseModel):
     date_formats: dict[InvoiceField, str] = {}
     decimal_separator: Literal[".", ","] | None = None
     thousands_separator: Literal[",", ".", " ", "'"] | None = None
+    # How the records of this source are identified when the file has NO document number: a person
+    # said these are operating costs and NINFA may identify each by its content (ADR 0057). None:
+    # the records are identified by their document number, which is then required.
+    document_identity: IdentityOrigin | None = None
     # Smart Import V3: how the document's structure is read (title, totals, sections, day grid).
     layout: LayoutSpec | None = None
     # Source Learning: what a person confirmed about this source (see `source_learning.Memory`).
@@ -173,9 +184,28 @@ class InvoiceMappingConfig(BaseModel):
             normalised[key] = category
         return normalised
 
+    @property
+    def is_synthetic(self) -> bool:
+        """The records of this mapping are operating costs identified by their content."""
+        return self.format_options.document_identity == IdentityOrigin.SYNTHETIC_COST_RECORD
+
     @model_validator(mode="after")
     def _check_fields(self) -> "InvoiceMappingConfig":
-        missing = sorted(f.value for f in REQUIRED_FIELDS if f not in self.column_mapping)
+        if self.format_options.document_identity == IdentityOrigin.DOCUMENT_NUMBER:
+            raise ValueError("document_identity can only say SYNTHETIC_COST_RECORD, or nothing")
+        required = REQUIRED_FIELDS
+        if self.is_synthetic:
+            # A file with a document number identifies by it; one that is a register of fiscal
+            # documents (type, due date, line number) is never covered by a synthetic identity.
+            if F.INVOICE_NUMBER in self.column_mapping:
+                raise ValueError("a mapping with a document number identifies its records by it")
+            level = sorted(f.value for f in DOCUMENT_LEVEL_FIELDS if f in self.column_mapping)
+            if level:
+                raise ValueError(
+                    f"a document-level file needs its document number ({', '.join(level)} mapped)"
+                )
+            required = REQUIRED_FIELDS - {F.INVOICE_NUMBER}
+        missing = sorted(f.value for f in required if f not in self.column_mapping)
         if missing:
             raise ValueError(f"required fields not mapped: {', '.join(missing)}")
         for field, source in self.column_mapping.items():

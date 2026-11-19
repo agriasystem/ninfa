@@ -411,6 +411,9 @@ def persisted_hits(session: Session, needles: Sequence[str]) -> list[tuple[str, 
         .scalars()
         .all()
     )
+    # (the migration bookkeeping holds revision names, never imported data: a revision called
+    # "...identity" would otherwise be a false positive for the word "entity")
+    tables = [table for table in tables if table != "alembic_version"]
     hits: list[tuple[str, str]] = []
     for table in tables:
         for needle in needles:

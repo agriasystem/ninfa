@@ -11,7 +11,20 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Date, String, Uuid, column, func, insert, select, update, values
+from sqlalchemy import (
+    Date,
+    String,
+    Uuid,
+    any_,
+    bindparam,
+    column,
+    func,
+    insert,
+    select,
+    update,
+    values,
+)
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -20,19 +33,24 @@ from app.modules.bookings.models import ImportRowStatus
 from app.modules.ingestion.models import DataSource
 from app.modules.invoices.models import (
     DocumentKind,
+    IdentityOrigin,
     Invoice,
     InvoiceImportRow,
     InvoiceLine,
     InvoiceMappingProfile,
+    InvoiceRemoval,
     SourceFormat,
     is_current_invoice,
+    is_latest_revision,
+    is_removed,
 )
 
 _CHUNK = 1000
 _KEYS_PER_QUERY = 2000
 
-# (supplier_id, normalised invoice number, invoice date, document kind): the identity of a document
-# inside one property.
+# (supplier_id, source record key, invoice date, document kind): the identity of a cost record
+# inside one property. The key is the normalised invoice number of a real document, or the
+# content-derived key of an operating cost that has no number (ADR 0057).
 InvoiceIdentity = tuple[UUID, str, date, DocumentKind]
 
 
@@ -42,6 +60,8 @@ class ExistingInvoice:
     source_fingerprint: str
     revision: int = 1
     source_format: SourceFormat = SourceFormat.FATTURAPA_XML
+    # A synthetic record a person's word took away (never true of a record with a number).
+    removed: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +97,7 @@ class InvoiceRepository:
                 Invoice.workspace_id == self._tenant.workspace_id,
                 Invoice.property_id == property_id,
             )
-            .order_by(Invoice.invoice_date, Invoice.normalized_invoice_number, Invoice.id)
+            .order_by(Invoice.invoice_date, Invoice.source_record_key, Invoice.id)
         ).all()
 
     def lines_of(self, invoice_id: UUID) -> Sequence[InvoiceLine]:
@@ -93,9 +113,11 @@ class InvoiceRepository:
     def find_by_identities(
         self, property_id: UUID, identities: Sequence[InvoiceIdentity]
     ) -> dict[InvoiceIdentity, ExistingInvoice]:
-        """The current invoices of the property at these identities (one statement per block, a
-        join with a VALUES list served by the unique identity key). The data source is NOT part of
-        the identity: the same invoice from another source is the same invoice."""
+        """The LATEST version of the records of the property at these identities (one statement per
+        block, a join with a VALUES list served by the unique identity key), whether or not it still
+        counts: `removed` says a person's word took it away, and a record that comes back is then
+        the next revision, never a row that already exists. The data source is NOT part of the
+        identity of a real document: the same invoice from another source is the same invoice."""
         found: dict[InvoiceIdentity, ExistingInvoice] = {}
         ordered = sorted(identities, key=lambda i: (str(i[0]), i[1], i[2], i[3].value))
         for start in range(0, len(ordered), _KEYS_PER_QUERY):
@@ -111,36 +133,106 @@ class InvoiceRepository:
                 select(
                     Invoice.id,
                     Invoice.supplier_id,
-                    Invoice.normalized_invoice_number,
+                    Invoice.source_record_key,
                     Invoice.invoice_date,
                     Invoice.document_kind,
                     Invoice.source_fingerprint,
                     Invoice.revision,
                     Invoice.source_format,
+                    is_removed().label("removed"),
                 )
                 .join(
                     wanted,
                     (Invoice.supplier_id == wanted.c.supplier_id)
-                    & (Invoice.normalized_invoice_number == wanted.c.number)
+                    & (Invoice.source_record_key == wanted.c.number)
                     & (Invoice.invoice_date == wanted.c.invoice_date)
                     & (Invoice.document_kind == wanted.c.kind),
                 )
                 .where(
                     Invoice.workspace_id == self._tenant.workspace_id,
                     Invoice.property_id == property_id,
-                    is_current_invoice(),
+                    is_latest_revision(),
                 )
             )
             for row in rows:
                 found[
                     (
                         row.supplier_id,
-                        row.normalized_invoice_number,
+                        row.source_record_key,
                         row.invoice_date,
                         row.document_kind,
                     )
-                ] = ExistingInvoice(row.id, row.source_fingerprint, row.revision, row.source_format)
+                ] = ExistingInvoice(
+                    row.id,
+                    row.source_fingerprint,
+                    row.revision,
+                    row.source_format,
+                    bool(row.removed),
+                )
         return found
+
+    # --- operating costs with no document number: what a complete file takes away --------------
+
+    def _synthetic_absent_from(
+        self, data_source_id: UUID, held_keys: Sequence[str], first: date, last: date
+    ) -> Any:
+        """The SYNTHETIC records of this data source that count, are dated within the file's own
+        period and are not among the keys the file holds. Real documents are never in it."""
+        held = bindparam("held_keys", list(held_keys), type_=ARRAY(String))
+        return select(Invoice.id, Invoice.property_id).where(
+            Invoice.workspace_id == self._tenant.workspace_id,
+            Invoice.data_source_id == data_source_id,
+            Invoice.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD,
+            Invoice.invoice_date >= first,
+            Invoice.invoice_date <= last,
+            ~(Invoice.source_record_key == any_(held)),
+            is_current_invoice(),
+        )
+
+    def count_synthetic_absent_from(
+        self, data_source_id: UUID, held_keys: Sequence[str], first: date, last: date
+    ) -> int:
+        """How many records of this source would stop counting if the file holds everything of the
+        period it covers (first to last date of its own rows). Read-only."""
+        absent = self._synthetic_absent_from(data_source_id, held_keys, first, last).subquery()
+        return int(self._session.scalar(select(func.count()).select_from(absent)) or 0)
+
+    def remove_synthetic_absent_from(
+        self,
+        data_source_id: UUID,
+        import_job_id: UUID,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
+    ) -> int:
+        """Take those records away: a removal row each, written with the import that did it. The
+        invoices themselves are immutable and stay."""
+        absent = self._synthetic_absent_from(data_source_id, held_keys, first, last).subquery()
+        result = self._session.execute(
+            insert(InvoiceRemoval).from_select(
+                [
+                    "workspace_id",
+                    "property_id",
+                    "data_source_id",
+                    "invoice_id",
+                    "identity_origin",
+                    "removed_by_import_job_id",
+                ],
+                select(
+                    bindparam("workspace_id", self._tenant.workspace_id, type_=Uuid),
+                    absent.c.property_id,
+                    bindparam("data_source_id", data_source_id, type_=Uuid),
+                    absent.c.id,
+                    bindparam(
+                        "identity_origin",
+                        IdentityOrigin.SYNTHETIC_COST_RECORD.value,
+                        type_=String,
+                    ),
+                    bindparam("job_id", import_job_id, type_=Uuid),
+                ),
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def insert_invoices(self, rows: Sequence[dict[str, Any]]) -> None:
         for start in range(0, len(rows), _CHUNK):

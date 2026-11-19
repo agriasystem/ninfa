@@ -23,7 +23,7 @@ GATE_4_HEAD = "0006_expected_engine"
 # them touch these tables/triggers/keys.
 GATE_6_HEAD = "0007_invoice_supplier_ingestion"
 GATE_8_HEAD = "0008_labor_ingestion"
-HEAD = "0017_mia_conversations"
+HEAD = "0018_cost_record_identity"
 GATE_6_TABLES = {
     "suppliers",
     "supplier_identifiers",
@@ -62,6 +62,8 @@ EXPECTED_INDEXES = {
         "pk_invoices",
         "uq_invoices_identity_revision",
         "uq_invoices_workspace_id_id",
+        # 0018: the target of the removals' foreign key, which carries the KIND of identity
+        "uq_invoices_workspace_id_id_identity_origin",
         "ix_invoices_workspace_id_property_id_invoice_date_supplier_id",
     },
     "invoice_lines": {
@@ -299,8 +301,14 @@ def test_no_index_repeats_or_merely_prefixes_another_one(at_head: None, db_engin
     by_table: dict[str, list[tuple[str, list[str]]]] = {}
     for table, index, columns in rows:
         by_table.setdefault(table, []).append((index, list(columns)))
+    # A foreign key needs a unique key on EXACTLY its columns: (workspace_id, id) is the target of
+    # the lines and (workspace_id, id, identity_origin) the target of the removals (0018), so the
+    # first is a prefix of the second on purpose.
+    foreign_key_targets = {("invoices", "uq_invoices_workspace_id_id")}
     for table, indexes in by_table.items():
         for name, columns in indexes:
+            if (table, name) in foreign_key_targets:
+                continue
             for other, other_columns in indexes:
                 if other == name:
                     continue

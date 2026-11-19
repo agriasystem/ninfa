@@ -2,12 +2,22 @@
 
 An Invoice belongs to ONE property (its supplier belongs to the workspace). It is a canonical
 accounting document: immutable once written (a database trigger refuses every UPDATE), identified
-by (workspace, property, supplier, normalised number, date, kind) and NOT by the data source it
+by (workspace, property, supplier, `source_record_key`, date, kind) and NOT by the data source it
 came from, so the same invoice arriving through an XML file and an accounting export is one cost.
+
+`source_record_key` is the TECHNICAL identity of the record, and it is not the fiscal number of a
+document (ADR 0057). For a real document it IS the normalised invoice number
+(`identity_origin = DOCUMENT_NUMBER`), exactly as before. An operating cost that comes with no
+document number at all (`identity_origin = SYNTHETIC_COST_RECORD`, only from a CSV/XLSX) keeps
+`invoice_number` NULL - a number is never invented - and NINFA derives the key from the content of
+the record, in the scope of the data source it came from.
 
 A row of a spreadsheet can be corrected, and then the corrected document is the next `revision` of
 that identity: the older one stays, with the import that brought it, and only the newest counts
-(`is_current_invoice`). A FatturaPA is a fiscal document: it is never replaced.
+(`is_current_invoice`). A FatturaPA is a fiscal document: it is never replaced. A SYNTHETIC record
+has no external identity, so a changed record is a different record: it can only stop counting
+because a person said a later file holds everything of its period, and that is an
+`InvoiceRemoval` (the invoice row itself is never touched). A fiscal document can never be removed.
 
 Amounts are signed CANONICAL amounts: a CREDIT_NOTE carries negative amounts, so a plain
 SUM(line_total) is always right without anyone re-reading TD04.
@@ -35,6 +45,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.engine.default import DefaultExecutionContext
 from sqlalchemy.orm import Mapped, aliased, mapped_column
 
 from app.db.base import Base
@@ -60,6 +71,16 @@ class SourceFormat(StrEnum):
     XLSX = "XLSX"
 
 
+class IdentityOrigin(StrEnum):
+    """Where the technical identity (`source_record_key`) of a cost record comes from."""
+
+    # The source's own document number: a real invoice or credit note (the key IS its number).
+    DOCUMENT_NUMBER = "DOCUMENT_NUMBER"
+    # An operating cost the source states with no document number: derived by NINFA from the
+    # record's content, never shown as a number and never a fiscal fact.
+    SYNTHETIC_COST_RECORD = "SYNTHETIC_COST_RECORD"
+
+
 class ResolutionMethod(StrEnum):
     """How the invoice's supplier was determined (which identifier, or that it was created)."""
 
@@ -72,6 +93,12 @@ class ResolutionMethod(StrEnum):
     CREATED_NEW_WITH_REVIEW = "CREATED_NEW_WITH_REVIEW"
 
 
+def _key_of_the_number(context: DefaultExecutionContext) -> str | None:
+    """The technical key of a record that does not say one: its normalised document number."""
+    number = context.get_current_parameters().get("normalized_invoice_number")  # type: ignore[no-untyped-call]
+    return number if isinstance(number, str) else None
+
+
 class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     __tablename__ = "invoices"
 
@@ -80,8 +107,22 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     data_source_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
     supplier_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
 
-    invoice_number: Mapped[str] = mapped_column(String(255), nullable=False)
-    normalized_invoice_number: Mapped[str] = mapped_column(String(255), nullable=False)
+    # The SOURCE's document number: NULL for a SYNTHETIC_COST_RECORD, never an invented value.
+    invoice_number: Mapped[str | None] = mapped_column(String(255))
+    normalized_invoice_number: Mapped[str | None] = mapped_column(String(255))
+    # The technical identity: the normalised number for a real document, a content-derived key for
+    # an operating cost that has no number. Nothing a person ever reads. Left out, it is the
+    # normalised number (what it always was for a real document); a synthetic record has no number
+    # to fall back on, so a missing key is refused by the database rather than made up.
+    source_record_key: Mapped[str] = mapped_column(
+        String(255), nullable=False, default=_key_of_the_number
+    )
+    identity_origin: Mapped[IdentityOrigin] = mapped_column(
+        enum_column(IdentityOrigin, 24),
+        nullable=False,
+        default=IdentityOrigin.DOCUMENT_NUMBER,
+        server_default=text("'DOCUMENT_NUMBER'"),
+    )
     invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
     revision: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default=text("1")
@@ -146,12 +187,13 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             name="fk_invoices_source_import_file",
             ondelete="RESTRICT",
         ),
-        # The canonical identity of a document: NO data source in it, on purpose.
+        # The canonical identity of a document: NO data source in it, on purpose (a synthetic
+        # record carries its data source INSIDE its key instead: two sources never merge).
         UniqueConstraint(
             "workspace_id",
             "property_id",
             "supplier_id",
-            "normalized_invoice_number",
+            "source_record_key",
             "invoice_date",
             "document_kind",
             "revision",
@@ -159,6 +201,13 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         ),
         # Foreign-key target of the lines.
         UniqueConstraint("workspace_id", "id", name="uq_invoices_workspace_id_id"),
+        # Foreign-key target of the removals: only a SYNTHETIC record can be pointed at as removed.
+        UniqueConstraint(
+            "workspace_id",
+            "id",
+            "identity_origin",
+            name="uq_invoices_workspace_id_id_identity_origin",
+        ),
         # "Costs of a property in a period, by supplier": the cost query and the date lookup.
         Index(
             "ix_invoices_workspace_id_property_id_invoice_date_supplier_id",
@@ -168,9 +217,25 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             "supplier_id",
         ),
         CheckConstraint("revision >= 1", name="revision_positive"),
-        CheckConstraint("btrim(invoice_number) <> ''", name="invoice_number_not_blank"),
         CheckConstraint(
-            "btrim(normalized_invoice_number) <> ''", name="normalized_invoice_number_not_blank"
+            values_check("identity_origin", IdentityOrigin), name="identity_origin_valid"
+        ),
+        # A real document has its number (and the key IS it); a synthetic record has none at all.
+        CheckConstraint(
+            "(identity_origin = 'DOCUMENT_NUMBER'"
+            " AND invoice_number IS NOT NULL AND btrim(invoice_number) <> ''"
+            " AND normalized_invoice_number IS NOT NULL AND btrim(normalized_invoice_number) <> ''"
+            " AND source_record_key = normalized_invoice_number)"
+            " OR (identity_origin = 'SYNTHETIC_COST_RECORD'"
+            " AND invoice_number IS NULL AND normalized_invoice_number IS NULL)",
+            name="identity_consistent",
+        ),
+        CheckConstraint("btrim(source_record_key) <> ''", name="source_record_key_not_blank"),
+        # Only a row of a spreadsheet can be synthetic: a FatturaPA or a credit note never is.
+        CheckConstraint(
+            "identity_origin <> 'SYNTHETIC_COST_RECORD'"
+            " OR (source_format IN ('CSV', 'XLSX') AND document_kind = 'INVOICE')",
+            name="synthetic_only_for_spreadsheets",
         ),
         CheckConstraint(
             "document_type_code IS NULL OR btrim(document_type_code) <> ''",
@@ -194,18 +259,97 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     )
 
 
-def is_current_invoice() -> ColumnElement[bool]:
-    """The condition every reading of costs carries: no newer version of the same document."""
+class InvoiceRemoval(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
+    """A SYNTHETIC cost record that stopped counting because a person said that a later file held
+    everything of its period (and this record was not in it).
+
+    The invoice itself is immutable: its removal is a row of its own, pointing at it, written with
+    the import that took it away. A later file that holds the record again is not an "undo": it is
+    the NEXT `revision` of the same identity, which counts again. `identity_origin` is part of the
+    key of the foreign key to the invoice, so a DOCUMENT_NUMBER record (a real fiscal document)
+    can never be the target of a removal: the database refuses it.
+    """
+
+    __tablename__ = "invoice_removals"
+
+    workspace_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    property_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    data_source_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    invoice_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+    identity_origin: Mapped[IdentityOrigin] = mapped_column(
+        enum_column(IdentityOrigin, 24),
+        nullable=False,
+        default=IdentityOrigin.SYNTHETIC_COST_RECORD,
+        server_default=text("'SYNTHETIC_COST_RECORD'"),
+    )
+    removed_by_import_job_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False)
+
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["workspace_id", "property_id"],
+            ["properties.workspace_id", "properties.id"],
+            name="fk_invoice_removals_workspace_id_properties",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "property_id", "data_source_id"],
+            ["data_sources.workspace_id", "data_sources.property_id", "data_sources.id"],
+            name="fk_invoice_removals_workspace_id_data_sources",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "invoice_id", "identity_origin"],
+            ["invoices.workspace_id", "invoices.id", "invoices.identity_origin"],
+            name="fk_invoice_removals_workspace_id_invoices",
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "property_id", "data_source_id", "removed_by_import_job_id"],
+            [
+                "import_jobs.workspace_id",
+                "import_jobs.property_id",
+                "import_jobs.data_source_id",
+                "import_jobs.id",
+            ],
+            name="fk_invoice_removals_removed_by_import_job",
+            ondelete="RESTRICT",
+        ),
+        UniqueConstraint(
+            "workspace_id", "invoice_id", name="uq_invoice_removals_workspace_id_invoice_id"
+        ),
+        Index("ix_invoice_removals_workspace_id_data_source_id", "workspace_id", "data_source_id"),
+        CheckConstraint("identity_origin = 'SYNTHETIC_COST_RECORD'", name="only_synthetic_records"),
+    )
+
+
+def is_latest_revision() -> ColumnElement[bool]:
+    """No newer version of the same record (a corrected row of a spreadsheet, or a record that came
+    back after a person's word took it away)."""
     newer = aliased(Invoice)
     return ~exists().where(
         newer.workspace_id == Invoice.workspace_id,
         newer.property_id == Invoice.property_id,
         newer.supplier_id == Invoice.supplier_id,
-        newer.normalized_invoice_number == Invoice.normalized_invoice_number,
+        newer.source_record_key == Invoice.source_record_key,
         newer.invoice_date == Invoice.invoice_date,
         newer.document_kind == Invoice.document_kind,
         newer.revision > Invoice.revision,
     )
+
+
+def is_removed() -> ColumnElement[bool]:
+    """A person said a later file held everything of its period, and this SYNTHETIC record was not
+    in it (`InvoiceRemoval`). Never true of a record with a document number."""
+    return exists().where(
+        InvoiceRemoval.workspace_id == Invoice.workspace_id,
+        InvoiceRemoval.invoice_id == Invoice.id,
+    )
+
+
+def is_current_invoice() -> ColumnElement[bool]:
+    """The condition every reading of costs carries: the newest version of the record, and one that
+    still counts."""
+    return is_latest_revision() & ~is_removed()
 
 
 class InvoiceLine(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):

@@ -18,7 +18,7 @@ HEAD = "0013_property_analysis_policy"
 PREVIOUS_HEAD = "0012_input_provenance"
 # "Which is the global head" belongs to the newest migration's own file; this one only needs to know
 # where an upgrade to head ends (`test_same_day_revisions_migration.py`).
-CURRENT_GLOBAL_HEAD = "0017_mia_conversations"
+CURRENT_GLOBAL_HEAD = "0018_cost_record_identity"
 TABLE = "property_analysis_policies"
 
 
