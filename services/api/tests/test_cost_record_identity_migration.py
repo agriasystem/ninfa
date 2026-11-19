@@ -114,15 +114,16 @@ def test_04_the_constraints_that_keep_a_synthetic_record_honest_exist(
                 )
             ).scalars()
         )
-        rules = dict(
-            connection.execute(
+        rules: dict[str, str] = {
+            str(row[0]): str(row[1])
+            for row in connection.execute(
                 text(
                     "SELECT constraint_name, delete_rule"
                     " FROM information_schema.referential_constraints"
                     " WHERE constraint_name LIKE 'fk\\_invoice\\_removals\\_%'"
                 )
-            ).all()
-        )
+            )
+        }
     assert {
         "ck_invoices_identity_origin_valid",
         "ck_invoices_identity_consistent",
