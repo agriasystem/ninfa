@@ -39,7 +39,10 @@ const REMEMBERED_ANSWERS: Readonly<Record<string, Readonly<Record<string, string
   date_order: { DMY: "Date scritte giorno/mese/anno", MDY: "Date scritte mese/giorno/anno" },
   decimal_style: { COMMA: "Decimali con la virgola", POINT: "Decimali con il punto" },
   amount_basis: { NET: "Importi senza IVA", GROSS: "Importi con IVA" },
-  document_identity: { SYNTHETIC_COST_RECORD: "Costi operativi senza numero documento" },
+  document_identity: {
+    SYNTHETIC_COST_RECORD: "Costi operativi senza numero documento",
+    DOCUMENT_NUMBER: "Fatture o documenti: il numero del documento è richiesto",
+  },
 };
 const REMEMBERED_SCOPES: Readonly<Record<string, string>> = {
   FULL: "Il file contiene tutto il periodo che copre",
@@ -704,6 +707,13 @@ export const sourcesCopy = {
         why: "NINFA può registrarli come costi operativi usando un riferimento interno. Non verrà creato né modificato alcun numero di fattura.",
         yes: "Continua come costi operativi",
         remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
+        // A due date or a row number is what an operating-cost register carries too: not blocked, asked.
+        either: {
+          title: "Questo file contiene fatture o documenti, oppure un registro di costi operativi?",
+          why: "Nel file c'è una scadenza o un numero di riga, ma non il numero del documento. Se sono costi operativi, NINFA li registra con un riferimento interno e non crea alcun numero di fattura. Se sono fatture, serve il numero del documento.",
+          costs: "Un registro di costi operativi",
+          documents: "Fatture o documenti",
+        },
       },
       DATE_ORDER: { title: "Come sono scritte le date di questo file?" },
       DECIMAL_STYLE: { title: "Come sono scritti i numeri con i decimali?" },

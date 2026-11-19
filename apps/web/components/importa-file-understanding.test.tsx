@@ -975,3 +975,60 @@ describe("a file of costs with no document number", () => {
     expect(sent.saveConfiguration).toBe(true); // a person's answer is worth remembering for the source
   });
 });
+
+describe("a file of costs with a due date or a row number but no document number", () => {
+  const either = () =>
+    ok(
+      understoodInspection(
+        {
+          level: "ASK",
+          questions: [
+            questionOf("DOCUMENT_IDENTITY", {
+              field: "invoice_number",
+              choices: [
+                { value: "SYNTHETIC_COST_RECORD", count: null, sheets: [], columns: [] },
+                { value: "DOCUMENT_NUMBER", count: null, sheets: [], columns: [] },
+              ],
+            }),
+          ],
+        },
+        { domain: "COSTS" },
+      ),
+    );
+
+  it("is asked what it is, never blocked on a column that may not exist", async () => {
+    understandFileMock.mockResolvedValueOnce(either());
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi.csv"));
+
+    await within(panel()).findByRole("heading", {
+      level: 3,
+      name: "Questo file contiene fatture o documenti, oppure un registro di costi operativi?",
+    });
+    const text = flat(panel());
+    expect(text).toContain("Nel file c'è una scadenza o un numero di riga, ma non il numero del documento.");
+    expect(within(panel()).getByRole("button", { name: "Un registro di costi operativi" })).not.toBeNull();
+    expect(within(panel()).getByRole("button", { name: "Fatture o documenti" })).not.toBeNull();
+    for (const technical of ["SYNTHETIC", "DOCUMENT_NUMBER", "invoice_number", "source_record_key"]) {
+      expect(text).not.toContain(technical);
+    }
+    expect(validateImportMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Un registro di costi operativi", "SYNTHETIC_COST_RECORD"],
+    ["Fatture o documenti", "DOCUMENT_NUMBER"],
+  ])("«%s» is sent as the person's answer", async (label, value) => {
+    understandFileMock.mockResolvedValueOnce(either());
+    understandFileMock.mockResolvedValueOnce(ok(understoodInspection({}, { domain: "COSTS" })));
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi.csv"));
+    await user.click(await within(panel()).findByRole("button", { name: label }));
+
+    await waitFor(() => expect(understandFileMock).toHaveBeenCalledTimes(2));
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { document_identity: value } });
+  });
+});

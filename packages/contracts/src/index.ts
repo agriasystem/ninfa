@@ -1237,8 +1237,11 @@ export interface UnderstandAnswers {
   amount_basis?: "NET" | "GROSS" | null;
   date_order?: "DMY" | "MDY" | null;
   decimal_style?: "COMMA" | "POINT" | null;
-  /** Costs: "these are operating costs" for a file with no document number (never an invoice number). */
-  document_identity?: "SYNTHETIC_COST_RECORD" | null;
+  /**
+   * Costs, for a file with no document number: "SYNTHETIC_COST_RECORD" = operating costs, recorded with an internal
+   * reference (never an invoice number); "DOCUMENT_NUMBER" = fiscal documents, whose number is then required.
+   */
+  document_identity?: "SYNTHETIC_COST_RECORD" | "DOCUMENT_NUMBER" | null;
   column_fields?: Record<string, string>;
   /**
    * Set by the server in the decisions it issues, never built here: columns whose name the semantic

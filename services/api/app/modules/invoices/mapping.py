@@ -7,7 +7,7 @@ the two have different fields and rules, and share only the header helpers.
 """
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal
@@ -66,13 +66,52 @@ REQUIRED_FIELDS = frozenset(
 # A constant is only safe where it cannot invent facts about one invoice or one line: never the
 # invoice number, the dates, the supplier, the description or the amount.
 CONSTANT_FIELDS = frozenset({F.DOCUMENT_TYPE, F.CURRENCY, F.COST_CATEGORY})
-# What makes a file DOCUMENT-LEVEL, a register of fiscal documents and not of costs: a column that
-# says what kind of document a line belongs to, when it falls due, or which line of a multi-line
-# document it is. A file that carries any of them identifies its records by the document number,
-# and without one it stays an error (ADR 0057): a synthetic identity must never cover a fiscal
-# document that is incomplete. (Supplier VAT / tax code / IBAN are NOT here: they only say who the
-# supplier is, which an operating-cost register may well say.)
-DOCUMENT_LEVEL_FIELDS = frozenset({F.DOCUMENT_TYPE, F.DUE_DATE, F.LINE_NUMBER})
+
+
+class DocumentEvidence(StrEnum):
+    """How much a file's columns say that it is a register of FISCAL DOCUMENTS (ADR 0057)."""
+
+    # nothing in the columns points at documents: a register of costs
+    NONE = "NONE"
+    # a due date or a row number: also what an operating-cost register carries ("Scadenza", "N."),
+    # so alone, or together, they prove nothing. A person is asked, never blocked.
+    WEAK = "WEAK"
+    # the file says what it is: a synthetic identity must never cover an incomplete fiscal document
+    STRONG = "STRONG"
+
+
+# A column that says what KIND of fiscal document a line belongs to (TD01, "Fattura", "Nota di
+# credito"): the engine only maps it from a header that says so, and its values must be fiscal
+# document labels or the row is refused.
+STRONG_DOCUMENT_FIELDS = frozenset({F.INVOICE_NUMBER, F.DOCUMENT_TYPE})
+# Compatible with an operating-cost register: a due date and a row number, alone or together.
+WEAK_DOCUMENT_FIELDS = frozenset({F.DUE_DATE, F.LINE_NUMBER})
+# Who the supplier is: not about the document, but with BOTH weak signals it completes a picture
+# that only a register of invoices has (a supplier identified fiscally, a line of a document, a due
+# date).
+SUPPLIER_FISCAL_FIELDS = frozenset({F.SUPPLIER_VAT_NUMBER, F.SUPPLIER_TAX_CODE, F.SUPPLIER_IBAN})
+
+
+def document_evidence(fields: Iterable[str]) -> DocumentEvidence:
+    """How strongly the fields a file carries say that it is a register of fiscal documents.
+
+    STRONG: a document number (or a column that may be it), a document type, or the whole picture of
+    an invoice register - a due date AND a row number AND a supplier identified fiscally (VAT, tax
+    code or IBAN). WEAK: a due date and/or a row number alone. Anything else: none. FatturaPA/XML
+    never gets here: it reads its own number and fails without one."""
+    present = {str(field) for field in fields}
+    strong = {field.value for field in STRONG_DOCUMENT_FIELDS}
+    weak = {field.value for field in WEAK_DOCUMENT_FIELDS}
+    supplier = {field.value for field in SUPPLIER_FISCAL_FIELDS}
+    if present & strong:
+        return DocumentEvidence.STRONG
+    if weak <= present and present & supplier:
+        return DocumentEvidence.STRONG
+    if present & weak:
+        return DocumentEvidence.WEAK
+    return DocumentEvidence.NONE
+
+
 DATE_FIELDS = frozenset({F.INVOICE_DATE, F.DUE_DATE})
 DECIMAL_FIELDS = frozenset(
     {
@@ -199,11 +238,8 @@ class InvoiceMappingConfig(BaseModel):
             # documents (type, due date, line number) is never covered by a synthetic identity.
             if F.INVOICE_NUMBER in self.column_mapping:
                 raise ValueError("a mapping with a document number identifies its records by it")
-            level = sorted(f.value for f in DOCUMENT_LEVEL_FIELDS if f in self.column_mapping)
-            if level:
-                raise ValueError(
-                    f"a document-level file needs its document number ({', '.join(level)} mapped)"
-                )
+            if document_evidence(f.value for f in self.column_mapping) == DocumentEvidence.STRONG:
+                raise ValueError("a register of fiscal documents needs its document number")
             required = REQUIRED_FIELDS - {F.INVOICE_NUMBER}
         missing = sorted(f.value for f in required if f not in self.column_mapping)
         if missing:

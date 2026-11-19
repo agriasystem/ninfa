@@ -419,6 +419,32 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
       break;
     }
     case "DOCUMENT_IDENTITY":
+      // A file with a due date or a row number but no document number: NOT blocked on a column that may not
+      // exist. The person says whether these are fiscal documents or operating costs.
+      if (question.choices.some((choice) => choice.value === "DOCUMENT_NUMBER")) {
+        body = (
+          <>
+            {heading(COPY.DOCUMENT_IDENTITY.either.title)}
+            <p className="struttura-flow__note">{COPY.DOCUMENT_IDENTITY.either.why}</p>
+            <div className="struttura-question__choices struttura-question__choices--stacked">
+              <StrutturaButton
+                variant="outline"
+                onClick={() => void flow.answer({ document_identity: "SYNTHETIC_COST_RECORD" })}
+              >
+                {COPY.DOCUMENT_IDENTITY.either.costs}
+              </StrutturaButton>
+              <StrutturaButton
+                variant="outline"
+                onClick={() => void flow.answer({ document_identity: "DOCUMENT_NUMBER" })}
+              >
+                {COPY.DOCUMENT_IDENTITY.either.documents}
+              </StrutturaButton>
+            </div>
+            <p className="struttura-flow__note">{COPY.DOCUMENT_IDENTITY.remembered}</p>
+          </>
+        );
+        break;
+      }
       // One plain confirmation, never a hunt for a column that does not exist. NINFA records these as
       // operating costs with an internal reference and creates no invoice number.
       body = (

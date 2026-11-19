@@ -586,7 +586,8 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
             "file fatti così e si corregge o si fa dimenticare dalle risposte ricordate.",
             "Lo stesso costo importato due volte non si duplica; due righe uguali nel file restano "
             "due costi.",
-            "Un file che ha tipo di documento, scadenza o numero di riga è un registro di fatture: "
+            "Una scadenza o un numero di riga non bastano a dire che è un registro di fatture: "
+            "NINFA chiede se sono fatture o costi operativi. Con la colonna del tipo di documento "
             "il numero del documento resta obbligatorio.",
         ),
         where=_IMPORT_PAGE,

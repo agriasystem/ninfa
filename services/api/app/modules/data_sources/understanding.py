@@ -172,6 +172,7 @@ from app.modules.document_understanding.structure import RowKind
 from app.modules.document_understanding.text import fold, has_word
 from app.modules.document_understanding.values import text_of
 from app.modules.ingestion.models import DataSource, DataSourceDomain, FileScope
+from app.modules.invoices.mapping import DocumentEvidence, document_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -221,9 +222,10 @@ class UnderstandAnswers(BaseModel):
     assisted_fields: dict[str, str] = Field(default_factory=dict, max_length=20)
     # What the person taught: {"role_mapping": {"HK": "HOUSEKEEPING"}}.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict, max_length=4)
-    # Costs: the file has no document number and the person said these are operating costs, to be
-    # recorded with an internal reference of NINFA's own (never an invoice number).
-    document_identity: Literal["SYNTHETIC_COST_RECORD"] | None = None
+    # Costs: what the person said a file with NO document number is. "SYNTHETIC_COST_RECORD":
+    # operating costs, recorded with an internal reference of NINFA's own (never an invoice number).
+    # "DOCUMENT_NUMBER": fiscal documents, whose number is then required.
+    document_identity: Literal["SYNTHETIC_COST_RECORD", "DOCUMENT_NUMBER"] | None = None
     # What THIS file says about the records it does not hold.
     file_scope: FileScope | None = None
     # That answer is also for the next files of this structure: only then does the memory change.
@@ -779,10 +781,14 @@ class UnderstandingService:
         # to the matching screen to look for a column that does not exist: one question asks whether
         # these are operating costs. The answer (or the family's memory of it) is part of the
         # decision. A file that is a register of fiscal documents never gets here.
-        identity_open = domain == DataSourceDomain.COSTS and _may_be_operating_costs(
-            adapter, proposal, decision, detection, confirmed_domain
+        identity_case = (
+            _identity_case(adapter, proposal, decision, detection, confirmed_domain)
+            if domain == DataSourceDomain.COSTS
+            else None
         )
-        if identity_open and effective.document_identity == "SYNTHETIC_COST_RECORD":
+        # (a person who said these are fiscal documents has answered too: the number stays required)
+        identity_open = identity_case is not None and effective.document_identity is None
+        if identity_case is not None and effective.document_identity == "SYNTHETIC_COST_RECORD":
             decision = decision.model_copy(update={"document_identity": "SYNTHETIC_COST_RECORD"})
         # (the check is made as if it were said: until then the question stands in its place)
         check = self._smart.check(
@@ -944,7 +950,7 @@ class UnderstandingService:
                 if not recognized_by_family:
                     questions.extend(unread_questions)
         if identity_open and decision.document_identity is None:
-            questions.append(_identity_question())
+            questions.append(_identity_question(ambiguous=identity_case == "AMBIGUOUS"))
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         # (the same reading on every file of a source: the file still does not say)
@@ -1208,7 +1214,7 @@ class UnderstandingService:
         if (
             domain == DataSourceDomain.COSTS
             and answers.document_identity is None
-            and kept.get("document_identity") == "SYNTHETIC_COST_RECORD"
+            and kept.get("document_identity") in ("SYNTHETIC_COST_RECORD", "DOCUMENT_NUMBER")
         ):
             update["document_identity"] = kept["document_identity"]
         return answers.model_copy(update=update) if update else answers
@@ -2080,47 +2086,57 @@ def _dedupe(questions: list[Question]) -> list[Question]:
     return out
 
 
-def _may_be_operating_costs(
+def _identity_case(
     adapter: FileDomain,
     proposal: Proposal,
     decision: MappingInput,
     detection: DomainVerdict,
     confirmed_domain: bool,
-) -> bool:
-    """A file that is clearly a register of COSTS and holds everything an import needs except a
-    document number, and says nothing that makes it a register of fiscal documents.
+) -> Literal["OPERATING", "AMBIGUOUS"] | None:
+    """Is a costs file that lacks a document number something to ask about, and how?
 
-    Never when a column may BE the number (it is asked about, never overruled), never when the file
-    says what kind of document a line belongs to, when it falls due or which line of a document it
-    is (those make it document-level, and a synthetic identity must never cover an incomplete fiscal
-    document), and never when something else the import needs is also missing."""
+    None: it is not (or not clearly) a register of COSTS, a column is or may be the number, the file
+    says it is a register of fiscal documents (STRONG evidence: a document type, or a due date AND a
+    row number AND a supplier identified fiscally), or something else the import needs is also
+    missing. The number stays required and the usual blocker says so.
+    "OPERATING": nothing points at documents. One confirmation: operating costs, with an internal
+    reference.
+    "AMBIGUOUS": a due date and/or a row number, which an operating-cost register carries too. The
+    file is not blocked on a column that may not exist: a person says whether these are fiscal
+    documents or operating costs, and the family remembers it."""
     if not (detection.domain == DataSourceDomain.COSTS or confirmed_domain):
-        return False
+        return None
     assigned = proposal.assigned()
     if "invoice_number" in assigned:
-        return False
+        return None
     if any(
         column.ambiguous_group and "invoice_number" in column.ambiguous_fields
         for column in proposal.columns
     ):
-        return False
-    if {"document_type", "due_date", "line_number"} & set(assigned):
-        return False
+        return None
+    evidence = document_evidence(assigned)
+    if evidence == DocumentEvidence.STRONG:
+        return None
     provided = set(assigned) | set(decision.constants)
-    return all(
+    if not all(
         any(key in provided for key in group)
         for group in adapter.required_groups(
             decision.model_copy(update={"document_identity": "SYNTHETIC_COST_RECORD"})
         )
-    )
+    ):
+        return None
+    return "AMBIGUOUS" if evidence == DocumentEvidence.WEAK else "OPERATING"
 
 
-def _identity_question() -> Question:
+def _identity_question(*, ambiguous: bool = False) -> Question:
+    choices = [Choice("SYNTHETIC_COST_RECORD")]
+    if ambiguous:
+        choices.append(Choice("DOCUMENT_NUMBER"))  # "fatture o documenti": the number is required
     return Question(
         id="DOCUMENT_IDENTITY",
         kind=QuestionKind.DOCUMENT_IDENTITY,
         field="invoice_number",
-        choices=(Choice("SYNTHETIC_COST_RECORD"),),
+        choices=tuple(choices),
     )
 
 

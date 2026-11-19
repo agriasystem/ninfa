@@ -612,15 +612,20 @@ QUESTIONS: dict[QuestionKind, _Explained] = {
             "Il file ha data, fornitore, descrizione e importo, ma nessun numero di documento. "
             "NINFA non inventa mai un numero di fattura. Se dici che sono costi operativi "
             "(utenze, lavanderia, manutenzione, commissioni, costi mensili) li registra con un "
-            "riferimento interno suo, che non compare mai come numero fattura. Un file che invece "
-            "è un registro di fatture, con tipo di documento, scadenza o numero di riga, continua "
-            "a richiedere il numero del documento."
+            "riferimento interno suo, che non compare mai come numero fattura. Una scadenza o un "
+            "numero di riga non bastano a dire che il file è un registro di fatture: in quel caso "
+            "NINFA chiede se sono fatture o costi operativi. Un file con la colonna del tipo di "
+            "documento continua invece a richiedere il numero del documento."
         ),
         answers=(
             (
                 "Continua come costi operativi",
                 "I costi vengono importati con un riferimento interno di NINFA: nessun numero di "
                 "fattura viene creato o modificato.",
+            ),
+            (
+                "Fatture o documenti (solo se il file ha una scadenza o un numero di riga)",
+                "Il numero del documento resta obbligatorio: il file va completato con il numero.",
             ),
         ),
         remembered=(

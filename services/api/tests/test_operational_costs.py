@@ -27,7 +27,11 @@ from app.modules.ingestion.models import DataSourceDomain, ImportJob, ImportJobS
 from app.modules.intelligence.costs.repository import CostLineRepository
 from app.modules.invoices.canonical import RECORD_KEY_VERSION, record_key
 from app.modules.invoices.errors import InvoiceErrorCode, InvoiceImportError
-from app.modules.invoices.mapping import InvoiceMappingConfig
+from app.modules.invoices.mapping import (
+    DocumentEvidence,
+    InvoiceMappingConfig,
+    document_evidence,
+)
 from app.modules.invoices.models import (
     IdentityOrigin,
     Invoice,
@@ -418,23 +422,125 @@ def test_a_fatturapa_without_a_number_still_fails(db_session: Session, world: Co
     assert counted(db_session, Invoice) == 0
 
 
-def test_a_register_of_documents_cannot_borrow_the_synthetic_identity(
+def register_with(
+    db_session: Session, factory: BookingFactory, extras: dict[str, tuple[str, str]]
+) -> tuple[CostWorld, Any]:
+    """A cost register with extra columns {field: (header, value)}, confirmed as operating costs.
+    Returns the world and the result of importing one row of it."""
+    costs = CostWorld.create(db_session, factory)
+    headers = [*OPERATIONAL_HEADERS, *(header for header, _ in extras.values())]
+    costs.confirm(
+        headers=headers,
+        columns={
+            **OPERATIONAL_COLUMNS,
+            **{field: {"column": header} for field, (header, _) in extras.items()},
+        },
+        format_options=dict(SYNTHETIC),
+    )
+    content = operational_csv([[*X, *(value for _, value in extras.values())]], headers)
+    return costs, costs.service().import_file(
+        costs.source.id, filename="costi.csv", content=content
+    )
+
+
+@pytest.mark.parametrize(
+    "extras",
+    [
+        {"due_date": ("Scadenza", "2026-11-30")},
+        {"line_number": ("N", "7")},
+        # both together, with no strong signal, are still no proof of a register of invoices
+        {"due_date": ("Scadenza", "2026-11-30"), "line_number": ("N", "7")},
+        # a supplier identified fiscally with ONE weak signal is still a cost register
+        {"due_date": ("Scadenza", "2026-11-30"), "supplier_vat_number": ("P.IVA", "01234567890")},
+    ],
+)
+def test_a_due_date_or_a_row_number_does_not_make_a_register_of_fiscal_documents(
+    db_session: Session, factory: BookingFactory, extras: dict[str, tuple[str, str]]
+) -> None:
+    costs, result = register_with(db_session, factory, extras)
+
+    assert result.succeeded and result.invoices_created == 1
+    [record] = all_records(db_session, costs)
+    assert (
+        record.invoice_number is None
+        and record.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD
+    )
+
+
+def test_a_row_number_never_becomes_part_of_what_a_cost_is(
     db_session: Session, factory: BookingFactory
 ) -> None:
-    """A type, a due date or a line number make a file document-level: the number stays required."""
-    for extra, column in (
-        ("document_type", "Tipo"),
-        ("due_date", "Scadenza"),
-        ("line_number", "N"),
-    ):
-        costs = CostWorld.create(db_session, factory)
-        with pytest.raises(InvoiceImportError) as refused:
-            costs.confirm(
-                headers=[*OPERATIONAL_HEADERS, column],
-                columns={**OPERATIONAL_COLUMNS, extra: {"column": column}},
-                format_options=dict(SYNTHETIC),
-            )
-        assert refused.value.code == InvoiceErrorCode.INVALID_MAPPING, extra
+    """A register's row number is a position: the same cost under another number is the same."""
+    costs, first = register_with(db_session, factory, {"line_number": ("N", "1")})
+    content = operational_csv([[*X, "9"]], [*OPERATIONAL_HEADERS, "N"])
+
+    again = costs.service().import_file(costs.source.id, filename="costi.csv", content=content)
+
+    assert first.succeeded and again.invoices_created == 0 and again.invoices_unchanged == 1
+
+
+@pytest.mark.parametrize(
+    "extras",
+    [
+        {"document_type": ("Tipo documento", "Fattura")},
+        {
+            "due_date": ("Scadenza", "2026-11-30"),
+            "line_number": ("N", "1"),
+            "supplier_vat_number": ("P.IVA", "01234567890"),
+        },
+        {
+            "due_date": ("Scadenza", "2026-11-30"),
+            "line_number": ("N", "1"),
+            "supplier_tax_code": ("CF", "RSSMRA80A01H501U"),
+        },
+        {
+            "due_date": ("Scadenza", "2026-11-30"),
+            "line_number": ("N", "1"),
+            "supplier_iban": ("IBAN", "IT60X0542811101000000123456"),
+        },
+    ],
+)
+def test_the_whole_picture_of_an_invoice_register_cannot_borrow_the_synthetic_identity(
+    db_session: Session, factory: BookingFactory, extras: dict[str, tuple[str, str]]
+) -> None:
+    """A document type, or a due date AND a row number AND a supplier identified fiscally: the
+    file says what it is, and the number stays required."""
+    costs = CostWorld.create(db_session, factory)
+    with pytest.raises(InvoiceImportError) as refused:
+        costs.confirm(
+            headers=[*OPERATIONAL_HEADERS, *(header for header, _ in extras.values())],
+            columns={
+                **OPERATIONAL_COLUMNS,
+                **{field: {"column": header} for field, (header, _) in extras.items()},
+            },
+            format_options=dict(SYNTHETIC),
+        )
+
+    assert refused.value.code == InvoiceErrorCode.INVALID_MAPPING
+
+
+@pytest.mark.parametrize(
+    ("fields", "evidence"),
+    [
+        ([], DocumentEvidence.NONE),
+        (["supplier_name", "invoice_date", "line_total"], DocumentEvidence.NONE),
+        (["supplier_vat_number"], DocumentEvidence.NONE),
+        (["due_date"], DocumentEvidence.WEAK),
+        (["line_number"], DocumentEvidence.WEAK),
+        (["due_date", "line_number"], DocumentEvidence.WEAK),
+        (["due_date", "supplier_vat_number"], DocumentEvidence.WEAK),
+        (["line_number", "supplier_iban"], DocumentEvidence.WEAK),
+        (["document_type"], DocumentEvidence.STRONG),
+        (["invoice_number"], DocumentEvidence.STRONG),
+        (["due_date", "line_number", "supplier_vat_number"], DocumentEvidence.STRONG),
+        (["due_date", "line_number", "supplier_tax_code"], DocumentEvidence.STRONG),
+        (["due_date", "line_number", "supplier_iban"], DocumentEvidence.STRONG),
+    ],
+)
+def test_the_evidence_a_file_gives_that_it_is_a_register_of_fiscal_documents(
+    fields: list[str], evidence: DocumentEvidence
+) -> None:
+    assert document_evidence(fields) == evidence
 
 
 def test_a_mapping_with_a_document_number_cannot_also_say_there_is_none(

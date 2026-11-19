@@ -38,8 +38,10 @@ The migration backfills the key under the immutability trigger (lifted for that 
 
 * **Fingerprint v1** = SHA-256 of canonical JSON of: `v`, the data source id, the resolved supplier id, the date, the currency, the signed net / tax / gross, and the sorted canonical lines
   (normalised description, quantity, lower-cased unit, unit price, line total, VAT rate). **Excluded:** row and line numbers, file name, job, timestamps, the cost category.
-* **Occurrence.** In file order, the n-th row with the same fingerprint gets `#n`. The number counts copies, never positions, so reordering the rows or re-importing the file changes nothing.
-* **Existing keys** are looked up by the latest revision (including a removed one); a removed record that comes back is inserted as `revision + 1`.
+* **Occurrences are matched, never positioned** (`InvoiceImportService._place_synthetic`). For one fingerprint: (1) an occurrence keeps the record already holding the same **stated** category;
+  (2) the rest are paired in a fixed order with the records left (a different stated category = a **reclassification**: the next revision of the same key; no stated category = nothing changes);
+  (3) the remaining occurrences are new (a removed record comes back first, as `revision + 1`). The category compared is the one the SOURCE stated (`EXPLICIT_SOURCE`), never a derived one.
+  Reordering the rows or importing the file again changes nothing; the preview of what a complete file takes away uses the same placement.
 * **Versioning.** `RECORD_KEY_VERSION = 1` is part of the key; a change of what the content holds is a new version.
 
 ## FULL / PARTIAL / DELTA for operating costs
@@ -54,8 +56,10 @@ A real invoice is never removed by any file. Registers identified by document nu
 
 ## Smart Import
 
-* `QuestionKind.DOCUMENT_IDENTITY`, asked only when: the domain is COSTS (detected or confirmed), no column is (or may be) the number, no document-level column (type, due date, line number) is
-  mapped, and every other required group (supplier, date, description, line total) is present.
+* `QuestionKind.DOCUMENT_IDENTITY`, asked only when: the domain is COSTS (detected or confirmed), no column is (or may be) the number, the file does not give STRONG evidence of being a register of
+  fiscal documents (`invoices.mapping.document_evidence`: a document type, or due date + row number + a fiscal supplier identifier), and every other required group (supplier, date, description,
+  line total) is present. With no document signal at all it has one choice ("Continua come costi operativi"); with weak signals only (a due date and/or a row number) it has two
+  ("Un registro di costi operativi" / "Fatture o documenti") and the file is not blocked.
 * Level: `ASK` with the one question (a provisional check is made as if the answer were given, so the file is not sent to the matching screen). After the answer the number is not required
   (`FileDomain.required_groups(decision)`), the decision carries `document_identity`, and the server's re-read must agree.
 * The answer is kept in the family's memory (`REMEMBERED_ANSWERS += document_identity`) like the net/gross basis; it is listed with the remembered answers and forgotten with its family.

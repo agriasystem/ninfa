@@ -310,14 +310,85 @@ def test_a_forgotten_answer_can_be_given_again_and_is_remembered_again(
 # --- a register of fiscal documents keeps needing its number --------------------------------
 
 
-def test_a_register_of_documents_is_not_offered_the_shortcut(
+def with_extra(header: str, value: str) -> bytes:
+    return csv([[*row, value] for row in OCTOBER], [*OPERATIONAL_HEADERS, header])
+
+
+def test_a_due_date_alone_is_a_semantic_question_never_a_blocker(
     api_client: TestClient, env: SourcesEnv
 ) -> None:
-    """A due date makes it document-level: the number stays required, and nothing is asked."""
-    headers = [*OPERATIONAL_HEADERS, "Scadenza"]
-    rows = [[*row, "2026-11-30"] for row in OCTOBER]
+    """A "Scadenza" column is what an operating-cost register carries too: nothing here proves a
+    register of invoices, so the file is not blocked on a number that may not exist. A person says
+    what it is."""
+    body = ask(api_client, env, with_extra("Scadenza", "2026-11-30"))
 
-    body = ask(api_client, env, csv(rows, headers))
+    u = body["understanding"]
+    assert u["level"] == "ASK" and u["blockers"] == []
+    assert kinds(body) == ["DOCUMENT_IDENTITY"]
+    [question] = u["questions"]
+    assert [choice["value"] for choice in question["choices"]] == [
+        "SYNTHETIC_COST_RECORD",
+        "DOCUMENT_NUMBER",
+    ]
+    assert body["proposal"]["document_identity"] is None
+
+
+def test_said_to_be_operating_costs_it_is_ready_and_imports_without_a_number(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    content = with_extra("Scadenza", "2026-11-30")
+
+    body = ask(api_client, env, content, YES)
+
+    assert body["understanding"]["level"] == "READY" and kinds(body) == []
+    result = imported(api_client, env, content, body)
+    assert result["succeeded"] is True
+    assert all(r.invoice_number is None for r in records(db_session, env))
+
+
+def test_said_to_be_fiscal_documents_the_number_stays_required(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    body = ask(
+        api_client,
+        env,
+        with_extra("Scadenza", "2026-11-30"),
+        {"document_identity": "DOCUMENT_NUMBER"},
+    )
+
+    u = body["understanding"]
+    assert "DOCUMENT_IDENTITY" not in kinds(body)  # answered: it is not asked again
+    assert u["level"] in ("MANUAL", "BLOCKED")
+    assert any(
+        b["code"] == "MISSING_REQUIRED" and ["invoice_number"] in b["groups"] for b in u["blockers"]
+    )
+    assert body["proposal"]["document_identity"] is None
+    assert records(db_session, env) == []  # nothing is written by saying so
+
+
+def test_the_answer_for_a_register_with_a_due_date_is_remembered_like_any_other(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    content = with_extra("Scadenza", "2026-11-30")
+    answered = ask(api_client, env, content, YES)
+    imported(api_client, env, content, answered)
+    other = csv([[*row, "2026-12-30"] for row in NOVEMBER], [*OPERATIONAL_HEADERS, "Scadenza"])
+
+    again = ask(api_client, env, other)
+
+    assert again["understanding"]["level"] == "READY" and kinds(again) == []
+    [item] = remembered(api_client, env, source_id(db_session, env))["files"]
+    assert item["answers"]["document_identity"] == "SYNTHETIC_COST_RECORD"
+    api_client.delete(f"{env.base}/{source_id(db_session, env)}/remembered-answers/{item['id']}")
+    assert kinds(ask(api_client, env, other)) == ["DOCUMENT_IDENTITY"]  # forgotten: asked again
+
+
+def test_a_document_type_column_says_it_is_a_register_of_documents(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    """A column that says what kind of fiscal document each line is: strong evidence. The number
+    stays required, nothing is asked and nothing is offered as a shortcut."""
+    body = ask(api_client, env, with_extra("Tipo documento", "Fattura"))
 
     u = body["understanding"]
     assert "DOCUMENT_IDENTITY" not in kinds(body)
@@ -325,6 +396,32 @@ def test_a_register_of_documents_is_not_offered_the_shortcut(
     assert any(
         b["code"] == "MISSING_REQUIRED" and ["invoice_number"] in b["groups"] for b in u["blockers"]
     )
+
+
+def test_an_invoice_file_without_a_number_keeps_needing_it(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    """Document type, due date and a supplier identified fiscally: a register of invoices that lost
+    its number. Answering "operating costs" does not make it one."""
+    headers = [*OPERATIONAL_HEADERS, "Tipo documento", "Scadenza", "P.IVA"]
+    rows = [[*row, "Fattura", "2026-11-30", "01234567890"] for row in OCTOBER]
+
+    body = ask(api_client, env, csv(rows, headers), YES)
+
+    u = body["understanding"]
+    assert u["level"] in ("MANUAL", "BLOCKED")
+    assert body["proposal"]["document_identity"] is None  # the answer is not applied
+    assert any(
+        b["code"] == "MISSING_REQUIRED" and ["invoice_number"] in b["groups"] for b in u["blockers"]
+    )
+
+
+def test_a_supplier_vat_number_alone_is_no_proof_of_a_register_of_invoices(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    body = ask(api_client, env, with_extra("Partita IVA", "01234567890"))
+
+    assert kinds(body) == ["DOCUMENT_IDENTITY"] and body["understanding"]["blockers"] == []
 
 
 def test_a_register_that_has_a_number_never_gets_the_question(

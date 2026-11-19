@@ -29,10 +29,16 @@ model was to **invent a number**, i.e. to store a fiscal fact that does not exis
    statement inside the migration), and `invoice_removals` has the same trigger.
 4. **A deterministic, versioned identity for a cost with no number (v1).** The fingerprint is SHA-256 of: the version, the **data source**, the resolved supplier, the date, the currency, the signed
    net/tax/gross amounts and the canonical lines (normalised description, quantity, unit, unit price, total, VAT rate). It excludes the row number, the file, the job, timestamps, the line
-   number (always 1) and the cost category (analysis, not accounting: re-teaching a label must not change what a cost is; the same rule the invoice fingerprint already follows).
+   number (always 1) and the cost category (analysis, not accounting: re-teaching a label or reclassifying a cost must not create a cost; the same rule the invoice fingerprint already follows).
    The key is `cost:v1:<fingerprint>#<n>`. The version is part of the key, so a stored key keeps meaning what it meant.
-5. **Identical rows are a multiset.** Two equal rows are two real costs and are never deduplicated. `n` counts the copies of a fingerprint in the file, never positions: the same file again, or the
-   same rows in another order, produce the same keys (nothing new); a fourth equal row is only `#4`.
+5. **Identical rows are a multiset; the category is the metadata of each occurrence.** Two equal rows are two real costs and are never deduplicated, whatever their categories: the distinction is the
+   *multiplicity* of the fingerprint, and each occurrence keeps the category its source stated. `n` counts the copies, never positions. For one fingerprint, occurrences are **matched** to the records
+   the source already holds, in this order: (1) an occurrence keeps the record that already holds the same stated category; (2) what is left is paired, in a fixed order (categories sorted, none
+   last; records by occurrence), with the records left: a different stated category is a **reclassification of that same cost**, written as the *next revision of its key* (the old row stays as
+   history, the analysis sees one current observation, the provenance of each is its own import), and a file that states no category says nothing and changes nothing; (3) occurrences beyond what the
+   source holds are new (a record a person's word took away comes back first, as the next revision). Only the category the **source stated** (`EXPLICIT_SOURCE`) is compared, never one NINFA derived,
+   so a supplier default that changes between two imports reclassifies nothing. The order of the rows of the CSV is never used: the same rows reordered are the same placement, a no-op. The preview
+   of what a complete file would take away and the import use the same placement, so a recategorization is never counted as an absence.
 6. **Source scope.** The data source is inside the fingerprint of a synthetic record, so two independent sources never merge silently because they carry the same values. (A real document keeps
    the old rule: its identity excludes the data source, because the same invoice from XML and from an accounting export is one invoice.)
 7. **A synthetic record has no external identity, so a changed record is a different record.** NINFA does not guess that `100,00 -> 120,00` is the same cost. With **FULL** (a person said the
@@ -40,9 +46,13 @@ model was to **invent a number**, i.e. to store a fiscal fact that does not exis
    written with the import and re-checked under the source lock against the figure the person was shown (`IMPORT_PLAN_CHANGED` otherwise). **PARTIAL**, **DELTA** and no word at all take nothing away.
    A record a later file holds again counts again as the **next revision** of the same identity (the old row stays, the removal stays). `is_current_invoice()` (the one filter every cost reader
    carries) now reads the key and the removals; nothing else in analysis, decisions or Mia changed.
-8. **FatturaPA and document-level files keep needing their number.** An XML reads its own number and fails without one. A structured file that carries a **document type, a due date or a line
-   number** is a register of fiscal documents: the synthetic identity is refused for it (the mapping cannot be built), and Smart Import does not even ask. Supplier VAT / tax code / IBAN do *not*
-   make a file document-level (they only say who the supplier is).
+8. **FatturaPA and registers of fiscal documents keep needing their number; a weak signal is a question, never a blocker.** An XML reads its own number and fails without one. For a structured
+   file the evidence that it is a register of fiscal documents is **strong** when it carries a document number (or a column that may be it), a **document type** column (it says what kind of fiscal
+   document each line is; its values must be fiscal document labels), or the whole picture of an invoice register: a **due date AND a row number AND a supplier identified fiscally** (VAT, tax code or
+   IBAN). A due date or a row number **alone, or together,** are *weak*: an operating-cost register carries them too ("Scadenza", "N."), so they prove nothing. With strong evidence the synthetic
+   identity is refused (the mapping cannot be built) and the usual blocker says what is missing. With weak evidence and no number the file is **not blocked on a column that may not exist**: Smart
+   Import asks one semantic question, *"Questo file contiene fatture o documenti, oppure un registro di costi operativi?"* (`DOCUMENT_IDENTITY` with two choices), and the answer enters Source Learning
+   like any other (a preview writes nothing, so the answer is remembered when an import from that family succeeds; "fatture o documenti" keeps the number required and cannot import this shape).
 9. **UX: one plain confirmation, never a dead end.** When a costs file has everything an import needs except the number, Smart Import asks one question (`DOCUMENT_IDENTITY`) instead of a
    blocker: *"Questo file contiene costi senza numero documento. NINFA può registrarli come costi operativi usando un riferimento interno. Non verrà creato né modificato alcun numero di
    fattura."* with the single action *"Continua come costi operativi"*. The level is `ASK`, not `MANUAL`. The answer is part of the decision the server issues and verifies (it cannot be posted
@@ -58,13 +68,18 @@ These are choices the brief left to the implementation; each is one line to chan
 * **Costs now have a scope.** Until now a cost register "may always be partial" (`scope_effect = 0`). That is still true for a register identified by document numbers. For operating costs with no
   number there is no other way to retire a stale or corrected record, so the FULL/PARTIAL/DELTA question applies to them (first file never asks; later files ask only when something would stop
   counting, and the answer is remembered only if the person ticks the box).
-* **What makes a file "document-level"**: document type, due date, line number (not supplier VAT/IBAN).
-* **The cost category is not part of the identity.** Two rows identical except for the category are one multiset group; the category stored is the one of the first import.
+* **What is strong evidence of a register of fiscal documents**: a document type, or a due date + a row number + a fiscal supplier identifier. A due date or a row number alone, or together, are weak
+  and only lead to a question.
+* **The cost category is not part of the identity, and is never lost**: it is the metadata of each occurrence (matching and reclassification as in decision 5).
 
 ## Limitations
 
 * The identity is a function of the **mapped columns**: a file that stops carrying a mapped field (or a source re-mapped with different columns) is a different shape, and its records do not match the
   earlier ones. With FULL they replace them; otherwise they are new records. The same holds for a corrected amount or description.
+* The engine does not map the usual headers of a row number ("N. riga", "Riga", "Progressivo") to `line_number`, so in a real file that column is simply left out; the rule is about a mapping that
+  has it.
+* Pairing in step (2) of decision 5 is by a fixed order, not by similarity: with several records and several new categories at once it is deterministic and keeps the count, but which of two
+  equally-economic records takes which new category is a convention, not a fact of the source.
 * A file of one or two rows is read with columns at medium confidence (a known Smart Import trait), so the source's memory is not reused and the question is asked again.
 * Two sources of the same property with the same costs are two sets of costs by design; deduplicating between them is a decision for a person, not an identity rule.
 * The downgrade of 0018 refuses once a synthetic record or a removal exists.
