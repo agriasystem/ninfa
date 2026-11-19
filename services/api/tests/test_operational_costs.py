@@ -17,6 +17,7 @@ identical siblings. The tests below are the contract of that identity:
 import re
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import func, select
@@ -562,7 +563,7 @@ def test_a_complete_file_never_takes_away_a_real_invoice(
 # --- the analysis does not depend on the number ------------------------------------------------
 
 
-def october(costs: CostWorld, db_session: Session) -> list[tuple[object, ...]]:
+def october(costs: CostWorld, db_session: Session) -> list[tuple[Any, ...]]:
     """What the cost analysis reads of October: month, currency, category, sums and counts."""
     aggregates = CostLineRepository(db_session, costs.context).monthly_aggregates(
         costs.tenant.property.id, date(2026, 10, 1), date(2026, 10, 31)

@@ -450,8 +450,11 @@ erDiagram
         uuid property_id
         uuid data_source_id
         uuid supplier_id
-        text invoice_number
-        text normalized_invoice_number
+        text invoice_number "NULL only for a SYNTHETIC_COST_RECORD (ADR 0057)"
+        text normalized_invoice_number "NULL only for a SYNTHETIC_COST_RECORD"
+        text source_record_key "technical identity; = the normalised number for a real document"
+        text identity_origin "DOCUMENT_NUMBER SYNTHETIC_COST_RECORD"
+        int revision
         date invoice_date
         date due_date "NULL when several"
         text document_kind "INVOICE CREDIT_NOTE"
@@ -463,6 +466,12 @@ erDiagram
         text source_fingerprint
         text supplier_resolution_method
     }
+    invoice_removals {
+        uuid id PK
+        uuid invoice_id "only a SYNTHETIC record (FK carries identity_origin)"
+        uuid removed_by_import_job_id
+    }
+    invoices ||--o| invoice_removals : "taken away by a complete file"
     invoice_lines {
         uuid id PK
         int source_line_number
