@@ -1,6 +1,6 @@
 # Smart Import V4.1 - algorithmic understanding: measured result (production closure)
 
-Branch `feature/smart-import-v4-algorithmic-understanding` (base `main` = `7d826a2`; not pushed). No model is called by any engine measured here: `SMART_IMPORT_AI_MODE=off`, the offline guard on, the same documents read by every engine through the real understanding service, scored by the existing benchmark's scorer. Architecture: [smart-import-v4-algorithmic-understanding](../architecture/smart-import-v4-algorithmic-understanding.md); decision: [ADR 0056](../architecture/adr/0056-smart-import-v4-reads-files-with-algorithms-and-keeps-v3-one-setting-away.md). Every number below is read from a JSON the benchmark wrote (`python -m tests.benchmarks.algorithmic_v4 --json`, then `.report`); the prose around the numbers is the only thing typed.
+Branch `feature/smart-import-v4-algorithmic-understanding` (base `main` = `7d826a2`; pull request #47). No model is called by any engine measured here: `SMART_IMPORT_AI_MODE=off`, the offline guard on, the same documents read by every engine through the real understanding service, scored by the existing benchmark's scorer. Architecture: [smart-import-v4-algorithmic-understanding](../architecture/smart-import-v4-algorithmic-understanding.md); decision: [ADR 0056](../architecture/adr/0056-smart-import-v4-reads-files-with-algorithms-and-keeps-v3-one-setting-away.md). Every number below is read from a JSON the benchmark wrote (`python -m tests.benchmarks.algorithmic_v4 --json`, then `.report`); the prose around the numbers is the only thing typed.
 
 This report is the PRODUCTION CLOSURE run: the engine measured is the one that is in the product, after the SciPy assignment, the margin demotion, the DuckDB / CleverCSV dialect reader and fsspec were removed. The measurements that justified removing them (section 7) are the pre-closure run, kept in the repository as evidence.
 
@@ -395,8 +395,9 @@ On the same 290-file challenge population the OpenAI semantic layer's V1.1 repor
 
 ## 12. The whole backend suite, under both engines
 
-* default engine (`v3`, what CI runs; the API and the worker are in the same run): `8966 passed, 6 skipped in 1313.38s (0:21:53)`
+* default engine (`v3`, what the CI `Backend V3` job runs; the API and the worker are in the same run): `8966 passed, 6 skipped in 1313.38s (0:21:53)`
 * forced `SMART_IMPORT_UNDERSTANDING_ENGINE=v4` on the same suite: `8966 passed, 6 skipped in 1310.21s (0:21:50)`
+* both runs above are local (Windows). Pull request #47 also runs both in CI on Linux, as the jobs `Backend V3` (with lint and types) and `Backend V4` (the same suite with the engine forced); the CI runs skip one more test than these local ones, a worker test (`test_queueing_lock_locale.py`) that skips on an English-speaking PostgreSQL and runs on the Italian-locale one used locally. No CI figure is quoted here: the CI run itself is the record.
 
 Before the closure the suite forced onto V4 had **46 failures**, every one a test of the semantic (model) layer asserting that the model WAS asked about a column V3's rules cannot read (`model.calls >= 1`). Under V4 that column is read from its values, so the model is rightly not asked: the tests were speaking about V3 without saying so. They were rewritten, not the application, and no safety assertion was weakened:
 

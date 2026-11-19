@@ -1,6 +1,6 @@
 # Smart Import V4.1 - algorithmic understanding
 
-Status: production-closed on `feature/smart-import-v4-algorithmic-understanding` (base `main` = `7d826a2`). Not pushed, not merged. No migration. `SMART_IMPORT_UNDERSTANDING_ENGINE`
+Status: production-closed on `feature/smart-import-v4-algorithmic-understanding` (base `main` = `7d826a2`). Open as pull request #47, not merged. No migration. `SMART_IMPORT_UNDERSTANDING_ENGINE`
 defaults to **`v3`**: merging changes nothing a pilot or production sees until the setting is changed. The semantic (OpenAI) layer is untouched and stays `off`. The measured
 results are in [the benchmark report](../benchmarks/smart-import-v4-algorithmic-understanding.md); the decision is in
 [ADR 0056](adr/0056-smart-import-v4-reads-files-with-algorithms-and-keeps-v3-one-setting-away.md).
