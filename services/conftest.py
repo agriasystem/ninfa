@@ -51,6 +51,11 @@ def pytest_configure(config: pytest.Config) -> None:
         "RUN_LIVE_OPENAI=1; while it runs the machine environment is back and the offline "
         "tripwire is off.",
     )
+    config.addinivalue_line(
+        "markers",
+        "rules_v3_only: the test's premise is a column only V3's rules leave open, so it runs "
+        "under the V3 engine alone (see the `rules_engine` fixture).",
+    )
     offline_guard.GUARD.install()
 
 

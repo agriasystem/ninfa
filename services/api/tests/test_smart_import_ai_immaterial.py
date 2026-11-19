@@ -142,6 +142,8 @@ def asked(inspection: Any) -> list[str]:
     return sorted(q.id for q in inspection.understanding.questions)
 
 
+@pytest.mark.usefixtures("rules_engine")
+@pytest.mark.rules_v3_only
 def test_a_rooms_column_that_says_what_the_import_assumes_asks_nothing() -> None:
     inspection, model, traces = read(bookings([1] * 10), {**STATUS, "Num. unita": "rooms"})
 
@@ -152,6 +154,8 @@ def test_a_rooms_column_that_says_what_the_import_assumes_asks_nothing() -> None
     assert all(field != "rooms" for _h, field, _l in outline(inspection)["columns"])
 
 
+@pytest.mark.usefixtures("rules_engine")
+@pytest.mark.rules_v3_only
 def test_one_booking_of_two_rooms_brings_the_question_back() -> None:
     inspection, _model, traces = read(
         bookings([1, 1, 1, 2, 1, 1, 1, 1]), {**STATUS, "Num. unita": "rooms"}
@@ -161,6 +165,8 @@ def test_one_booking_of_two_rooms_brings_the_question_back() -> None:
     assert traces[0].ignored == 0 and traces[0].suggested == 2
 
 
+@pytest.mark.usefixtures("rules_engine")
+@pytest.mark.rules_v3_only
 def test_a_descriptive_column_named_by_a_model_is_set_aside_quietly() -> None:
     content = bookings([1] * 10, extra=("Sistemazione", ["Doppia", "Singola"] * 5))
     truth = {**STATUS, "Num. unita": "rooms", "Sistemazione": "room_type"}

@@ -38,7 +38,10 @@ def test_only_argon2_cffi_was_added_to_backend_dependencies() -> None:
     dependencies = _backend_dependencies()
     # `openai`: the semantic layer's SDK (Smart Import OpenAI Intelligence V1, ADR 0050),
     # allow-listed like `anthropic`, with the same isolation (`test_ai_boundary.py`).
-    unexpected = dependencies - known_before_gate_13 - {"argon2-cffi", "anthropic", "openai"}
+    # `rapidfuzz`: Smart Import V4.1's header reader (ADR 0056), imported by one module only -
+    # `test_algorithmic_dependency_boundary.py` is the precise guard.
+    allowed = {"argon2-cffi", "anthropic", "openai", "rapidfuzz"}
+    unexpected = dependencies - known_before_gate_13 - allowed
     assert unexpected == set(), f"unexpected new dependency: {unexpected}"
     assert "argon2-cffi" in dependencies
 

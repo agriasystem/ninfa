@@ -26,7 +26,9 @@ INJECTION_FILES = (
 )
 
 
-def _level(doc_id: str, *, vocabulary_certainty: bool) -> tuple[UnderstandingLevel, int]:
+def _level(
+    doc_id: str, *, vocabulary_certainty: bool, engine: str = "v3"
+) -> tuple[UnderstandingLevel, int]:
     doc = next(d for d in adversarial_docs() if d.id == doc_id)
     model = SemanticStandIn(Behaviour.ORACLE, _truth(doc), None, doc.golden.pii_values)
     inspection = understand_semantic(
@@ -38,15 +40,23 @@ def _level(doc_id: str, *, vocabulary_certainty: bool) -> tuple[UnderstandingLev
     )
     understanding = inspection.understanding
     assert understanding is not None
-    assert model.calls >= 1  # the model WAS asked: the difference is not "nothing happened"
+    if engine == "v3":
+        assert model.calls >= 1  # the model WAS asked: the difference is not "nothing happened"
+    else:
+        # V4 reads these files itself and leaves the person a question: the model has nothing to
+        # add, and the rules ALONE already hold the file back. That is what is asserted instead.
+        alone = understand_semantic(None, DataSourceDomain.BOOKINGS, doc.content, mode=AiMode.OFF)
+        assert alone.understanding is not None
+        assert alone.understanding.level != UnderstandingLevel.READY
+        assert len(alone.understanding.questions) >= 1
     return understanding.level, len(understanding.questions)
 
 
 @pytest.mark.parametrize("doc_id", INJECTION_FILES)
 def test_with_the_certainty_withdrawn_a_file_with_a_sentence_of_orders_reaches_a_person(
-    doc_id: str,
+    doc_id: str, rules_engine: str
 ) -> None:
-    level, questions = _level(doc_id, vocabulary_certainty=False)
+    level, questions = _level(doc_id, vocabulary_certainty=False, engine=rules_engine)
 
     assert level != UnderstandingLevel.READY
     assert questions >= 1

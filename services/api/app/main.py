@@ -12,6 +12,7 @@ from app.modules.ai.gateway.factory import (
     build_language_model_provider,
     build_mia_provider,
 )
+from app.modules.data_sources.algorithmic.selector import configure as configure_engine
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -41,6 +42,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.language_model_provider = build_language_model_provider(settings)
     # The optional assistant of Smart Import V3: no provider unless explicitly selected.
     app.state.import_understanding_resolver = build_import_understanding_resolver(settings)
+    # Which engine reads the columns of an uploaded file: V3's (default) or V4's, one setting.
+    configure_engine(settings.smart_import_understanding_engine)
     # Mia, the assistant of NINFA (ADR 0055): a model only when `MIA_PROVIDER` says so, built once.
     app.state.mia_provider = build_mia_provider(settings)
 

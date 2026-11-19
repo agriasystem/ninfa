@@ -13,9 +13,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The whole backend suite runs twice, once per Smart Import understanding engine (ADR 0056):
+  #   V3 = the repository default, nothing set (also the only run that lints and type-checks)
+  #   V4 = the same suite with SMART_IMPORT_UNDERSTANDING_ENGINE=v4 forced for the whole process
+  # V4 is opt-in and ships dark, so V3 stays the default; the V4 run is what keeps it from rotting.
   backend:
-    name: Backend (lint, types, tests)
+    name: Backend ${{ matrix.label }}
     runs-on: ubuntu-latest
+    strategy:
+      # One engine failing must not hide the other's result.
+      fail-fast: false
+      matrix:
+        include:
+          - engine: v3
+            label: V3 (lint, types, tests)
+          - engine: v4
+            label: V4 (forced engine, tests)
     services:
       postgres:
         image: postgres:18
@@ -46,9 +59,36 @@ jobs:
         run: >-
           psql "postgresql://postgres:postgres@127.0.0.1:5432/postgres"
           -v app_password=ci_only_password -f scripts/db/bootstrap-local.sql
-      - run: uv run --all-packages ruff check services
-      - run: uv run --all-packages ruff format --check services
-      - run: uv run --all-packages mypy services/api services/worker
+      - name: Force the V4 engine for the rest of this job
+        if: matrix.engine == 'v4'
+        run: echo "SMART_IMPORT_UNDERSTANDING_ENGINE=v4" >> "$GITHUB_ENV"
+      # Proves the job runs the engine its name says. The V3 job must see NO variable at all, so a
+      # change of the repository default (or of the AI mode, which stays off) fails here.
+      - name: Confirm the engine and the AI mode this job runs
+        env:
+          EXPECTED_ENGINE: ${{ matrix.engine }}
+        run: |
+          uv run --all-packages python - <<'PY'
+          import os
+
+          from app.core.config import Settings
+          from app.modules.data_sources.algorithmic.selector import current_name
+
+          expected = os.environ["EXPECTED_ENGINE"]
+          settings = Settings(_env_file=None)
+          assert settings.smart_import_understanding_engine == expected, settings.smart_import_understanding_engine
+          assert current_name() == expected, current_name()
+          assert settings.smart_import_ai_mode == "off", settings.smart_import_ai_mode
+          if expected == "v3":
+              assert "SMART_IMPORT_UNDERSTANDING_ENGINE" not in os.environ
+          print("engine:", current_name(), "| smart import ai mode:", settings.smart_import_ai_mode)
+          PY
+      - if: matrix.engine == 'v3'
+        run: uv run --all-packages ruff check services
+      - if: matrix.engine == 'v3'
+        run: uv run --all-packages ruff format --check services
+      - if: matrix.engine == 'v3'
+        run: uv run --all-packages mypy services/api services/worker
       - name: Migrations
         run: uv run --all-packages alembic -c services/api/alembic.ini upgrade head
       - run: uv run --all-packages pytest

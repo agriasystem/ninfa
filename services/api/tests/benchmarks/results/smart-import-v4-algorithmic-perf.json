@@ -1,0 +1,82 @@
+[
+ {
+  "rows": 100,
+  "kind": "csv",
+  "bytes": 8254,
+  "scan_ms": 0.5,
+  "mapping_v3_ms": 34.4,
+  "total_v3_ms": 204.4,
+  "mapping_v4_ms": 37.4,
+  "total_v4_ms": 252.2
+ },
+ {
+  "rows": 100,
+  "kind": "xlsx",
+  "bytes": 9899,
+  "scan_ms": 13.7,
+  "mapping_v3_ms": 34.0,
+  "total_v3_ms": 280.2,
+  "mapping_v4_ms": 39.6,
+  "total_v4_ms": 320.3
+ },
+ {
+  "rows": 1000,
+  "kind": "csv",
+  "bytes": 81705,
+  "scan_ms": 4.0,
+  "mapping_v3_ms": 101.7,
+  "total_v3_ms": 909.6,
+  "mapping_v4_ms": 127.8,
+  "total_v4_ms": 1119.1
+ },
+ {
+  "rows": 1000,
+  "kind": "xlsx",
+  "bytes": 51988,
+  "scan_ms": 109.0,
+  "mapping_v3_ms": 96.2,
+  "total_v3_ms": 1407.8,
+  "mapping_v4_ms": 118.3,
+  "total_v4_ms": 1591.6
+ },
+ {
+  "rows": 10000,
+  "kind": "csv",
+  "bytes": 816696,
+  "scan_ms": 34.5,
+  "mapping_v3_ms": 166.8,
+  "total_v3_ms": 1604.7,
+  "mapping_v4_ms": 219.9,
+  "total_v4_ms": 1981.0
+ },
+ {
+  "rows": 10000,
+  "kind": "xlsx",
+  "bytes": 440234,
+  "scan_ms": 1263.3,
+  "mapping_v3_ms": 160.7,
+  "total_v3_ms": 4815.8,
+  "mapping_v4_ms": 208.8,
+  "total_v4_ms": 5193.5
+ },
+ {
+  "rows": 40000,
+  "kind": "csv",
+  "bytes": 3265606,
+  "scan_ms": 144.5,
+  "mapping_v3_ms": 167.1,
+  "total_v3_ms": 1920.0,
+  "mapping_v4_ms": 220.0,
+  "total_v4_ms": 2226.6
+ },
+ {
+  "rows": 40000,
+  "kind": "xlsx",
+  "bytes": 1796666,
+  "scan_ms": 3821.6,
+  "mapping_v3_ms": 159.7,
+  "total_v3_ms": 9748.2,
+  "mapping_v4_ms": 208.7,
+  "total_v4_ms": 10100.9
+ }
+]

@@ -180,6 +180,9 @@ def test_no_new_runtime_dependency_was_added() -> None:
         # openai: added by Smart Import OpenAI Intelligence V1 (ADR 0050), unrelated to the
         # decision layer - see `test_ai_boundary.py`.
         "openai",
+        # rapidfuzz: Smart Import V4.1 (ADR 0056), unrelated to the decision layer - see
+        # `test_algorithmic_dependency_boundary.py`.
+        "rapidfuzz",
     }
     unexpected = dependencies - known
     assert unexpected == set(), f"unexpected new dependency: {unexpected}"

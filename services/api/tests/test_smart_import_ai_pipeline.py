@@ -31,6 +31,14 @@ from tests.semantic_support import (
     understand_semantic,
 )
 
+# Every test here runs under BOTH rules engines (the `rules_engine` fixture, ADR 0056): what the
+# model may and may not change holds whoever reads the columns. A test marked `rules_v3_only` is
+# about a gap only V3's rules leave - a status named "Condizione", two date columns called
+# "Colonna 3" and "Colonna 4" - which V4 reads deterministically, so there the model is NOT asked
+# (that is V4 doing its job); the V4 side of the same promises is in
+# `test_smart_import_ai_with_each_engine.py`.
+pytestmark = pytest.mark.usefixtures("rules_engine")
+
 BOOKINGS = DataSourceDomain.BOOKINGS
 LABOR = DataSourceDomain.LABOR
 BASE = [
@@ -170,6 +178,7 @@ def test_the_model_is_not_asked_when_the_rules_left_nothing_open() -> None:
 # --- C: a valid answer is a candidate, checked --------------------------------------------------
 
 
+@pytest.mark.rules_v3_only
 def test_a_clear_reading_of_a_status_column_turns_manual_into_ready_through_the_vocabulary() -> (
     None
 ):
@@ -211,6 +220,7 @@ def test_two_unknown_columns_are_both_read_when_both_are_recognised() -> None:
     assert traces[0].promoted == 2
 
 
+@pytest.mark.rules_v3_only
 def test_the_assisted_column_is_marked_as_coming_from_the_semantic_layer() -> None:
     from app.modules.data_sources.understanding import UnderstandAnswers
     from tests.semantic_support import semantic_service
@@ -226,6 +236,7 @@ def test_the_assisted_column_is_marked_as_coming_from_the_semantic_layer() -> No
     assert origins["check_in"] != "ASSISTANT"
 
 
+@pytest.mark.rules_v3_only
 def test_without_the_corroboration_the_same_reading_is_only_a_suggestion_to_confirm() -> None:
     result, _, traces = read(Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS, corroborate=False)
 
@@ -250,6 +261,7 @@ def test_a_reading_whose_values_do_not_fit_the_field_is_dropped() -> None:
 # --- D, E, F: invented fields, another kind, doubt ------------------------------------------------
 
 
+@pytest.mark.rules_v3_only
 def test_an_invented_field_is_rejected_and_the_reading_is_the_legacy_one() -> None:
     result, provider, traces = read(Behaviour.INVENTS_FIELD, STATUS_UNKNOWN, TRUTH_STATUS)
 
@@ -269,6 +281,7 @@ def test_a_reading_about_another_kind_of_data_is_never_ready() -> None:
     "behaviour",
     [Behaviour.LOW, Behaviour.AMBIGUOUS, Behaviour.UNKNOWN, Behaviour.INCOMPATIBLE],
 )
+@pytest.mark.rules_v3_only
 def test_a_model_that_doubts_is_a_model_that_did_not_help(behaviour: Behaviour) -> None:
     result, _, _ = read(behaviour, STATUS_UNKNOWN, TRUTH_STATUS)
 
@@ -312,6 +325,7 @@ def test_money_is_never_placed_by_a_model() -> None:
     assert provider is not None and provider.calls == 0 and traces == []
 
 
+@pytest.mark.rules_v3_only
 def test_money_is_never_placed_by_a_model_that_is_asked_for_another_reason() -> None:
     content = bookings(revenue="Corrispettivo", status="Condizione")
 
@@ -329,6 +343,7 @@ def test_money_is_never_placed_by_a_model_that_is_asked_for_another_reason() -> 
     assert traces[0].suggested == 1 and traces[0].promoted == 1
 
 
+@pytest.mark.rules_v3_only
 def test_a_date_is_only_ever_a_suggestion_to_confirm() -> None:
     content = bookings(**{"in": "Colonna 3", "out": "Colonna 4"})
     truth = {"Colonna 3": "check_in", "Colonna 4": "check_out"}
@@ -353,6 +368,7 @@ def test_a_count_is_never_promoted() -> None:
     assert ("Unita", "rooms", "RECOGNIZED") not in result["columns"]
 
 
+@pytest.mark.rules_v3_only
 def test_an_identifier_is_never_promoted() -> None:
     content = bookings(code="Chiave 9", status="Condizione")
     truth = {**TRUTH_STATUS, "Chiave 9": "source_record_id"}
@@ -386,6 +402,7 @@ def test_a_column_whose_words_are_mostly_unknown_is_not_promoted() -> None:
     assert traces[0].promoted == 0
 
 
+@pytest.mark.rules_v3_only
 def test_when_two_free_columns_hold_the_same_kind_of_words_the_values_cannot_choose() -> None:
     header = [*header_of(status="Condizione"), "Altra condizione"]
     body = [[*row, "Confermata"] for row in rows_of()]
@@ -458,6 +475,7 @@ GUESTS = [
 ]
 
 
+@pytest.mark.rules_v3_only
 def test_no_personal_value_reaches_the_model() -> None:
     header = [*header_of(status="Condizione"), "Ospite", "Email", "Telefono", "IBAN"]
     body = [[*row, *GUESTS[index % len(GUESTS)]] for index, row in enumerate(rows_of(9))]
@@ -474,6 +492,7 @@ def test_no_personal_value_reaches_the_model() -> None:
     assert "PII_" in document  # the CLASS of a personal-data column is all the model learns of it
 
 
+@pytest.mark.rules_v3_only
 def test_a_header_that_is_a_personal_value_does_not_reach_the_model_either() -> None:
     header = [*header_of(status="Condizione"), "mario.rossi@example.com"]
     body = [[*row, "x"] for row in rows_of()]
@@ -499,6 +518,7 @@ def test_a_header_that_is_a_personal_value_does_not_reach_the_model_either() -> 
         (Behaviour.QUOTA, FailureKind.QUOTA),
     ],
 )
+@pytest.mark.rules_v3_only
 def test_a_failing_model_costs_one_call_and_leaves_the_legacy_reading(
     behaviour: Behaviour, kind: FailureKind
 ) -> None:
@@ -510,6 +530,7 @@ def test_a_failing_model_costs_one_call_and_leaves_the_legacy_reading(
 
 
 @pytest.mark.parametrize("behaviour", [Behaviour.GARBAGE, Behaviour.EMPTY])
+@pytest.mark.rules_v3_only
 def test_an_answer_that_is_not_the_shape_imports_nothing_unsafe(behaviour: Behaviour) -> None:
     result, provider, traces = read(behaviour, STATUS_UNKNOWN, TRUTH_STATUS)
 
@@ -554,6 +575,7 @@ def test_a_model_that_agrees_with_what_was_confirmed_adds_an_agreement_not_a_cha
 # --- S, T: a difficult workbook, and a file that is not hospitality ---------------------------
 
 
+@pytest.mark.rules_v3_only
 def test_a_workbook_with_an_introduction_sheet_is_still_read_through_its_data_sheet() -> None:
     from tests.booking_support import xlsx_bytes as workbook
 
@@ -602,6 +624,7 @@ def test_an_empty_file_is_not_asked_about() -> None:
 # --- SHADOW: measured, never applied --------------------------------------------------------------
 
 
+@pytest.mark.rules_v3_only
 def test_shadow_returns_exactly_the_legacy_reading_and_records_what_assist_would_do() -> None:
     legacy = without_a_model(STATUS_UNKNOWN)
 
@@ -638,6 +661,7 @@ def test_shadow_never_changes_the_answer_whatever_the_model_says(behaviour: Beha
         assert shadow == without_a_model(content)
 
 
+@pytest.mark.rules_v3_only
 def test_the_audit_record_holds_counts_words_and_ids_never_content() -> None:
     _, _, traces = read(Behaviour.ORACLE, STATUS_UNKNOWN, TRUTH_STATUS, vocabulary_certainty=True)
 
@@ -787,6 +811,7 @@ def test_a_wrong_model_cannot_slip_a_column_into_an_import_through_an_optional_f
     )
 
 
+@pytest.mark.rules_v3_only
 def test_the_model_never_names_more_columns_than_a_person_can_be_asked_about() -> None:
     from app.modules.data_sources.understanding_ai import MAX_ASSISTED
 
@@ -812,6 +837,7 @@ def held_for_the_matching_screen() -> bytes:
     return table(header, body)
 
 
+@pytest.mark.rules_v3_only
 def test_a_model_hint_never_lowers_a_file_held_for_the_matching_screen_to_a_question() -> None:
     content = held_for_the_matching_screen()
     truth = {**TRUTH_STATUS, "Dettaglio camera": "room_type"}
@@ -827,6 +853,7 @@ def test_a_model_hint_never_lowers_a_file_held_for_the_matching_screen_to_a_ques
     assert not any(q[0] == "CONFIRM:Dettaglio camera" for q in with_a_model["questions"])
 
 
+@pytest.mark.rules_v3_only
 def test_the_same_rule_holds_for_the_original_assistant_whichever_model_it_is() -> None:
     """Nothing about it is provider-specific: a column ANY model names on an optional field, and
     nothing makes certain, is asked about; money is never placed by any model."""

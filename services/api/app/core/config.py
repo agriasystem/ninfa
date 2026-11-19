@@ -73,6 +73,12 @@ class Settings(BaseSettings):
     # is off because the live benchmark with the real model found three unsafe READY with it on
     # (files carrying a sentence of orders, read correctly and not flagged by the model): ADR 0052.
     smart_import_ai_vocabulary_certainty: bool = False
+
+    # Which engine reads the columns of an uploaded file (Smart Import V4.1). `v3` is the engine
+    # every customer file has been read with so far (the way back); `v4` is the algorithmic one:
+    # vocabulary + RapidFuzz, what the values prove and rule out, a global assignment of columns
+    # to fields. Neither calls a model: this is NOT the semantic layer above.
+    smart_import_understanding_engine: Literal["v3", "v4"] = "v3"
     # A custom endpoint (a proxy, an Azure-style gateway) OR a regional one OpenAI itself offers
     # (`eu`...), never both - the SDK refuses the pair. Nothing is hard-coded: a regional one is
     # used only when the OpenAI project is set up for it.

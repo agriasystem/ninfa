@@ -8,10 +8,17 @@
 
 The result is a proposal, never a mapping: only a confirmed decision, checked by the import
 service's own rules, becomes one.
+
+Steps 2 and 3 are a SELECTION: which column is which field, and how sure. V3's selection is the
+greedy one below (`greedy_selection`); a `SelectionEngine` (Smart Import V4,
+`data_sources/algorithmic`) can replace it. Everything after it - contested look-alike columns,
+columns that confirm each other, values no person could have, "hours" that do not say which - is the
+same for every engine, so the safety rules never depend on which one chose.
 """
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Protocol
 
 from app.modules.data_sources.column_profile import ColumnSample
 from app.modules.data_sources.semantics import (
@@ -36,6 +43,11 @@ _STRONG_ALTERNATIVE = 0.85
 
 # `ColumnProposal.ambiguous_group` of a column that competes with a look-alike for ONE field.
 CONTESTED = "CONTESTED"
+
+# One candidate reading, ranked: (level rank, name score, -field order, -column, field, name, fit,
+# level). The greedy selection takes them best first.
+Entry = tuple[int, float, int, int, str, NameMatch, float | None, Level]
+Chosen = dict[int, tuple[str, NameMatch, float | None, Level]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,11 +84,36 @@ class Proposal:
         return {c.field: c for c in self.columns if c.field is not None}
 
 
+@dataclass(slots=True)
+class Selection:
+    """What a selection engine decides: for each column the field it is (or none), how sure."""
+
+    # What each (column, field) pair came to, for telling look-alike columns apart afterwards.
+    scored: dict[tuple[int, str], tuple[Candidate, Level]]
+    fits: dict[tuple[int, str], float | None]
+    chosen: Chosen
+    taken_fields: set[str]
+    # Why each chosen column was read as it was (added to the evidence; never a value of the file).
+    notes: dict[int, list[str]] = field(default_factory=dict)
+
+
+class SelectionEngine(Protocol):
+    def select(
+        self,
+        sem: DomainSem,
+        samples: Sequence[ColumnSample],
+        stats: Sequence[ColumnStats],
+        locked: dict[int, tuple[str, PiiKind | None]],
+        personal: dict[int, PiiKind],
+    ) -> Selection: ...
+
+
 def propose(
     sem: DomainSem,
     samples: Sequence[ColumnSample],
     *,
     excluded_reason: Callable[[str], str | None] = lambda _header: None,
+    engine: SelectionEngine | None = None,
 ) -> Proposal:
     stats = [column_stats(sample.values) for sample in samples]
 
@@ -103,82 +140,17 @@ def propose(
         elif pii is not None:
             personal[index] = pii
 
-    # 2. every column against every field
-    entries: list[tuple[int, float, int, int, str, NameMatch, float | None, Level]] = []
-    # What each (column, field) pair came to, for telling look-alike columns apart below.
-    scored: dict[tuple[int, str], tuple[Candidate, Level]] = {}
-    fits: dict[tuple[int, str], float | None] = {}
-    have_name: set[str] = set()
-    for index, sample in enumerate(samples):
-        if index in locked:
-            continue
-        says_which_is_missing = _ambiguous_words(sem, sample.header)
-        for candidate in name_candidates(sem, sample.header):
-            if candidate.name == NameMatch.FUZZY and says_which_is_missing:
-                continue  # "Costo totale" looks like a cost, but not WHICH one: that is a question
-            spec = sem.fields[candidate.field]
-            fit = spec.fit(stats[index]) if spec.fit is not None else None
-            if fit is not None and stats[index].n >= MIN_EVIDENCE and fit < 0.2:
-                continue  # the values contradict the name
-            level = level_of(candidate.name, candidate.score, fit, stats[index])
-            scored[(index, candidate.field)] = (candidate, level)
-            fits[(index, candidate.field)] = fit
-            order = sem.order.index(candidate.field) if candidate.field in sem.order else 99
-            entries.append(
-                (
-                    _LEVEL_RANK[level],
-                    candidate.score,
-                    -order,
-                    -index,
-                    candidate.field,
-                    candidate.name,
-                    fit,
-                    level,
-                )
-            )
-            have_name.add(candidate.field)
-
-    # 3. a field no name points at may be proposed from the values of the one column that fits
-    for key, spec in sem.fields.items():
-        if not spec.value_only or key in have_name or spec.fit is None:
-            continue
-        fitting = [
-            index
-            for index in range(len(samples))
-            if index not in locked
-            and stats[index].enough()
-            and spec.fit(stats[index]) >= _VALUE_ONLY_FIT
-            and not any(e[3] == -index for e in entries)
-        ]
-        if len(fitting) == 1:
-            index = fitting[0]
-            level = level_of(NameMatch.VALUES, 0.5, spec.fit(stats[index]), stats[index])
-            order = sem.order.index(key) if key in sem.order else 99
-            entries.append(
-                (
-                    _LEVEL_RANK[level],
-                    0.5,
-                    -order,
-                    -index,
-                    key,
-                    NameMatch.VALUES,
-                    spec.fit(stats[index]),
-                    level,
-                )
-            )
-
-    # 4. take the best, each field once, each column once
-    taken_fields: set[str] = set()
-    taken_columns: set[int] = set()
-    chosen: dict[int, tuple[str, NameMatch, float | None, Level]] = {}
-    for rank, _score, _order, neg_index, key, name, fit, level in sorted(entries, reverse=True):
-        index = -neg_index
-        if key in taken_fields or index in taken_columns:
-            continue
-        taken_fields.add(key)
-        taken_columns.add(index)
-        chosen[index] = (key, name, fit, level)
-        del rank
+    # 2-3. which column is which field
+    if engine is None:
+        selection = greedy_selection(sem, samples, stats, locked)
+    else:
+        selection = engine.select(sem, samples, stats, locked, personal)
+    scored, fits, chosen, taken_fields = (
+        selection.scored,
+        selection.fits,
+        selection.chosen,
+        selection.taken_fields,
+    )
 
     # 4b. a field that two columns claim in the same words - "Ore previste" and "Ore previste
     #     (rev.)", "Imponibile" and "Imponibile (rettificato)", one net per VAT rate - is a CHOICE,
@@ -228,6 +200,7 @@ def propose(
             why.append("an abbreviation read as the word it cuts")
         if fit is not None:
             why.append(f"{fit:.0%} of the values fit")
+        why.extend(selection.notes.get(index, ()))
         notes[index] = why
 
     # 5. columns that confirm each other
@@ -337,6 +310,99 @@ def propose(
     return Proposal(tuple(out))
 
 
+def greedy_selection(
+    sem: DomainSem,
+    samples: Sequence[ColumnSample],
+    stats: Sequence[ColumnStats],
+    locked: dict[int, tuple[str, PiiKind | None]],
+) -> Selection:
+    """V3's selection: every column against every field by name then by values, then the best
+    pair first, each field once and each column once."""
+    # 2. every column against every field
+    entries: list[Entry] = []
+    # What each (column, field) pair came to, for telling look-alike columns apart below.
+    scored: dict[tuple[int, str], tuple[Candidate, Level]] = {}
+    fits: dict[tuple[int, str], float | None] = {}
+    have_name: set[str] = set()
+    for index, sample in enumerate(samples):
+        if index in locked:
+            continue
+        says_which_is_missing = ambiguous_words(sem, sample.header)
+        for candidate in name_candidates(sem, sample.header):
+            if candidate.name == NameMatch.FUZZY and says_which_is_missing:
+                continue  # "Costo totale" looks like a cost, but not WHICH one: that is a question
+            spec = sem.fields[candidate.field]
+            fit = spec.fit(stats[index]) if spec.fit is not None else None
+            if fit is not None and stats[index].n >= MIN_EVIDENCE and fit < 0.2:
+                continue  # the values contradict the name
+            level = level_of(candidate.name, candidate.score, fit, stats[index])
+            scored[(index, candidate.field)] = (candidate, level)
+            fits[(index, candidate.field)] = fit
+            order = sem.order.index(candidate.field) if candidate.field in sem.order else 99
+            entries.append(
+                (
+                    _LEVEL_RANK[level],
+                    candidate.score,
+                    -order,
+                    -index,
+                    candidate.field,
+                    candidate.name,
+                    fit,
+                    level,
+                )
+            )
+            have_name.add(candidate.field)
+
+    # 3. a field no name points at may be proposed from the values of the one column that fits
+    for key, spec in sem.fields.items():
+        if not spec.value_only or key in have_name or spec.fit is None:
+            continue
+        fitting = [
+            index
+            for index in range(len(samples))
+            if index not in locked
+            and stats[index].enough()
+            and spec.fit(stats[index]) >= _VALUE_ONLY_FIT
+            and not any(e[3] == -index for e in entries)
+        ]
+        if len(fitting) == 1:
+            index = fitting[0]
+            level = level_of(NameMatch.VALUES, 0.5, spec.fit(stats[index]), stats[index])
+            order = sem.order.index(key) if key in sem.order else 99
+            entries.append(
+                (
+                    _LEVEL_RANK[level],
+                    0.5,
+                    -order,
+                    -index,
+                    key,
+                    NameMatch.VALUES,
+                    spec.fit(stats[index]),
+                    level,
+                )
+            )
+
+    # 4. take the best, each field once, each column once
+    chosen, taken_fields = greedy_pick(entries)
+    return Selection(scored, fits, chosen, taken_fields)
+
+
+def greedy_pick(entries: Sequence[Entry]) -> tuple[Chosen, set[str]]:
+    """Best reading first, each field once and each column once."""
+    taken_fields: set[str] = set()
+    taken_columns: set[int] = set()
+    chosen: Chosen = {}
+    for rank, _score, _order, neg_index, key, name, fit, level in sorted(entries, reverse=True):
+        index = -neg_index
+        if key in taken_fields or index in taken_columns:
+            continue
+        taken_fields.add(key)
+        taken_columns.add(index)
+        chosen[index] = (key, name, fit, level)
+        del rank
+    return chosen, taken_fields
+
+
 def _settle(
     members: Sequence[int],
     key: str,
@@ -394,7 +460,7 @@ def _look_alike(mine: Candidate, other: tuple[Candidate, Level] | None) -> bool:
     )
 
 
-def _ambiguous_words(sem: DomainSem, header: str) -> bool:
+def ambiguous_words(sem: DomainSem, header: str) -> bool:
     words = tokens(header)
     return any(group.words & words and not group.veto & words for group in sem.ambiguous)
 
@@ -414,4 +480,16 @@ def _ambiguous(
     return None
 
 
-__all__ = ["CONTESTED", "Candidate", "ColumnProposal", "Level", "Proposal", "propose"]
+__all__ = [
+    "CONTESTED",
+    "Candidate",
+    "ColumnProposal",
+    "Level",
+    "Proposal",
+    "Selection",
+    "SelectionEngine",
+    "ambiguous_words",
+    "greedy_pick",
+    "greedy_selection",
+    "propose",
+]

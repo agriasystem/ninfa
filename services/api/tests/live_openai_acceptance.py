@@ -46,6 +46,7 @@ from app.core.tenant import TenantContext
 from app.modules.ai.gateway.openai_provider import OpenAIImportUnderstandingProvider
 from app.modules.ai.import_understanding.resolver import ImportUnderstandingResolver
 from app.modules.ai.import_understanding.types import AiMode, AiTrace
+from app.modules.data_sources.algorithmic.selector import use_engine
 from app.modules.data_sources.smart_import import SmartImportService
 from app.modules.data_sources.understanding import UnderstandAnswers, UnderstandingService
 from app.modules.ingestion.models import DataSourceDomain
@@ -192,16 +193,21 @@ def _service(resolver: ImportUnderstandingResolver | None) -> UnderstandingServi
 
 
 def _outline(service: UnderstandingService, content: bytes) -> dict[str, Any]:
-    inspection = service.understand(
-        DataSourceDomain.BOOKINGS,
-        "synthetic.xlsx",
-        content,
-        UnderstandAnswers(),
-        False,
-        None,
-        False,
-        currency="EUR",
-    )
+    # The acceptance is of the MODEL layer. Its synthetic file holds a status column called
+    # "Condizione" that only V3's rules leave open; V4 reads it deterministically and the model
+    # would then not be asked at all, so the run would prove nothing about the model. The script
+    # therefore pins the rules engine it was written for, whatever the process is set to (ADR 0056).
+    with use_engine("v3"):
+        inspection = service.understand(
+            DataSourceDomain.BOOKINGS,
+            "synthetic.xlsx",
+            content,
+            UnderstandAnswers(),
+            False,
+            None,
+            False,
+            currency="EUR",
+        )
     info = inspection.understanding
     assert info is not None
     return {

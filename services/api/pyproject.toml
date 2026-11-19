@@ -23,6 +23,11 @@ dependencies = [
     # codebase, isolated to app/modules/ai/gateway/anthropic_provider.py - see ADR 0025.
     "anthropic>=1.8.0,<2",
     "openai>=3.50,<4",
+    # Smart Import V4.1 (algorithmic understanding, ADR 0056). RapidFuzz measures how alike two WORDS
+    # are (header spelling mistakes). MIT, no dependencies, imported only by
+    # `data_sources/algorithmic/header.py`. The other libraries the V4.1 brief approved were measured
+    # and left out: see ADR 0056 and the benchmark report.
+    "rapidfuzz>=3.14,<4",
 ]
 
 [dependency-groups]

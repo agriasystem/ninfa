@@ -102,7 +102,9 @@ def test_a_personal_value_used_as_a_header_never_reaches_the_browser(
     assert [c["header"] for c in payload["proposal"]["columns"]][-1] == "Colonna I"
 
 
-def test_adv09_of_the_adversarial_corpus_shows_no_personal_value_with_the_model_off_or_on() -> None:
+def test_adv09_of_the_adversarial_corpus_shows_no_personal_value_with_the_model_off_or_on(
+    rules_engine: str,
+) -> None:
     doc = next(d for d in adversarial_docs() if d.id.startswith("ADV09"))
     forbidden = doc.golden.pii_values
 
@@ -113,7 +115,10 @@ def test_adv09_of_the_adversarial_corpus_shows_no_personal_value_with_the_model_
     for observed in (off, on):
         assert observed.error is None
         assert not any(value in observed.payload for value in forbidden)
-    assert model.calls >= 1 and model.violations == []
+    if rules_engine == "v3":
+        assert model.calls >= 1  # V3 leaves a gap the model is asked about
+    # V4 reads the file itself and may not ask the model at all: either way nothing personal went
+    assert model.violations == []
 
 
 def test_the_column_keeps_its_place_its_values_and_its_reading_in_the_import() -> None:

@@ -135,3 +135,33 @@ def factory(db_session: Session) -> BookingFactory:
 def two_tenants(factory: BookingFactory) -> tuple[Tenant, Tenant]:
     """Workspace A and workspace B, each with property, data source and import job."""
     return factory.tenant(), factory.tenant()
+
+
+# --- which engine reads the columns, for the tests of what the model layer adds on top of it ---
+
+
+@pytest.fixture
+def rules_engine(request: pytest.FixtureRequest) -> Iterator[str]:
+    """The engine that reads the columns (`v3` or `v4`) for the code inside the test, whatever the
+    process was started with (ADR 0056).
+
+    The semantic (model) layer starts from what the rules left open, so which file reaches the model
+    depends on the engine: V4 reads deterministically a column V3 asked the model about (a status
+    named `Condizione`), and then the model is NOT asked - which is the point of V4, not a failure.
+    A test that is about the layer says which engine it speaks of:
+
+    * `usefixtures("rules_engine")` runs it under BOTH engines - the guarantee holds whoever reads;
+    * plus `@pytest.mark.rules_v3_only` when its premise is a gap only V3's rules leave (the test
+      then runs under V3 alone, and the V4 side of the same promise is in
+      `test_smart_import_ai_with_each_engine.py`).
+    """
+    from app.modules.data_sources.algorithmic.selector import use_engine
+
+    with use_engine(request.param):
+        yield str(request.param)
+
+
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "rules_engine" in metafunc.fixturenames:
+        v3_only = metafunc.definition.get_closest_marker("rules_v3_only") is not None
+        metafunc.parametrize("rules_engine", ["v3"] if v3_only else ["v3", "v4"], indirect=True)

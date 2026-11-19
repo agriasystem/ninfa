@@ -56,6 +56,8 @@ def the_model_reads_the_status_column(
     yield provider
 
 
+@pytest.mark.usefixtures("rules_engine")
+@pytest.mark.rules_v3_only
 def test_these_runs_are_real_the_model_reads_a_column_the_rules_do_not(
     api_client: TestClient,
     env: SourcesEnv,
