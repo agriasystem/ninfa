@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.ingestion.models import FileScope
 from app.modules.ingestion.scope import NO_SCOPE, ScopePlan
-from app.modules.invoices.models import Invoice, InvoiceRemoval, is_current_invoice
+from app.modules.invoices.models import Invoice, InvoiceLine, InvoiceRemoval, is_current_invoice
 from app.modules.invoices.service import InvoiceImportResult
 from tests.booking_support import csv_bytes
 from tests.invoice_support import CostWorld
@@ -122,3 +122,13 @@ def removals(session: Session, world: CostWorld) -> list[InvoiceRemoval]:
 
 def days(records: Sequence[Invoice]) -> list[date]:
     return sorted(record.invoice_date for record in records)
+
+
+def stated(session: Session, world: CostWorld) -> dict[str, str]:
+    """What counts, as {key of the record: the category it carries}: one entry per current cost."""
+    rows = session.execute(
+        select(Invoice.source_record_key, InvoiceLine.cost_category)
+        .join(InvoiceLine, InvoiceLine.invoice_id == Invoice.id)
+        .where(Invoice.workspace_id == world.tenant.workspace.id, is_current_invoice())
+    )
+    return {key: category.value for key, category in rows}

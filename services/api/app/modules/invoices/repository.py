@@ -15,6 +15,7 @@ from sqlalchemy import (
     Date,
     String,
     Uuid,
+    and_,
     any_,
     bindparam,
     column,
@@ -31,6 +32,7 @@ from sqlalchemy.orm import Session
 from app.core.tenant import TenantContext
 from app.modules.bookings.models import ImportRowStatus
 from app.modules.ingestion.models import DataSource
+from app.modules.invoices.cost_categories import ClassificationMethod, CostCategory
 from app.modules.invoices.models import (
     DocumentKind,
     IdentityOrigin,
@@ -62,6 +64,21 @@ class ExistingInvoice:
     source_format: SourceFormat = SourceFormat.FATTURAPA_XML
     # A synthetic record a person's word took away (never true of a record with a number).
     removed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ExistingRecord:
+    """A SYNTHETIC cost record already in a data source (ADR 0057): which of its identical siblings
+    it is (`occurrence`), which version it is, whether a person's word took it away, and the
+    category the SOURCE stated for it (None: the source stated none, and whatever NINFA derived is
+    not a statement of the source and never a reason to change anything)."""
+
+    id: UUID
+    key: str
+    occurrence: int
+    revision: int
+    removed: bool
+    category: CostCategory | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +186,69 @@ class InvoiceRepository:
                     row.source_format,
                     bool(row.removed),
                 )
+        return found
+
+    def synthetic_records_of(
+        self,
+        property_id: UUID,
+        data_source_id: UUID,
+        fingerprints: Sequence[str],
+        dates: Sequence[date],
+    ) -> dict[str, list[ExistingRecord]]:
+        """The latest version of every SYNTHETIC record of this data source that has one of these
+        content fingerprints (the date narrows the search to what the file can hold), by
+        fingerprint, whether or not it still counts. A record's category is the one its source
+        STATED (`EXPLICIT_SOURCE`), never one NINFA derived."""
+        found: dict[str, list[ExistingRecord]] = {}
+        ordered = sorted(set(fingerprints))
+        for start in range(0, len(ordered), _KEYS_PER_QUERY):
+            block = ordered[start : start + _KEYS_PER_QUERY]
+            rows = self._session.execute(
+                select(
+                    Invoice.id,
+                    Invoice.source_record_key,
+                    Invoice.revision,
+                    Invoice.source_fingerprint,
+                    is_removed().label("removed"),
+                    InvoiceLine.cost_category,
+                    InvoiceLine.classification_method,
+                )
+                .join(
+                    InvoiceLine,
+                    and_(
+                        InvoiceLine.workspace_id == Invoice.workspace_id,
+                        InvoiceLine.invoice_id == Invoice.id,
+                    ),
+                    isouter=True,
+                )
+                .where(
+                    Invoice.workspace_id == self._tenant.workspace_id,
+                    Invoice.property_id == property_id,
+                    Invoice.data_source_id == data_source_id,
+                    Invoice.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD,
+                    Invoice.invoice_date.in_(sorted(set(dates))),
+                    Invoice.source_fingerprint.in_(block),
+                    is_latest_revision(),
+                )
+            )
+            for row in rows:
+                stated = (
+                    row.cost_category
+                    if row.classification_method == ClassificationMethod.EXPLICIT_SOURCE
+                    else None
+                )
+                found.setdefault(row.source_fingerprint, []).append(
+                    ExistingRecord(
+                        row.id,
+                        row.source_record_key,
+                        int(row.source_record_key.rsplit("#", 1)[1]),
+                        row.revision,
+                        bool(row.removed),
+                        stated,
+                    )
+                )
+        for records in found.values():
+            records.sort(key=lambda record: record.occurrence)
         return found
 
     # --- operating costs with no document number: what a complete file takes away --------------

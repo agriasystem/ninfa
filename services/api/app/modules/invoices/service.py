@@ -61,6 +61,7 @@ from app.modules.invoices.canonical import (
     record_key,
 )
 from app.modules.invoices.classification import classify_line
+from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.documents import ParsedDocument
 from app.modules.invoices.errors import InvoiceErrorCode, InvoiceImportError, RowIssue
 from app.modules.invoices.fatturapa import parse_fatturapa
@@ -73,6 +74,7 @@ from app.modules.invoices.mapping import (
 )
 from app.modules.invoices.models import InvoiceMappingProfile, ResolutionMethod, SourceFormat
 from app.modules.invoices.repository import (
+    ExistingRecord,
     InvoiceIdentity,
     InvoiceImportRowRepository,
     InvoiceMappingProfileRepository,
@@ -419,16 +421,118 @@ class InvoiceImportService:
             return 0
         documents = [document for document in canonical if document is not None]
         plan = self._resolver.plan([document.supplier for document in documents])
-        keyed = _identify(
+        placed = self._place_synthetic(
             [(document, plan.resolutions[document.supplier.key]) for document in documents],
+            property_id,
             data_source_id,
         )
         return self._invoices.count_synthetic_absent_from(
             data_source_id,
-            [identity[1] for identity, *_ in keyed],
+            [placement.identity[1] for placement in placed],
             min(document.invoice_date for document in documents),
             max(document.invoice_date for document in documents),
         )
+
+    def _place_synthetic(
+        self,
+        resolved: list[tuple[CanonicalDocument, SupplierResolution]],
+        property_id: UUID,
+        data_source_id: UUID,
+    ) -> list["_Placement"]:
+        """Where each operating cost with no number goes among the records the source already
+        holds (ADR 0057). The same function serves the import and the preview of what a complete
+        file would take away, so the figure a person is shown is the one that is applied.
+
+        Rows that are economically identical (same fingerprint) are a MULTISET. The CATEGORY is not
+        part of what a cost is: a reclassification is the same cost, and two equal rows may be
+        stated with two categories and stay two costs, each with its own. For one fingerprint:
+
+        1. an occurrence keeps the record already holding the same stated category (nothing
+           changes);
+        2. whatever is left is paired, in a fixed order, with the records left: a different stated
+           category is a RECLASSIFICATION of that same cost (the next revision of its key), and a
+           file that states no category says nothing and changes nothing;
+        3. occurrences beyond the records the source holds are new: a record a person's word took
+           away comes back first (the next revision of its key), then new numbers are used.
+
+        The order of the rows in the file is never used: the same rows in another order are the
+        same placement."""
+        groups: dict[str, list[tuple[CanonicalDocument, SupplierResolution]]] = {}
+        for document, resolution in resolved:
+            fingerprint = document.record_fingerprint(
+                str(resolution.supplier_id), str(data_source_id)
+            )
+            groups.setdefault(fingerprint, []).append((document, resolution))
+        existing = self._invoices.synthetic_records_of(
+            property_id,
+            data_source_id,
+            list(groups),
+            [document.invoice_date for document, _ in resolved],
+        )
+        placed: list[_Placement] = []
+        for fingerprint, items in groups.items():
+            records = existing.get(fingerprint, [])
+            counting = [record for record in records if not record.removed]
+            away = [record for record in records if record.removed]
+            next_number = max((record.occurrence for record in records), default=0) + 1
+            ordered = sorted(items, key=lambda item: _category_order(_stated_category(item[0])))
+            leftover: list[tuple[CanonicalDocument, SupplierResolution]] = []
+            for document, resolution in ordered:
+                stated = _stated_category(document)
+                match = next((record for record in counting if record.category == stated), None)
+                if match is None:
+                    leftover.append((document, resolution))
+                    continue
+                counting.remove(match)
+                placed.append(
+                    _placement(
+                        document, resolution, fingerprint, match, "UNCHANGED", match.revision
+                    )
+                )
+            fresh: list[tuple[CanonicalDocument, SupplierResolution]] = []
+            for document, resolution in leftover:
+                if counting:
+                    record = counting.pop(0)
+                    reclassified = _stated_category(document) is not None
+                    placed.append(
+                        _placement(
+                            document,
+                            resolution,
+                            fingerprint,
+                            record,
+                            "RECLASSIFY" if reclassified else "UNCHANGED",
+                            record.revision + 1 if reclassified else record.revision,
+                        )
+                    )
+                else:
+                    fresh.append((document, resolution))
+            for document, resolution in fresh:
+                if away:
+                    record = away.pop(0)
+                    placed.append(
+                        _placement(
+                            document,
+                            resolution,
+                            fingerprint,
+                            record,
+                            "RESTORE",
+                            record.revision + 1,
+                        )
+                    )
+                else:
+                    placed.append(
+                        _placement(
+                            document,
+                            resolution,
+                            fingerprint,
+                            None,
+                            "NEW",
+                            1,
+                            record_key(fingerprint, next_number),
+                        )
+                    )
+                    next_number += 1
+        return placed
 
     # --- import -------------------------------------------------------------------------------
 
@@ -658,7 +762,10 @@ class InvoiceImportService:
             resolved = [
                 (document, plan.resolutions[document.supplier.key]) for document in documents
             ]
-            keyed = _identify(resolved, ids.data_source)
+            keyed = _identify([(d, r) for d, r in resolved if not d.is_synthetic])
+            placed = self._place_synthetic(
+                [(d, r) for d, r in resolved if d.is_synthetic], ids.property, ids.data_source
+            )
             identities: dict[InvoiceIdentity, CanonicalDocument] = {}
             duplicated: list[int] = []
             for identity, document, _resolution, _fingerprint in keyed:
@@ -681,29 +788,15 @@ class InvoiceImportService:
                 stored = existing.get(identity)
                 revision = 1
                 if stored is not None:
-                    if document.is_synthetic:
-                        # The key IS the content: the same key is the same record. One that still
-                        # counts is nothing new; one a person's word took away and this file holds
-                        # again counts again, as the next revision of the same identity.
-                        if not stored.removed:
-                            unchanged += 1
-                            continue
-                        revision = stored.revision + 1
-                        restored += 1
-                    else:
-                        if stored.source_fingerprint == fingerprint:
-                            unchanged += 1
-                            continue
-                        if SourceFormat.FATTURAPA_XML in (
-                            stored.source_format,
-                            document.source_format,
-                        ):
-                            conflicts.append(document.source_document_index)
-                            continue
-                        # A row of a spreadsheet corrected: the older version stays, this one
-                        # counts.
-                        revision = stored.revision + 1
-                        revised += 1
+                    if stored.source_fingerprint == fingerprint:
+                        unchanged += 1
+                        continue
+                    if SourceFormat.FATTURAPA_XML in (stored.source_format, document.source_format):
+                        conflicts.append(document.source_document_index)
+                        continue
+                    # A row of a spreadsheet corrected: the older version stays, this one counts.
+                    revision = stored.revision + 1
+                    revised += 1
                 invoice_id = uuid4()
                 new_invoices.append(
                     self._invoice_row(
@@ -718,6 +811,30 @@ class InvoiceImportService:
                     )
                 )
                 new_lines.extend(self._line_rows(invoice_id, document, resolution))
+            for placement in placed:
+                if placement.action == "UNCHANGED":
+                    unchanged += 1
+                    continue
+                if placement.action == "RESTORE":
+                    restored += 1  # a record a person's word took away comes back: next revision
+                elif placement.action == "RECLASSIFY":
+                    revised += 1  # the same cost, stated with another category: next revision
+                invoice_id = uuid4()
+                new_invoices.append(
+                    self._invoice_row(
+                        ids,
+                        invoice_id,
+                        placement.document,
+                        placement.resolution,
+                        placement.fingerprint,
+                        _resolution_story(placement.resolution, created_by),
+                        placement.revision,
+                        placement.identity[1],
+                    )
+                )
+                new_lines.extend(
+                    self._line_rows(invoice_id, placement.document, placement.resolution)
+                )
             if conflicts:
                 raise InvoiceImportError(
                     InvoiceErrorCode.DOCUMENT_CONFLICT,
@@ -735,7 +852,7 @@ class InvoiceImportService:
                 and bool(synthetic)
                 and len(synthetic) == len(documents)
             )
-            held = [identity[1] for identity in identities]
+            held = [placement.identity[1] for placement in placed]
             first = min((doc.invoice_date for doc in synthetic), default=None)
             last = max((doc.invoice_date for doc in synthetic), default=None)
             if complete and first is not None and last is not None:
@@ -1072,34 +1189,64 @@ def _file_row(file_rows: list[int | None], position: int) -> int | None:
 
 
 def _identify(
-    resolved: list[tuple[CanonicalDocument, SupplierResolution]], data_source_id: UUID
+    resolved: list[tuple[CanonicalDocument, SupplierResolution]],
 ) -> list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution, str]]:
-    """The identity and the content fingerprint of every document, in file order.
-
-    A real document is identified by its number (as it always was). An operating cost with no
-    number is identified by its CONTENT inside its data source, and numbered among its identical
-    siblings: a MULTISET, so two equal rows are two costs, the same rows in another order are the
-    same records, and a fourth equal row is only `#4`. The number counts the copies, never the
-    position of a row (ADR 0057)."""
-    seen: Counter[str] = Counter()
+    """The identity and the content fingerprint of every REAL document, in file order: its number,
+    as it always was. (An operating cost with no number is placed by `_place_synthetic`.)"""
     keyed: list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution, str]] = []
     for document, resolution in resolved:
-        if document.is_synthetic:
-            fingerprint = document.record_fingerprint(
-                str(resolution.supplier_id), str(data_source_id)
+        if document.normalized_invoice_number is None:  # pragma: no cover - checked by the DB
+            raise InvoiceImportError(
+                InvoiceErrorCode.VALIDATION_FAILED, "a document with no number and no identity"
             )
-            seen[fingerprint] += 1
-            key = record_key(fingerprint, seen[fingerprint])
-        else:
-            fingerprint = document.fingerprint(str(resolution.supplier_id))
-            if document.normalized_invoice_number is None:  # pragma: no cover - checked by the DB
-                raise InvoiceImportError(
-                    InvoiceErrorCode.VALIDATION_FAILED, "a document with no number and no identity"
-                )
-            key = document.normalized_invoice_number
-        identity = (resolution.supplier_id, key, document.invoice_date, document.document_kind)
+        identity = (
+            resolution.supplier_id,
+            document.normalized_invoice_number,
+            document.invoice_date,
+            document.document_kind,
+        )
+        fingerprint = document.fingerprint(str(resolution.supplier_id))
         keyed.append((identity, document, resolution, fingerprint))
     return keyed
+
+
+@dataclass(frozen=True, slots=True)
+class _Placement:
+    """Where one operating cost with no number goes (`InvoiceImportService._place_synthetic`)."""
+
+    identity: InvoiceIdentity
+    document: CanonicalDocument
+    resolution: SupplierResolution
+    fingerprint: str
+    action: Literal["NEW", "UNCHANGED", "RESTORE", "RECLASSIFY"]
+    # the revision to WRITE (the stored one for UNCHANGED, where nothing is written)
+    revision: int
+
+
+def _placement(
+    document: CanonicalDocument,
+    resolution: SupplierResolution,
+    fingerprint: str,
+    record: ExistingRecord | None,
+    action: Literal["NEW", "UNCHANGED", "RESTORE", "RECLASSIFY"],
+    revision: int,
+    key: str | None = None,
+) -> _Placement:
+    chosen = key if record is None else record.key
+    assert chosen is not None  # a new occurrence is given its key; an existing one has its own
+    identity = (resolution.supplier_id, chosen, document.invoice_date, document.document_kind)
+    return _Placement(identity, document, resolution, fingerprint, action, revision)
+
+
+def _stated_category(document: CanonicalDocument) -> CostCategory | None:
+    """The category the SOURCE stated for this cost (None: it stated none). An operating cost is one
+    line; what NINFA derives when the source says nothing is not a statement of the source."""
+    return next((line.explicit_category for line in document.lines), None)
+
+
+def _category_order(category: CostCategory | None) -> tuple[bool, str]:
+    """A fixed order for the categories of identical rows (none last), never the file order."""
+    return (category is None, "" if category is None else category.value)
 
 
 def _dry_run_summary(documents: list[ParsedDocument]) -> dict[str, Any]:
