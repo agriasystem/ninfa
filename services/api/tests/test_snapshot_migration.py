@@ -80,6 +80,7 @@ def test_head_is_the_snapshot_migration_with_its_tables_function_and_trigger(
         "trg_labor_entries_immutable",
         "trg_decision_runs_immutable",  # Gate 11, on top
         "trg_decision_observations_immutable",
+        "trg_invoice_removals_immutable",  # 0018, on top: a removal is never edited
     }
 
 
