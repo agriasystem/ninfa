@@ -234,12 +234,13 @@ class InvoiceMappingConfig(BaseModel):
             raise ValueError("document_identity can only say SYNTHETIC_COST_RECORD, or nothing")
         required = REQUIRED_FIELDS
         if self.is_synthetic:
-            # A file with a document number identifies by it; one that is a register of fiscal
-            # documents (type, due date, line number) is never covered by a synthetic identity.
+            # A file with a document number identifies by it. Whether a file WITHOUT one is a
+            # register of operating costs is decided before a mapping exists (ADR 0057): by the
+            # file when nothing in it points at fiscal documents, by a person when something does.
+            # A document type column may then stay mapped: its credit notes are refused row by row
+            # (a credit note is a fiscal document, never a synthetic cost).
             if F.INVOICE_NUMBER in self.column_mapping:
                 raise ValueError("a mapping with a document number identifies its records by it")
-            if document_evidence(f.value for f in self.column_mapping) == DocumentEvidence.STRONG:
-                raise ValueError("a register of fiscal documents needs its document number")
             required = REQUIRED_FIELDS - {F.INVOICE_NUMBER}
         missing = sorted(f.value for f in required if f not in self.column_mapping)
         if missing:

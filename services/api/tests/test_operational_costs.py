@@ -500,23 +500,48 @@ def test_a_row_number_never_becomes_part_of_what_a_cost_is(
         },
     ],
 )
-def test_the_whole_picture_of_an_invoice_register_cannot_borrow_the_synthetic_identity(
+def test_signals_of_documents_said_to_be_operating_costs_import_as_operating_costs(
     db_session: Session, factory: BookingFactory, extras: dict[str, tuple[str, str]]
 ) -> None:
-    """A document type, or a due date AND a row number AND a supplier identified fiscally: the
-    file says what it is, and the number stays required."""
-    costs = CostWorld.create(db_session, factory)
-    with pytest.raises(InvoiceImportError) as refused:
-        costs.confirm(
-            headers=[*OPERATIONAL_HEADERS, *(header for header, _ in extras.values())],
-            columns={
-                **OPERATIONAL_COLUMNS,
-                **{field: {"column": header} for field, (header, _) in extras.items()},
-            },
-            format_options=dict(SYNTHETIC),
-        )
+    """A document type, or a due date AND a row number AND a supplier identified fiscally, with no
+    document number: never taken to be invoices by the file alone (final correctness gate). Smart
+    Import asks the person; once they said operating costs, the mapping is valid and an ordinary
+    row is a synthetic cost. (The rule used to refuse this mapping outright: the person's answer is
+    now what decides.)"""
+    costs, result = register_with(db_session, factory, extras)
 
-    assert refused.value.code == InvoiceErrorCode.INVALID_MAPPING
+    assert result.succeeded and result.invoices_created == 1
+    [record] = all_records(db_session, costs)
+    assert record.invoice_number is None
+    assert record.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD
+
+
+@pytest.mark.parametrize("label", ["Nota di credito", "NC", "TD04", "nota credito", "TD08"])
+def test_a_credit_note_without_a_number_is_refused_never_a_synthetic_cost(
+    db_session: Session, factory: BookingFactory, label: str
+) -> None:
+    """T19: a credit note is a fiscal document. In a register of operating costs (no number) its row
+    is refused with a readable reason; nothing of the file is recorded as a synthetic cost."""
+    costs, result = register_with(db_session, factory, {"document_type": ("Tipo documento", label)})
+
+    assert not result.succeeded
+    assert all_records(db_session, costs) == []
+    assert set(result.row_error_summary) == {InvoiceErrorCode.CREDIT_NOTE_WITHOUT_NUMBER.value}
+
+
+def test_only_the_document_type_says_credit_note_never_the_sign_of_the_amount(
+    db_session: Session, world: CostWorld
+) -> None:
+    """A negative amount with no document type is not inferred to be a credit note: it is what the
+    register says, an operating cost (a refund, a correction) with its own sign."""
+    refund = cost_row(description="Rimborso conguaglio", net="-12.00", tax="-2.64", gross="-14.64")
+
+    result = import_costs(world, [refund])
+
+    assert result.succeeded and result.invoices_created == 1
+    [record] = all_records(db_session, world)
+    assert record.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD
+    assert record.document_kind.value == "INVOICE"
 
 
 @pytest.mark.parametrize(

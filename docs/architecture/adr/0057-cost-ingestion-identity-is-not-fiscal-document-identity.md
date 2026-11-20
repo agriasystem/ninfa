@@ -46,17 +46,23 @@ model was to **invent a number**, i.e. to store a fiscal fact that does not exis
    written with the import and re-checked under the source lock against the figure the person was shown (`IMPORT_PLAN_CHANGED` otherwise). **PARTIAL**, **DELTA** and no word at all take nothing away.
    A record a later file holds again counts again as the **next revision** of the same identity (the old row stays, the removal stays). `is_current_invoice()` (the one filter every cost reader
    carries) now reads the key and the removals; nothing else in analysis, decisions or Mia changed.
-8. **FatturaPA and registers of fiscal documents keep needing their number; a weak signal is a question, never a blocker.** An XML reads its own number and fails without one. For a structured
-   file the evidence that it is a register of fiscal documents is **strong** when it carries a document number (or a column that may be it), a **document type** column (it says what kind of fiscal
-   document each line is; its values must be fiscal document labels), or the whole picture of an invoice register: a **due date AND a row number AND a supplier identified fiscally** (VAT, tax code or
-   IBAN). A due date or a row number **alone, or together,** are *weak*: an operating-cost register carries them too ("Scadenza", "N."), so they prove nothing. With strong evidence the synthetic
-   identity is refused (the mapping cannot be built) and the usual blocker says what is missing. With weak evidence and no number the file is **not blocked on a column that may not exist**: Smart
-   Import asks one semantic question, *"Questo file contiene fatture o documenti, oppure un registro di costi operativi?"* (`DOCUMENT_IDENTITY` with two choices), and the answer enters Source Learning
-   like any other (a preview writes nothing, so the answer is remembered when an import from that family succeeds; "fatture o documenti" keeps the number required and cannot import this shape).
-9. **UX: one plain confirmation, never a dead end.** When a costs file has everything an import needs except the number, Smart Import asks one question (`DOCUMENT_IDENTITY`) instead of a
-   blocker: *"Questo file contiene costi senza numero documento. NINFA può registrarli come costi operativi usando un riferimento interno. Non verrà creato né modificato alcun numero di
-   fattura."* with the single action *"Continua come costi operativi"*. The level is `ASK`, not `MANUAL`. The answer is part of the decision the server issues and verifies (it cannot be posted
-   by hand to turn a question into a yes; a matching built by hand never carries it).
+8. **Without a column of document numbers, a file is never taken to be invoices by itself** (final correctness gate, which supersedes the first two versions of this rule: "a document type, a due
+   date or a line number refuse the synthetic identity", then "strong evidence refuses it"). An XML (FatturaPA) reads its own number and still fails without one. For a structured file:
+   * a column of document numbers **filled in most of its rows** (more than half of the scanned rows): the records are identified by their numbers, as always;
+   * otherwise, the evidence of `invoices.mapping.document_evidence` is read without the number. **None** or **weak** (a due date and/or a row number, alone or together: an operating-cost register
+     carries them too, "Scadenza", "N.") -> **operating costs, with no question**: the decision carries `document_identity = SYNTHETIC_COST_RECORD` from the server's own reading. **Strong** (a
+     **document type** column, or a due date AND a row number AND a supplier identified fiscally by VAT, tax code or IBAN), or a number column **empty in most rows** -> **one semantic question**,
+     *"Questo file contiene fatture o documenti, oppure un registro di costi operativi?"* (`DOCUMENT_IDENTITY`, two choices). Nothing is refused and no column is to be matched;
+   * a person who said **"Fatture o documenti"** (now, or for this family before) gets a plain `BLOCKED` with `DOCUMENT_NUMBER_MISSING`: the file is not imported as invoices, the copy says that the
+     number is needed to register invoices and points at the electronic invoice (XML) or a register exported with the number column. It is never the matching screen and never a request to point
+     at a column the file does not have;
+   * a number column empty in most rows is left out of a register of operating costs (its few numbers identify nothing);
+   * with a document type column kept in a register of operating costs, a row whose type is a **credit note** ("Nota di credito", "NC", TD04, TD08...) is refused row by row
+     (`CREDIT_NOTE_WITHOUT_NUMBER`), never recorded as a synthetic cost. A negative amount alone is never read as a credit note.
+   The mapping (`InvoiceMappingConfig`) no longer refuses a synthetic identity next to a document type or a due date: whether a file WITHOUT a number holds operating costs is decided before a
+   mapping exists, by the file when nothing points at documents and by a person when something does. A mapping with a document number still cannot say there is none.
+9. **UX: never a dead end, never a hunt for a column.** A file with no document signal is simply "File riconosciuto". A file with one is asked the question above; the level is `ASK`, not `MANUAL`.
+   The answer is part of the decision the server issues and verifies (it cannot be posted by hand to turn a question into a yes; a matching built by hand never carries it).
 10. **Source Learning.** The answer is remembered by the family of files (the same mechanism as the net/gross basis), shown with the remembered answers, correctable by answering again after
     forgetting it, forgotten with its family, scoped to the source and never retroactive on imported data.
 11. **The internal key is never shown.** It appears in no API schema, contract, copy or Mia tool, and never as "Numero fattura" / "Numero documento". It stays internal.
@@ -68,8 +74,12 @@ These are choices the brief left to the implementation; each is one line to chan
 * **Costs now have a scope.** Until now a cost register "may always be partial" (`scope_effect = 0`). That is still true for a register identified by document numbers. For operating costs with no
   number there is no other way to retire a stale or corrected record, so the FULL/PARTIAL/DELTA question applies to them (first file never asks; later files ask only when something would stop
   counting, and the answer is remembered only if the person ticks the box).
-* **What is strong evidence of a register of fiscal documents**: a document type, or a due date + a row number + a fiscal supplier identifier. A due date or a row number alone, or together, are weak
-  and only lead to a question.
+* **No question at all for a file with no document signal** (or only a due date / a row number): it is read as operating costs. A synthetic cost and the same cost later arriving as a FatturaPA in
+  another source are two costs (decision 6): the person is not asked to confirm, by the rule of the final gate.
+* **What is a document signal**: a document type, or a due date + a row number + a fiscal supplier identifier, or a number column empty in most rows ('most' = more than half of the scanned
+  rows). They lead to the question, never to a refusal.
+* **There is no NINFA costs template.** The `DOCUMENT_NUMBER_MISSING` copy points at the electronic invoice (XML) and at a register exported with the number column; the CSV template endpoint
+  still refuses COSTS.
 * **The cost category is not part of the identity, and is never lost**: it is the metadata of each occurrence (matching and reclassification as in decision 5).
 
 ## Limitations
@@ -80,6 +90,8 @@ These are choices the brief left to the implementation; each is one line to chan
   has it.
 * Pairing in step (2) of decision 5 is by a fixed order, not by similarity: with several records and several new categories at once it is deterministic and keeps the count, but which of two
   equally-economic records takes which new category is a convention, not a fact of the source.
+* A matching built by hand never carries the synthetic identity: on the matching screen (opened only by the person, for a file NINFA could not read for another reason) a costs file without a
+  number still needs one. Smart Import's own states never ask for it.
 * A file of one or two rows is read with columns at medium confidence (a known Smart Import trait), so the source's memory is not reused and the question is asked again.
 * Two sources of the same property with the same costs are two sets of costs by design; deduplicating between them is a decision for a person, not an identity rule.
 * The downgrade of 0018 refuses once a synthetic record or a removal exists.

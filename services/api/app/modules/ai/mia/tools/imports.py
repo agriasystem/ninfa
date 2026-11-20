@@ -605,27 +605,25 @@ QUESTIONS: dict[QuestionKind, _Explained] = {
         remembered="Puoi scegliere di ricordare la scelta per i prossimi file.",
     ),
     QuestionKind.DOCUMENT_IDENTITY: _Explained(
-        asked=(
-            "Questo file contiene costi senza numero documento: li registro come costi operativi?"
-        ),
+        asked=("Questo file contiene fatture o documenti, oppure un registro di costi operativi?"),
         meaning=(
-            "Il file ha data, fornitore, descrizione e importo, ma nessun numero di documento. "
-            "NINFA non inventa mai un numero di fattura. Se dici che sono costi operativi "
-            "(utenze, lavanderia, manutenzione, commissioni, costi mensili) li registra con un "
-            "riferimento interno suo, che non compare mai come numero fattura. Una scadenza o un "
-            "numero di riga non bastano a dire che il file è un registro di fatture: in quel caso "
-            "NINFA chiede se sono fatture o costi operativi. Un file con la colonna del tipo di "
-            "documento continua invece a richiedere il numero del documento."
+            "Il file ha data, fornitore, descrizione e importo, ma nessun numero di documento, e "
+            "qualcosa indica documenti fiscali (per esempio la colonna del tipo di documento). "
+            "NINFA non inventa mai un numero di fattura. Un file senza numero in cui nulla indica "
+            "documenti fiscali (una scadenza o un numero di riga da soli non bastano) viene "
+            "registrato come costi operativi senza domande."
         ),
         answers=(
             (
-                "Continua come costi operativi",
+                "Un registro di costi operativi",
                 "I costi vengono importati con un riferimento interno di NINFA: nessun numero di "
-                "fattura viene creato o modificato.",
+                "fattura viene creato o modificato. Le note di credito senza numero non vengono "
+                "registrate.",
             ),
             (
-                "Fatture o documenti (solo se il file ha una scadenza o un numero di riga)",
-                "Il numero del documento resta obbligatorio: il file va completato con il numero.",
+                "Fatture o documenti",
+                "Il file non viene importato: senza il numero del documento le fatture non si "
+                "possono registrare.",
             ),
         ),
         remembered=(
@@ -633,8 +631,9 @@ QUESTIONS: dict[QuestionKind, _Explained] = {
             "o farla dimenticare dalle risposte ricordate."
         ),
         note=(
-            "Si chiede solo quando al file manca soltanto il numero del documento. Lo stesso costo "
-            "importato due volte non si duplica; due righe uguali nel file restano due costi."
+            "Si chiede solo quando al file manca soltanto il numero del documento e qualcosa "
+            "indica documenti fiscali. Lo stesso costo importato due volte non si duplica; due "
+            "righe uguali nel file restano due costi."
         ),
     ),
 }

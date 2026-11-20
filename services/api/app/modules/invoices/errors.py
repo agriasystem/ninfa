@@ -47,6 +47,9 @@ class InvoiceErrorCode(StrEnum):
     INVALID_COUNTRY = "INVOICE_INVALID_COUNTRY"
     UNKNOWN_DOCUMENT_TYPE = "INVOICE_UNKNOWN_DOCUMENT_TYPE"
     UNSUPPORTED_DOCUMENT_TYPE = "INVOICE_UNSUPPORTED_DOCUMENT_TYPE"
+    # A row of a register of operating costs (no document number, ADR 0057) that says it is a credit
+    # note: a fiscal document, which needs its number. Refused, never recorded as a synthetic cost.
+    CREDIT_NOTE_WITHOUT_NUMBER = "INVOICE_CREDIT_NOTE_WITHOUT_NUMBER"
     UNKNOWN_CATEGORY = "INVOICE_UNKNOWN_CATEGORY"
     DUPLICATE_LINE = "INVOICE_DUPLICATE_LINE"
     INCONSISTENT_HEADER = "INVOICE_INCONSISTENT_HEADER"

@@ -128,10 +128,10 @@ Category words are NINFA's own lexicon (Utenze, Lavanderia, Consulenze...) plus 
 | `DATES_REVERSED` | the arrival is after the departure on (nearly) every row | "Controlla le colonne" (the matching screen); nothing is swapped |
 | `FILE_SCOPE` | stored records of the file's period are not in it, and that changes what counts ([import-scope-semantics-v1.md](import-scope-semantics-v1.md)) | all of it / a part / what is new |
 | `FILE_SCOPE_CONFIRM` | a family remembered as complete, and this file would stop something counting ([ADR 0041](adr/0041-remembered-scope-safety.md)) | all of it / a part, for this import; remembered only if the box is ticked |
-| `DOCUMENT_IDENTITY` | a costs file with everything the import needs except a document number, and no STRONG evidence that it is a register of fiscal documents; a due date or a row number alone are weak ([ADR 0057](adr/0057-cost-ingestion-identity-is-not-fiscal-document-identity.md)) | "Continua come costi operativi" (no document signal), or "un registro di costi operativi" / "fatture o documenti" (weak signals): internal reference, no invoice number created; remembered by the family |
+| `DOCUMENT_IDENTITY` | a costs file with everything the import needs except a column of document numbers filled in most rows, and a document signal (a document type, or due date + row number + a fiscal supplier identifier, or a number column empty in most rows); with no signal, or only a due date / a row number, the file is read as operating costs with no question ([ADR 0057](adr/0057-cost-ingestion-identity-is-not-fiscal-document-identity.md)) | "un registro di costi operativi" (internal reference, no invoice number created; remembered by the family) / "fatture o documenti" (`DOCUMENT_NUMBER_MISSING`: not imported) |
 
 Blockers: `NO_TABLE`, `MISSING_REQUIRED`, `PERIOD_SUMMARY_ONLY`, `GRID_NOT_SUPPORTED`, `GRID_NOT_HOURS`, `AMOUNT_NOT_NET`,
-`MIXED_FORMATS`. What the person says is never asked again (`answers`).
+`MIXED_FORMATS`, `DOCUMENT_NUMBER_MISSING`. What the person says is never asked again (`answers`).
 
 ## API
 

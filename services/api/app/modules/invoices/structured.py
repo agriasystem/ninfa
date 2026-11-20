@@ -377,6 +377,11 @@ class _Row:
         kind = resolve_document_kind(self.document_type_text)
         if kind is None:
             self._add(F.DOCUMENT_TYPE, InvoiceErrorCode.UNKNOWN_DOCUMENT_TYPE)
+        elif kind == DocumentKind.CREDIT_NOTE and self._synthetic:
+            # Only the document type says it (a negative amount alone never does): a credit note is
+            # a fiscal document, and one with no number is refused, never made a synthetic cost.
+            self._add(F.DOCUMENT_TYPE, InvoiceErrorCode.CREDIT_NOTE_WITHOUT_NUMBER)
+            return None
         return kind
 
     def _amount(self, field: InvoiceField, *, required: bool = False) -> Decimal | None:

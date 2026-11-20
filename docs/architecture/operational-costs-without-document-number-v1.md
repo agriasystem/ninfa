@@ -56,11 +56,18 @@ A real invoice is never removed by any file. Registers identified by document nu
 
 ## Smart Import
 
-* `QuestionKind.DOCUMENT_IDENTITY`, asked only when: the domain is COSTS (detected or confirmed), no column is (or may be) the number, the file does not give STRONG evidence of being a register of
-  fiscal documents (`invoices.mapping.document_evidence`: a document type, or due date + row number + a fiscal supplier identifier), and every other required group (supplier, date, description,
-  line total) is present. With no document signal at all it has one choice ("Continua come costi operativi"); with weak signals only (a due date and/or a row number) it has two
-  ("Un registro di costi operativi" / "Fatture o documenti") and the file is not blocked.
-* Level: `ASK` with the one question (a provisional check is made as if the answer were given, so the file is not sent to the matching screen). After the answer the number is not required
+* **The rule (final correctness gate, `understanding._identity_case`).** Domain COSTS (detected or confirmed), no column of document numbers filled in most rows, no column that MAY be
+  the number:
+  * no document signal, or only a due date / a row number (`document_evidence` NONE or WEAK): read as operating costs, **no question**, `document_identity = SYNTHETIC_COST_RECORD` in the
+    server's decision;
+  * a document signal (STRONG: document type, or due date + row number + VAT/tax code/IBAN; or a number column empty in most rows): `QuestionKind.DOCUMENT_IDENTITY` with two choices
+    ("Un registro di costi operativi" / "Fatture o documenti"), asked only when every other required group (supplier, date, description, line total) is present;
+  * "Fatture o documenti" (answered now, or remembered): `BLOCKED` with `DOCUMENT_NUMBER_MISSING` - not imported, a plain reason, never the matching screen;
+  * a number column empty in most rows is left out of the decision when the file is operating costs;
+  * the provisional check is always made as operating costs, so no blocker ever lists a number the file does not have.
+* Rows of a register of operating costs whose document type is a credit note are refused (`INVOICE_CREDIT_NOTE_WITHOUT_NUMBER`); a negative amount alone is never a credit note.
+* Level: `READY` with no question for operating costs; `ASK` with the one question when a document signal is there (a provisional check is made as if the answer were given, so the file is not
+  sent to the matching screen). After the answer the number is not required
   (`FileDomain.required_groups(decision)`), the decision carries `document_identity`, and the server's re-read must agree.
 * The answer is kept in the family's memory (`REMEMBERED_ANSWERS += document_identity`) like the net/gross basis; it is listed with the remembered answers and forgotten with its family.
 * Copy (Italian) lives in `apps/web/lib/sources/copy.ts` (`understanding.question.DOCUMENT_IDENTITY`); Mia explains the question (`mia/tools/imports.py`, knowledge entry

@@ -76,6 +76,10 @@ class BlockerCode(StrEnum):
     AMOUNT_NOT_NET = "AMOUNT_NOT_NET"
     # One column writes its dates (or numbers) in two different ways: the file has to be fixed.
     MIXED_FORMATS = "MIXED_FORMATS"
+    # Costs a person said are fiscal documents (invoices), in a file with no document number in most
+    # of its rows (ADR 0057): they cannot be registered as invoices, and NINFA never invents a
+    # number nor asks for a column the file does not have.
+    DOCUMENT_NUMBER_MISSING = "DOCUMENT_NUMBER_MISSING"
 
 
 class OriginKind(StrEnum):

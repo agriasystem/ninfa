@@ -37,7 +37,8 @@ OPERATIONAL_COLUMNS: dict[str, dict[str, Any]] = {
     "invoice_tax_amount": {"column": "IVA"},
     "invoice_gross_amount": {"column": "Totale"},
 }
-# What a person's "Continua come costi operativi" puts in the mapping.
+# What the mapping says of a register of operating costs (read so by the file, or by a person's
+# "Un registro di costi operativi").
 SYNTHETIC = {"document_identity": "SYNTHETIC_COST_RECORD"}
 
 

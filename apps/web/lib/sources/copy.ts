@@ -530,6 +530,8 @@ export const sourcesCopy = {
       INVALID_VAT_NUMBER: "partita IVA non valida",
       INVALID_TAX_CODE: "codice fiscale non valido",
       UNKNOWN_DOCUMENT_TYPE: "tipo di documento non riconosciuto",
+      CREDIT_NOTE_WITHOUT_NUMBER:
+        "nota di credito senza numero del documento: non può essere registrata come costo operativo",
     } satisfies Record<string, string>,
     rowProblemFallback: "valore non valido",
     save: "Salva questa configurazione per i prossimi file",
@@ -702,18 +704,14 @@ export const sourcesCopy = {
         gross: "No, comprende l'IVA",
         why: "NINFA analizza i costi al netto di IVA, e non deve indovinare quale importo sia.",
       },
+      // Asked only when something in a file of costs without document numbers points at fiscal documents (a
+      // document type, say). A due date or a row number alone is what an operating-cost register carries too.
       DOCUMENT_IDENTITY: {
-        title: "Questo file contiene costi senza numero documento.",
-        why: "NINFA può registrarli come costi operativi usando un riferimento interno. Non verrà creato né modificato alcun numero di fattura.",
-        yes: "Continua come costi operativi",
+        title: "Questo file contiene fatture o documenti, oppure un registro di costi operativi?",
+        why: "Nel file ci sono indicazioni da documento fiscale (per esempio il tipo di documento), ma non il numero del documento. Se sono costi operativi, NINFA li registra con un riferimento interno e non crea alcun numero di fattura. Se sono fatture, senza il numero NINFA non può registrarle.",
+        costs: "Un registro di costi operativi",
+        documents: "Fatture o documenti",
         remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
-        // A due date or a row number is what an operating-cost register carries too: not blocked, asked.
-        either: {
-          title: "Questo file contiene fatture o documenti, oppure un registro di costi operativi?",
-          why: "Nel file c'è una scadenza o un numero di riga, ma non il numero del documento. Se sono costi operativi, NINFA li registra con un riferimento interno e non crea alcun numero di fattura. Se sono fatture, serve il numero del documento.",
-          costs: "Un registro di costi operativi",
-          documents: "Fatture o documenti",
-        },
       },
       DATE_ORDER: { title: "Come sono scritte le date di questo file?" },
       DECIMAL_STYLE: { title: "Come sono scritti i numeri con i decimali?" },
@@ -816,6 +814,9 @@ export const sourcesCopy = {
         "L'importo comprende l'IVA. NINFA lavora con l'importo al netto di IVA (l'imponibile): esporta anche quella colonna e riprova.",
       MIXED_FORMATS:
         "In una colonna le date (o i numeri) sono scritti in modi diversi. Correggi il file e riprova.",
+      // Costs said to be invoices, in a file with no document number: no column to match, no number invented.
+      DOCUMENT_NUMBER_MISSING:
+        "Questo file non contiene il numero del documento, che serve per registrare le fatture: NINFA non lo inventa. Per le fatture carica la fattura elettronica XML da «Importa le fatture», oppure un registro esportato dal gestionale con la colonna del numero del documento. Se invece sono costi operativi, scegli di nuovo il file e rispondi «Un registro di costi operativi».",
       checkColumns: "Controlla colonne",
     },
     manualIntro:

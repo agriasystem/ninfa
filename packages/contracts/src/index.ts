@@ -1165,7 +1165,9 @@ export type UnderstandingBlockerCode =
   | "GRID_NOT_SUPPORTED"
   | "GRID_NOT_HOURS"
   | "AMOUNT_NOT_NET"
-  | "MIXED_FORMATS";
+  | "MIXED_FORMATS"
+  /** Costs said to be invoices, in a file with no document number: never imported as invoices, never matched by hand. */
+  | "DOCUMENT_NUMBER_MISSING";
 
 export interface UnderstandingBlocker {
   code: UnderstandingBlockerCode;

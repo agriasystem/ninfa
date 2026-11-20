@@ -910,40 +910,8 @@ describe("when NINFA is not sure enough", () => {
   });
 });
 
-describe("a file of costs with no document number", () => {
-  const asksIdentity = () =>
-    ok(
-      understoodInspection(
-        { level: "ASK", questions: [questionOf("DOCUMENT_IDENTITY", { field: "invoice_number" })] },
-        { domain: "COSTS" },
-      ),
-    );
-
-  it("gets one plain confirmation instead of a hunt for a column that does not exist", async () => {
-    understandFileMock.mockResolvedValueOnce(asksIdentity());
-    const user = renderFlow();
-
-    await pick(user, csvFile("costi_ottobre.csv"));
-
-    await within(panel()).findByRole("heading", {
-      level: 3,
-      name: "Questo file contiene costi senza numero documento.",
-    });
-    const text = flat(panel());
-    expect(text).toContain(
-      "NINFA può registrarli come costi operativi usando un riferimento interno. Non verrà creato né modificato alcun numero di fattura.",
-    );
-    expect(within(panel()).getByRole("button", { name: "Continua come costi operativi" })).not.toBeNull();
-    // nothing technical, and no matching screen asking for a document number that is not in the file
-    for (const technical of ["SYNTHETIC", "source_record_key", "invoice_number", "Numero del documento"]) {
-      expect(text).not.toContain(technical);
-    }
-    expect(text).not.toContain("Abbina le colonne");
-    expect(validateImportMock).not.toHaveBeenCalled();
-  });
-
-  it("the answer is the person's, is sent to be read again, and travels with the decision", async () => {
-    understandFileMock.mockResolvedValueOnce(asksIdentity());
+describe("a file of costs with no document number and nothing that points at documents", () => {
+  it("is read as operating costs: no question, no hunt for a column that does not exist", async () => {
     understandFileMock.mockResolvedValueOnce(
       ok(
         understoodInspection(
@@ -957,26 +925,29 @@ describe("a file of costs with no document number", () => {
     const user = renderFlow();
 
     await pick(user, csvFile("costi_ottobre.csv"));
-    await user.click(await within(panel()).findByRole("button", { name: "Continua come costi operativi" }));
 
     await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
-    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({
-      answers: { document_identity: "SYNTHETIC_COST_RECORD" },
-    });
+    const text = flat(panel());
+    for (const absent of [
+      "Questo file contiene fatture o documenti",
+      "Abbina le colonne",
+      "Nel file non ho trovato:",
+      "SYNTHETIC",
+      "source_record_key",
+      "invoice_number",
+    ]) {
+      expect(text).not.toContain(absent);
+    }
 
     await user.click(within(panel()).getByRole("button", { name: "Importa dati" }));
 
     await within(panel()).findByRole("heading", { level: 3, name: "Importazione completata" });
-    const sent = importMatchedFileMock.mock.calls[0]?.[0] as {
-      mapping: { document_identity: string };
-      saveConfiguration: boolean;
-    };
+    const sent = importMatchedFileMock.mock.calls[0]?.[0] as { mapping: { document_identity: string } };
     expect(sent.mapping.document_identity).toBe("SYNTHETIC_COST_RECORD"); // carried back as the server built it
-    expect(sent.saveConfiguration).toBe(true); // a person's answer is worth remembering for the source
   });
 });
 
-describe("a file of costs with a due date or a row number but no document number", () => {
+describe("a file of costs with no document number in which something points at documents", () => {
   const either = () =>
     ok(
       understoodInspection(
@@ -996,7 +967,7 @@ describe("a file of costs with a due date or a row number but no document number
       ),
     );
 
-  it("is asked what it is, never blocked on a column that may not exist", async () => {
+  it("is asked what it is, never blocked on a column that does not exist", async () => {
     understandFileMock.mockResolvedValueOnce(either());
     const user = renderFlow();
 
@@ -1007,12 +978,15 @@ describe("a file of costs with a due date or a row number but no document number
       name: "Questo file contiene fatture o documenti, oppure un registro di costi operativi?",
     });
     const text = flat(panel());
-    expect(text).toContain("Nel file c'è una scadenza o un numero di riga, ma non il numero del documento.");
+    expect(text).toContain(
+      "Nel file ci sono indicazioni da documento fiscale (per esempio il tipo di documento), ma non il numero del documento.",
+    );
     expect(within(panel()).getByRole("button", { name: "Un registro di costi operativi" })).not.toBeNull();
     expect(within(panel()).getByRole("button", { name: "Fatture o documenti" })).not.toBeNull();
     for (const technical of ["SYNTHETIC", "DOCUMENT_NUMBER", "invoice_number", "source_record_key"]) {
       expect(text).not.toContain(technical);
     }
+    expect(text).not.toContain("Abbina le colonne");
     expect(validateImportMock).not.toHaveBeenCalled();
   });
 
@@ -1030,5 +1004,34 @@ describe("a file of costs with a due date or a row number but no document number
 
     await waitFor(() => expect(understandFileMock).toHaveBeenCalledTimes(2));
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: { document_identity: value } });
+  });
+
+  it("said to be invoices, it is refused plainly: never imported, never a column to match", async () => {
+    understandFileMock.mockResolvedValueOnce(either());
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection(
+          { level: "BLOCKED", blockers: [{ code: "DOCUMENT_NUMBER_MISSING", groups: [] }] },
+          { domain: "COSTS" },
+        ),
+      ),
+    );
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi.csv"));
+    await user.click(await within(panel()).findByRole("button", { name: "Fatture o documenti" }));
+
+    const alert = await within(panel()).findByRole("alert");
+    const text = flat(alert);
+    expect(text).toContain("Questo file non contiene il numero del documento, che serve per registrare le fatture");
+    expect(text).toContain("«Importa le fatture»");
+    expect(text).toContain("Non è stato importato nulla.");
+    // no request, in any form, to point at a column the file does not have
+    expect(text).not.toContain("Nel file non ho trovato:");
+    expect(within(panel()).queryByRole("button", { name: "Abbina le colonne" })).toBeNull();
+    expect(within(panel()).getByRole("button", { name: "Scegli un altro file" })).not.toBeNull();
+    expect(flat(panel())).not.toContain("invoice_number");
+    expect(validateImportMock).not.toHaveBeenCalled();
+    expect(importMatchedFileMock).not.toHaveBeenCalled();
   });
 });
