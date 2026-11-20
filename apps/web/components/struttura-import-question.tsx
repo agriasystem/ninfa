@@ -465,7 +465,10 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
       // Costs said to be invoices, whose number nobody named: only the columns of THIS file that may hold it
       // are offered, each with what it holds, and "none of these" - never a column the file does not have.
       const examplesOf = (header: string) =>
-        step.inspection.columns.find((column) => column.header === header)?.examples.slice(0, 2) ?? [];
+        // (the first two the backend sends; the browser never cuts anything of the file itself)
+        (step.inspection.columns.find((column) => column.header === header)?.examples ?? []).filter(
+          (_, index) => index < 2,
+        );
       body = (
         <>
           {heading(COPY.DOCUMENT_NUMBER_COLUMN.title)}
