@@ -903,3 +903,225 @@ def test_t28_a_register_with_a_movement_id_1_to_n_is_operating_costs_with_no_que
     assert_operating_costs_without_question(body)
     fields = {c["header"]: c["field"] for c in body["proposal"]["columns"]}
     assert fields["ID movimento"] is None
+
+
+# --- T29, T30: the same register when its header changes -------------------------------------
+
+REGISTER = [
+    cost_row(
+        day=f"2026-10-{day:02d}",
+        supplier=supplier,
+        category=category,
+        description=f"{description} ottobre",
+        net=net,
+        tax="0.00",
+        gross=net,
+    )
+    for day, supplier, category, description, net in [
+        (5, "Enel Energia", "UTILITIES", "Energia elettrica", "100.00"),
+        (6, "Acqua Salento", "UTILITIES", "Acqua", "40.00"),
+        (7, "Lavanderia Salento", "LAUNDRY", "Lavaggio biancheria", "55.00"),
+        (8, "Gas Puglia", "UTILITIES", "Gas", "30.00"),
+        (9, "Pulizie Lecce", "CLEANING", "Pulizie camere", "80.00"),
+    ]
+]
+
+
+def registers(session: Session, env: SourcesEnv) -> set[str | None]:
+    return {r.cost_register_key for r in counting(session, env)}
+
+
+def with_column(rows: list[list[Any]], header: str, value: str) -> bytes:
+    return csv([[*row, value] for row in rows], [*OPERATIONAL_HEADERS, header])
+
+
+def first_register(api_client: TestClient, env: SourcesEnv, session: Session) -> str | None:
+    content = csv(REGISTER)
+    body = ask(api_client, env, content)
+    assert body["understanding"]["level"] == "READY", body["understanding"]
+    assert imported(api_client, env, content, body)["succeeded"] is True
+    [key] = registers(session, env)
+    return key
+
+
+def test_t29_a_column_nobody_reads_added_to_the_register_is_the_same_register(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T29 (a): the register keeps its columns and gains one NINFA does not read ("Note"): the
+    register is the same (it is made of the columns read), nothing is duplicated."""
+    key = first_register(api_client, env, db_session)
+    content = with_column(REGISTER, "Note", "verificato")
+
+    body = ask(api_client, env, content)
+    assert {c["header"]: c["field"] for c in body["proposal"]["columns"]}["Note"] is None
+    result = imported(api_client, env, content, body)
+
+    assert result["succeeded"] is True and result["created"] == 0
+    assert len(counting(db_session, env)) == 5 and registers(db_session, env) == {key}
+
+
+def test_t29_a_column_read_added_to_the_register_duplicates_nothing_and_keeps_the_old_register(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T29 (b): the register gains a column NINFA reads ("Scadenza"): another register (another
+    structure). The same costs are recognised by their content: nothing is duplicated. The costs
+    re-observed KEEP the register that wrote them: a re-observation writes nothing (an unchanged
+    record is never rewritten, and the rows are immutable), so their register cannot move."""
+    key = first_register(api_client, env, db_session)
+    content = with_column(REGISTER, "Scadenza", "2026-11-30")
+
+    body = ask(api_client, env, content)
+    assert {c["header"]: c["field"] for c in body["proposal"]["columns"]}["Scadenza"] == "due_date"
+    result = imported(api_client, env, content, body)
+
+    assert result["succeeded"] is True and result["created"] == 0 and result["unchanged"] == 5
+    assert len(counting(db_session, env)) == 5
+    assert registers(db_session, env) == {key}  # still the register that wrote them
+
+
+def test_t30_a_complete_file_of_the_same_register_takes_away_exactly_the_missing_cost(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T30 (a): after T29 (a), complete without the cost of the 7th: exactly that one goes."""
+    first_register(api_client, env, db_session)
+    lacking = with_column([r for r in REGISTER if r[0] != "2026-10-07"], "Note", "verificato")
+
+    body = ask(api_client, env, lacking, {"file_scope": "FULL"})
+
+    assert body["understanding"]["removes"] == 1
+    assert [item["supplier"] for item in body["understanding"]["removal_preview"]] == [
+        "Lavanderia Salento"
+    ]
+    result = imported(api_client, env, lacking, body)
+    assert result["removed"] == 1 and len(counting(db_session, env)) == 4
+
+
+def test_t30_after_a_change_of_structure_a_complete_file_takes_away_less_never_more(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T30 (b), a known limit: after T29 (b) the costs belong to the OLD register, so a complete
+    file with the new header takes away nothing - the missing cost keeps counting (less, never
+    more). It is not asked what the file holds, because nothing would stop counting."""
+    first_register(api_client, env, db_session)
+    content = with_column(REGISTER, "Scadenza", "2026-11-30")
+    imported(api_client, env, content, ask(api_client, env, content))
+    lacking = with_column([r for r in REGISTER if r[0] != "2026-10-07"], "Scadenza", "2026-11-30")
+
+    asked = ask(api_client, env, lacking)
+    assert "FILE_SCOPE" not in kinds(asked)
+    body = ask(api_client, env, lacking, {"file_scope": "FULL"})
+    result = imported(api_client, env, lacking, body)
+
+    assert body["understanding"]["removes"] == 0 and result["removed"] == 0
+    assert len(counting(db_session, env)) == 5  # never more taken than the file's own register
+
+
+# --- T33, T34: what a person is shown before a complete file takes costs away ----------------
+
+
+def test_t33_the_costs_that_would_stop_counting_are_shown_one_by_one(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T33 (backend): date, supplier, category and amount of each, the same ones the import takes
+    away, when it is asked and on the summary once said."""
+    first_register(api_client, env, db_session)
+    lacking = csv([r for r in REGISTER if r[0] not in ("2026-10-06", "2026-10-08")])
+
+    asked = ask(api_client, env, lacking)
+    assert kinds(asked) == ["FILE_SCOPE"]
+    expected = [
+        {
+            "date": "2026-10-06",
+            "supplier": "Acqua Salento",
+            "category": "UTILITIES",
+            "amount": "40.00",
+            "currency": "EUR",
+        },
+        {
+            "date": "2026-10-08",
+            "supplier": "Gas Puglia",
+            "category": "UTILITIES",
+            "amount": "30.00",
+            "currency": "EUR",
+        },
+    ]
+    assert asked["understanding"]["removal_preview"] == expected
+    assert asked["understanding"]["scope"]["removal_count"] == 2
+    body = ask(api_client, env, lacking, {"file_scope": "FULL"})
+    assert body["understanding"]["removes"] == 2
+    assert body["understanding"]["removal_preview"] == expected
+    assert imported(api_client, env, lacking, body)["removed"] == 2
+    assert {r.invoice_date.isoformat() for r in counting(db_session, env)} == {
+        "2026-10-05",
+        "2026-10-07",
+        "2026-10-09",
+    }
+
+
+def test_t33_at_most_twenty_are_listed_and_the_count_says_the_rest(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    month = [
+        cost_row(
+            day=f"2026-10-{day:02d}",
+            supplier=f"Fornitore {day:02d}",
+            description=f"Servizio del giorno {day}",
+            net=f"{day}.00",
+            tax="0.00",
+            gross=f"{day}.00",
+        )
+        for day in range(1, 26)
+    ]
+    content = csv(month)
+    imported(api_client, env, content, ask(api_client, env, content))
+    ends = csv([month[0], month[1], month[23], month[24]])
+
+    body = ask(api_client, env, ends, {"file_scope": "FULL"})
+
+    u = body["understanding"]
+    assert u["removes"] == 21 and u["scope"]["removal_count"] == 21
+    assert len(u["removal_preview"]) == 20
+    days = [item["date"] for item in u["removal_preview"]]
+    assert days == sorted(days) and days[0] == "2026-10-03"
+
+
+def test_t34_two_registers_with_the_same_header_are_one_register_and_the_preview_says_so(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T34, a known limit (no change of logic): a laundry list and the utilities exported by the
+    same program have the SAME header, so NINFA sees one register. A complete utilities file would
+    take the laundry costs of those days away too - and the person is shown exactly which ones,
+    supplier and category, before saying the file is complete."""
+    laundry = [
+        cost_row(
+            day=f"2026-10-{day:02d}",
+            supplier="Lavanderia Salento",
+            category="LAUNDRY",
+            description=f"Lavaggio {day}",
+            net="55.00",
+            tax="0.00",
+            gross="55.00",
+        )
+        for day in (5, 6, 7)
+    ]
+    utilities = [
+        *(r for r in REGISTER if r[2] == "UTILITIES"),  # the 5th, 6th and 8th
+        cost_row(day="2026-10-09", supplier="Telecom", description="Telefono", net="20.00"),
+    ]
+    imported(api_client, env, csv(laundry), ask(api_client, env, csv(laundry)))
+    body = ask(api_client, env, csv(utilities), {"file_scope": "PARTIAL"})
+    assert imported(api_client, env, csv(utilities), body)["succeeded"] is True
+    assert len(registers(db_session, env)) == 1  # one register: the same header
+
+    without_gas = csv([utilities[0], utilities[1], utilities[3]])  # the 5th, 6th and 9th
+    asked = ask(api_client, env, without_gas)
+
+    assert kinds(asked) == ["FILE_SCOPE"]
+    shown = asked["understanding"]["removal_preview"]
+    assert [(i["date"], i["supplier"], i["category"]) for i in shown] == [
+        ("2026-10-05", "Lavanderia Salento", "LAUNDRY"),
+        ("2026-10-06", "Lavanderia Salento", "LAUNDRY"),
+        ("2026-10-07", "Lavanderia Salento", "LAUNDRY"),
+        ("2026-10-08", "Gas Puglia", "UTILITIES"),
+    ]
+    assert asked["understanding"]["scope"]["removal_count"] == 4

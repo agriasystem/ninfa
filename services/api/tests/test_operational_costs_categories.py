@@ -500,3 +500,48 @@ def test_a_complete_file_can_take_away_several_records_at_once(
     assert result.succeeded and result.records_removed == 4, result.error_code
     assert len(current_records(db_session, world)) == 1
     assert len({r.id for r in removals(db_session, world)}) == 4
+
+
+# --- T32: a complete file of operating costs never touches a real document ---------------------
+
+
+def test_t32_a_complete_file_of_operating_costs_never_takes_away_a_numbered_cost_of_its_period(
+    db_session: Session, world: CostWorld
+) -> None:
+    """Numbered invoices of the same source, on the same days: a complete file of operating costs
+    takes away only the synthetic cost it does not hold, never a fiscal document."""
+    numbered_headers = ["Numero", *OPERATIONAL_HEADERS]
+    world.confirm(
+        headers=numbered_headers,
+        columns={**OPERATIONAL_COLUMNS, "invoice_number": {"column": "Numero"}},
+    )
+    invoices = [
+        ["FT/1", *cost_row(day="2026-10-05", supplier="Fornitore A", description="Fattura uno")],
+        ["FT/2", *cost_row(day="2026-10-06", supplier="Fornitore B", description="Fattura due")],
+        ["FT/3", *cost_row(day="2026-10-07", supplier="Fornitore C", description="Fattura tre")],
+    ]
+    assert (
+        world.service()
+        .import_file(
+            world.source.id,
+            filename="fatture.csv",
+            content=operational_csv(invoices, numbered_headers),
+        )
+        .succeeded
+    )
+    confirm_operational(world)
+    x = cost_row(day="2026-10-05", supplier="Enel Energia", description="Luce", net="100.00")
+    y = cost_row(day="2026-10-06", supplier="Acqua Salento", description="Acqua", net="40.00")
+    z = cost_row(day="2026-10-07", supplier="Gas Puglia", description="Gas", net="30.00")
+    import_costs(world, [x, y, z])
+
+    result = import_costs(world, [x, z], scope=full(1))
+
+    assert result.succeeded and result.records_removed == 1, result.error_code
+    current = current_records(db_session, world)
+    numbered = sorted(r.invoice_number or "" for r in current if r.invoice_number)
+    assert numbered == ["FT/1", "FT/2", "FT/3"]  # every fiscal document still counts
+    assert len(current) == 5
+    [removal] = removals(db_session, world)
+    gone = next(r for r in all_records(db_session, world) if r.id == removal.invoice_id)
+    assert gone.invoice_number is None and gone.invoice_date.isoformat() == "2026-10-06"

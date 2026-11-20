@@ -811,7 +811,7 @@ def test_a_real_document_always_has_its_number_and_its_key_is_the_number(
 
 
 @pytest.mark.parametrize("register", [None, "not-a-hash", "D" * 64])
-def test_a_synthetic_record_always_says_which_register_wrote_it(
+def test_t31_a_synthetic_record_without_a_register_is_impossible(
     db_session: Session, rejects: Rejects, a: Costs, register: str | None
 ) -> None:
     with rejects(pg.CheckViolation, "ck_invoices_cost_register_key_only_for_synthetic"):
