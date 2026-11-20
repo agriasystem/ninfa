@@ -62,6 +62,7 @@ from tests.support import BookingFactory
 KEY = re.compile(r"^cost:v1:[0-9a-f]{64}#[1-9][0-9]*$")
 API_DIR = Path(__file__).resolve().parents[1] / "app" / "api"
 CONTRACTS = Path(__file__).resolve().parents[3] / "packages" / "contracts" / "src" / "index.ts"
+WEB_DIR = Path(__file__).resolve().parents[3] / "apps" / "web"
 
 X = cost_row()  # a utility bill
 Y = cost_row(day="2026-10-06", supplier="Acqua Salento", description="Acqua ottobre", net="40.00")
@@ -624,11 +625,28 @@ def test_no_invented_number_is_ever_stored(db_session: Session, world: CostWorld
 
 
 def test_the_internal_key_appears_in_no_surface_a_person_reads() -> None:
-    surfaces = [*API_DIR.rglob("*.py"), CONTRACTS]
+    """T20 (in the code): the API, the contracts, Mia's tools and knowledge, every other analysis
+    module and the web app never read, name or show the internal key (so never as "Numero fattura"
+    or "Numero documento" either). The person's own answer travels as SYNTHETIC_COST_RECORD where a
+    decision is carried (contracts, web, the Smart Import decision), never as a number."""
+    app_dir = API_DIR.parent
+    readers = [
+        path for path in app_dir.rglob("*.py") if "invoices" not in path.relative_to(app_dir).parts
+    ]
+    web = [
+        path
+        for folder in ("components", "lib", "app")
+        for path in (WEB_DIR / folder).rglob("*.ts*")
+        if ".test." not in path.name
+    ]
+    surfaces = [*readers, *web, CONTRACTS]
+    assert any("mia" in path.parts for path in readers) and web
+    deciders = {p for p in readers if "data_sources" in p.relative_to(app_dir).parts}
+    carried = {CONTRACTS, *web, *deciders}
     for path in surfaces:
         text = path.read_text(encoding="utf-8")
         for word in ("source_record_key", "identity_origin", "cost:v1", "SYNTHETIC_COST_RECORD"):
-            if path == CONTRACTS and word == "SYNTHETIC_COST_RECORD":
+            if path in carried and word == "SYNTHETIC_COST_RECORD":
                 continue  # the person's own answer travels as that word, never as a number
             assert word not in text, f"{path.name} shows {word}"
 
