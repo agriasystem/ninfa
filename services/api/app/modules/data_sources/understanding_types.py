@@ -231,6 +231,17 @@ class ScopePreflight:
 
 
 @dataclass(frozen=True, slots=True)
+class RemovedCost:
+    """An operating cost a complete file would stop counting, as a person recognises it."""
+
+    date: str  # ISO date
+    supplier: str
+    category: str | None  # a CostCategory value (the page says it in words)
+    amount: str | None  # the amount NINFA counts (net), plain decimal text
+    currency: str
+
+
+@dataclass(frozen=True, slots=True)
 class UnderstandingInfo:
     level: UnderstandingLevel
     detection: Detection
@@ -247,9 +258,13 @@ class UnderstandingInfo:
     # period: said on the summary, before anyone presses anything.
     removes: int = 0
     scope: ScopePreflight = field(default_factory=ScopePreflight)
+    # Costs: the first of the records a complete file would stop counting (at most 20, the count is
+    # `scope.removal_count`), shown before anyone says the file is complete.
+    removal_preview: tuple[RemovedCost, ...] = ()
 
 
 __all__ = [
+    "RemovedCost",
     "Blocker",
     "BlockerCode",
     "Choice",

@@ -42,7 +42,7 @@ from app.modules.invoices import mapping as invoice_mapping
 from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.mapping import InvoiceField, InvoiceMappingConfig
 from app.modules.invoices.repository import InvoiceMappingProfileRepository
-from app.modules.invoices.service import InvoiceImportService
+from app.modules.invoices.service import InvoiceImportService, RemovalPreview
 from app.modules.invoices.suggestions import FIELD_ALIASES as INVOICE_ALIASES
 from app.modules.invoices.suggestions import FIELD_ORDER as INVOICE_ORDER
 from app.modules.labor import mapping as labor_mapping
@@ -207,6 +207,13 @@ class FileDomain(ABC):
         """How much of what the source holds would stop counting if this file is complete. 0 for a
         kind of data where absence never means anything: a cost register may always be partial."""
         return 0
+
+    def scope_preview(
+        self, source: DataSource, filename: str, content: bytes, config: Any
+    ) -> RemovalPreview | None:
+        """The records a complete file would stop counting, one by one (costs only; None when this
+        kind of data shows only how many)."""
+        return None
 
 
 # --- bookings -------------------------------------------------------------------------------------
@@ -668,6 +675,13 @@ class CostsDomain(FileDomain):
         return InvoiceImportService(
             self._session, self._tenant
         ).records_a_complete_file_would_remove(
+            source.id, source.property_id, filename=filename, content=content, mapping=config
+        )
+
+    def scope_preview(
+        self, source: DataSource, filename: str, content: bytes, config: InvoiceMappingConfig
+    ) -> RemovalPreview | None:
+        return InvoiceImportService(self._session, self._tenant).what_a_complete_file_would_remove(
             source.id, source.property_id, filename=filename, content=content, mapping=config
         )
 

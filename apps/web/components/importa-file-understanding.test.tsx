@@ -1137,3 +1137,86 @@ describe("the matching screen of a file of costs", () => {
     expect(flat(panel())).toContain("Numero del documento");
   });
 });
+
+describe("the costs a complete file would take away (T33)", () => {
+  const FORBIDDEN = ["FULL", "PARTIAL", "DELTA", "scope", "source", "famiglia", "registro tecnico", "fingerprint", "hash"];
+  const cost = (day: number, supplier: string, category: string | null, amount: string) => ({
+    date: `2026-10-${String(day).padStart(2, "0")}`,
+    supplier,
+    category,
+    amount,
+    currency: "EUR",
+  });
+  const twentyTwo = Array.from({ length: 22 }, (_, index) =>
+    cost(index + 1, `Fornitore ${index + 1}`, "UTILITIES", `${index + 1}.00`),
+  );
+
+  function expectNoForbiddenWord(text: string) {
+    for (const word of FORBIDDEN) {
+      expect(text.toLowerCase()).not.toContain(word.toLowerCase());
+    }
+  }
+
+  it("are listed one by one while the person is asked what the file holds", async () => {
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection(
+          {
+            level: "ASK",
+            questions: [
+              questionOf("FILE_SCOPE", {
+                absent_records: 2,
+                choices: ["FULL", "PARTIAL", "DELTA"].map((value) => ({ value, count: null, sheets: [], columns: [] })),
+              }),
+            ],
+            removal_preview: [
+              cost(6, "Acqua Salento", "UTILITIES", "40.00"),
+              cost(7, "Lavanderia Salento", "LAUNDRY", "55.00"),
+            ],
+            scope: { effective_scope: null, remembered_scope: null, removal_count: 2, requires_scope_confirmation: false },
+          },
+          { domain: "COSTS" },
+        ),
+      ),
+    );
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi.csv"));
+
+    await within(panel()).findByText("I 2 costi di questo periodo che in questo file non compaiono:");
+    const text = flat(panel());
+    expect(text).toContain("6 ottobre 2026 · Acqua Salento · Utenze · €40,00");
+    expect(text).toContain("7 ottobre 2026 · Lavanderia Salento · Lavanderia · €55,00");
+    expect(text).toContain("Restano nello storico di NINFA.");
+    expectNoForbiddenWord(text);
+  });
+
+  it("are listed on the summary, at most twenty and the rest counted, never in the words of bookings", async () => {
+    understandFileMock.mockResolvedValueOnce(
+      ok(
+        understoodInspection(
+          {
+            removes: 22,
+            removal_preview: twentyTwo.slice(0, 20),
+            scope: { effective_scope: "FULL", remembered_scope: null, removal_count: 22, requires_scope_confirmation: false },
+          },
+          { domain: "COSTS" },
+        ),
+      ),
+    );
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi.csv"));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "File riconosciuto" });
+    const text = flat(panel());
+    expect(text).toContain("22 costi che in questo file non compaiono non saranno più contati:");
+    expect(text).toContain("1 ottobre 2026 · Fornitore 1 · Utenze · €1,00");
+    expect(text).toContain("20 ottobre 2026 · Fornitore 20 · Utenze · €20,00");
+    expect(text).not.toContain("Fornitore 21");
+    expect(text).toContain("e altri 2 costi.");
+    expect(text).not.toContain("prenotazion");
+    expectNoForbiddenWord(text);
+  });
+});

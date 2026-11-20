@@ -147,6 +147,7 @@ from app.modules.data_sources.understanding_types import (
     Question,
     QuestionKind,
     Recognized,
+    RemovedCost,
     ScopePreflight,
     SheetSummary,
     SkippedSummary,
@@ -1044,6 +1045,26 @@ class UnderstandingService:
                     questions = [*questions, _scope_confirmation(removal_count)]
                     level = UnderstandingLevel.ASK
         removes = removal_count if file_scope is FileScope.FULL else 0
+        # (costs: the records that would stop counting, one by one, before anyone says "complete")
+        preview = (
+            self._smart.scope_preview(adapter, decision, filename, content, source)
+            if removal_count and source is not None and domain == DataSourceDomain.COSTS
+            else None
+        )
+        removal_preview = (
+            ()
+            if preview is None
+            else tuple(
+                RemovedCost(
+                    date=item.invoice_date.isoformat(),
+                    supplier=item.supplier,
+                    category=None if item.category is None else item.category.value,
+                    amount=None if item.amount is None else format(item.amount, "f"),
+                    currency=item.currency,
+                )
+                for item in preview.items
+            )
+        )
         decision = decision.model_copy(
             update={
                 "file_scope": file_scope,
@@ -1069,6 +1090,7 @@ class UnderstandingService:
             assumed=tuple(sorted(assumed)),
             removes=removes,
             scope=ScopePreflight(file_scope, remembered_scope, removal_count, confirm),
+            removal_preview=removal_preview,
         )
         complete = check.valid
         canonical = complete and all(

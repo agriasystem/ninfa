@@ -8,6 +8,7 @@ statement per kind of row) so an import does not grow with its number of invoice
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -46,6 +47,7 @@ from app.modules.invoices.models import (
     is_latest_revision,
     is_removed,
 )
+from app.modules.suppliers.models import Supplier
 
 _CHUNK = 1000
 _KEYS_PER_QUERY = 2000
@@ -79,6 +81,17 @@ class ExistingRecord:
     revision: int
     removed: bool
     category: CostCategory | None
+
+
+@dataclass(frozen=True, slots=True)
+class AbsentCost:
+    """An operating cost a complete file would take away, as a person recognises it."""
+
+    invoice_date: date
+    supplier: str
+    category: CostCategory | None
+    amount: Decimal | None
+    currency: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,6 +303,62 @@ class InvoiceRepository:
             data_source_id, register, held_keys, first, last
         ).subquery()
         return int(self._session.scalar(select(func.count()).select_from(absent)) or 0)
+
+    def synthetic_absent_preview(
+        self,
+        data_source_id: UUID,
+        register: str,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
+        limit: int,
+    ) -> list[AbsentCost]:
+        """The first `limit` of the records `count_synthetic_absent_from` counts (the SAME ones), by
+        date and supplier: what a person is shown before a complete file takes them away."""
+        absent = self._synthetic_absent_from(
+            data_source_id, register, held_keys, first, last
+        ).subquery()
+        rows = self._session.execute(
+            select(
+                Invoice.invoice_date,
+                Supplier.legal_name,
+                func.min(InvoiceLine.cost_category),
+                func.sum(InvoiceLine.line_total),
+                Invoice.currency,
+            )
+            .join(absent, absent.c.id == Invoice.id)
+            .join(
+                Supplier,
+                and_(
+                    Supplier.workspace_id == Invoice.workspace_id,
+                    Supplier.id == Invoice.supplier_id,
+                ),
+            )
+            .join(
+                InvoiceLine,
+                and_(
+                    InvoiceLine.workspace_id == Invoice.workspace_id,
+                    InvoiceLine.invoice_id == Invoice.id,
+                ),
+                isouter=True,
+            )
+            .where(Invoice.workspace_id == self._tenant.workspace_id)
+            .group_by(
+                Invoice.id,
+                Invoice.invoice_date,
+                Supplier.legal_name,
+                Invoice.currency,
+                Invoice.source_record_key,
+            )
+            .order_by(Invoice.invoice_date, Supplier.legal_name, Invoice.source_record_key)
+            .limit(limit)
+        ).all()
+        return [
+            AbsentCost(
+                row[0], row[1], None if row[2] is None else CostCategory(row[2]), row[3], row[4]
+            )
+            for row in rows
+        ]
 
     def remove_synthetic_absent_from(
         self,

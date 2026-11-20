@@ -559,6 +559,23 @@ export const sourcesCopy = {
         action: "Il file contiene tutto il piano?",
       },
     },
+    // Costs: the records a complete file would stop counting, one by one (said before anything is imported).
+    removals: {
+      absent: (count: number) =>
+        count === 1
+          ? "Il costo di questo periodo che in questo file non compare:"
+          : `I ${count} costi di questo periodo che in questo file non compaiono:`,
+      removed: (count: number) =>
+        count === 1
+          ? "1 costo che in questo file non compare non sarà più contato:"
+          : `${count} costi che in questo file non compaiono non saranno più contati:`,
+      item: (date: string, supplier: string, category: string, amount: string) =>
+        `${date} · ${supplier} · ${category} · ${amount}`,
+      more: (count: number) => (count === 1 ? "e un altro costo." : `e altri ${count} costi.`),
+      kept: "Restano nello storico di NINFA.",
+      noCategory: "senza categoria",
+      noAmount: "importo non indicato",
+    },
     removes: {
       BOOKINGS: (count: number) =>
         count === 1

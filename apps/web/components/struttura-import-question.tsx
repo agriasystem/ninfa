@@ -2,11 +2,17 @@
 
 import { useState, type ReactNode } from "react";
 
-import type { DataSourceDomain, UnderstandAnswers, UnderstandingChoice } from "@ninfa/contracts";
+import type {
+  DataSourceDomain,
+  UnderstandAnswers,
+  UnderstandingChoice,
+  UnderstandingRemovedCost,
+} from "@ninfa/contracts";
 
 import { sourcesCopy } from "@/lib/sources/copy";
 import type { AskStep, ImportFlow } from "@/lib/sources/use-import-flow";
 
+import { StrutturaImportRemovals } from "./struttura-import-removals";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.understanding.question;
@@ -64,10 +70,13 @@ function Choices({
 export function StrutturaScopeConfirmation({
   domain,
   absent,
+  preview = [],
   onAnswer,
 }: {
   domain: DataSourceDomain;
   absent: number;
+  /** Costs: the records that would stop counting, one by one. */
+  preview?: UnderstandingRemovedCost[];
   onAnswer: (patch: Partial<UnderstandAnswers>) => void;
 }) {
   const [remember, setRemember] = useState(false);
@@ -80,6 +89,7 @@ export function StrutturaScopeConfirmation({
   return (
     <>
       <p className="struttura-flow__note">{words.found(absent)}</p>
+      {domain === "COSTS" ? <StrutturaImportRemovals items={preview} count={absent} mode="question" /> : null}
       <h3 className="struttura-flow__subtitle" id="struttura-question-title">
         {words.title}
       </h3>
@@ -402,6 +412,13 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
         <>
           {heading(scope.title)}
           <p className="struttura-flow__note">{scope.absent(question.absent_records)}</p>
+          {step.inspection.domain === "COSTS" ? (
+            <StrutturaImportRemovals
+              items={step.understanding.removal_preview}
+              count={question.absent_records}
+              mode="question"
+            />
+          ) : null}
           <div className="struttura-question__choices struttura-question__choices--stacked">
             {(["FULL", "PARTIAL", "DELTA"] as const).map((value) => (
               <StrutturaButton
@@ -486,6 +503,7 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
         <StrutturaScopeConfirmation
           domain={step.inspection.domain}
           absent={question.absent_records}
+          preview={step.understanding.removal_preview}
           onAnswer={(patch) => void flow.answer(patch)}
         />
       );

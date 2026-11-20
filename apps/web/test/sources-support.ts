@@ -466,6 +466,7 @@ export function understandingOf(overrides: Partial<Understanding> = {}): Underst
   return {
     assumed: [],
     removes: 0,
+    removal_preview: [],
     scope: {
       effective_scope: null,
       remembered_scope: null,

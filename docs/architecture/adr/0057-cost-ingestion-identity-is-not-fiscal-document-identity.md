@@ -51,6 +51,8 @@ model was to **invent a number**, i.e. to store a fiscal fact that does not exis
    every synthetic row as `invoices.cost_register_key` (NULL for a real document, CHECK). Every costs upload of a property goes into ONE data source, so without it a complete laundry list took
    away the utilities of the same days (T25). The matching of occurrences (decision 5) stays per data source: a record keeps the register of the file that wrote its current version. After a
    change of structure (a renamed or an added mapped column) a complete file takes away less, never more: what the old structure wrote and the new one does not hold keeps counting.
+   **Before** anyone says a file is complete, the person sees the costs that would stop counting, one by one (date, supplier, category, amount; at most 20, then "e altri N"): in the
+   question, in its confirmation and on the summary (`UnderstandingInfo.removal_preview`, computed by the same query as the removal, same register, same period).
 8. **Without a column of document numbers, a file is never taken to be invoices by itself** (final correctness gate, which supersedes the first two versions of this rule: "a document type, a due
    date or a line number refuse the synthetic identity", then "strong evidence refuses it"). An XML (FatturaPA) reads its own number and still fails without one. For a structured file:
    * a column of document numbers **filled in most of its rows** (more than half of the scanned rows): the records are identified by their numbers, as always;
@@ -105,6 +107,11 @@ These are choices the brief left to the implementation; each is one line to chan
   on a matching built by hand only if its own reading of the file finds no column of document numbers filled in most rows (`FileInspection.without_document_number`); a file classified as
   documents keeps the number required. Residual: for a file with a document SIGNAL the server cannot tell, from a matching built by hand alone, that the person really answered "operating
   costs" (the answer is carried by the decision the matching starts from); it can never be claimed for a file whose number column is filled, and credit notes are refused row by row.
+* **A register is its structure.** Two registers exported with IDENTICAL headers (a laundry list and the utilities from the same program) are one register: a complete file of one
+  would take the other's costs of those days away. Mitigated, not solved: the person is shown those costs, supplier and category, before saying the file is complete (T34).
+* After a change of structure that adds or renames a column NINFA reads, the costs keep the register that wrote them (a re-observation writes nothing): a complete file with the new
+  header takes away none of them - a missing cost keeps counting until a file of the old structure, or no word at all, says otherwise (T30, "less, never more"). A column NINFA
+  does not read ("Note") changes nothing: the same register.
 * A file of one or two rows is read with columns at medium confidence (a known Smart Import trait), so the source's memory is not reused and the question is asked again.
 * Two sources of the same property with the same costs are two sets of costs by design; deduplicating between them is a decision for a person, not an identity rule.
 * The downgrade of 0018 refuses once a synthetic record or a removal exists.

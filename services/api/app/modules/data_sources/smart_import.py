@@ -96,6 +96,7 @@ from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.ingestion.models import DataSource, DataSourceDomain, FileScope
 from app.modules.ingestion.repository import ImportFileRepository, ImportJobRepository
 from app.modules.ingestion.suggestions import SuggestionConfidence
+from app.modules.invoices.service import RemovalPreview
 
 logger = logging.getLogger(__name__)
 
@@ -672,6 +673,24 @@ class SmartImportService:
             return adapter.scope_effect(source, filename, content, config)
         except (AppError, ValueError):
             return 0
+
+    def scope_preview(
+        self,
+        adapter: FileDomain,
+        mapping: MappingInput,
+        filename: str,
+        content: bytes,
+        source: DataSource,
+    ) -> RemovalPreview | None:
+        """The records a complete file would stop counting, one by one, when this kind of data
+        shows them (costs). Reads only; None when it cannot be said."""
+        try:
+            config, refused, _ = self._config_for(adapter, mapping, filename, content, source)
+            if config is None or refused is not None:
+                return None
+            return adapter.scope_preview(source, filename, content, config)
+        except (AppError, ValueError):
+            return None
 
     def scope_said_of_this_file(self, source: DataSource, content: bytes) -> FileScope | None:
         """What was said about these very bytes the last time they were imported, when it was a part

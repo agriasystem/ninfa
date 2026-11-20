@@ -1171,6 +1171,18 @@ export type UnderstandingBlockerCode =
   /** Costs said to be invoices, in a file with no document number: never imported as invoices, never matched by hand. */
   | "DOCUMENT_NUMBER_MISSING";
 
+/** An operating cost a complete file would stop counting, as a person recognises it. */
+export interface UnderstandingRemovedCost {
+  /** ISO date. */
+  date: string;
+  supplier: string;
+  /** A cost category value (the page says it in words); null when the record has none. */
+  category: string | null;
+  /** The amount NINFA counts (net), plain decimal text. */
+  amount: string | null;
+  currency: string;
+}
+
 export interface UnderstandingBlocker {
   code: UnderstandingBlockerCode;
   /** MISSING_REQUIRED: what the file does not have; each group is "at least one of". */
@@ -1228,6 +1240,8 @@ export interface Understanding {
   /** What stops counting if this file is imported, because it is complete and no longer holds it. */
   removes: number;
   scope: ImportScopePreflight;
+  /** Costs: the first of the records a complete file would stop counting (at most 20; how many is `scope.removal_count`). */
+  removal_preview: UnderstandingRemovedCost[];
 }
 
 /** What the person has already said, so a question is never asked twice. */

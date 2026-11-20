@@ -10,6 +10,7 @@ import type { ReadyStep } from "@/lib/sources/use-import-flow";
 
 import { StrutturaRowProblems } from "./struttura-import-preview";
 import { StrutturaScopeConfirmation } from "./struttura-import-question";
+import { StrutturaImportRemovals } from "./struttura-import-removals";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.understanding;
@@ -133,7 +134,11 @@ export function StrutturaImportUnderstood({
           {COPY.amountsCheck[document.amounts]}
         </p>
       ) : null}
-      {understanding.removes > 0 ? (
+      {understanding.removes > 0 && domain === "COSTS" ? (
+        // (costs: each one that would stop counting, never a figure alone - and never in the words of bookings)
+        <StrutturaImportRemovals items={understanding.removal_preview} count={understanding.removes} mode="summary" />
+      ) : null}
+      {understanding.removes > 0 && domain !== "COSTS" ? (
         <div className="struttura-preview__attention" role="note">
           <p>{COPY.removes[domain === "LABOR" ? "LABOR" : "BOOKINGS"](understanding.removes)}</p>
         </div>
@@ -155,6 +160,7 @@ export function StrutturaImportUnderstood({
           <StrutturaScopeConfirmation
             domain={domain}
             absent={scope.removal_count}
+            preview={understanding.removal_preview}
             onAnswer={onAnswer}
           />
         </section>

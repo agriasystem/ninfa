@@ -74,6 +74,7 @@ from app.modules.invoices.mapping import (
 )
 from app.modules.invoices.models import InvoiceMappingProfile, ResolutionMethod, SourceFormat
 from app.modules.invoices.repository import (
+    AbsentCost,
     ExistingRecord,
     InvoiceIdentity,
     InvoiceImportRowRepository,
@@ -120,6 +121,18 @@ class InvoiceFileDescription:
     headers: list[str]
     requires_sheet_selection: bool = False
     sheet_names: list[str] = field(default_factory=list)
+
+
+# How many operating costs a person is shown, one by one, before a complete file takes them away.
+PREVIEW_LIMIT = 20
+
+
+@dataclass(frozen=True)
+class RemovalPreview:
+    """What a complete file would take away: how many, and the first ones as a person sees them."""
+
+    count: int
+    items: tuple[AbsentCost, ...]
 
 
 @dataclass(frozen=True)
@@ -403,14 +416,36 @@ class InvoiceImportService:
         0 for a mapping that identifies its records by a document number (a real invoice is never
         taken away by any file), for a file that cannot be read cleanly (what is wrong with it is
         said when it is tried, not here), and when nothing would go."""
+        return self.what_a_complete_file_would_remove(
+            data_source_id,
+            property_id,
+            filename=filename,
+            content=content,
+            mapping=mapping,
+            limit=0,
+        ).count
+
+    def what_a_complete_file_would_remove(
+        self,
+        data_source_id: UUID,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: InvoiceMappingConfig,
+        limit: int = PREVIEW_LIMIT,
+    ) -> RemovalPreview:
+        """How many, and the first `limit` of them (date, supplier, category, amount): what a person
+        sees before saying that a file holds everything of its period. The SAME records the import
+        would take away (same source, same register, same period, same placement). Read-only."""
         if not mapping.is_synthetic:
-            return 0
+            return RemovalPreview(0, ())
         prop = self._properties.get(property_id)
         if prop is None:
-            return 0
+            return RemovalPreview(0, ())
         kind = detect_source(filename, content)
         if kind == "xml":
-            return 0
+            return RemovalPreview(0, ())
         source_format = SourceFormat.CSV if kind == "csv" else SourceFormat.XLSX
         ids = _Ids(uuid4(), uuid4(), data_source_id, property_id)
         parsed, register = self._parse_structured(
@@ -418,7 +453,7 @@ class InvoiceImportService:
         )
         canonical = [document.canonical for document in parsed if document.valid]
         if not parsed or len(canonical) != len(parsed):
-            return 0
+            return RemovalPreview(0, ())
         documents = [document for document in canonical if document is not None]
         plan = self._resolver.plan([document.supplier for document in documents])
         placed = self._place_synthetic(
@@ -426,13 +461,20 @@ class InvoiceImportService:
             property_id,
             data_source_id,
         )
-        return self._invoices.count_synthetic_absent_from(
-            data_source_id,
-            register,
-            [placement.identity[1] for placement in placed],
-            min(document.invoice_date for document in documents),
-            max(document.invoice_date for document in documents),
+        held = [placement.identity[1] for placement in placed]
+        first = min(document.invoice_date for document in documents)
+        last = max(document.invoice_date for document in documents)
+        count = self._invoices.count_synthetic_absent_from(
+            data_source_id, register, held, first, last
         )
+        items = (
+            self._invoices.synthetic_absent_preview(
+                data_source_id, register, held, first, last, limit
+            )
+            if count and limit
+            else []
+        )
+        return RemovalPreview(count, tuple(items))
 
     def _place_synthetic(
         self,
