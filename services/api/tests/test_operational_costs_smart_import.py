@@ -657,3 +657,64 @@ def test_a_register_with_numbers_never_asks_what_it_holds(
         imported(api_client, env, first, body)
         shorter = ask(api_client, env, csv(rows[:2], headers))
         assert "FILE_SCOPE" not in kinds(shorter)
+
+
+# --- T25: FULL between two different registers of the same property --------------------------
+# Fact: every costs upload of a property goes into ONE data source (`_source_for_domain`: the
+# single active source of (property, COSTS)), whatever its structure or family.
+
+UTILITIES_HEADERS = ["Data", "Fornitore", "Descrizione", "Importo netto"]
+UTILITY_SUPPLIERS = ["Enel Energia", "Acqua Salento", "Gas Puglia", "Telecom", "Rifiuti Lecce"]
+DAYS = ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"]
+UTILITIES = [
+    [day, supplier, f"Utenza {supplier} {day}", f"{40 + 10 * i}.00"]
+    for i, (day, supplier) in enumerate(zip(DAYS, UTILITY_SUPPLIERS, strict=True))
+]
+LAUNDRY = [
+    cost_row(
+        day=day,
+        supplier="Lavanderia Salento",
+        category="LAUNDRY",
+        description=f"Lavaggio biancheria {day}",
+        net="55.00",
+        tax="12.10",
+        gross="67.10",
+    )
+    for day in DAYS
+]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "KNOWN DEFECT, decision pending (gate stop condition, not corrected): FULL removes every "
+        "synthetic record of the property's ONE costs data source dated inside the file's period, "
+        "whatever register it came from - here the 5 laundry costs of register A with the one "
+        "missing utility of register B (6 shown, 6 removed)."
+    ),
+)
+def test_t25_a_complete_register_never_takes_away_the_costs_of_another_register(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T25: register A (laundry) and register B (utilities, another structure) of the same property
+    and period. B again as a complete file with one row less: only B's missing cost may go; A's
+    costs stay intact."""
+    laundry = csv(LAUNDRY)
+    body = ask(api_client, env, laundry)
+    assert body["understanding"]["level"] == "READY", body["understanding"]
+    assert imported(api_client, env, laundry, body)["succeeded"] is True
+    utilities = csv(UTILITIES, UTILITIES_HEADERS)
+    body = ask(api_client, env, utilities, {"file_scope": "PARTIAL"})
+    assert body["understanding"]["level"] == "READY", body["understanding"]
+    assert imported(api_client, env, utilities, body)["succeeded"] is True
+    assert len(counting(db_session, env)) == 10
+
+    shorter = csv([u for i, u in enumerate(UTILITIES) if i != 2], UTILITIES_HEADERS)
+    body = ask(api_client, env, shorter, {"file_scope": "FULL"})
+    assert body["understanding"]["level"] == "READY", body["understanding"]
+    shown = body["understanding"]["removes"]
+    result = imported(api_client, env, shorter, body)
+
+    left = counting(db_session, env)
+    assert result["succeeded"] is True, result
+    assert (shown, result["removed"], len(left)) == (1, 1, 9), (shown, result["removed"], len(left))
