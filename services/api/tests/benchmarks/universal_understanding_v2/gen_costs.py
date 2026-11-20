@@ -2278,7 +2278,9 @@ def adv_row_counter_number(rng: random.Random) -> Built:
         # document signal; the register is operating costs, READY with a synthetic identity, the
         # counter left unmapped (it was NOT_AUTOMATIC when every cost needed a number).
         absent=("invoice_number",),
-        note=f"'{header}' counts the rows 1..n: it is not the number of an invoice. Operating costs.",
+        note=(
+            f"'{header}' counts the rows 1..n: it is not the number of an invoice. Operating costs."
+        ),
     )
 
 
