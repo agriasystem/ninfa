@@ -336,13 +336,17 @@ def gross_only_explicit(r: random.Random) -> Built:
 
 @COSTS.case("neg_without_document_number", "negative")
 def no_number(r: random.Random) -> Built:
+    # Truth revised by ADR 0057 (operating costs without a document number, gate tests T13/T15):
+    # date, supplier, description and amount with NO document signal is a register of operating
+    # costs, imported with a synthetic identity and no question. It used to be a REJECT ("the
+    # number is required") when every cost was an invoice. The number is still absent: claiming one
+    # is still an error. (The case keeps its id so that every earlier result still compares.)
     return flat_document(
         "costs",
         "costi_senza_numero.xlsx",
         [k_date(), k_supplier(), k_desc(), k_net()],
         lines(r, 16),
-        outcome="REJECT",
-        blockers=("MISSING_REQUIRED",),
+        outcome="READY",
         absent=("invoice_number",),
     )
 
