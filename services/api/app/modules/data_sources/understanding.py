@@ -69,6 +69,7 @@ from app.modules.data_sources.mapping_types import (
     SmartImportDecision,
     SuggestionLevel,
 )
+from app.modules.data_sources.number_candidates import number_candidates
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
 from app.modules.data_sources.semantics_bookings import BOOKINGS
@@ -146,6 +147,7 @@ from app.modules.data_sources.understanding_types import (
     Question,
     QuestionKind,
     Recognized,
+    RemovedCost,
     ScopePreflight,
     SheetSummary,
     SkippedSummary,
@@ -172,6 +174,7 @@ from app.modules.document_understanding.structure import RowKind
 from app.modules.document_understanding.text import fold, has_word
 from app.modules.document_understanding.values import text_of
 from app.modules.ingestion.models import DataSource, DataSourceDomain, FileScope
+from app.modules.invoices.mapping import DocumentEvidence, document_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -221,6 +224,13 @@ class UnderstandAnswers(BaseModel):
     assisted_fields: dict[str, str] = Field(default_factory=dict, max_length=20)
     # What the person taught: {"role_mapping": {"HK": "HOUSEKEEPING"}}.
     labels: dict[str, dict[str, str]] = Field(default_factory=dict, max_length=4)
+    # Costs: what the person said a file with NO document number is. "SYNTHETIC_COST_RECORD":
+    # operating costs, recorded with an internal reference of NINFA's own (never an invoice number).
+    # "DOCUMENT_NUMBER": fiscal documents, whose number is then required.
+    document_identity: Literal["SYNTHETIC_COST_RECORD", "DOCUMENT_NUMBER"] | None = None
+    # Costs said to be invoices: "NONE" = none of the columns offered holds the document number (a
+    # column that does is answered as `column_fields`: {header: "invoice_number"}).
+    document_number_column: Literal["NONE"] | None = None
     # What THIS file says about the records it does not hold.
     file_scope: FileScope | None = None
     # That answer is also for the next files of this structure: only then does the memory change.
@@ -771,7 +781,51 @@ class UnderstandingService:
                 confirmed_domain=confirmed_domain,
             ),
         )
-        check = self._smart.check(domain, decision)
+        # --- operating costs with no document number (ADR 0057) ---------------------------------
+        # Without a column of document numbers filled in most of its rows, a file of costs is NEVER
+        # taken to be fiscal documents by itself, and never sent to the matching screen to look for
+        # a column that does not exist:
+        #   - nothing in it points at documents (or only a due date / a row number, which a register
+        #     of operating costs carries too): operating costs, with no question;
+        #   - something does (a document type, the whole picture of an invoice register, a number
+        #     column empty in most rows): ONE question, invoices or operating costs;
+        #   - a person said invoices (now, or for this family before): a plain "no", there is no
+        #     number to register them by.
+        # The answer (or the family's memory of it) is part of the decision. FatturaPA never gets
+        # here: it reads its own number and fails without one.
+        identity = (
+            _identity_case(adapter, proposal, samples, decision, detection, confirmed_domain)
+            if domain == DataSourceDomain.COSTS
+            else None
+        )
+        said_identity = effective.document_identity
+        identity_open = False
+        number_column_open = False
+        as_if_operating = decision
+        if identity is not None:
+            as_if_operating = _as_operating_costs(decision, identity)
+            if said_identity == "DOCUMENT_NUMBER":
+                # invoices: the number may be in a column nobody named - which one, among those
+                # only; with none of them (or none at all) there is nothing to register them by
+                if (
+                    identity.candidates
+                    and identity.complete
+                    and answers.document_number_column != "NONE"
+                ):
+                    number_column_open = True
+                else:
+                    blockers.append(Blocker(BlockerCode.DOCUMENT_NUMBER_MISSING))
+            elif identity.kind == "OPERATING" or said_identity == "SYNTHETIC_COST_RECORD":
+                # operating costs, even when something else is still missing: the matching screen
+                # (if the person goes there) then never asks for a number the file does not have
+                decision = as_if_operating
+            else:
+                # (asked only of a file that has everything else: until then the question would be
+                # premature, and what really is missing is said instead)
+                identity_open = identity.complete
+        # (the check never lists a number the file does not have: the question, the refusal or the
+        # reading as operating costs stands in its place)
+        check = self._smart.check(domain, as_if_operating)
 
         # --- what is still missing, as questions or as an honest "this is not in the file" --------
         extra_questions, extra_blockers = self._missing(
@@ -893,7 +947,11 @@ class UnderstandingService:
                     ),
                 }
             )
+            if identity is not None and said_identity == "DOCUMENT_NUMBER":
+                # (what the person says now wins over how the source was read before)
+                decision = decision.model_copy(update={"document_identity": None})
             check = self._smart.check(domain, decision)
+            identity_open = identity_open and decision.document_identity is None
         if not recognized_by_profile and not blockers:
             decision = self._with_kept_formats(adapter, decision, samples, memory, match, reuse)
             formats = self._smart.formats_of(adapter, decision, samples)
@@ -912,6 +970,10 @@ class UnderstandingService:
                     skip.add("line_total")  # the amount is asked about as an amount, not twice
                 if any(q.kind == QuestionKind.DATES_REVERSED for q in questions):
                     skip.update({"check_in", "check_out"})  # looked at together, not one by one
+                if identity is not None and identity.sparse_number is not None:
+                    # (a column of numbers empty in most rows is asked about as part of what the
+                    # file holds, never as "is this the document number?")
+                    skip.add("invoice_number")
                 questions.extend(_confirm_questions(adapter.groups, proposal, skip))
                 # whatever a MODEL named and nothing made certain stays a question, required or
                 # not, whichever model it was: the rules only ask about the fields an import cannot
@@ -923,6 +985,10 @@ class UnderstandingService:
                     questions.extend(_assisted_confirmations(proposal, ai_headers, questions))
                 if not recognized_by_family:
                     questions.extend(unread_questions)
+        if identity_open and decision.document_identity is None:
+            questions.append(_identity_question())
+        if number_column_open and identity is not None:
+            questions.append(_number_column_question(identity.candidates))
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         # (the same reading on every file of a source: the file still does not say)
@@ -979,6 +1045,26 @@ class UnderstandingService:
                     questions = [*questions, _scope_confirmation(removal_count)]
                     level = UnderstandingLevel.ASK
         removes = removal_count if file_scope is FileScope.FULL else 0
+        # (costs: the records that would stop counting, one by one, before anyone says "complete")
+        preview = (
+            self._smart.scope_preview(adapter, decision, filename, content, source)
+            if removal_count and source is not None and domain == DataSourceDomain.COSTS
+            else None
+        )
+        removal_preview = (
+            ()
+            if preview is None
+            else tuple(
+                RemovedCost(
+                    date=item.invoice_date.isoformat(),
+                    supplier=item.supplier,
+                    category=None if item.category is None else item.category.value,
+                    amount=None if item.amount is None else format(item.amount, "f"),
+                    currency=item.currency,
+                )
+                for item in preview.items
+            )
+        )
         decision = decision.model_copy(
             update={
                 "file_scope": file_scope,
@@ -1004,6 +1090,7 @@ class UnderstandingService:
             assumed=tuple(sorted(assumed)),
             removes=removes,
             scope=ScopePreflight(file_scope, remembered_scope, removal_count, confirm),
+            removal_preview=removal_preview,
         )
         complete = check.valid
         canonical = complete and all(
@@ -1035,7 +1122,8 @@ class UnderstandingService:
                 sheet_name=table.sheet_name,
                 columns=columns,
                 fields=tuple(adapter.fields),
-                requirement_groups=tuple(adapter.groups),
+                requirement_groups=tuple(adapter.required_groups(decision)),
+                without_document_number=identity is not None,
                 suggestion_complete=complete,
                 already_canonical=canonical,
                 profile=profile,
@@ -1183,6 +1271,12 @@ class UnderstandingService:
             and kept.get("amount_basis") in ("NET", "GROSS")
         ):
             update["amount_basis"] = kept["amount_basis"]
+        if (
+            domain == DataSourceDomain.COSTS
+            and answers.document_identity is None
+            and kept.get("document_identity") in ("SYNTHETIC_COST_RECORD", "DOCUMENT_NUMBER")
+        ):
+            update["document_identity"] = kept["document_identity"]
         return answers.model_copy(update=update) if update else answers
 
     def _with_kept_formats(
@@ -1608,6 +1702,8 @@ class UnderstandingService:
             BlockerCode.GRID_NOT_HOURS,
             BlockerCode.AMOUNT_NOT_NET,
             BlockerCode.MIXED_FORMATS,
+            # (never the matching screen: there is no column of document numbers to match)
+            BlockerCode.DOCUMENT_NUMBER_MISSING,
         }
         if any(b.code in hard for b in blockers):
             return UnderstandingLevel.BLOCKED
@@ -1620,7 +1716,7 @@ class UnderstandingService:
         if by_profile:
             return UnderstandingLevel.READY
         decided = {c.field: c for c in proposal.columns if c.field is not None}
-        for group in adapter.groups:
+        for group in adapter.required_groups(decision):
             fields = [f for f in group if f in decided]
             if fields:
                 if not all(decided[f].level == Level.HIGH for f in fields):
@@ -2052,6 +2148,110 @@ def _dedupe(questions: list[Question]) -> list[Question]:
     return out
 
 
+@dataclass(frozen=True)
+class _IdentityCase:
+    """A file of costs with no column of document numbers filled in most of its rows (ADR 0057)."""
+
+    # OPERATING: nothing in it points at fiscal documents (a due date or a row number alone or
+    # together prove nothing: a register of operating costs carries them too) - operating costs,
+    # with no question. AMBIGUOUS: something does - ONE question, invoices or operating costs.
+    kind: Literal["OPERATING", "AMBIGUOUS"]
+    # everything else an import needs is in the file (else what IS missing is said first)
+    complete: bool
+    # a column read as the document number but empty in most rows: it identifies nothing, and a
+    # register of operating costs leaves it out
+    sparse_number: str | None = None
+    # unmapped columns that MAY hold a document number nobody named (`number_candidates`)
+    candidates: tuple[str, ...] = ()
+
+
+def _identity_case(
+    adapter: FileDomain,
+    proposal: Proposal,
+    samples: list[ColumnSample],
+    decision: MappingInput,
+    detection: DomainVerdict,
+    confirmed_domain: bool,
+) -> _IdentityCase | None:
+    """Is this a file of costs WITHOUT a column of document numbers filled in most rows, and does
+    anything in it point at fiscal documents?
+
+    None: it is not (or not clearly) a register of COSTS, a column of document numbers is filled in
+    most of its rows (the records are identified by their numbers), or a column MAY be the number
+    (that column is asked about, or matched by hand: it is in the file)."""
+    if not (detection.domain == DataSourceDomain.COSTS or confirmed_domain):
+        return None
+    assigned = proposal.assigned()
+    sparse: str | None = None
+    number = assigned.get("invoice_number")
+    if number is not None:
+        if _mostly_filled(samples[number.position]):
+            return None
+        sparse = number.header
+    if any(
+        column.ambiguous_group and "invoice_number" in column.ambiguous_fields
+        for column in proposal.columns
+    ):
+        return None
+    fields = set(assigned) - {"invoice_number"}
+    evidence = document_evidence(fields)
+    candidates = number_candidates(proposal, samples)
+    provided = fields | set(decision.constants)
+    complete = all(
+        any(key in provided for key in group)
+        for group in adapter.required_groups(
+            decision.model_copy(update={"document_identity": "SYNTHETIC_COST_RECORD"})
+        )
+    )
+    documentary = sparse is not None or evidence == DocumentEvidence.STRONG or bool(candidates)
+    return _IdentityCase("AMBIGUOUS" if documentary else "OPERATING", complete, sparse, candidates)
+
+
+def _mostly_filled(sample: ColumnSample) -> bool:
+    """A value in more than half of the scanned rows (a sample built by hand has no rows: the
+    column is taken as it is)."""
+    if not sample.rows:
+        return True
+    filled = sum(1 for cell in sample.rows if cell is not None and str(cell).strip())
+    return filled * 2 > len(sample.rows)
+
+
+def _as_operating_costs(decision: MappingInput, identity: _IdentityCase) -> MappingInput:
+    """The decision as a register of operating costs: identified by content, and without a column of
+    numbers that identifies nothing."""
+    columns = [
+        column.model_copy(update={"field": None})
+        if identity.sparse_number is not None
+        and column.header == identity.sparse_number
+        and column.field == "invoice_number"
+        else column
+        for column in decision.columns
+    ]
+    return decision.model_copy(
+        update={"document_identity": "SYNTHETIC_COST_RECORD", "columns": columns}
+    )
+
+
+def _number_column_question(candidates: Sequence[str]) -> Question:
+    """Which column holds the document number: only the columns that may, or none of them."""
+    return Question(
+        id="DOCUMENT_NUMBER_COLUMN",
+        kind=QuestionKind.DOCUMENT_NUMBER_COLUMN,
+        field="invoice_number",
+        choices=(*(Choice(header) for header in candidates), Choice("NONE")),
+    )
+
+
+def _identity_question() -> Question:
+    """Invoices or operating costs: asked only when something in the file points at documents."""
+    return Question(
+        id="DOCUMENT_IDENTITY",
+        kind=QuestionKind.DOCUMENT_IDENTITY,
+        field="invoice_number",
+        choices=(Choice("SYNTHETIC_COST_RECORD"), Choice("DOCUMENT_NUMBER")),
+    )
+
+
 def _scope_question(absent_records: int) -> Question:
     return Question(
         id="FILE_SCOPE",
@@ -2088,6 +2288,7 @@ def confirmation_from(answers: UnderstandAnswers, learning: LearningInfo | None)
             ("decimal_style", answers.decimal_style),
             ("amount_basis", answers.amount_basis),
             ("department_value", answers.department_value),
+            ("document_identity", answers.document_identity),
         )
         if value
     }

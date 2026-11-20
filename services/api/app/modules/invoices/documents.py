@@ -22,7 +22,7 @@ from app.modules.invoices.canonical import (
     canonicalize,
 )
 from app.modules.invoices.errors import InvoiceErrorCode, RowIssue, RowWarning
-from app.modules.invoices.models import DocumentKind, SourceFormat
+from app.modules.invoices.models import DocumentKind, IdentityOrigin, SourceFormat
 from app.modules.suppliers.resolution import SupplierEvidence
 
 MAX_NUMBER_LENGTH = 255
@@ -91,9 +91,15 @@ def assemble(
     lines: list[ParsedLine],
     header_issues: list[RowIssue],
     source_format: SourceFormat,
+    identity_origin: IdentityOrigin = IdentityOrigin.DOCUMENT_NUMBER,
 ) -> ParsedDocument:
-    """Apply the format-independent rules; with nothing wrong, build the canonical document."""
+    """Apply the format-independent rules; with nothing wrong, build the canonical document.
+
+    A document whose identity is its NUMBER cannot be complete without it. An operating cost with
+    `SYNTHETIC_COST_RECORD` identity has none, by decision of a person (ADR 0057), and is complete
+    without: the number stays None, it is never invented."""
     issues = list(header_issues)
+    synthetic = identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD
 
     if not lines:
         issues.append(RowIssue("lines", InvoiceErrorCode.NO_LINES))
@@ -132,7 +138,7 @@ def assemble(
     )
     complete = (
         header.supplier is not None
-        and header.invoice_number is not None
+        and (header.invoice_number is not None or synthetic)
         and header.invoice_date is not None
         and header.document_kind is not None
         and header.currency is not None
@@ -142,12 +148,14 @@ def assemble(
         return parsed
 
     assert header.supplier is not None  # narrowed by `complete`
-    assert header.invoice_number is not None and header.invoice_date is not None
+    assert header.invoice_number is not None or synthetic
+    assert header.invoice_date is not None
     assert header.document_kind is not None and header.currency is not None
     raw = RawDocument(
         source_document_index=index,
         supplier=header.supplier,
-        invoice_number=header.invoice_number,
+        invoice_number=None if synthetic else header.invoice_number,
+        identity_origin=identity_origin,
         invoice_date=header.invoice_date,
         document_kind=header.document_kind,
         currency=header.currency,

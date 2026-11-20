@@ -17,7 +17,7 @@ from app.modules.tenancy.models import Workspace
 from tests.support import alembic_config
 
 GATE_1_HEAD = "0003_canonical_data_model"
-HEAD = "0017_mia_conversations"  # the global chain head (V1.2); Gate 2's own is 0004
+HEAD = "0018_cost_record_identity"  # the global chain head (V1.2); Gate 2's own is 0004
 GATE_2_TABLES = {"booking_channels", "booking_mapping_profiles", "bookings", "booking_import_rows"}
 GATE_1_TABLES = {
     "users",

@@ -227,8 +227,8 @@ def test_there_is_no_migration_for_gate_5() -> None:
     assert revisions["0007_invoice_supplier_ingestion"] == "0006_expected_engine"
     # Gate 7 also added none: Gate 6's 0007 is directly followed by Gate 8's 0008.
     assert revisions["0008_labor_ingestion"] == "0007_invoice_supplier_ingestion"
-    assert script.get_heads() == ["0017_mia_conversations"]
-    assert len(revisions) == 17
+    assert script.get_heads() == ["0018_cost_record_identity"]
+    assert len(revisions) == 18
 
 
 # --- read-only, no clock, no float ------------------------------------------------------------

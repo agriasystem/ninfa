@@ -23,11 +23,16 @@ from typing import Any
 from app.modules.bookings.text import normalize_key
 from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.errors import RowIssue, RowWarning, WarningCode
-from app.modules.invoices.models import MAX_MONEY, DocumentKind, SourceFormat
+from app.modules.invoices.models import MAX_MONEY, DocumentKind, IdentityOrigin, SourceFormat
 from app.modules.suppliers.resolution import SupplierEvidence
 
 _CENT = Decimal("0.01")
 _FINGERPRINT_FORMAT = 1
+# The identity of an operating cost that has no document number (ADR 0057). VERSIONED: a change of
+# what the content contains is a new version, never an edit of this one, because a stored key must
+# keep meaning what it meant (a record imported under v1 is recognised under v1 for good).
+RECORD_KEY_VERSION = 1
+_RECORD_KEY_PREFIX = f"cost:v{RECORD_KEY_VERSION}:"
 MAX_DECIMALS = 8  # decimals accepted in a source amount, quantity or unit price
 
 
@@ -118,7 +123,8 @@ class RawLine:
 class RawDocument:
     source_document_index: int
     supplier: SupplierEvidence
-    invoice_number: str
+    # None only for a SYNTHETIC_COST_RECORD: the source stated no number, NINFA never invents one.
+    invoice_number: str | None
     invoice_date: date
     document_kind: DocumentKind
     currency: str
@@ -130,6 +136,7 @@ class RawDocument:
     tax_amount: Decimal | None = None
     gross_amount: Decimal | None = None
     warnings: tuple[RowWarning, ...] = ()
+    identity_origin: IdentityOrigin = IdentityOrigin.DOCUMENT_NUMBER
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,8 +166,8 @@ class Reconciliation:
 class CanonicalDocument:
     source_document_index: int
     supplier: SupplierEvidence
-    invoice_number: str
-    normalized_invoice_number: str
+    invoice_number: str | None
+    normalized_invoice_number: str | None
     invoice_date: date
     document_kind: DocumentKind
     currency: str
@@ -172,6 +179,11 @@ class CanonicalDocument:
     tax_amount: Decimal | None = None
     gross_amount: Decimal | None = None
     warnings: tuple[RowWarning, ...] = field(default=())
+    identity_origin: IdentityOrigin = IdentityOrigin.DOCUMENT_NUMBER
+
+    @property
+    def is_synthetic(self) -> bool:
+        return self.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD
 
     def reconciliation(self) -> Reconciliation:
         total = sum((line.line_total for line in self.lines), Decimal(0))
@@ -213,6 +225,53 @@ class CanonicalDocument:
         canonical = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
+    def record_fingerprint(self, supplier_id: str, data_source_id: str) -> str:
+        """SHA-256 of the business CONTENT of an operating cost that has no document number: the
+        identity of the record, before it is numbered among its identical siblings (ADR 0057).
+
+        It covers what makes the cost this cost: the data source it came from (two independent
+        sources never merge, even with the same values), the resolved supplier, the date, the
+        currency, the signed amounts and the canonical lines (description, quantity, unit, unit
+        price, total, VAT rate). It excludes everything that is technical or positional: the row
+        number, the file, the import job, timestamps, the line number, and the cost category (a
+        category is analysis, not accounting: re-teaching a label must not change what a cost is).
+        Rows of a file in a different order, or the same file again, give the same fingerprints.
+        """
+        document = {
+            "v": RECORD_KEY_VERSION,
+            "kind": "cost-record",
+            "source": data_source_id,
+            "supplier_id": supplier_id,
+            "date": self.invoice_date.isoformat(),
+            "currency": self.currency,
+            "net": money_text(self.net_amount),
+            "tax": money_text(self.tax_amount),
+            "gross": money_text(self.gross_amount),
+            "lines": sorted(
+                [
+                    line.description_normalized,
+                    plain(line.quantity),
+                    None if line.unit is None else line.unit.casefold(),
+                    plain(line.unit_price),
+                    money_text(line.line_total),
+                    plain(line.vat_rate),
+                ]
+                for line in self.lines
+            ),
+        }
+        canonical = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def record_key(fingerprint: str, occurrence: int) -> str:
+    """The technical identity of the `occurrence`-th (1-based) record with this fingerprint.
+
+    Identical rows are a MULTISET, not duplicates: two equal rows are two real costs. The number is
+    how many of them the file holds, never where they sit, so the same rows in another order are
+    the same records and a fourth identical row is only `#4`.
+    """
+    return f"{_RECORD_KEY_PREFIX}{fingerprint}#{occurrence}"
+
 
 def canonicalize(raw: RawDocument) -> CanonicalDocument:
     """Apply the document sign, then quantise every money amount once (HALF_UP, two decimals).
@@ -247,7 +306,9 @@ def canonicalize(raw: RawDocument) -> CanonicalDocument:
         source_document_index=raw.source_document_index,
         supplier=raw.supplier,
         invoice_number=raw.invoice_number,
-        normalized_invoice_number=normalize_invoice_number(raw.invoice_number),
+        normalized_invoice_number=(
+            None if raw.invoice_number is None else normalize_invoice_number(raw.invoice_number)
+        ),
         invoice_date=raw.invoice_date,
         document_kind=raw.document_kind,
         currency=raw.currency,
@@ -259,6 +320,7 @@ def canonicalize(raw: RawDocument) -> CanonicalDocument:
         tax_amount=money(raw.tax_amount),
         gross_amount=money(raw.gross_amount),
         warnings=raw.warnings,
+        identity_origin=raw.identity_origin,
     )
 
 
@@ -325,6 +387,7 @@ def header_payload(document: CanonicalDocument) -> dict[str, Any]:
         "source_document_index": document.source_document_index,
         "supplier": supplier_payload(document.supplier),
         "invoice_number": document.invoice_number,
+        "identity_origin": document.identity_origin.value,
         "invoice_date": document.invoice_date.isoformat(),
         "due_date": None if document.due_date is None else document.due_date.isoformat(),
         "document_type_code": document.document_type_code,
@@ -354,7 +417,14 @@ def document_from_payloads(
         source_document_index=header["source_document_index"],
         supplier=supplier_from_payload(header["supplier"], data_source_id),
         invoice_number=header["invoice_number"],
-        normalized_invoice_number=normalize_invoice_number(header["invoice_number"]),
+        normalized_invoice_number=(
+            None
+            if header["invoice_number"] is None
+            else normalize_invoice_number(header["invoice_number"])
+        ),
+        identity_origin=IdentityOrigin(
+            header.get("identity_origin", IdentityOrigin.DOCUMENT_NUMBER.value)
+        ),
         invoice_date=date.fromisoformat(header["invoice_date"]),
         document_kind=DocumentKind(header["document_kind"]),
         currency=header["currency"],

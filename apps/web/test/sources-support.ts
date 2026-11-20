@@ -212,7 +212,7 @@ const BOOKINGS_FIELDS: ImportFieldSpec[] = [
   { key: "channel", kind: "TEXT", constant: { kind: "TEXT", choices: [], default: null } },
 ];
 
-function column(
+export function column(
   position: number,
   header: string,
   examples: string[],
@@ -466,6 +466,7 @@ export function understandingOf(overrides: Partial<Understanding> = {}): Underst
   return {
     assumed: [],
     removes: 0,
+    removal_preview: [],
     scope: {
       effective_scope: null,
       remembered_scope: null,

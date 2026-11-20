@@ -15,7 +15,7 @@ from sqlalchemy import Engine, inspect, text
 from tests.support import alembic_config
 
 HEAD = "0016_remembered_scope"
-CURRENT_GLOBAL_HEAD = "0017_mia_conversations"
+CURRENT_GLOBAL_HEAD = "0018_cost_record_identity"
 PREVIOUS_HEAD = "0015_import_scope"
 
 

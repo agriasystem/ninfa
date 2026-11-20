@@ -46,6 +46,14 @@ class QuestionKind(StrEnum):
     # This family of files is remembered as complete, and this file would take something away: a
     # memory does not do that by itself. Does THIS file hold everything of its period?
     FILE_SCOPE_CONFIRM = "FILE_SCOPE_CONFIRM"
+    # A file of costs that has no document number at all (utilities, laundry, a month of
+    # commissions): NINFA can record them as operating costs with an internal reference of its own,
+    # never inventing an invoice number. Asked only when everything else the import needs is there.
+    DOCUMENT_IDENTITY = "DOCUMENT_IDENTITY"
+    # Costs said to be invoices, in a file whose number nobody named but one or more columns MAY
+    # hold it ("Campo 1": 2026/102, ...): which one is it? Only those columns are offered, with
+    # "none of these" - never a column the file does not have.
+    DOCUMENT_NUMBER_COLUMN = "DOCUMENT_NUMBER_COLUMN"
 
 
 class UnderstandingLevel(StrEnum):
@@ -72,6 +80,10 @@ class BlockerCode(StrEnum):
     AMOUNT_NOT_NET = "AMOUNT_NOT_NET"
     # One column writes its dates (or numbers) in two different ways: the file has to be fixed.
     MIXED_FORMATS = "MIXED_FORMATS"
+    # Costs a person said are fiscal documents (invoices), in a file with no document number in most
+    # of its rows (ADR 0057): they cannot be registered as invoices, and NINFA never invents a
+    # number nor asks for a column the file does not have.
+    DOCUMENT_NUMBER_MISSING = "DOCUMENT_NUMBER_MISSING"
 
 
 class OriginKind(StrEnum):
@@ -219,6 +231,17 @@ class ScopePreflight:
 
 
 @dataclass(frozen=True, slots=True)
+class RemovedCost:
+    """An operating cost a complete file would stop counting, as a person recognises it."""
+
+    date: str  # ISO date
+    supplier: str
+    category: str | None  # a CostCategory value (the page says it in words)
+    amount: str | None  # the amount NINFA counts (net), plain decimal text
+    currency: str
+
+
+@dataclass(frozen=True, slots=True)
 class UnderstandingInfo:
     level: UnderstandingLevel
     detection: Detection
@@ -235,9 +258,13 @@ class UnderstandingInfo:
     # period: said on the summary, before anyone presses anything.
     removes: int = 0
     scope: ScopePreflight = field(default_factory=ScopePreflight)
+    # Costs: the first of the records a complete file would stop counting (at most 20, the count is
+    # `scope.removal_count`), shown before anyone says the file is complete.
+    removal_preview: tuple[RemovedCost, ...] = ()
 
 
 __all__ = [
+    "RemovedCost",
     "Blocker",
     "BlockerCode",
     "Choice",

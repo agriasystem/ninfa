@@ -19,10 +19,12 @@ from app.modules.ingestion.models import DataSource, DataSourceDomain, ImportFil
 from app.modules.invoices.cost_categories import ClassificationMethod, CostCategory
 from app.modules.invoices.models import (
     DocumentKind,
+    IdentityOrigin,
     Invoice,
     InvoiceImportRow,
     InvoiceLine,
     InvoiceMappingProfile,
+    InvoiceRemoval,
     ResolutionMethod,
     SourceFormat,
 )
@@ -158,12 +160,14 @@ def test_the_identity_has_no_data_source_in_it(db_session: Session) -> None:
             " WHERE c.conname = 'uq_invoices_identity_revision' ORDER BY a.attname"
         )
     ).scalars()
+    # (the TECHNICAL identity: the normalised number for a real document, a content key for an
+    # operating cost with none - ADR 0057 - and still no data source)
     assert sorted(columns) == [
         "document_kind",
         "invoice_date",
-        "normalized_invoice_number",
         "property_id",
         "revision",
+        "source_record_key",
         "supplier_id",
         "workspace_id",
     ]
@@ -248,8 +252,8 @@ def test_a_supplier_has_no_property_but_an_invoice_has_exactly_one() -> None:
 @pytest.mark.parametrize(
     ("column", "value", "constraint"),
     [
-        ("invoice_number", " ", "ck_invoices_invoice_number_not_blank"),
-        ("normalized_invoice_number", "", "ck_invoices_normalized_invoice_number_not_blank"),
+        ("invoice_number", " ", "ck_invoices_identity_consistent"),
+        ("normalized_invoice_number", "", "ck_invoices_identity_consistent"),
         ("currency", "eur", "ck_invoices_currency_format"),
         ("source_fingerprint", "xyz", "ck_invoices_source_fingerprint_format"),
         ("document_type_code", " ", "ck_invoices_document_type_code_not_blank"),
@@ -275,10 +279,11 @@ def test_closed_sets_are_stored_as_text_with_a_check(
         db_session.execute(
             text(
                 "INSERT INTO invoices (id, workspace_id, property_id, data_source_id, supplier_id,"
-                " invoice_number, normalized_invoice_number, invoice_date, document_kind, currency,"
-                " source_format, source_import_job_id, source_import_file_id, source_fingerprint,"
-                " supplier_resolution_method) VALUES (gen_random_uuid(), :w, :p, :d, :s, 'N', 'N',"
-                " '2026-01-01', :kind, 'EUR', :fmt, :j, :f, :fp, :res)"
+                " invoice_number, normalized_invoice_number, source_record_key, invoice_date,"
+                " document_kind, currency, source_format, source_import_job_id,"
+                " source_import_file_id, source_fingerprint, supplier_resolution_method)"
+                " VALUES (gen_random_uuid(), :w, :p, :d, :s, 'N', 'N', 'N', '2026-01-01', :kind,"
+                " 'EUR', :fmt, :j, :f, :fp, :res)"
             ),
             {
                 "w": a.workspace.id,
@@ -710,7 +715,7 @@ def test_a_supplier_can_evolve_but_an_invoice_and_its_lines_cannot(
     assert db_session.get(Supplier, supplier.id).is_verified is True  # type: ignore[union-attr]
 
 
-def test_the_triggers_live_on_invoices_and_lines_only(db_session: Session) -> None:
+def test_the_triggers_live_on_the_invoice_evidence_tables_only(db_session: Session) -> None:
     triggers = set(
         db_session.execute(
             text(
@@ -722,6 +727,8 @@ def test_the_triggers_live_on_invoices_and_lines_only(db_session: Session) -> No
     assert triggers == {
         "invoices.trg_invoices_immutable",
         "invoice_lines.trg_invoice_lines_immutable",
+        # 0018: a removal is evidence of what a person said a file held, and is never edited
+        "invoice_removals.trg_invoice_removals_immutable",
     }
     assert not db_session.scalar(
         text(
@@ -754,3 +761,176 @@ def test_staging_rows_can_be_marked_imported_because_they_are_not_evidence(
     assert db_session.scalars(select(InvoiceImportRow.validation_status)).one() == (
         ImportRowStatus.IMPORTED
     )
+
+
+# --- ADR 0057: the technical identity is not the fiscal number ---------------------------------
+
+SYNTHETIC_KEY = "cost:v1:" + "c" * 64 + "#1"
+REGISTER = "d" * 64  # the register (structure) a synthetic record was written from
+
+
+def synthetic_values(c: Costs, key: str = SYNTHETIC_KEY, **overrides: Any) -> dict[str, Any]:
+    """An operating cost with no document number: a spreadsheet row, no number, a content key."""
+    values = invoice_values(
+        c,
+        invoice_number=None,
+        normalized_invoice_number=None,
+        source_record_key=key,
+        identity_origin=IdentityOrigin.SYNTHETIC_COST_RECORD,
+        source_format=SourceFormat.CSV,
+        cost_register_key=REGISTER,
+    )
+    values.update(overrides)
+    return values
+
+
+def test_an_operating_cost_with_no_number_is_a_valid_record(db_session: Session, a: Costs) -> None:
+    invoice = Invoice(**synthetic_values(a))
+    db_session.add(invoice)
+    db_session.flush()
+
+    assert invoice.invoice_number is None and invoice.normalized_invoice_number is None
+    assert invoice.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        # a real document always has its number...
+        {"invoice_number": None, "normalized_invoice_number": None, "source_record_key": "X"},
+        {"normalized_invoice_number": None, "source_record_key": "FA/1"},
+        # ...and its key IS that number: a key of another value says something false
+        {"source_record_key": "OTHER"},
+    ],
+)
+def test_a_real_document_always_has_its_number_and_its_key_is_the_number(
+    db_session: Session, rejects: Rejects, a: Costs, change: dict[str, Any]
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_identity_consistent"):
+        db_session.add(Invoice(**invoice_values(a, **change)))
+
+
+@pytest.mark.parametrize("register", [None, "not-a-hash", "D" * 64])
+def test_t31_a_synthetic_record_without_a_register_is_impossible(
+    db_session: Session, rejects: Rejects, a: Costs, register: str | None
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_cost_register_key_only_for_synthetic"):
+        db_session.add(Invoice(**synthetic_values(a, cost_register_key=register)))
+
+
+def test_a_real_document_never_has_a_register(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_cost_register_key_only_for_synthetic"):
+        db_session.add(Invoice(**invoice_values(a, cost_register_key=REGISTER)))
+
+
+def test_a_synthetic_record_can_never_carry_a_number(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_identity_consistent"):
+        db_session.add(Invoice(**synthetic_values(a, invoice_number="FA/9")))
+
+
+def test_a_fatturapa_can_never_be_synthetic(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_synthetic_only_for_spreadsheets"):
+        db_session.add(Invoice(**synthetic_values(a, source_format=SourceFormat.FATTURAPA_XML)))
+
+
+def test_a_credit_note_can_never_be_synthetic(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_synthetic_only_for_spreadsheets"):
+        db_session.add(
+            Invoice(
+                **synthetic_values(
+                    a,
+                    document_kind=DocumentKind.CREDIT_NOTE,
+                    net_amount=Decimal("-100.00"),
+                    tax_amount=Decimal("-22.00"),
+                    gross_amount=Decimal("-122.00"),
+                )
+            )
+        )
+
+
+def test_a_blank_key_is_refused(db_session: Session, rejects: Rejects, a: Costs) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_source_record_key_not_blank"):
+        db_session.add(Invoice(**synthetic_values(a, key=" ")))
+
+
+def test_the_same_synthetic_record_twice_is_refused_by_the_database(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    db_session.add(Invoice(**synthetic_values(a)))
+    db_session.flush()
+
+    with rejects(pg.UniqueViolation, "uq_invoices_identity_revision"):
+        db_session.add(Invoice(**synthetic_values(a)))
+
+
+def removal_values(c: Costs, invoice: Invoice, **overrides: Any) -> dict[str, Any]:
+    values: dict[str, Any] = {
+        "workspace_id": c.workspace.id,
+        "property_id": c.property.id,
+        "data_source_id": c.source.id,
+        "invoice_id": invoice.id,
+        "removed_by_import_job_id": c.job.id,
+    }
+    values.update(overrides)
+    return values
+
+
+def test_a_synthetic_record_can_be_removed_once(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    invoice = Invoice(**synthetic_values(a))
+    db_session.add(invoice)
+    db_session.flush()
+    db_session.add(InvoiceRemoval(**removal_values(a, invoice)))
+    db_session.flush()
+
+    with rejects(pg.UniqueViolation, "uq_invoice_removals_workspace_id_invoice_id"):
+        db_session.add(InvoiceRemoval(**removal_values(a, invoice)))
+
+
+def test_a_fiscal_document_can_never_be_removed(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    """The foreign key of a removal carries the KIND of identity of its invoice."""
+    invoice = make_invoice(db_session, a)  # a real document, with its number
+
+    with rejects(pg.ForeignKeyViolation, "fk_invoice_removals_workspace_id_invoices"):
+        db_session.add(InvoiceRemoval(**removal_values(a, invoice)))
+
+
+def test_a_removal_cannot_name_another_kind_of_identity(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    invoice = make_invoice(db_session, a)
+
+    with rejects(pg.CheckViolation, "ck_invoice_removals_only_synthetic_records"):
+        db_session.add(
+            InvoiceRemoval(
+                **removal_values(a, invoice, identity_origin=IdentityOrigin.DOCUMENT_NUMBER)
+            )
+        )
+
+
+def test_a_removal_is_never_edited(db_session: Session, a: Costs) -> None:
+    invoice = Invoice(**synthetic_values(a))
+    db_session.add(invoice)
+    db_session.flush()
+    removal = InvoiceRemoval(**removal_values(a, invoice))
+    db_session.add(removal)
+    db_session.flush()
+
+    with pytest.raises(Exception, match="immutable") as raised, db_session.begin_nested():
+        db_session.execute(
+            update(InvoiceRemoval)
+            .where(InvoiceRemoval.id == removal.id)
+            .values(removed_by_import_job_id=a.job.id)
+        )
+    assert "immutable accounting evidence" in str(raised.value)

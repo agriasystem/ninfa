@@ -26,7 +26,7 @@ GATE_9_HEAD = "0009_decision_layer"
 HEAD = "0010_auth_session"
 # Gate 22 added 0011_analysis_coverage on top, then Gate 23B added 0012_input_provenance on top
 # of THAT; owned/asserted by test_input_provenance_migration.py.
-CURRENT_GLOBAL_HEAD = "0017_mia_conversations"
+CURRENT_GLOBAL_HEAD = "0018_cost_record_identity"
 GATE_13_TABLES = {"user_credentials", "auth_sessions"}
 
 

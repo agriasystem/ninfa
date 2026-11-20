@@ -539,7 +539,10 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
             "La domanda compare solo quando la risposta cambia ciò che viene contato, e solo dopo "
             "le altre domande.",
             "Un primo file non la pone mai: non c'è nulla che possa mancare.",
-            "Un file dei costi non la pone mai: l'unità è il documento.",
+            "Un file dei costi con il numero del documento non la pone mai: l'unità è il "
+            "documento.",
+            "I costi operativi senza numero documento la pongono come le prenotazioni: un file "
+            "completo toglie i costi del periodo che non contiene, uno parziale no.",
         ),
         where=_IMPORT_PAGE,
         related=("import.scope", "import.scope_full", "import.scope_partial", "import.scope_delta"),
@@ -568,6 +571,38 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
         where=_IMPORT_PAGE,
         related=("import.scope", "import.remembered_scope_safety"),
         keywords=("conferma", "file completo", "ricorda questa scelta", "non compaiono più"),
+    ),
+    entry(
+        "import.question_document_identity",
+        FEATURE,
+        "Domanda: costi senza numero documento",
+        "Un file di costi senza il numero del documento non viene mai trattato da solo come un "
+        "registro di fatture. Se nulla nel file indica documenti fiscali, NINFA lo registra come "
+        "costi operativi con un riferimento interno, senza domande. Se qualcosa li indica (per "
+        "esempio la colonna del tipo di documento), chiede se sono fatture o costi operativi.",
+        copy("Questo file contiene fatture o documenti, oppure un registro di costi operativi?"),
+        enum(f"{_QUESTION}.DOCUMENT_IDENTITY"),
+        details=(
+            "Le risposte sono Un registro di costi operativi e Fatture o documenti: la risposta "
+            "vale anche per i prossimi file fatti così e si corregge o si fa dimenticare dalle "
+            "risposte ricordate.",
+            "Una scadenza o un numero di riga da soli non bastano a dire che è un registro di "
+            "fatture: un registro di costi operativi li ha spesso.",
+            "Con Fatture o documenti il file non viene importato: senza il numero del documento "
+            "le fatture non si possono registrare, e NINFA non lo inventa.",
+            "Le righe con tipo di documento nota di credito e senza numero non vengono mai "
+            "registrate come costi operativi.",
+            "Lo stesso costo importato due volte non si duplica; due righe uguali nel file restano "
+            "due costi.",
+        ),
+        where=_IMPORT_PAGE,
+        related=("import.blocker_missing_required", "import.scope"),
+        keywords=(
+            "costi operativi",
+            "senza numero documento",
+            "numero fattura",
+            "riferimento interno",
+        ),
     ),
     entry(
         "import.blocker_no_table",
@@ -659,6 +694,43 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
         where=_IMPORT_PAGE,
         related=("import.question_date_order", "import.question_decimal_style"),
         keywords=("formati misti", "date diverse", "numeri misti"),
+    ),
+    entry(
+        "import.question_document_number_column",
+        FEATURE,
+        "Domanda: quale colonna contiene il numero del documento",
+        "Se la persona dice che un file di costi contiene fatture ma nessuna colonna ha un nome da "
+        "numero di documento, NINFA chiede quale colonna lo contiene, proponendo solo le colonne "
+        "del file che potrebbero contenerlo (codici come 2026/105) e Nessuna di queste.",
+        copy("Quale colonna contiene il numero del documento?"),
+        enum(f"{_QUESTION}.DOCUMENT_NUMBER_COLUMN"),
+        details=(
+            "Con una colonna scelta le fatture vengono importate con il loro numero; con Nessuna "
+            "di queste il file non viene importato.",
+            "NINFA non propone mai una colonna che il file non ha.",
+        ),
+        where=_IMPORT_PAGE,
+        related=("import.question_document_identity", "import.blocker_document_number_missing"),
+        keywords=("numero documento", "numero fattura", "quale colonna"),
+    ),
+    entry(
+        "import.blocker_document_number_missing",
+        FEATURE,
+        "Fatture senza numero del documento",
+        "Se la persona dice che un file di costi senza numero del documento contiene fatture, "
+        "NINFA non lo importa: senza il numero le fatture non si possono registrare, e NINFA non "
+        "lo inventa né chiede di abbinare una colonna che il file non ha.",
+        copy("Questo file non contiene il numero del documento, che serve per registrare"),
+        enum(f"{_BLOCKER}.DOCUMENT_NUMBER_MISSING"),
+        details=(
+            "Per le fatture si carica la fattura elettronica XML da Importa le fatture, oppure un "
+            "registro esportato dal gestionale con la colonna del numero del documento.",
+            "Se invece sono costi operativi, si sceglie di nuovo il file e si risponde Un registro "
+            "di costi operativi.",
+        ),
+        where=_IMPORT_PAGE,
+        related=("import.question_document_identity", "import.level_blocked"),
+        keywords=("fatture senza numero", "numero documento mancante", "numero fattura"),
     ),
     entry(
         "import.source_learning",

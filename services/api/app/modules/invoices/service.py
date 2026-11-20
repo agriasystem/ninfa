@@ -43,6 +43,7 @@ from app.modules.ingestion.models import (
     DataSource,
     DataSourceDomain,
     DataSourceType,
+    FileScope,
     ImportJobStatus,
 )
 from app.modules.ingestion.repository import (
@@ -51,13 +52,16 @@ from app.modules.ingestion.repository import (
     ImportJobRepository,
 )
 from app.modules.ingestion.schemas import ImportFileCreate, ImportJobCreate
+from app.modules.ingestion.scope import NO_SCOPE, ScopePlan
 from app.modules.invoices.canonical import (
     CanonicalDocument,
     document_from_payloads,
     header_payload,
     line_payload,
+    record_key,
 )
 from app.modules.invoices.classification import classify_line
+from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.documents import ParsedDocument
 from app.modules.invoices.errors import InvoiceErrorCode, InvoiceImportError, RowIssue
 from app.modules.invoices.fatturapa import parse_fatturapa
@@ -70,6 +74,8 @@ from app.modules.invoices.mapping import (
 )
 from app.modules.invoices.models import InvoiceMappingProfile, ResolutionMethod, SourceFormat
 from app.modules.invoices.repository import (
+    AbsentCost,
+    ExistingRecord,
     InvoiceIdentity,
     InvoiceImportRowRepository,
     InvoiceMappingProfileRepository,
@@ -117,6 +123,18 @@ class InvoiceFileDescription:
     sheet_names: list[str] = field(default_factory=list)
 
 
+# How many operating costs a person is shown, one by one, before a complete file takes them away.
+PREVIEW_LIMIT = 20
+
+
+@dataclass(frozen=True)
+class RemovalPreview:
+    """What a complete file would take away: how many, and the first ones as a person sees them."""
+
+    count: int
+    items: tuple[AbsentCost, ...]
+
+
 @dataclass(frozen=True)
 class InvoiceImportResult:
     """Outcome of one import. Machine-readable: branch on `error_code`, never on messages.
@@ -137,6 +155,11 @@ class InvoiceImportResult:
     invoices_created: int = 0
     invoices_unchanged: int = 0
     invoices_revised: int = 0
+    # Operating costs with no document number (ADR 0057): a record that a person's word had taken
+    # away and that this file holds again (it counts again, as the next revision), and the records
+    # this file took away because a person said it holds everything of its period.
+    records_restored: int = 0
+    records_removed: int = 0
     lines_created: int = 0
     suppliers_created: int = 0
     suppliers_matched: int = 0
@@ -156,7 +179,13 @@ class InvoiceImportResult:
 
     @property
     def changed_data(self) -> bool:
-        return self.invoices_created + self.invoices_revised > 0
+        return (
+            self.invoices_created
+            + self.invoices_revised
+            + self.records_restored
+            + self.records_removed
+            > 0
+        )
 
 
 @dataclass(frozen=True)
@@ -371,6 +400,183 @@ class InvoiceImportService:
             summary=_dry_run_summary(documents),
         )
 
+    def records_a_complete_file_would_remove(
+        self,
+        data_source_id: UUID,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: InvoiceMappingConfig,
+    ) -> int:
+        """How many operating costs of this source would stop counting if THIS file holds everything
+        of the period it covers (first to last date of its own rows). Read-only: nothing is written
+        and no supplier is created.
+
+        0 for a mapping that identifies its records by a document number (a real invoice is never
+        taken away by any file), for a file that cannot be read cleanly (what is wrong with it is
+        said when it is tried, not here), and when nothing would go."""
+        return self.what_a_complete_file_would_remove(
+            data_source_id,
+            property_id,
+            filename=filename,
+            content=content,
+            mapping=mapping,
+            limit=0,
+        ).count
+
+    def what_a_complete_file_would_remove(
+        self,
+        data_source_id: UUID,
+        property_id: UUID,
+        *,
+        filename: str,
+        content: bytes,
+        mapping: InvoiceMappingConfig,
+        limit: int = PREVIEW_LIMIT,
+    ) -> RemovalPreview:
+        """How many, and the first `limit` of them (date, supplier, category, amount): what a person
+        sees before saying that a file holds everything of its period. The SAME records the import
+        would take away (same source, same register, same period, same placement). Read-only."""
+        if not mapping.is_synthetic:
+            return RemovalPreview(0, ())
+        prop = self._properties.get(property_id)
+        if prop is None:
+            return RemovalPreview(0, ())
+        kind = detect_source(filename, content)
+        if kind == "xml":
+            return RemovalPreview(0, ())
+        source_format = SourceFormat.CSV if kind == "csv" else SourceFormat.XLSX
+        ids = _Ids(uuid4(), uuid4(), data_source_id, property_id)
+        parsed, register = self._parse_structured(
+            ids, filename, content, prop.currency, source_format, mapping
+        )
+        canonical = [document.canonical for document in parsed if document.valid]
+        if not parsed or len(canonical) != len(parsed):
+            return RemovalPreview(0, ())
+        documents = [document for document in canonical if document is not None]
+        plan = self._resolver.plan([document.supplier for document in documents])
+        placed = self._place_synthetic(
+            [(document, plan.resolutions[document.supplier.key]) for document in documents],
+            property_id,
+            data_source_id,
+        )
+        held = [placement.identity[1] for placement in placed]
+        first = min(document.invoice_date for document in documents)
+        last = max(document.invoice_date for document in documents)
+        count = self._invoices.count_synthetic_absent_from(
+            data_source_id, register, held, first, last
+        )
+        items = (
+            self._invoices.synthetic_absent_preview(
+                data_source_id, register, held, first, last, limit
+            )
+            if count and limit
+            else []
+        )
+        return RemovalPreview(count, tuple(items))
+
+    def _place_synthetic(
+        self,
+        resolved: list[tuple[CanonicalDocument, SupplierResolution]],
+        property_id: UUID,
+        data_source_id: UUID,
+    ) -> list["_Placement"]:
+        """Where each operating cost with no number goes among the records the source already
+        holds (ADR 0057). The same function serves the import and the preview of what a complete
+        file would take away, so the figure a person is shown is the one that is applied.
+
+        Rows that are economically identical (same fingerprint) are a MULTISET. The CATEGORY is not
+        part of what a cost is: a reclassification is the same cost, and two equal rows may be
+        stated with two categories and stay two costs, each with its own. For one fingerprint:
+
+        1. an occurrence keeps the record already holding the same stated category (nothing
+           changes);
+        2. whatever is left is paired, in a fixed order, with the records left: a different stated
+           category is a RECLASSIFICATION of that same cost (the next revision of its key), and a
+           file that states no category says nothing and changes nothing;
+        3. occurrences beyond the records the source holds are new: a record a person's word took
+           away comes back first (the next revision of its key), then new numbers are used.
+
+        The order of the rows in the file is never used: the same rows in another order are the
+        same placement."""
+        groups: dict[str, list[tuple[CanonicalDocument, SupplierResolution]]] = {}
+        for document, resolution in resolved:
+            fingerprint = document.record_fingerprint(
+                str(resolution.supplier_id), str(data_source_id)
+            )
+            groups.setdefault(fingerprint, []).append((document, resolution))
+        existing = self._invoices.synthetic_records_of(
+            property_id,
+            data_source_id,
+            list(groups),
+            [document.invoice_date for document, _ in resolved],
+        )
+        placed: list[_Placement] = []
+        for fingerprint, items in groups.items():
+            records = existing.get(fingerprint, [])
+            counting = [record for record in records if not record.removed]
+            away = [record for record in records if record.removed]
+            next_number = max((record.occurrence for record in records), default=0) + 1
+            ordered = sorted(items, key=lambda item: _category_order(_stated_category(item[0])))
+            leftover: list[tuple[CanonicalDocument, SupplierResolution]] = []
+            for document, resolution in ordered:
+                stated = _stated_category(document)
+                match = next((record for record in counting if record.category == stated), None)
+                if match is None:
+                    leftover.append((document, resolution))
+                    continue
+                counting.remove(match)
+                placed.append(
+                    _placement(
+                        document, resolution, fingerprint, match, "UNCHANGED", match.revision
+                    )
+                )
+            fresh: list[tuple[CanonicalDocument, SupplierResolution]] = []
+            for document, resolution in leftover:
+                if counting:
+                    record = counting.pop(0)
+                    reclassified = _stated_category(document) is not None
+                    placed.append(
+                        _placement(
+                            document,
+                            resolution,
+                            fingerprint,
+                            record,
+                            "RECLASSIFY" if reclassified else "UNCHANGED",
+                            record.revision + 1 if reclassified else record.revision,
+                        )
+                    )
+                else:
+                    fresh.append((document, resolution))
+            for document, resolution in fresh:
+                if away:
+                    record = away.pop(0)
+                    placed.append(
+                        _placement(
+                            document,
+                            resolution,
+                            fingerprint,
+                            record,
+                            "RESTORE",
+                            record.revision + 1,
+                        )
+                    )
+                else:
+                    placed.append(
+                        _placement(
+                            document,
+                            resolution,
+                            fingerprint,
+                            None,
+                            "NEW",
+                            1,
+                            record_key(fingerprint, next_number),
+                        )
+                    )
+                    next_number += 1
+        return placed
+
     # --- import -------------------------------------------------------------------------------
 
     def import_file(
@@ -382,11 +588,18 @@ class InvoiceImportService:
         mime_type: str | None = None,
         property_id: UUID | None = None,
         mapping_override: InvoiceMappingConfig | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> InvoiceImportResult:
         """Import one invoice file into the canonical model, atomically and idempotently.
 
         `mapping_override` is a validated mapping used instead of the one saved for the data source
         (Smart Import: the person's own matching, saved only once this import has succeeded).
+
+        `scope` is what the caller knows this file to be. Only `FileScope.FULL`, and only for
+        operating costs with no document number, makes the absence of a record mean anything: the
+        records of the source the file does not hold, inside the period its own rows cover, stop
+        counting. With anything else, or nothing, nothing is ever taken away. A real invoice is
+        never taken away by any file.
 
         Raises InvoiceImportError(INVOICE_INVALID_DATA_SOURCE) when the data source cannot be used
         (nothing is created). Every later problem ends as a FAILED ImportJob and a returned result
@@ -415,7 +628,9 @@ class InvoiceImportService:
         self._log("invoice import started", ids)
 
         try:
-            result = self._run(ids, filename, content, currency, duplicate_of, mapping_override)
+            result = self._run(
+                ids, filename, content, currency, duplicate_of, mapping_override, scope
+            )
         except (InvoiceImportError, SupplierError) as error:
             result = self._fail(ids, error.code, error.message, _details(error), duplicate_of)
         except Exception as error:  # a bug or infrastructure problem: never leave the job RUNNING
@@ -452,6 +667,7 @@ class InvoiceImportService:
         currency: str,
         duplicate_of: UUID | None,
         mapping_override: InvoiceMappingConfig | None = None,
+        scope: ScopePlan = NO_SCOPE,
     ) -> InvoiceImportResult:
         kind = detect_source(filename, content)
         source_format = {
@@ -459,10 +675,11 @@ class InvoiceImportService:
             "csv": SourceFormat.CSV,
             "xlsx": SourceFormat.XLSX,
         }[kind]
+        register: str | None = None
         if kind == "xml":
             documents = parse_fatturapa(content, data_source_id=ids.data_source)
         else:
-            documents = self._parse_structured(
+            documents, register = self._parse_structured(
                 ids, filename, content, currency, source_format, mapping_override
             )
         if not documents:
@@ -488,7 +705,9 @@ class InvoiceImportService:
                 warnings=warnings,
                 source_format=source_format,
             )
-        return self._canonicalize(ids, duplicate_of, counts, warnings, source_format)
+        return self._canonicalize(
+            ids, duplicate_of, counts, warnings, source_format, scope, register
+        )
 
     def _parse_structured(
         self,
@@ -498,7 +717,8 @@ class InvoiceImportService:
         currency: str,
         source_format: SourceFormat,
         mapping_override: InvoiceMappingConfig | None = None,
-    ) -> list[ParsedDocument]:
+    ) -> tuple[list[ParsedDocument], str]:
+        """The parsed documents, and the REGISTER the file is (see `register_key`)."""
         profile = (
             None
             if mapping_override is not None
@@ -543,13 +763,14 @@ class InvoiceImportService:
             )
         rows = extract(table, config)
         require_explicit_formats(rows, config)
-        return parse_structured(
+        documents = parse_structured(
             rows,
             config,
             property_currency=currency,
             data_source_id=ids.data_source,
             source_format=source_format,
         )
+        return documents, config.register_key()
 
     @staticmethod
     def _open_table(content: bytes, filename: str, options: FormatOptions) -> Any:
@@ -568,8 +789,11 @@ class InvoiceImportService:
         counts: _Counts,
         warnings: dict[str, int],
         source_format: SourceFormat,
+        scope: ScopePlan = NO_SCOPE,
+        register: str | None = None,
     ) -> InvoiceImportResult:
         """Every valid document becomes a canonical invoice (with its supplier), or none does."""
+        removed = 0
         try:
             # One canonicalisation per data source at a time, and one supplier registry writer per
             # workspace at a time, always in this order (no lock cycle is possible).
@@ -587,20 +811,16 @@ class InvoiceImportService:
             resolved = [
                 (document, plan.resolutions[document.supplier.key]) for document in documents
             ]
+            keyed = _identify([(d, r) for d, r in resolved if not d.is_synthetic])
+            placed = self._place_synthetic(
+                [(d, r) for d, r in resolved if d.is_synthetic], ids.property, ids.data_source
+            )
             identities: dict[InvoiceIdentity, CanonicalDocument] = {}
-            keyed: list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution]] = []
             duplicated: list[int] = []
-            for document, resolution in resolved:
-                identity = (
-                    resolution.supplier_id,
-                    document.normalized_invoice_number,
-                    document.invoice_date,
-                    document.document_kind,
-                )
+            for identity, document, _resolution, _fingerprint in keyed:
                 if identity in identities:  # the same document twice in one import
                     duplicated.append(document.source_document_index)
                 identities[identity] = document
-                keyed.append((identity, document, resolution))
             if duplicated:
                 raise InvoiceImportError(
                     InvoiceErrorCode.DOCUMENT_CONFLICT,
@@ -612,9 +832,8 @@ class InvoiceImportService:
             conflicts: list[int] = []
             new_invoices: list[dict[str, Any]] = []
             new_lines: list[dict[str, Any]] = []
-            unchanged = revised = 0
-            for identity, document, resolution in keyed:
-                fingerprint = document.fingerprint(str(resolution.supplier_id))
+            unchanged = revised = restored = 0
+            for identity, document, resolution, fingerprint in keyed:
                 stored = existing.get(identity)
                 revision = 1
                 if stored is not None:
@@ -637,9 +856,35 @@ class InvoiceImportService:
                         fingerprint,
                         _resolution_story(resolution, created_by),
                         revision,
+                        identity[1],
                     )
                 )
                 new_lines.extend(self._line_rows(invoice_id, document, resolution))
+            for placement in placed:
+                if placement.action == "UNCHANGED":
+                    unchanged += 1
+                    continue
+                if placement.action == "RESTORE":
+                    restored += 1  # a record a person's word took away comes back: next revision
+                elif placement.action == "RECLASSIFY":
+                    revised += 1  # the same cost, stated with another category: next revision
+                invoice_id = uuid4()
+                new_invoices.append(
+                    self._invoice_row(
+                        ids,
+                        invoice_id,
+                        placement.document,
+                        placement.resolution,
+                        placement.fingerprint,
+                        _resolution_story(placement.resolution, created_by),
+                        placement.revision,
+                        placement.identity[1],
+                        register,
+                    )
+                )
+                new_lines.extend(
+                    self._line_rows(invoice_id, placement.document, placement.resolution)
+                )
             if conflicts:
                 raise InvoiceImportError(
                     InvoiceErrorCode.DOCUMENT_CONFLICT,
@@ -648,10 +893,45 @@ class InvoiceImportService:
                     details={"reason": "different_content", "documents": conflicts[:50]},
                 )
 
+            # What a COMPLETE file of operating costs takes away: the records of this source that
+            # THIS REGISTER wrote and the file does not hold, inside the period its own rows cover
+            # (another register of the property is never touched). Computed here, under the lock:
+            # if it is not what the person was shown, nothing is imported. A real invoice is never
+            # in it.
+            synthetic = [doc for doc in documents if doc.is_synthetic]
+            complete = (
+                scope.file_scope is FileScope.FULL
+                and register is not None
+                and bool(synthetic)
+                and len(synthetic) == len(documents)
+            )
+            held = [placement.identity[1] for placement in placed]
+            first = min((doc.invoice_date for doc in synthetic), default=None)
+            last = max((doc.invoice_date for doc in synthetic), default=None)
+            if complete and register is not None and first is not None and last is not None:
+                absent = self._invoices.count_synthetic_absent_from(
+                    ids.data_source, register, held, first, last
+                )
+                if scope.is_stale(absent):
+                    raise InvoiceImportError(
+                        InvoiceErrorCode.IMPORT_PLAN_CHANGED,
+                        "What this file would take away changed after it was read: "
+                        "nothing was imported",
+                    )
+
             self._invoices.insert_invoices(new_invoices)
             self._invoices.insert_lines(new_lines)
+            if complete and register is not None and first is not None and last is not None:
+                removed = self._invoices.remove_synthetic_absent_from(
+                    ids.data_source, register, ids.job, held, first, last
+                )
             self._rows.mark_valid_rows_imported(ids.job)
-            self._jobs.succeed(ids.job, changed_data=bool(new_invoices))
+            self._jobs.succeed(
+                ids.job,
+                changed_data=bool(new_invoices) or removed > 0,
+                file_scope=scope.file_scope,
+                remembered_file_scope=scope.remembered_file_scope,
+            )
             self._session.commit()
         except (InvoiceImportError, SupplierError):
             raise  # rolled back and recorded as FAILED by import_file
@@ -693,9 +973,11 @@ class InvoiceImportService:
             rows_total=counts.rows,
             rows_valid=counts.valid,
             rows_invalid=counts.invalid,
-            invoices_created=len(new_invoices) - revised,
+            invoices_created=len(new_invoices) - revised - restored,
             invoices_unchanged=unchanged,
             invoices_revised=revised,
+            records_restored=restored,
+            records_removed=removed,
             lines_created=len(new_lines),
             suppliers_created=len(created_suppliers),
             suppliers_matched=len(matched_suppliers),
@@ -730,6 +1012,8 @@ class InvoiceImportService:
         fingerprint: str,
         method: ResolutionMethod,
         revision: int = 1,
+        key: str | None = None,
+        register: str | None = None,
     ) -> dict[str, Any]:
         return {
             "id": invoice_id,
@@ -738,8 +1022,13 @@ class InvoiceImportService:
             "property_id": ids.property,
             "data_source_id": ids.data_source,
             "supplier_id": resolution.supplier_id,
+            # the SOURCE's number: None for an operating cost that has none, never an invented one
             "invoice_number": document.invoice_number,
             "normalized_invoice_number": document.normalized_invoice_number,
+            "source_record_key": key or document.normalized_invoice_number,
+            "identity_origin": document.identity_origin,
+            # (the register that wrote this version: only a synthetic record has one)
+            "cost_register_key": register if document.is_synthetic else None,
             "invoice_date": document.invoice_date,
             "due_date": document.due_date,
             "document_type_code": document.document_type_code,
@@ -953,6 +1242,67 @@ def _stage(
 
 def _file_row(file_rows: list[int | None], position: int) -> int | None:
     return file_rows[position] if position < len(file_rows) else None
+
+
+def _identify(
+    resolved: list[tuple[CanonicalDocument, SupplierResolution]],
+) -> list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution, str]]:
+    """The identity and the content fingerprint of every REAL document, in file order: its number,
+    as it always was. (An operating cost with no number is placed by `_place_synthetic`.)"""
+    keyed: list[tuple[InvoiceIdentity, CanonicalDocument, SupplierResolution, str]] = []
+    for document, resolution in resolved:
+        if document.normalized_invoice_number is None:  # pragma: no cover - checked by the DB
+            raise InvoiceImportError(
+                InvoiceErrorCode.VALIDATION_FAILED, "a document with no number and no identity"
+            )
+        identity = (
+            resolution.supplier_id,
+            document.normalized_invoice_number,
+            document.invoice_date,
+            document.document_kind,
+        )
+        fingerprint = document.fingerprint(str(resolution.supplier_id))
+        keyed.append((identity, document, resolution, fingerprint))
+    return keyed
+
+
+@dataclass(frozen=True, slots=True)
+class _Placement:
+    """Where one operating cost with no number goes (`InvoiceImportService._place_synthetic`)."""
+
+    identity: InvoiceIdentity
+    document: CanonicalDocument
+    resolution: SupplierResolution
+    fingerprint: str
+    action: Literal["NEW", "UNCHANGED", "RESTORE", "RECLASSIFY"]
+    # the revision to WRITE (the stored one for UNCHANGED, where nothing is written)
+    revision: int
+
+
+def _placement(
+    document: CanonicalDocument,
+    resolution: SupplierResolution,
+    fingerprint: str,
+    record: ExistingRecord | None,
+    action: Literal["NEW", "UNCHANGED", "RESTORE", "RECLASSIFY"],
+    revision: int,
+    key: str | None = None,
+) -> _Placement:
+    chosen = key if record is None else record.key
+    assert chosen is not None  # a new occurrence is given its key; an existing one has its own
+    identity = (resolution.supplier_id, chosen, document.invoice_date, document.document_kind)
+    return _Placement(identity, document, resolution, fingerprint, action, revision)
+
+
+def _stated_category(document: CanonicalDocument) -> CostCategory | None:
+    """The category the SOURCE stated for this cost (None: it stated none). An operating cost is one
+    line; what NINFA derives when the source says nothing is not a statement of the source."""
+    return next((line.explicit_category for line in document.lines), None)
+
+
+def _category_order(category: CostCategory | None) -> tuple[bool, str]:
+    """A fixed order for the categories of identical rows (none last), never the file order."""
+    return (category is None, "" if category is None else category.value)
 
 
 def _dry_run_summary(documents: list[ParsedDocument]) -> dict[str, Any]:

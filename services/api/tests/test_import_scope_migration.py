@@ -18,7 +18,7 @@ from tests.support import alembic_config
 
 HEAD = "0015_import_scope"
 PREVIOUS_HEAD = "0014_same_day_revisions"
-CURRENT_GLOBAL_HEAD = "0017_mia_conversations"
+CURRENT_GLOBAL_HEAD = "0018_cost_record_identity"
 
 
 @pytest.fixture

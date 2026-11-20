@@ -6,8 +6,10 @@ read into NINFA: that is how unneeded personal data is kept out. It is NOT the b
 the two have different fields and rules, and share only the header helpers.
 """
 
+import hashlib
+import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal
@@ -26,7 +28,7 @@ from app.modules.bookings.text import normalize_key
 from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.invoices.cost_categories import CostCategory
 from app.modules.invoices.errors import InvoiceErrorCode, InvoiceImportError
-from app.modules.invoices.models import DocumentKind
+from app.modules.invoices.models import DocumentKind, IdentityOrigin
 
 __all__ = ["compute_header_signature", "header_index", "normalize_header"]
 
@@ -34,6 +36,8 @@ __all__ = ["compute_header_signature", "header_index", "normalize_header"]
 # Bumped when the meaning of a stored mapping changes (the same rule as the bookings' and the
 # labor mapping): a configuration saved against another version is never applied silently.
 MAPPING_SCHEMA_VERSION = 1
+# Part of every register key: a change of what the key holds is a new version.
+REGISTER_KEY_VERSION = 1
 
 
 class InvoiceField(StrEnum):
@@ -66,6 +70,52 @@ REQUIRED_FIELDS = frozenset(
 # A constant is only safe where it cannot invent facts about one invoice or one line: never the
 # invoice number, the dates, the supplier, the description or the amount.
 CONSTANT_FIELDS = frozenset({F.DOCUMENT_TYPE, F.CURRENCY, F.COST_CATEGORY})
+
+
+class DocumentEvidence(StrEnum):
+    """How much a file's columns say that it is a register of FISCAL DOCUMENTS (ADR 0057)."""
+
+    # nothing in the columns points at documents: a register of costs
+    NONE = "NONE"
+    # a due date or a row number: also what an operating-cost register carries ("Scadenza", "N."),
+    # so alone, or together, they prove nothing. A person is asked, never blocked.
+    WEAK = "WEAK"
+    # the file says what it is: a synthetic identity must never cover an incomplete fiscal document
+    STRONG = "STRONG"
+
+
+# A column that says what KIND of fiscal document a line belongs to (TD01, "Fattura", "Nota di
+# credito"): the engine only maps it from a header that says so, and its values must be fiscal
+# document labels or the row is refused.
+STRONG_DOCUMENT_FIELDS = frozenset({F.INVOICE_NUMBER, F.DOCUMENT_TYPE})
+# Compatible with an operating-cost register: a due date and a row number, alone or together.
+WEAK_DOCUMENT_FIELDS = frozenset({F.DUE_DATE, F.LINE_NUMBER})
+# Who the supplier is: not about the document, but with BOTH weak signals it completes a picture
+# that only a register of invoices has (a supplier identified fiscally, a line of a document, a due
+# date).
+SUPPLIER_FISCAL_FIELDS = frozenset({F.SUPPLIER_VAT_NUMBER, F.SUPPLIER_TAX_CODE, F.SUPPLIER_IBAN})
+
+
+def document_evidence(fields: Iterable[str]) -> DocumentEvidence:
+    """How strongly the fields a file carries say that it is a register of fiscal documents.
+
+    STRONG: a document number (or a column that may be it), a document type, or the whole picture of
+    an invoice register - a due date AND a row number AND a supplier identified fiscally (VAT, tax
+    code or IBAN). WEAK: a due date and/or a row number alone. Anything else: none. FatturaPA/XML
+    never gets here: it reads its own number and fails without one."""
+    present = {str(field) for field in fields}
+    strong = {field.value for field in STRONG_DOCUMENT_FIELDS}
+    weak = {field.value for field in WEAK_DOCUMENT_FIELDS}
+    supplier = {field.value for field in SUPPLIER_FISCAL_FIELDS}
+    if present & strong:
+        return DocumentEvidence.STRONG
+    if weak <= present and present & supplier:
+        return DocumentEvidence.STRONG
+    if present & weak:
+        return DocumentEvidence.WEAK
+    return DocumentEvidence.NONE
+
+
 DATE_FIELDS = frozenset({F.INVOICE_DATE, F.DUE_DATE})
 DECIMAL_FIELDS = frozenset(
     {
@@ -126,6 +176,10 @@ class InvoiceFormatOptions(BaseModel):
     date_formats: dict[InvoiceField, str] = {}
     decimal_separator: Literal[".", ","] | None = None
     thousands_separator: Literal[",", ".", " ", "'"] | None = None
+    # How the records of this source are identified when the file has NO document number: a person
+    # said these are operating costs and NINFA may identify each by its content (ADR 0057). None:
+    # the records are identified by their document number, which is then required.
+    document_identity: IdentityOrigin | None = None
     # Smart Import V3: how the document's structure is read (title, totals, sections, day grid).
     layout: LayoutSpec | None = None
     # Source Learning: what a person confirmed about this source (see `source_learning.Memory`).
@@ -173,9 +227,26 @@ class InvoiceMappingConfig(BaseModel):
             normalised[key] = category
         return normalised
 
+    @property
+    def is_synthetic(self) -> bool:
+        """The records of this mapping are operating costs identified by their content."""
+        return self.format_options.document_identity == IdentityOrigin.SYNTHETIC_COST_RECORD
+
     @model_validator(mode="after")
     def _check_fields(self) -> "InvoiceMappingConfig":
-        missing = sorted(f.value for f in REQUIRED_FIELDS if f not in self.column_mapping)
+        if self.format_options.document_identity == IdentityOrigin.DOCUMENT_NUMBER:
+            raise ValueError("document_identity can only say SYNTHETIC_COST_RECORD, or nothing")
+        required = REQUIRED_FIELDS
+        if self.is_synthetic:
+            # A file with a document number identifies by it. Whether a file WITHOUT one is a
+            # register of operating costs is decided before a mapping exists (ADR 0057): by the
+            # file when nothing in it points at fiscal documents, by a person when something does.
+            # A document type column may then stay mapped: its credit notes are refused row by row
+            # (a credit note is a fiscal document, never a synthetic cost).
+            if F.INVOICE_NUMBER in self.column_mapping:
+                raise ValueError("a mapping with a document number identifies its records by it")
+            required = REQUIRED_FIELDS - {F.INVOICE_NUMBER}
+        missing = sorted(f.value for f in required if f not in self.column_mapping)
         if missing:
             raise ValueError(f"required fields not mapped: {', '.join(missing)}")
         for field, source in self.column_mapping.items():
@@ -212,6 +283,24 @@ class InvoiceMappingConfig(BaseModel):
 
     def mapped_columns(self) -> dict[InvoiceField, str]:
         return {f: s.column for f, s in self.column_mapping.items() if s.column is not None}
+
+    def register_key(self) -> str:
+        """Which REGISTER a file read with this mapping is (ADR 0057): a hash of which header feeds
+        which field. Two registers of the same property (a laundry list, the utilities) have
+        different structures, so a complete file of one never takes away what the other wrote. The
+        order of the columns, the constants and the layout do not count; a renamed or added mapped
+        column makes another register (a complete file then takes away less, never more)."""
+        columns = sorted(
+            [field.value, normalize_header(column)]
+            for field, column in self.mapped_columns().items()
+        )
+        canonical = json.dumps(
+            {"v": REGISTER_KEY_VERSION, "columns": columns},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def constants(self) -> dict[InvoiceField, str | int]:
         return {f: s.constant for f, s in self.column_mapping.items() if s.constant is not None}

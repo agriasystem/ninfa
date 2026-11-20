@@ -8,31 +8,53 @@ statement per kind of row) so an import does not grow with its number of invoice
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Date, String, Uuid, column, func, insert, select, update, values
+from sqlalchemy import (
+    Date,
+    String,
+    Uuid,
+    and_,
+    any_,
+    bindparam,
+    column,
+    func,
+    insert,
+    select,
+    update,
+    values,
+)
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app.core.tenant import TenantContext
 from app.modules.bookings.models import ImportRowStatus
 from app.modules.ingestion.models import DataSource
+from app.modules.invoices.cost_categories import ClassificationMethod, CostCategory
 from app.modules.invoices.models import (
     DocumentKind,
+    IdentityOrigin,
     Invoice,
     InvoiceImportRow,
     InvoiceLine,
     InvoiceMappingProfile,
+    InvoiceRemoval,
     SourceFormat,
     is_current_invoice,
+    is_latest_revision,
+    is_removed,
 )
+from app.modules.suppliers.models import Supplier
 
 _CHUNK = 1000
 _KEYS_PER_QUERY = 2000
 
-# (supplier_id, normalised invoice number, invoice date, document kind): the identity of a document
-# inside one property.
+# (supplier_id, source record key, invoice date, document kind): the identity of a cost record
+# inside one property. The key is the normalised invoice number of a real document, or the
+# content-derived key of an operating cost that has no number (ADR 0057).
 InvoiceIdentity = tuple[UUID, str, date, DocumentKind]
 
 
@@ -42,6 +64,34 @@ class ExistingInvoice:
     source_fingerprint: str
     revision: int = 1
     source_format: SourceFormat = SourceFormat.FATTURAPA_XML
+    # A synthetic record a person's word took away (never true of a record with a number).
+    removed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ExistingRecord:
+    """A SYNTHETIC cost record already in a data source (ADR 0057): which of its identical siblings
+    it is (`occurrence`), which version it is, whether a person's word took it away, and the
+    category the SOURCE stated for it (None: the source stated none, and whatever NINFA derived is
+    not a statement of the source and never a reason to change anything)."""
+
+    id: UUID
+    key: str
+    occurrence: int
+    revision: int
+    removed: bool
+    category: CostCategory | None
+
+
+@dataclass(frozen=True, slots=True)
+class AbsentCost:
+    """An operating cost a complete file would take away, as a person recognises it."""
+
+    invoice_date: date
+    supplier: str
+    category: CostCategory | None
+    amount: Decimal | None
+    currency: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +127,7 @@ class InvoiceRepository:
                 Invoice.workspace_id == self._tenant.workspace_id,
                 Invoice.property_id == property_id,
             )
-            .order_by(Invoice.invoice_date, Invoice.normalized_invoice_number, Invoice.id)
+            .order_by(Invoice.invoice_date, Invoice.source_record_key, Invoice.id)
         ).all()
 
     def lines_of(self, invoice_id: UUID) -> Sequence[InvoiceLine]:
@@ -93,9 +143,11 @@ class InvoiceRepository:
     def find_by_identities(
         self, property_id: UUID, identities: Sequence[InvoiceIdentity]
     ) -> dict[InvoiceIdentity, ExistingInvoice]:
-        """The current invoices of the property at these identities (one statement per block, a
-        join with a VALUES list served by the unique identity key). The data source is NOT part of
-        the identity: the same invoice from another source is the same invoice."""
+        """The LATEST version of the records of the property at these identities (one statement per
+        block, a join with a VALUES list served by the unique identity key), whether or not it still
+        counts: `removed` says a person's word took it away, and a record that comes back is then
+        the next revision, never a row that already exists. The data source is NOT part of the
+        identity of a real document: the same invoice from another source is the same invoice."""
         found: dict[InvoiceIdentity, ExistingInvoice] = {}
         ordered = sorted(identities, key=lambda i: (str(i[0]), i[1], i[2], i[3].value))
         for start in range(0, len(ordered), _KEYS_PER_QUERY):
@@ -111,36 +163,249 @@ class InvoiceRepository:
                 select(
                     Invoice.id,
                     Invoice.supplier_id,
-                    Invoice.normalized_invoice_number,
+                    Invoice.source_record_key,
                     Invoice.invoice_date,
                     Invoice.document_kind,
                     Invoice.source_fingerprint,
                     Invoice.revision,
                     Invoice.source_format,
+                    is_removed().label("removed"),
                 )
                 .join(
                     wanted,
                     (Invoice.supplier_id == wanted.c.supplier_id)
-                    & (Invoice.normalized_invoice_number == wanted.c.number)
+                    & (Invoice.source_record_key == wanted.c.number)
                     & (Invoice.invoice_date == wanted.c.invoice_date)
                     & (Invoice.document_kind == wanted.c.kind),
                 )
                 .where(
                     Invoice.workspace_id == self._tenant.workspace_id,
                     Invoice.property_id == property_id,
-                    is_current_invoice(),
+                    is_latest_revision(),
                 )
             )
             for row in rows:
                 found[
                     (
                         row.supplier_id,
-                        row.normalized_invoice_number,
+                        row.source_record_key,
                         row.invoice_date,
                         row.document_kind,
                     )
-                ] = ExistingInvoice(row.id, row.source_fingerprint, row.revision, row.source_format)
+                ] = ExistingInvoice(
+                    row.id,
+                    row.source_fingerprint,
+                    row.revision,
+                    row.source_format,
+                    bool(row.removed),
+                )
         return found
+
+    def synthetic_records_of(
+        self,
+        property_id: UUID,
+        data_source_id: UUID,
+        fingerprints: Sequence[str],
+        dates: Sequence[date],
+    ) -> dict[str, list[ExistingRecord]]:
+        """The latest version of every SYNTHETIC record of this data source that has one of these
+        content fingerprints (the date narrows the search to what the file can hold), by
+        fingerprint, whether or not it still counts. A record's category is the one its source
+        STATED (`EXPLICIT_SOURCE`), never one NINFA derived."""
+        found: dict[str, list[ExistingRecord]] = {}
+        ordered = sorted(set(fingerprints))
+        for start in range(0, len(ordered), _KEYS_PER_QUERY):
+            block = ordered[start : start + _KEYS_PER_QUERY]
+            rows = self._session.execute(
+                select(
+                    Invoice.id,
+                    Invoice.source_record_key,
+                    Invoice.revision,
+                    Invoice.source_fingerprint,
+                    is_removed().label("removed"),
+                    InvoiceLine.cost_category,
+                    InvoiceLine.classification_method,
+                )
+                .join(
+                    InvoiceLine,
+                    and_(
+                        InvoiceLine.workspace_id == Invoice.workspace_id,
+                        InvoiceLine.invoice_id == Invoice.id,
+                    ),
+                    isouter=True,
+                )
+                .where(
+                    Invoice.workspace_id == self._tenant.workspace_id,
+                    Invoice.property_id == property_id,
+                    Invoice.data_source_id == data_source_id,
+                    Invoice.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD,
+                    Invoice.invoice_date.in_(sorted(set(dates))),
+                    Invoice.source_fingerprint.in_(block),
+                    is_latest_revision(),
+                )
+            )
+            for row in rows:
+                stated = (
+                    row.cost_category
+                    if row.classification_method == ClassificationMethod.EXPLICIT_SOURCE
+                    else None
+                )
+                found.setdefault(row.source_fingerprint, []).append(
+                    ExistingRecord(
+                        row.id,
+                        row.source_record_key,
+                        int(row.source_record_key.rsplit("#", 1)[1]),
+                        row.revision,
+                        bool(row.removed),
+                        stated,
+                    )
+                )
+        for records in found.values():
+            records.sort(key=lambda record: record.occurrence)
+        return found
+
+    # --- operating costs with no document number: what a complete file takes away --------------
+
+    def _synthetic_absent_from(
+        self,
+        data_source_id: UUID,
+        register: str,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
+    ) -> Any:
+        """The SYNTHETIC records of this data source WRITTEN BY THIS REGISTER that count, are dated
+        within the file's own period and are not among the keys the file holds. Real documents, and
+        what another register of the same property wrote, are never in it."""
+        held = bindparam("held_keys", list(held_keys), type_=ARRAY(String))
+        return select(Invoice.id, Invoice.property_id).where(
+            Invoice.workspace_id == self._tenant.workspace_id,
+            Invoice.data_source_id == data_source_id,
+            Invoice.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD,
+            Invoice.cost_register_key == register,
+            Invoice.invoice_date >= first,
+            Invoice.invoice_date <= last,
+            ~(Invoice.source_record_key == any_(held)),
+            is_current_invoice(),
+        )
+
+    def count_synthetic_absent_from(
+        self,
+        data_source_id: UUID,
+        register: str,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
+    ) -> int:
+        """How many records of this source would stop counting if the file holds everything of the
+        period it covers (first to last date of its own rows). Read-only."""
+        absent = self._synthetic_absent_from(
+            data_source_id, register, held_keys, first, last
+        ).subquery()
+        return int(self._session.scalar(select(func.count()).select_from(absent)) or 0)
+
+    def synthetic_absent_preview(
+        self,
+        data_source_id: UUID,
+        register: str,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
+        limit: int,
+    ) -> list[AbsentCost]:
+        """The first `limit` of the records `count_synthetic_absent_from` counts (the SAME ones), by
+        date and supplier: what a person is shown before a complete file takes them away."""
+        absent = self._synthetic_absent_from(
+            data_source_id, register, held_keys, first, last
+        ).subquery()
+        rows = self._session.execute(
+            select(
+                Invoice.invoice_date,
+                Supplier.legal_name,
+                func.min(InvoiceLine.cost_category),
+                func.sum(InvoiceLine.line_total),
+                Invoice.currency,
+            )
+            .join(absent, absent.c.id == Invoice.id)
+            .join(
+                Supplier,
+                and_(
+                    Supplier.workspace_id == Invoice.workspace_id,
+                    Supplier.id == Invoice.supplier_id,
+                ),
+            )
+            .join(
+                InvoiceLine,
+                and_(
+                    InvoiceLine.workspace_id == Invoice.workspace_id,
+                    InvoiceLine.invoice_id == Invoice.id,
+                ),
+                isouter=True,
+            )
+            .where(Invoice.workspace_id == self._tenant.workspace_id)
+            .group_by(
+                Invoice.id,
+                Invoice.invoice_date,
+                Supplier.legal_name,
+                Invoice.currency,
+                Invoice.source_record_key,
+            )
+            .order_by(Invoice.invoice_date, Supplier.legal_name, Invoice.source_record_key)
+            .limit(limit)
+        ).all()
+        return [
+            AbsentCost(
+                row[0], row[1], None if row[2] is None else CostCategory(row[2]), row[3], row[4]
+            )
+            for row in rows
+        ]
+
+    def remove_synthetic_absent_from(
+        self,
+        data_source_id: UUID,
+        register: str,
+        import_job_id: UUID,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
+    ) -> int:
+        """Take those records away: a removal row each, written with the import that did it. The
+        invoices themselves are immutable and stay."""
+        absent = self._synthetic_absent_from(
+            data_source_id, register, held_keys, first, last
+        ).subquery()
+        # (RETURNING, not `rowcount`: an INSERT ... SELECT does not report how many rows it wrote)
+        removed = self._session.scalars(
+            insert(InvoiceRemoval)
+            .from_select(
+                [
+                    "workspace_id",
+                    "property_id",
+                    "data_source_id",
+                    "invoice_id",
+                    "identity_origin",
+                    "removed_by_import_job_id",
+                ],
+                select(
+                    bindparam("workspace_id", self._tenant.workspace_id, type_=Uuid),
+                    absent.c.property_id,
+                    bindparam("data_source_id", data_source_id, type_=Uuid),
+                    absent.c.id,
+                    bindparam(
+                        "identity_origin",
+                        IdentityOrigin.SYNTHETIC_COST_RECORD.value,
+                        type_=String,
+                    ),
+                    bindparam("job_id", import_job_id, type_=Uuid),
+                ),
+                # (the id is PostgreSQL's gen_random_uuid(), one per row: the ORM's Python default
+                # would be evaluated ONCE and repeated on every row of an INSERT ... SELECT, so a
+                # complete file taking away two records or more would break the primary key)
+                include_defaults=False,
+            )
+            .returning(InvoiceRemoval.id)
+        ).all()
+        return len(removed)
 
     def insert_invoices(self, rows: Sequence[dict[str, Any]]) -> None:
         for start in range(0, len(rows), _CHUNK):

@@ -392,8 +392,21 @@ class DataSourcesService:
             return None, None
         if reference is None:
             # (nobody was asked what a file matched by hand is: absence says nothing about it)
+            # A file classified as operating costs (by the file itself, or by the person's answer
+            # before they matched the columns) stays so: the number is not required. The server
+            # never takes the browser's word for it: it keeps it only if its own reading of the file
+            # finds no column of document numbers filled in most rows; otherwise the records are
+            # identified by the number the matching maps, as always.
+            keep = mapping.document_identity == "SYNTHETIC_COST_RECORD" and (
+                self._without_document_number(property_id, domain, filename, content, mapping)
+            )
             by_hand = mapping.model_copy(
-                update={"file_scope": None, "remembered_file_scope": None, "expected_removals": 0}
+                update={
+                    "file_scope": None,
+                    "remembered_file_scope": None,
+                    "expected_removals": 0,
+                    "document_identity": mapping.document_identity if keep else None,
+                }
             )
             return by_hand, self._manual_confirmation(
                 property_id, domain, filename, content, by_hand
@@ -433,6 +446,35 @@ class DataSourcesService:
             raise ImportDecisionChangedError()
         confirmation = confirmation_from(answers, inspection.learning) if confirm else None
         return settled.model_copy(update={"smart_import": None}), confirmation
+
+    def _without_document_number(
+        self,
+        property_id: UUID,
+        domain: DataSourceDomain,
+        filename: str,
+        content: bytes,
+        mapping: MappingInput,
+    ) -> bool:
+        """Is this a file of costs with no column of document numbers filled in most rows? Read by
+        the server from the same table the matching was built on, with no answer and no model."""
+        if domain != DataSourceDomain.COSTS:
+            return False
+        layout = mapping.layout
+        hotel = PropertyRepository(self._session, self._tenant).get(property_id)
+        inspection = self._settling.understand(
+            domain,
+            filename,
+            content,
+            UnderstandAnswers(
+                sheet_name=mapping.sheet_name,
+                table_key=None if layout is None else layout.table_key,
+            ),
+            True,
+            self._source_for_domain(property_id, domain),
+            False,
+            currency=None if hotel is None else hotel.currency,
+        )
+        return inspection.without_document_number
 
     def _manual_confirmation(
         self,
@@ -958,6 +1000,7 @@ class DataSourcesService:
                 content=content,
                 property_id=property_id,
                 mapping_override=override,
+                scope=_scope_plan(mapped.mapping),
             )
             return (
                 ImportOutcome(
@@ -967,11 +1010,14 @@ class DataSourcesService:
                     else problem_of_error_code(invoices.error_code, invoices.details),
                     rows_total=invoices.rows_total,
                     rows_invalid=invoices.rows_invalid,
-                    created=invoices.invoices_created,
+                    # (an operating cost that comes back after a complete file took it away counts
+                    # again, so it is new to the person)
+                    created=invoices.invoices_created + invoices.records_restored,
                     updated=invoices.invoices_revised,
                     unchanged=invoices.invoices_unchanged,
                     already_imported=invoices.duplicate_of_import_file_id is not None,
                     changed_data=invoices.changed_data,
+                    removed=invoices.records_removed,
                 ),
                 resolved,
             )

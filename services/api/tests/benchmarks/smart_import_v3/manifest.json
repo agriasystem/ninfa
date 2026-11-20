@@ -17087,13 +17087,12 @@
   "structure": [
    "xlsx",
    "sheets:1",
-   "preamble:0",
-   "refusal"
+   "preamble:0"
   ],
   "sheets": 1,
   "golden": {
    "domain": "costs",
-   "outcome": "REJECT",
+   "outcome": "READY",
    "sheets": [
     "Prenotazioni"
    ],
@@ -17147,9 +17146,7 @@
    "questions": [],
    "tolerated": [],
    "labels": {},
-   "blockers": [
-    "MISSING_REQUIRED"
-   ],
+   "blockers": [],
    "period_start": null,
    "date_order": null,
    "decimal": null,

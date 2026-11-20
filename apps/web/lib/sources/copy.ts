@@ -39,6 +39,10 @@ const REMEMBERED_ANSWERS: Readonly<Record<string, Readonly<Record<string, string
   date_order: { DMY: "Date scritte giorno/mese/anno", MDY: "Date scritte mese/giorno/anno" },
   decimal_style: { COMMA: "Decimali con la virgola", POINT: "Decimali con il punto" },
   amount_basis: { NET: "Importi senza IVA", GROSS: "Importi con IVA" },
+  document_identity: {
+    SYNTHETIC_COST_RECORD: "Costi operativi senza numero documento",
+    DOCUMENT_NUMBER: "Fatture o documenti: il numero del documento è richiesto",
+  },
 };
 const REMEMBERED_SCOPES: Readonly<Record<string, string>> = {
   FULL: "Il file contiene tutto il periodo che copre",
@@ -526,6 +530,8 @@ export const sourcesCopy = {
       INVALID_VAT_NUMBER: "partita IVA non valida",
       INVALID_TAX_CODE: "codice fiscale non valido",
       UNKNOWN_DOCUMENT_TYPE: "tipo di documento non riconosciuto",
+      CREDIT_NOTE_WITHOUT_NUMBER:
+        "nota di credito senza numero del documento: non può essere registrata come costo operativo",
     } satisfies Record<string, string>,
     rowProblemFallback: "valore non valido",
     save: "Salva questa configurazione per i prossimi file",
@@ -552,6 +558,23 @@ export const sourcesCopy = {
             : `${count} giornate di reparto di questo periodo non compaiono in questo file e restano contate.`,
         action: "Il file contiene tutto il piano?",
       },
+    },
+    // Costs: the records a complete file would stop counting, one by one (said before anything is imported).
+    removals: {
+      absent: (count: number) =>
+        count === 1
+          ? "Il costo di questo periodo che in questo file non compare:"
+          : `I ${count} costi di questo periodo che in questo file non compaiono:`,
+      removed: (count: number) =>
+        count === 1
+          ? "1 costo che in questo file non compare non sarà più contato:"
+          : `${count} costi che in questo file non compaiono non saranno più contati:`,
+      item: (date: string, supplier: string, category: string, amount: string) =>
+        `${date} · ${supplier} · ${category} · ${amount}`,
+      more: (count: number) => (count === 1 ? "e un altro costo." : `e altri ${count} costi.`),
+      kept: "Restano nello storico di NINFA.",
+      noCategory: "senza categoria",
+      noAmount: "importo non indicato",
     },
     removes: {
       BOOKINGS: (count: number) =>
@@ -698,6 +721,23 @@ export const sourcesCopy = {
         gross: "No, comprende l'IVA",
         why: "NINFA analizza i costi al netto di IVA, e non deve indovinare quale importo sia.",
       },
+      // Asked only when something in a file of costs without document numbers points at fiscal documents (a
+      // document type, say). A due date or a row number alone is what an operating-cost register carries too.
+      DOCUMENT_IDENTITY: {
+        title: "Questo file contiene fatture o documenti, oppure un registro di costi operativi?",
+        why: "Nel file ci sono indicazioni da documento fiscale (per esempio il tipo di documento), ma non il numero del documento. Se sono costi operativi, NINFA li registra con un riferimento interno e non crea alcun numero di fattura. Se sono fatture, senza il numero NINFA non può registrarle.",
+        costs: "Un registro di costi operativi",
+        documents: "Fatture o documenti",
+        remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
+      },
+      // Costs said to be invoices, whose number is in a column nobody named: which one (only those that may be).
+      DOCUMENT_NUMBER_COLUMN: {
+        title: "Quale colonna contiene il numero del documento?",
+        why: "Per registrare le fatture serve il numero di ogni documento. Queste colonne del file potrebbero contenerlo.",
+        column: (header: string, examples: string[]) =>
+          examples.length > 0 ? `${header} (per esempio ${examples.join(", ")})` : header,
+        none: "Nessuna di queste",
+      },
       DATE_ORDER: { title: "Come sono scritte le date di questo file?" },
       DECIMAL_STYLE: { title: "Come sono scritti i numeri con i decimali?" },
       FILE_SCOPE: {
@@ -721,6 +761,16 @@ export const sourcesCopy = {
             count === 1
               ? "In NINFA c'è 1 giornata di reparto di questo periodo che in questo file non compare."
               : `In NINFA ci sono ${count} giornate di reparto di questo periodo che in questo file non compaiono.`,
+        },
+        COSTS: {
+          title: "Questo file contiene tutti i costi del periodo oppure solo una parte?",
+          FULL: "Tutti i costi del periodo",
+          PARTIAL: "Solo una parte (per esempio un reparto)",
+          DELTA: "Solo i costi nuovi o modificati",
+          absent: (count: number) =>
+            count === 1
+              ? "In NINFA c'è 1 costo di questo periodo che in questo file non compare."
+              : `In NINFA ci sono ${count} costi di questo periodo che in questo file non compaiono.`,
         },
         remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
       },
@@ -748,6 +798,18 @@ export const sourcesCopy = {
             count === 1
               ? "Se contiene tutto il piano, quella giornata non sarà più contata e resterà nello storico."
               : `Se contiene tutto il piano, quelle ${count} giornate non saranno più contate e resteranno nello storico.`,
+        },
+        COSTS: {
+          found: (count: number) =>
+            count === 1
+              ? "NINFA ha trovato 1 costo presente nei dati precedenti ma non in questo file."
+              : `NINFA ha trovato ${count} costi presenti nei dati precedenti ma non in questo file.`,
+          title: "Questo file contiene tutti i costi del periodo?",
+          yes: "Sì, contiene tutti i costi",
+          ifYes: (count: number) =>
+            count === 1
+              ? "Se li contiene tutti, quel costo non sarà più contato e resterà nello storico."
+              : `Se li contiene tutti, quei ${count} costi non saranno più contati e resteranno nello storico.`,
         },
         no: "No, contiene solo una parte",
         ifNo: "Se ne contiene solo una parte, NINFA non toglie nulla.",
@@ -777,6 +839,9 @@ export const sourcesCopy = {
         "L'importo comprende l'IVA. NINFA lavora con l'importo al netto di IVA (l'imponibile): esporta anche quella colonna e riprova.",
       MIXED_FORMATS:
         "In una colonna le date (o i numeri) sono scritti in modi diversi. Correggi il file e riprova.",
+      // Costs said to be invoices, in a file with no document number: no column to match, no number invented.
+      DOCUMENT_NUMBER_MISSING:
+        "Questo file non contiene il numero del documento, che serve per registrare le fatture: NINFA non lo inventa. Per le fatture carica la fattura elettronica XML da «Importa le fatture», oppure un registro esportato dal gestionale con la colonna del numero del documento. Se invece sono costi operativi, scegli di nuovo il file e rispondi «Un registro di costi operativi».",
       checkColumns: "Controlla colonne",
     },
     manualIntro:

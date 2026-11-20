@@ -253,6 +253,14 @@ class ScopePreflightResponse(BaseModel):
     requires_scope_confirmation: bool
 
 
+class RemovedCostResponse(BaseModel):
+    date: str
+    supplier: str
+    category: str | None
+    amount: str | None
+    currency: str
+
+
 class UnderstandingResponse(BaseModel):
     level: str
     detection: DetectionResponse
@@ -264,6 +272,7 @@ class UnderstandingResponse(BaseModel):
     assumed: list[str]
     removes: int
     scope: ScopePreflightResponse
+    removal_preview: list[RemovedCostResponse] = []
 
 
 class DryRunSummaryResponse(BaseModel):

@@ -2,11 +2,17 @@
 
 import { useState, type ReactNode } from "react";
 
-import type { DataSourceDomain, UnderstandAnswers, UnderstandingChoice } from "@ninfa/contracts";
+import type {
+  DataSourceDomain,
+  UnderstandAnswers,
+  UnderstandingChoice,
+  UnderstandingRemovedCost,
+} from "@ninfa/contracts";
 
 import { sourcesCopy } from "@/lib/sources/copy";
 import type { AskStep, ImportFlow } from "@/lib/sources/use-import-flow";
 
+import { StrutturaImportRemovals } from "./struttura-import-removals";
 import { StrutturaButton } from "./struttura-parts";
 
 const COPY = sourcesCopy.understanding.question;
@@ -64,17 +70,26 @@ function Choices({
 export function StrutturaScopeConfirmation({
   domain,
   absent,
+  preview = [],
   onAnswer,
 }: {
   domain: DataSourceDomain;
   absent: number;
+  /** Costs: the records that would stop counting, one by one. */
+  preview?: UnderstandingRemovedCost[];
   onAnswer: (patch: Partial<UnderstandAnswers>) => void;
 }) {
   const [remember, setRemember] = useState(false);
-  const words = domain === "LABOR" ? COPY.FILE_SCOPE_CONFIRM.LABOR : COPY.FILE_SCOPE_CONFIRM.BOOKINGS;
+  const words =
+    domain === "LABOR"
+      ? COPY.FILE_SCOPE_CONFIRM.LABOR
+      : domain === "COSTS"
+        ? COPY.FILE_SCOPE_CONFIRM.COSTS
+        : COPY.FILE_SCOPE_CONFIRM.BOOKINGS;
   return (
     <>
       <p className="struttura-flow__note">{words.found(absent)}</p>
+      {domain === "COSTS" ? <StrutturaImportRemovals items={preview} count={absent} mode="question" /> : null}
       <h3 className="struttura-flow__subtitle" id="struttura-question-title">
         {words.title}
       </h3>
@@ -387,11 +402,23 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
       );
       break;
     case "FILE_SCOPE": {
-      const scope = step.inspection.domain === "LABOR" ? COPY.FILE_SCOPE.LABOR : COPY.FILE_SCOPE.BOOKINGS;
+      const scope =
+        step.inspection.domain === "LABOR"
+          ? COPY.FILE_SCOPE.LABOR
+          : step.inspection.domain === "COSTS"
+            ? COPY.FILE_SCOPE.COSTS
+            : COPY.FILE_SCOPE.BOOKINGS;
       body = (
         <>
           {heading(scope.title)}
           <p className="struttura-flow__note">{scope.absent(question.absent_records)}</p>
+          {step.inspection.domain === "COSTS" ? (
+            <StrutturaImportRemovals
+              items={step.understanding.removal_preview}
+              count={question.absent_records}
+              mode="question"
+            />
+          ) : null}
           <div className="struttura-question__choices struttura-question__choices--stacked">
             {(["FULL", "PARTIAL", "DELTA"] as const).map((value) => (
               <StrutturaButton
@@ -408,11 +435,78 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
       );
       break;
     }
+    case "DOCUMENT_IDENTITY":
+      // A file of costs with no document number in which something points at fiscal documents (a document
+      // type, say): never blocked on a column that does not exist, never taken to be invoices by itself. The
+      // person says what it holds. (A file in which nothing points at documents is not asked at all.)
+      body = (
+        <>
+          {heading(COPY.DOCUMENT_IDENTITY.title)}
+          <p className="struttura-flow__note">{COPY.DOCUMENT_IDENTITY.why}</p>
+          <div className="struttura-question__choices struttura-question__choices--stacked">
+            <StrutturaButton
+              variant="outline"
+              onClick={() => void flow.answer({ document_identity: "SYNTHETIC_COST_RECORD" })}
+            >
+              {COPY.DOCUMENT_IDENTITY.costs}
+            </StrutturaButton>
+            <StrutturaButton
+              variant="outline"
+              onClick={() => void flow.answer({ document_identity: "DOCUMENT_NUMBER" })}
+            >
+              {COPY.DOCUMENT_IDENTITY.documents}
+            </StrutturaButton>
+          </div>
+          <p className="struttura-flow__note">{COPY.DOCUMENT_IDENTITY.remembered}</p>
+        </>
+      );
+      break;
+    case "DOCUMENT_NUMBER_COLUMN": {
+      // Costs said to be invoices, whose number nobody named: only the columns of THIS file that may hold it
+      // are offered, each with what it holds, and "none of these" - never a column the file does not have.
+      const examplesOf = (header: string) =>
+        // (the first two the backend sends; the browser never cuts anything of the file itself)
+        (step.inspection.columns.find((column) => column.header === header)?.examples ?? []).filter(
+          (_, index) => index < 2,
+        );
+      body = (
+        <>
+          {heading(COPY.DOCUMENT_NUMBER_COLUMN.title)}
+          <p className="struttura-flow__note">{COPY.DOCUMENT_NUMBER_COLUMN.why}</p>
+          <div className="struttura-question__choices struttura-question__choices--stacked">
+            {question.choices
+              .filter((choice) => choice.value !== "NONE")
+              .map((choice) => (
+                <StrutturaButton
+                  key={choice.value}
+                  variant="outline"
+                  onClick={() =>
+                    void flow.answer({
+                      document_identity: "DOCUMENT_NUMBER",
+                      column_fields: { [choice.value]: "invoice_number" },
+                    })
+                  }
+                >
+                  {COPY.DOCUMENT_NUMBER_COLUMN.column(choice.value, examplesOf(choice.value))}
+                </StrutturaButton>
+              ))}
+            <StrutturaButton
+              variant="outline"
+              onClick={() => void flow.answer({ document_identity: "DOCUMENT_NUMBER", document_number_column: "NONE" })}
+            >
+              {COPY.DOCUMENT_NUMBER_COLUMN.none}
+            </StrutturaButton>
+          </div>
+        </>
+      );
+      break;
+    }
     case "FILE_SCOPE_CONFIRM":
       body = (
         <StrutturaScopeConfirmation
           domain={step.inspection.domain}
           absent={question.absent_records}
+          preview={step.understanding.removal_preview}
           onAnswer={(patch) => void flow.answer(patch)}
         />
       );

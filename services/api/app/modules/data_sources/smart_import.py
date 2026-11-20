@@ -96,6 +96,7 @@ from app.modules.document_understanding.layout import LayoutSpec
 from app.modules.ingestion.models import DataSource, DataSourceDomain, FileScope
 from app.modules.ingestion.repository import ImportFileRepository, ImportJobRepository
 from app.modules.ingestion.suggestions import SuggestionConfidence
+from app.modules.invoices.service import RemovalPreview
 
 logger = logging.getLogger(__name__)
 
@@ -341,7 +342,9 @@ class SmartImportService:
         adapter = self.domain(domain)
         problems, provided = self._structural_problems(adapter, mapping)
         missing = tuple(
-            group for group in adapter.groups if not any(key in provided for key in group)
+            group
+            for group in adapter.required_groups(mapping)
+            if not any(key in provided for key in group)
         )
         if not missing and not problems:
             documents = self._documents(adapter, mapping, _no_formats(), {})
@@ -569,6 +572,8 @@ class SmartImportService:
         if formats.decimal_separator:
             options["decimal_separator"] = formats.decimal_separator
             options["thousands_separator"] = formats.thousands_separator
+        if mapping.document_identity:
+            options["document_identity"] = mapping.document_identity
         documents: dict[str, dict[str, Any]] = {
             "column_mapping": column_mapping,
             "format_options": options,
@@ -668,6 +673,24 @@ class SmartImportService:
             return adapter.scope_effect(source, filename, content, config)
         except (AppError, ValueError):
             return 0
+
+    def scope_preview(
+        self,
+        adapter: FileDomain,
+        mapping: MappingInput,
+        filename: str,
+        content: bytes,
+        source: DataSource,
+    ) -> RemovalPreview | None:
+        """The records a complete file would stop counting, one by one, when this kind of data
+        shows them (costs). Reads only; None when it cannot be said."""
+        try:
+            config, refused, _ = self._config_for(adapter, mapping, filename, content, source)
+            if config is None or refused is not None:
+                return None
+            return adapter.scope_preview(source, filename, content, config)
+        except (AppError, ValueError):
+            return None
 
     def scope_said_of_this_file(self, source: DataSource, content: bytes) -> FileScope | None:
         """What was said about these very bytes the last time they were imported, when it was a part
@@ -828,6 +851,11 @@ class SmartImportService:
                 if fmt.decimal_separator == ","
                 else "POINT"
                 if fmt.decimal_separator == "."
+                else None
+            ),
+            document_identity=(
+                "SYNTHETIC_COST_RECORD"
+                if fmt.document_identity == "SYNTHETIC_COST_RECORD"
                 else None
             ),
         )

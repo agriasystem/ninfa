@@ -60,7 +60,7 @@ from app.modules.invoices.mapping import (
     resolve_category,
     resolve_document_kind,
 )
-from app.modules.invoices.models import DocumentKind, SourceFormat
+from app.modules.invoices.models import DocumentKind, IdentityOrigin, SourceFormat
 from app.modules.suppliers.normalization import (
     display_name,
     hash_iban,
@@ -252,6 +252,8 @@ class _Row:
         self.mapped: dict[str, Any] = {}
         self._values = values
         self._config = config
+        # Operating costs with no document number (ADR 0057): each row is a record of its own.
+        self._synthetic = config.is_synthetic
 
         self.supplier_name = self._name()
         self.vat = self._identifier(
@@ -261,7 +263,8 @@ class _Row:
             F.SUPPLIER_TAX_CODE, normalize_tax_code, InvoiceErrorCode.INVALID_TAX_CODE
         )
         self.iban_hashes = self._iban()
-        self.invoice_number = self._required_text(F.INVOICE_NUMBER)
+        # (a synthetic mapping has no number column: the number stays None, it is never invented)
+        self.invoice_number = None if self._synthetic else self._required_text(F.INVOICE_NUMBER)
         self.invoice_date = self._required_date(F.INVOICE_DATE)
         self.due_date = self._optional(F.DUE_DATE, self._date_of)
         self.document_type_text = self._safe(F.DOCUMENT_TYPE, _text)
@@ -374,6 +377,11 @@ class _Row:
         kind = resolve_document_kind(self.document_type_text)
         if kind is None:
             self._add(F.DOCUMENT_TYPE, InvoiceErrorCode.UNKNOWN_DOCUMENT_TYPE)
+        elif kind == DocumentKind.CREDIT_NOTE and self._synthetic:
+            # Only the document type says it (a negative amount alone never does): a credit note is
+            # a fiscal document, and one with no number is refused, never made a synthetic cost.
+            self._add(F.DOCUMENT_TYPE, InvoiceErrorCode.CREDIT_NOTE_WITHOUT_NUMBER)
+            return None
         return kind
 
     def _amount(self, field: InvoiceField, *, required: bool = False) -> Decimal | None:
@@ -397,7 +405,12 @@ class _Row:
         return value
 
     def _line_number(self) -> int:
-        """The source's own line number when mapped, else the row number (always unique)."""
+        """The source's own line number when mapped, else the row number (always unique).
+
+        A record with no document number is ONE line: it is always line 1, so that where it sits in
+        the file never becomes part of what it is."""
+        if self._synthetic:
+            return 1
         cell = self._values.get(F.LINE_NUMBER)
         if F.LINE_NUMBER not in self._config.column_mapping or cell is None:
             return self.number
@@ -443,7 +456,10 @@ class _Row:
 
     @property
     def group_key(self) -> tuple[Any, ...] | None:
-        """None when a component is unusable: the row then stands alone, with its issues."""
+        """None when a component is unusable: the row then stands alone, with its issues. A record
+        with no document number always stands alone: there is no number to group lines by."""
+        if self._synthetic:
+            return None
         if (
             self.supplier_name is None
             or self.invoice_number is None
@@ -592,6 +608,11 @@ def _assemble_group(
         lines=lines,
         header_issues=issues,
         source_format=source_format,
+        identity_origin=(
+            IdentityOrigin.SYNTHETIC_COST_RECORD
+            if config.is_synthetic
+            else IdentityOrigin.DOCUMENT_NUMBER
+        ),
     )
 
 

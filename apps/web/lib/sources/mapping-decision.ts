@@ -139,6 +139,7 @@ export function personAnswered(answers: UnderstandAnswers): boolean {
       answers.decimal_style,
       answers.department_from,
       answers.department_value,
+      answers.document_identity,
       answers.table_key,
       answers.sheet_name,
     ].some((value) => value !== undefined && value !== null && value !== "")

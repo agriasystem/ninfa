@@ -31,6 +31,8 @@ class InvoiceErrorCode(StrEnum):
     VALIDATION_FAILED = "INVOICE_VALIDATION_FAILED"
     DOCUMENT_CONFLICT = "INVOICE_DOCUMENT_CONFLICT"
     CANONICALIZATION_FAILED = "INVOICE_CANONICALIZATION_FAILED"
+    # What a complete file would take away changed between its reading and its commit.
+    IMPORT_PLAN_CHANGED = "INVOICE_IMPORT_PLAN_CHANGED"
     INTERNAL_ERROR = "INVOICE_INTERNAL_ERROR"
     # --- row / document level (also used as job-level summary keys) ------------------------------
     REQUIRED_VALUE_MISSING = "INVOICE_REQUIRED_VALUE_MISSING"
@@ -45,6 +47,9 @@ class InvoiceErrorCode(StrEnum):
     INVALID_COUNTRY = "INVOICE_INVALID_COUNTRY"
     UNKNOWN_DOCUMENT_TYPE = "INVOICE_UNKNOWN_DOCUMENT_TYPE"
     UNSUPPORTED_DOCUMENT_TYPE = "INVOICE_UNSUPPORTED_DOCUMENT_TYPE"
+    # A row of a register of operating costs (no document number, ADR 0057) that says it is a credit
+    # note: a fiscal document, which needs its number. Refused, never recorded as a synthetic cost.
+    CREDIT_NOTE_WITHOUT_NUMBER = "INVOICE_CREDIT_NOTE_WITHOUT_NUMBER"
     UNKNOWN_CATEGORY = "INVOICE_UNKNOWN_CATEGORY"
     DUPLICATE_LINE = "INVOICE_DUPLICATE_LINE"
     INCONSISTENT_HEADER = "INVOICE_INCONSISTENT_HEADER"
