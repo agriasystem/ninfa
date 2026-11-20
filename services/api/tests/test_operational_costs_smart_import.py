@@ -661,7 +661,8 @@ def test_a_register_with_numbers_never_asks_what_it_holds(
 
 # --- T25: FULL between two different registers of the same property --------------------------
 # Fact: every costs upload of a property goes into ONE data source (`_source_for_domain`: the
-# single active source of (property, COSTS)), whatever its structure or family.
+# single active source of (property, COSTS)), whatever its structure or family. A complete file
+# takes away only what its own REGISTER (`InvoiceMappingConfig.register_key`) wrote.
 
 UTILITIES_HEADERS = ["Data", "Fornitore", "Descrizione", "Importo netto"]
 UTILITY_SUPPLIERS = ["Enel Energia", "Acqua Salento", "Gas Puglia", "Telecom", "Rifiuti Lecce"]
@@ -684,15 +685,6 @@ LAUNDRY = [
 ]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "KNOWN DEFECT, decision pending (gate stop condition, not corrected): FULL removes every "
-        "synthetic record of the property's ONE costs data source dated inside the file's period, "
-        "whatever register it came from - here the 5 laundry costs of register A with the one "
-        "missing utility of register B (6 shown, 6 removed)."
-    ),
-)
 def test_t25_a_complete_register_never_takes_away_the_costs_of_another_register(
     api_client: TestClient, env: SourcesEnv, db_session: Session
 ) -> None:

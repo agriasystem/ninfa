@@ -28,6 +28,7 @@ HEAD = "0018_cost_record_identity"
 PREVIOUS = "0017_mia_conversations"
 FP = "d" * 64
 KEY = "cost:v1:" + "e" * 64 + "#1"
+REGISTER = "f" * 64  # the register (structure) that wrote a synthetic record
 
 
 @pytest.fixture
@@ -343,13 +344,13 @@ def _synthetic(connection: Connection, ids: dict[str, uuid.UUID]) -> uuid.UUID:
         text(
             "INSERT INTO invoices (id, workspace_id, property_id, data_source_id, supplier_id,"
             " invoice_number, normalized_invoice_number, source_record_key, identity_origin,"
-            " invoice_date, revision, document_kind, currency, source_format,"
+            " cost_register_key, invoice_date, revision, document_kind, currency, source_format,"
             " source_import_job_id, source_import_file_id, source_fingerprint,"
             " supplier_resolution_method)"
-            " VALUES (:id, :w, :p, :d, :s, NULL, NULL, :key, 'SYNTHETIC_COST_RECORD',"
+            " VALUES (:id, :w, :p, :d, :s, NULL, NULL, :key, 'SYNTHETIC_COST_RECORD', :reg,"
             " '2026-10-05', 1, 'INVOICE', 'EUR', 'CSV', :j, :f, :fp, 'CREATED_NEW')"
         ),
-        {**ids, "id": invoice, "key": KEY, "fp": FP},
+        {**ids, "id": invoice, "key": KEY, "fp": FP, "reg": REGISTER},
     )
     return invoice
 
@@ -423,19 +424,28 @@ def test_09_the_database_refuses_an_invented_number_a_synthetic_fatturapa_and_a_
         base = (
             "INSERT INTO invoices (id, workspace_id, property_id, data_source_id, supplier_id,"
             " invoice_number, normalized_invoice_number, source_record_key, identity_origin,"
-            " invoice_date, revision, document_kind, currency, source_format,"
+            " cost_register_key, invoice_date, revision, document_kind, currency, source_format,"
             " source_import_job_id, source_import_file_id, source_fingerprint,"
             " supplier_resolution_method) VALUES (gen_random_uuid(), :w, :p, :d, :s, :n, :nn,"
-            " :key, :origin, '2026-10-06', 1, 'INVOICE', 'EUR', :fmt, :j, :f, :fp, 'CREATED_NEW')"
+            " :key, :origin, :reg, '2026-10-06', 1, 'INVOICE', 'EUR', :fmt, :j, :f, :fp,"
+            " 'CREATED_NEW')"
         )
-        common = {**ids, "key": KEY, "fp": FP, "fmt": "CSV"}
+        common = {**ids, "key": KEY, "fp": FP, "fmt": "CSV", "reg": REGISTER}
         # a synthetic record that carries a number
         assert "identity_consistent" in _refused(
             db_engine, base, {**common, "n": "FA/9", "nn": None, "origin": "SYNTHETIC_COST_RECORD"}
         )
         # a real document with no number
         assert "identity_consistent" in _refused(
-            db_engine, base, {**common, "n": None, "nn": None, "origin": "DOCUMENT_NUMBER"}
+            db_engine,
+            base,
+            {**common, "n": None, "nn": None, "origin": "DOCUMENT_NUMBER", "reg": None},
+        )
+        # a synthetic record that does not say which register wrote it
+        assert "cost_register_key_only_for_synthetic" in _refused(
+            db_engine,
+            base,
+            {**common, "n": None, "nn": None, "origin": "SYNTHETIC_COST_RECORD", "reg": None},
         )
         # a synthetic FatturaPA
         assert "synthetic_only_for_spreadsheets" in _refused(

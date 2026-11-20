@@ -42,10 +42,15 @@ model was to **invent a number**, i.e. to store a fiscal fact that does not exis
 6. **Source scope.** The data source is inside the fingerprint of a synthetic record, so two independent sources never merge silently because they carry the same values. (A real document keeps
    the old rule: its identity excludes the data source, because the same invoice from XML and from an accounting export is one invoice.)
 7. **A synthetic record has no external identity, so a changed record is a different record.** NINFA does not guess that `100,00 -> 120,00` is the same cost. With **FULL** (a person said the
-   file holds everything of its period) the records of that source the file does not hold, inside the period its own rows cover (first to last date), stop counting: one `invoice_removals` row each,
+   file holds everything of its period) the records of that source **that the same register wrote** and the file does not hold, inside the period its own rows cover (first to last date), stop
+   counting: one `invoice_removals` row each,
    written with the import and re-checked under the source lock against the figure the person was shown (`IMPORT_PLAN_CHANGED` otherwise). **PARTIAL**, **DELTA** and no word at all take nothing away.
    A record a later file holds again counts again as the **next revision** of the same identity (the old row stays, the removal stays). `is_current_invoice()` (the one filter every cost reader
    carries) now reads the key and the removals; nothing else in analysis, decisions or Mia changed.
+   **A register is the structure of a file** (`InvoiceMappingConfig.register_key`: a hash of which header feeds which field; the order of the columns, constants and layout do not count), kept on
+   every synthetic row as `invoices.cost_register_key` (NULL for a real document, CHECK). Every costs upload of a property goes into ONE data source, so without it a complete laundry list took
+   away the utilities of the same days (T25). The matching of occurrences (decision 5) stays per data source: a record keeps the register of the file that wrote its current version. After a
+   change of structure (a renamed or an added mapped column) a complete file takes away less, never more: what the old structure wrote and the new one does not hold keeps counting.
 8. **Without a column of document numbers, a file is never taken to be invoices by itself** (final correctness gate, which supersedes the first two versions of this rule: "a document type, a due
    date or a line number refuse the synthetic identity", then "strong evidence refuses it"). An XML (FatturaPA) reads its own number and still fails without one. For a structured file:
    * a column of document numbers **filled in most of its rows** (more than half of the scanned rows): the records are identified by their numbers, as always;

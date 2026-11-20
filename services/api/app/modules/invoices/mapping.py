@@ -6,6 +6,8 @@ read into NINFA: that is how unneeded personal data is kept out. It is NOT the b
 the two have different fields and rules, and share only the header helpers.
 """
 
+import hashlib
+import json
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -34,6 +36,8 @@ __all__ = ["compute_header_signature", "header_index", "normalize_header"]
 # Bumped when the meaning of a stored mapping changes (the same rule as the bookings' and the
 # labor mapping): a configuration saved against another version is never applied silently.
 MAPPING_SCHEMA_VERSION = 1
+# Part of every register key: a change of what the key holds is a new version.
+REGISTER_KEY_VERSION = 1
 
 
 class InvoiceField(StrEnum):
@@ -279,6 +283,24 @@ class InvoiceMappingConfig(BaseModel):
 
     def mapped_columns(self) -> dict[InvoiceField, str]:
         return {f: s.column for f, s in self.column_mapping.items() if s.column is not None}
+
+    def register_key(self) -> str:
+        """Which REGISTER a file read with this mapping is (ADR 0057): a hash of which header feeds
+        which field. Two registers of the same property (a laundry list, the utilities) have
+        different structures, so a complete file of one never takes away what the other wrote. The
+        order of the columns, the constants and the layout do not count; a renamed or added mapped
+        column makes another register (a complete file then takes away less, never more)."""
+        columns = sorted(
+            [field.value, normalize_header(column)]
+            for field, column in self.mapped_columns().items()
+        )
+        canonical = json.dumps(
+            {"v": REGISTER_KEY_VERSION, "columns": columns},
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def constants(self) -> dict[InvoiceField, str | int]:
         return {f: s.constant for f, s in self.column_mapping.items() if s.constant is not None}

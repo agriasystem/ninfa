@@ -780,3 +780,65 @@ def test_a_record_that_comes_back_counts_again_in_the_analysis(
     import_costs(world, [X, Y, W])
 
     assert sum(row[7] for row in october(world, db_session)) == 3
+
+
+# --- T25 at the importer: a complete file takes away only what its own register wrote -------------
+
+
+def test_the_register_is_the_structure_of_the_file_and_nothing_else() -> None:
+    def config(columns: dict[str, dict[str, Any]]) -> InvoiceMappingConfig:
+        return InvoiceMappingConfig.parse(
+            {"column_mapping": columns, "format_options": dict(SYNTHETIC)}
+        )
+
+    same = config(dict(OPERATIONAL_COLUMNS)).register_key()
+    reordered = config(dict(reversed(list(OPERATIONAL_COLUMNS.items())))).register_key()
+    spelled = config(
+        {
+            field: {"column": f"  {spec['column'].upper()} "}
+            for field, spec in OPERATIONAL_COLUMNS.items()
+        }
+    ).register_key()
+    with_constant = config({**OPERATIONAL_COLUMNS, "currency": {"constant": "EUR"}}).register_key()
+    renamed = config({**OPERATIONAL_COLUMNS, "line_total": {"column": "Netto"}}).register_key()
+
+    assert re.fullmatch(r"[0-9a-f]{64}", same)
+    assert same == reordered == spelled == with_constant  # order, case, spaces, constants: no
+    assert renamed != same  # another header for a field: another register
+
+
+def test_a_complete_file_never_takes_away_what_another_register_of_the_source_wrote(
+    db_session: Session, world: CostWorld
+) -> None:
+    import_costs(world, [X, Y, W])  # register A: the operating register
+    other_headers = ["Giorno", "Ditta", "Categoria", "Voce", "Netto", "Imposta", "Lordo"]
+    other_columns = {
+        field: {"column": other_headers[OPERATIONAL_HEADERS.index(spec["column"])]}
+        for field, spec in OPERATIONAL_COLUMNS.items()
+    }
+    world.confirm(headers=other_headers, columns=other_columns, format_options=dict(SYNTHETIC))
+    b1 = cost_row(day="2026-10-05", supplier="Gas Puglia", description="Gas", net="30.00")
+    b2 = cost_row(day="2026-10-06", supplier="Rifiuti Lecce", description="Rifiuti", net="25.00")
+    b3 = cost_row(day="2026-10-07", supplier="Telecom", description="Telefono", net="20.00")
+    assert (
+        world.service()
+        .import_file(
+            world.source.id, filename="b.csv", content=operational_csv([b1, b2, b3], other_headers)
+        )
+        .succeeded
+    )
+
+    # B again, complete for the 5th-7th, without the cost of the 6th: A's 6th is not B's business
+    result = world.service().import_file(
+        world.source.id,
+        filename="b.csv",
+        content=operational_csv([b1, b3], other_headers),
+        scope=full(1),
+    )
+
+    assert result.succeeded and result.records_removed == 1, result.error_code
+    current = current_records(db_session, world)
+    assert len(current) == 5  # A's three, and B's gas and telephone
+    assert sum(1 for r in current if r.invoice_date.isoformat() == "2026-10-06") == 1  # A's water
+    registers = {r.cost_register_key for r in all_records(db_session, world)}
+    assert len(registers) == 2 and None not in registers

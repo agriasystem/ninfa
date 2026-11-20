@@ -16,6 +16,10 @@ This migration separates the two things:
   neither.
   An invented number is never stored. A FatturaPA, a credit note or anything that is not a
   CSV/XLSX invoice can never be synthetic (CHECK).
+* `invoices.cost_register_key` says which REGISTER (a hash of which header feeds which field)
+  wrote a synthetic record: a complete file only takes away records of its own register, never the
+  costs another register of the same property wrote in the same period. NULL for a real document
+  (CHECK).
 * `invoice_removals` records that a SYNTHETIC record stopped counting because a person said a later
   file held everything of its period. `invoices` stays immutable (its trigger is untouched); a
   removal is a row of its own, and a foreign key on `(workspace_id, invoice_id, identity_origin)`
@@ -71,6 +75,11 @@ _CONSISTENT = (
     " OR (identity_origin = 'SYNTHETIC_COST_RECORD'"
     " AND invoice_number IS NULL AND normalized_invoice_number IS NULL)"
 )
+_REGISTER_ONLY_FOR_SYNTHETIC = (
+    "(identity_origin = 'SYNTHETIC_COST_RECORD'"
+    " AND cost_register_key IS NOT NULL AND cost_register_key ~ '^[0-9a-f]{64}$')"
+    " OR (identity_origin <> 'SYNTHETIC_COST_RECORD' AND cost_register_key IS NULL)"
+)
 _SPREADSHEETS_ONLY = (
     "identity_origin <> 'SYNTHETIC_COST_RECORD'"
     " OR (source_format IN ('CSV', 'XLSX') AND document_kind = 'INVOICE')"
@@ -88,6 +97,8 @@ def upgrade() -> None:
         ),
     )
     op.add_column("invoices", sa.Column("source_record_key", sa.String(length=255), nullable=True))
+    # (every existing row is a real document: NULL is what the CHECK below wants of it)
+    op.add_column("invoices", sa.Column("cost_register_key", sa.String(length=64), nullable=True))
 
     # The canonical rows are immutable: the one statement that fills the new column lifts the
     # trigger and puts it back, inside this transaction.
@@ -116,6 +127,11 @@ def upgrade() -> None:
     )
     op.create_check_constraint(
         op.f("ck_invoices_synthetic_only_for_spreadsheets"), "invoices", _SPREADSHEETS_ONLY
+    )
+    op.create_check_constraint(
+        op.f("ck_invoices_cost_register_key_only_for_synthetic"),
+        "invoices",
+        _REGISTER_ONLY_FOR_SYNTHETIC,
     )
 
     op.drop_constraint(op.f(_IDENTITY_KEY), "invoices", type_="unique")
@@ -220,6 +236,9 @@ def downgrade() -> None:
     op.drop_constraint(op.f(_IDENTITY_KEY), "invoices", type_="unique")
     op.create_unique_constraint(op.f(_IDENTITY_KEY), "invoices", _IDENTITY_COLUMNS_OLD)
     op.drop_constraint(
+        op.f("ck_invoices_cost_register_key_only_for_synthetic"), "invoices", type_="check"
+    )
+    op.drop_constraint(
         op.f("ck_invoices_synthetic_only_for_spreadsheets"), "invoices", type_="check"
     )
     op.drop_constraint(op.f("ck_invoices_source_record_key_not_blank"), "invoices", type_="check")
@@ -235,5 +254,6 @@ def downgrade() -> None:
     op.create_check_constraint(
         op.f("ck_invoices_invoice_number_not_blank"), "invoices", "btrim(invoice_number) <> ''"
     )
+    op.drop_column("invoices", "cost_register_key")
     op.drop_column("invoices", "source_record_key")
     op.drop_column("invoices", "identity_origin")

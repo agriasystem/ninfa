@@ -413,7 +413,7 @@ class InvoiceImportService:
             return 0
         source_format = SourceFormat.CSV if kind == "csv" else SourceFormat.XLSX
         ids = _Ids(uuid4(), uuid4(), data_source_id, property_id)
-        parsed = self._parse_structured(
+        parsed, register = self._parse_structured(
             ids, filename, content, prop.currency, source_format, mapping
         )
         canonical = [document.canonical for document in parsed if document.valid]
@@ -428,6 +428,7 @@ class InvoiceImportService:
         )
         return self._invoices.count_synthetic_absent_from(
             data_source_id,
+            register,
             [placement.identity[1] for placement in placed],
             min(document.invoice_date for document in documents),
             max(document.invoice_date for document in documents),
@@ -632,10 +633,11 @@ class InvoiceImportService:
             "csv": SourceFormat.CSV,
             "xlsx": SourceFormat.XLSX,
         }[kind]
+        register: str | None = None
         if kind == "xml":
             documents = parse_fatturapa(content, data_source_id=ids.data_source)
         else:
-            documents = self._parse_structured(
+            documents, register = self._parse_structured(
                 ids, filename, content, currency, source_format, mapping_override
             )
         if not documents:
@@ -661,7 +663,9 @@ class InvoiceImportService:
                 warnings=warnings,
                 source_format=source_format,
             )
-        return self._canonicalize(ids, duplicate_of, counts, warnings, source_format, scope)
+        return self._canonicalize(
+            ids, duplicate_of, counts, warnings, source_format, scope, register
+        )
 
     def _parse_structured(
         self,
@@ -671,7 +675,8 @@ class InvoiceImportService:
         currency: str,
         source_format: SourceFormat,
         mapping_override: InvoiceMappingConfig | None = None,
-    ) -> list[ParsedDocument]:
+    ) -> tuple[list[ParsedDocument], str]:
+        """The parsed documents, and the REGISTER the file is (see `register_key`)."""
         profile = (
             None
             if mapping_override is not None
@@ -716,13 +721,14 @@ class InvoiceImportService:
             )
         rows = extract(table, config)
         require_explicit_formats(rows, config)
-        return parse_structured(
+        documents = parse_structured(
             rows,
             config,
             property_currency=currency,
             data_source_id=ids.data_source,
             source_format=source_format,
         )
+        return documents, config.register_key()
 
     @staticmethod
     def _open_table(content: bytes, filename: str, options: FormatOptions) -> Any:
@@ -742,6 +748,7 @@ class InvoiceImportService:
         warnings: dict[str, int],
         source_format: SourceFormat,
         scope: ScopePlan = NO_SCOPE,
+        register: str | None = None,
     ) -> InvoiceImportResult:
         """Every valid document becomes a canonical invoice (with its supplier), or none does."""
         removed = 0
@@ -830,6 +837,7 @@ class InvoiceImportService:
                         _resolution_story(placement.resolution, created_by),
                         placement.revision,
                         placement.identity[1],
+                        register,
                     )
                 )
                 new_lines.extend(
@@ -843,21 +851,24 @@ class InvoiceImportService:
                     details={"reason": "different_content", "documents": conflicts[:50]},
                 )
 
-            # What a COMPLETE file of operating costs takes away: the records of this source it does
-            # not hold, inside the period its own rows cover. Computed here, under the lock: if it
-            # is not what the person was shown, nothing is imported. A real invoice is never in it.
+            # What a COMPLETE file of operating costs takes away: the records of this source that
+            # THIS REGISTER wrote and the file does not hold, inside the period its own rows cover
+            # (another register of the property is never touched). Computed here, under the lock:
+            # if it is not what the person was shown, nothing is imported. A real invoice is never
+            # in it.
             synthetic = [doc for doc in documents if doc.is_synthetic]
             complete = (
                 scope.file_scope is FileScope.FULL
+                and register is not None
                 and bool(synthetic)
                 and len(synthetic) == len(documents)
             )
             held = [placement.identity[1] for placement in placed]
             first = min((doc.invoice_date for doc in synthetic), default=None)
             last = max((doc.invoice_date for doc in synthetic), default=None)
-            if complete and first is not None and last is not None:
+            if complete and register is not None and first is not None and last is not None:
                 absent = self._invoices.count_synthetic_absent_from(
-                    ids.data_source, held, first, last
+                    ids.data_source, register, held, first, last
                 )
                 if scope.is_stale(absent):
                     raise InvoiceImportError(
@@ -868,9 +879,9 @@ class InvoiceImportService:
 
             self._invoices.insert_invoices(new_invoices)
             self._invoices.insert_lines(new_lines)
-            if complete and first is not None and last is not None:
+            if complete and register is not None and first is not None and last is not None:
                 removed = self._invoices.remove_synthetic_absent_from(
-                    ids.data_source, ids.job, held, first, last
+                    ids.data_source, register, ids.job, held, first, last
                 )
             self._rows.mark_valid_rows_imported(ids.job)
             self._jobs.succeed(
@@ -960,6 +971,7 @@ class InvoiceImportService:
         method: ResolutionMethod,
         revision: int = 1,
         key: str | None = None,
+        register: str | None = None,
     ) -> dict[str, Any]:
         return {
             "id": invoice_id,
@@ -973,6 +985,8 @@ class InvoiceImportService:
             "normalized_invoice_number": document.normalized_invoice_number,
             "source_record_key": key or document.normalized_invoice_number,
             "identity_origin": document.identity_origin,
+            # (the register that wrote this version: only a synthetic record has one)
+            "cost_register_key": register if document.is_synthetic else None,
             "invoice_date": document.invoice_date,
             "due_date": document.due_date,
             "document_type_code": document.document_type_code,

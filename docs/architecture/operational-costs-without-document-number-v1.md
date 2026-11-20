@@ -16,7 +16,7 @@ Decision: [ADR 0057](adr/0057-cost-ingestion-identity-is-not-fiscal-document-ide
         |  occurrence n among identical fingerprints (a MULTISET)
         v
   invoices.source_record_key = cost:v1:<fingerprint>#<n>   identity_origin = SYNTHETIC_COST_RECORD
-        |  FULL only: absent keys of this source, inside the file's own period -> invoice_removals
+        |  FULL only: absent keys of this source AND of this register, inside the file's own period -> invoice_removals
         v
   is_current_invoice() = newest revision AND not removed   (the only filter the analysis carries)
 ```
@@ -28,6 +28,7 @@ Decision: [ADR 0057](adr/0057-cost-ingestion-identity-is-not-fiscal-document-ide
 | `invoices.identity_origin` | `DOCUMENT_NUMBER` (default, every existing row) \| `SYNTHETIC_COST_RECORD` |
 | `invoices.source_record_key` | technical identity, `NOT NULL`. A real document: **equals** `normalized_invoice_number` (CHECK). A synthetic record: `cost:v1:<64 hex>#<n>` |
 | `invoices.invoice_number`, `normalized_invoice_number` | nullable; `NULL` **only** for a synthetic record (CHECK `identity_consistent`) |
+| `invoices.cost_register_key` | the register (structure of the file: which header feeds which field, SHA-256) that wrote this version of a synthetic record; NULL for a real document (CHECK `cost_register_key_only_for_synthetic`). A complete file takes away only what its own register wrote. |
 | `uq_invoices_identity_revision` | `(workspace, property, supplier, source_record_key, invoice_date, document_kind, revision)` |
 | `ck_invoices_synthetic_only_for_spreadsheets` | a synthetic record is a `CSV`/`XLSX` `INVOICE`: never a FatturaPA, never a credit note |
 | `invoice_removals` | one row per synthetic record taken away, with the import that did it. FK `(workspace, invoice_id, identity_origin) -> invoices` + CHECK `identity_origin = 'SYNTHETIC_COST_RECORD'`: a fiscal document cannot be removed. Immutable (trigger) |
@@ -50,7 +51,7 @@ The migration backfills the key under the immutability trigger (lifted for that 
 | --- | --- |
 | nothing (first file, CLI, saved config, hand-built matching) | nothing |
 | PARTIAL, DELTA | nothing |
-| FULL | the **synthetic** records of this data source dated within `[first date, last date]` of the file, whose key the file does not hold, stop counting (`invoice_removals`); recomputed and compared with the figure shown under the source lock (`IMPORT_PLAN_CHANGED`) |
+| FULL | the **synthetic** records of this data source **written by the same register** dated within `[first date, last date]` of the file, whose key the file does not hold, stop counting (`invoice_removals`); recomputed and compared with the figure shown under the source lock (`IMPORT_PLAN_CHANGED`) |
 
 A real invoice is never removed by any file. Registers identified by document numbers keep their old rule (`scope_effect = 0`, a register may always be partial).
 

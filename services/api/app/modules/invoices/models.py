@@ -123,6 +123,10 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         default=IdentityOrigin.DOCUMENT_NUMBER,
         server_default=text("'DOCUMENT_NUMBER'"),
     )
+    # The REGISTER a synthetic record was written from (a hash of which header fed which field):
+    # a complete file only ever takes away records of its own register, never those another
+    # register of the same property wrote (ADR 0057). NULL for a real document.
+    cost_register_key: Mapped[str | None] = mapped_column(String(64))
     invoice_date: Mapped[date] = mapped_column(Date, nullable=False)
     revision: Mapped[int] = mapped_column(
         Integer, nullable=False, default=1, server_default=text("1")
@@ -231,6 +235,13 @@ class Invoice(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             name="identity_consistent",
         ),
         CheckConstraint("btrim(source_record_key) <> ''", name="source_record_key_not_blank"),
+        # A synthetic record always says which register wrote it; a real document never has one.
+        CheckConstraint(
+            "(identity_origin = 'SYNTHETIC_COST_RECORD'"
+            " AND cost_register_key IS NOT NULL AND cost_register_key ~ '^[0-9a-f]{64}$')"
+            " OR (identity_origin <> 'SYNTHETIC_COST_RECORD' AND cost_register_key IS NULL)",
+            name="cost_register_key_only_for_synthetic",
+        ),
         # Only a row of a spreadsheet can be synthetic: a FatturaPA or a credit note never is.
         CheckConstraint(
             "identity_origin <> 'SYNTHETIC_COST_RECORD'"

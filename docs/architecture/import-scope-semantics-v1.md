@@ -153,7 +153,7 @@ document has its identity, its revisions, and a FatturaPA stays immutable. No qu
 **The exception is the operating cost with no document number** ([ADR 0057](adr/0057-cost-ingestion-identity-is-not-fiscal-document-identity.md)).
 It has no external identity, so a corrected or stale record can only stop counting because a person said the file holds everything
 of its period. The question is the same (`FILE_SCOPE` / `FILE_SCOPE_CONFIRM`, with costs wording), asked only once a source exists and
-only when something would stop counting; FULL takes away the SYNTHETIC records of that source inside the file's own period (an
+only when something would stop counting; FULL takes away the SYNTHETIC records of that source written by the same register (file structure) inside the file's own period (an
 `invoice_removals` row each, re-checked under the lock), PARTIAL / DELTA / no word take nothing, and a real invoice is never taken
 away by any file.
 

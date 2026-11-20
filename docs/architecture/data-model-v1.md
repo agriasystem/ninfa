@@ -453,6 +453,7 @@ erDiagram
         text invoice_number "NULL only for a SYNTHETIC_COST_RECORD (ADR 0057)"
         text normalized_invoice_number "NULL only for a SYNTHETIC_COST_RECORD"
         text source_record_key "technical identity; = the normalised number for a real document"
+        text cost_register_key "synthetic only: the register (file structure) that wrote it"
         text identity_origin "DOCUMENT_NUMBER SYNTHETIC_COST_RECORD"
         int revision
         date invoice_date

@@ -766,6 +766,7 @@ def test_staging_rows_can_be_marked_imported_because_they_are_not_evidence(
 # --- ADR 0057: the technical identity is not the fiscal number ---------------------------------
 
 SYNTHETIC_KEY = "cost:v1:" + "c" * 64 + "#1"
+REGISTER = "d" * 64  # the register (structure) a synthetic record was written from
 
 
 def synthetic_values(c: Costs, key: str = SYNTHETIC_KEY, **overrides: Any) -> dict[str, Any]:
@@ -777,6 +778,7 @@ def synthetic_values(c: Costs, key: str = SYNTHETIC_KEY, **overrides: Any) -> di
         source_record_key=key,
         identity_origin=IdentityOrigin.SYNTHETIC_COST_RECORD,
         source_format=SourceFormat.CSV,
+        cost_register_key=REGISTER,
     )
     values.update(overrides)
     return values
@@ -806,6 +808,21 @@ def test_a_real_document_always_has_its_number_and_its_key_is_the_number(
 ) -> None:
     with rejects(pg.CheckViolation, "ck_invoices_identity_consistent"):
         db_session.add(Invoice(**invoice_values(a, **change)))
+
+
+@pytest.mark.parametrize("register", [None, "not-a-hash", "D" * 64])
+def test_a_synthetic_record_always_says_which_register_wrote_it(
+    db_session: Session, rejects: Rejects, a: Costs, register: str | None
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_cost_register_key_only_for_synthetic"):
+        db_session.add(Invoice(**synthetic_values(a, cost_register_key=register)))
+
+
+def test_a_real_document_never_has_a_register(
+    db_session: Session, rejects: Rejects, a: Costs
+) -> None:
+    with rejects(pg.CheckViolation, "ck_invoices_cost_register_key_only_for_synthetic"):
+        db_session.add(Invoice(**invoice_values(a, cost_register_key=REGISTER)))
 
 
 def test_a_synthetic_record_can_never_carry_a_number(

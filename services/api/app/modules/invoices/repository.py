@@ -254,15 +254,22 @@ class InvoiceRepository:
     # --- operating costs with no document number: what a complete file takes away --------------
 
     def _synthetic_absent_from(
-        self, data_source_id: UUID, held_keys: Sequence[str], first: date, last: date
+        self,
+        data_source_id: UUID,
+        register: str,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
     ) -> Any:
-        """The SYNTHETIC records of this data source that count, are dated within the file's own
-        period and are not among the keys the file holds. Real documents are never in it."""
+        """The SYNTHETIC records of this data source WRITTEN BY THIS REGISTER that count, are dated
+        within the file's own period and are not among the keys the file holds. Real documents, and
+        what another register of the same property wrote, are never in it."""
         held = bindparam("held_keys", list(held_keys), type_=ARRAY(String))
         return select(Invoice.id, Invoice.property_id).where(
             Invoice.workspace_id == self._tenant.workspace_id,
             Invoice.data_source_id == data_source_id,
             Invoice.identity_origin == IdentityOrigin.SYNTHETIC_COST_RECORD,
+            Invoice.cost_register_key == register,
             Invoice.invoice_date >= first,
             Invoice.invoice_date <= last,
             ~(Invoice.source_record_key == any_(held)),
@@ -270,16 +277,24 @@ class InvoiceRepository:
         )
 
     def count_synthetic_absent_from(
-        self, data_source_id: UUID, held_keys: Sequence[str], first: date, last: date
+        self,
+        data_source_id: UUID,
+        register: str,
+        held_keys: Sequence[str],
+        first: date,
+        last: date,
     ) -> int:
         """How many records of this source would stop counting if the file holds everything of the
         period it covers (first to last date of its own rows). Read-only."""
-        absent = self._synthetic_absent_from(data_source_id, held_keys, first, last).subquery()
+        absent = self._synthetic_absent_from(
+            data_source_id, register, held_keys, first, last
+        ).subquery()
         return int(self._session.scalar(select(func.count()).select_from(absent)) or 0)
 
     def remove_synthetic_absent_from(
         self,
         data_source_id: UUID,
+        register: str,
         import_job_id: UUID,
         held_keys: Sequence[str],
         first: date,
@@ -287,7 +302,9 @@ class InvoiceRepository:
     ) -> int:
         """Take those records away: a removal row each, written with the import that did it. The
         invoices themselves are immutable and stay."""
-        absent = self._synthetic_absent_from(data_source_id, held_keys, first, last).subquery()
+        absent = self._synthetic_absent_from(
+            data_source_id, register, held_keys, first, last
+        ).subquery()
         # (RETURNING, not `rowcount`: an INSERT ... SELECT does not report how many rows it wrote)
         removed = self._session.scalars(
             insert(InvoiceRemoval)
