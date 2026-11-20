@@ -1098,3 +1098,42 @@ describe("costs said to be invoices, whose number is in a column nobody named", 
     expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: sent });
   });
 });
+
+describe("the matching screen of a file of costs", () => {
+  const manualCosts = (documentIdentity: "SYNTHETIC_COST_RECORD" | null) =>
+    ok(
+      understoodInspection(
+        { level: "MANUAL", blockers: [{ code: "MISSING_REQUIRED", groups: [["line_description"]] }] },
+        { domain: "COSTS", proposal: proposalOf({ document_identity: documentIdentity }) },
+      ),
+    );
+
+  it("of operating costs never asks for a document number: the classification travels with the matching", async () => {
+    understandFileMock.mockResolvedValueOnce(manualCosts("SYNTHETIC_COST_RECORD"));
+    checkMappingMock.mockResolvedValue(ok(checkOf({ valid: false, missing: [["line_description"]] })));
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi.csv"));
+    await user.click(await within(panel()).findByRole("button", { name: "Abbina le colonne" }));
+
+    await within(panel()).findByText("Abbina le colonne del tuo file");
+    const sent = checkMappingMock.mock.calls[0]?.[2] as { document_identity: string | null; smart_import: unknown };
+    expect(sent.document_identity).toBe("SYNTHETIC_COST_RECORD"); // the server verifies it against the file
+    expect(sent.smart_import).toBeNull();
+    expect(flat(panel())).not.toContain("Numero del documento");
+  });
+
+  it("of documents keeps the number required, as the server says", async () => {
+    understandFileMock.mockResolvedValueOnce(manualCosts(null));
+    checkMappingMock.mockResolvedValue(ok(checkOf({ valid: false, missing: [["invoice_number"]] })));
+    const user = renderFlow();
+
+    await pick(user, csvFile("costi.csv"));
+    await user.click(await within(panel()).findByRole("button", { name: "Abbina le colonne" }));
+
+    await within(panel()).findByText("Abbina le colonne del tuo file");
+    const sent = checkMappingMock.mock.calls[0]?.[2] as { document_identity: string | null };
+    expect(sent.document_identity ?? null).toBeNull();
+    expect(flat(panel())).toContain("Numero del documento");
+  });
+});

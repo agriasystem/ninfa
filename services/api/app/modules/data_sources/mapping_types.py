@@ -228,6 +228,10 @@ class FileInspection:
     # Source Learning: what was remembered of this source and how this file relates to it. Internal:
     # it is never part of the API response.
     learning: "LearningInfo | None" = None
+    # Costs: no column of document numbers filled in most rows (nor one that MAY be the number), so
+    # the records may be operating costs identified by their content (ADR 0057). Internal: what lets
+    # the server keep "operating costs" on a matching built by hand.
+    without_document_number: bool = False
 
 
 # --- checking and trying a decision ---------------------------------------------------------------

@@ -814,9 +814,9 @@ class UnderstandingService:
                     number_column_open = True
                 else:
                     blockers.append(Blocker(BlockerCode.DOCUMENT_NUMBER_MISSING))
-            elif identity.complete and (
-                identity.kind == "OPERATING" or said_identity == "SYNTHETIC_COST_RECORD"
-            ):
+            elif identity.kind == "OPERATING" or said_identity == "SYNTHETIC_COST_RECORD":
+                # operating costs, even when something else is still missing: the matching screen
+                # (if the person goes there) then never asks for a number the file does not have
                 decision = as_if_operating
             else:
                 # (asked only of a file that has everything else: until then the question would be
@@ -1101,6 +1101,7 @@ class UnderstandingService:
                 columns=columns,
                 fields=tuple(adapter.fields),
                 requirement_groups=tuple(adapter.required_groups(decision)),
+                without_document_number=identity is not None,
                 suggestion_complete=complete,
                 already_canonical=canonical,
                 profile=profile,

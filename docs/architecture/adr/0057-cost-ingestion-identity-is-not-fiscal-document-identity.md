@@ -101,8 +101,10 @@ These are choices the brief left to the implementation; each is one line to chan
   has it.
 * Pairing in step (2) of decision 5 is by a fixed order, not by similarity: with several records and several new categories at once it is deterministic and keeps the count, but which of two
   equally-economic records takes which new category is a convention, not a fact of the source.
-* A matching built by hand never carries the synthetic identity: on the matching screen (opened only by the person, for a file NINFA could not read for another reason) a costs file without a
-  number still needs one. Smart Import's own states never ask for it.
+* On the matching screen a file classified as operating costs (by the file, or by the person's answer before) keeps that classification: the number is not required. The server keeps it
+  on a matching built by hand only if its own reading of the file finds no column of document numbers filled in most rows (`FileInspection.without_document_number`); a file classified as
+  documents keeps the number required. Residual: for a file with a document SIGNAL the server cannot tell, from a matching built by hand alone, that the person really answered "operating
+  costs" (the answer is carried by the decision the matching starts from); it can never be claimed for a file whose number column is filled, and credit notes are refused row by row.
 * A file of one or two rows is read with columns at medium confidence (a known Smart Import trait), so the source's memory is not reused and the question is asked again.
 * Two sources of the same property with the same costs are two sets of costs by design; deduplicating between them is a decision for a person, not an identity rule.
 * The downgrade of 0018 refuses once a synthetic record or a removal exists.

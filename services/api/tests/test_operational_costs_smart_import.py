@@ -497,20 +497,76 @@ def test_t20_no_answer_the_api_gives_shows_the_internal_reference_as_a_number(
             assert key.split("#")[0].removeprefix("cost:v1:") not in text
 
 
-def test_a_matching_built_by_hand_never_carries_the_answer(
+def test_a_matching_built_by_hand_keeps_operating_costs_and_never_needs_a_number(
     api_client: TestClient, env: SourcesEnv, db_session: Session
 ) -> None:
-    """Nobody was asked when the matching is built by hand: it identifies by the number it maps."""
+    """Point 3 of the gate (this replaces "a matching built by hand never carries the answer"): a
+    file classified as operating costs stays so on the matching screen - the number is not
+    required - and the server verifies it against the file, never on the browser's word."""
     content = csv(OCTOBER)
-    answered = ask(api_client, env, content, YES)
-    manual = by_hand(answered["proposal"])
+    body = ask(api_client, env, content)
+    manual = by_hand(body["proposal"])
+    assert manual["document_identity"] == "SYNTHETIC_COST_RECORD"
 
+    checked = api_client.post(
+        f"{env.base}/import-mapping-check", json={"domain": COSTS, "mapping": manual}
+    )
     judged = dry_run(api_client, env, COSTS, "costi.csv", content, manual)
     result = import_mapped(api_client, env, COSTS, "costi.csv", content, manual)
 
-    for response in (judged, result):
-        body = response.json()
-        assert body.get("succeeded") is not True and body.get("status") != "OK", body
+    assert checked.status_code == 200 and ["invoice_number"] not in checked.json()["missing"]
+    assert judged.json()["can_import"] is True, judged.json()
+    assert result.json()["succeeded"] is True, result.json()
+    saved = records(db_session, env)
+    assert len(saved) == 3 and all(r.invoice_number is None for r in saved)
+
+
+def test_operating_costs_missing_something_else_go_to_the_matching_screen_without_the_number(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """The description is in a column nobody named: the file goes to the matching screen for THAT,
+    already classified as operating costs - the number is never listed as missing or required."""
+    headers = ["Data", "Fornitore", "Categoria", "Campo 2", "Imponibile", "IVA", "Totale"]
+    content = csv(OCTOBER, headers)
+
+    body = ask(api_client, env, content)
+
+    u = body["understanding"]
+    assert u["level"] == "MANUAL"
+    assert [b["groups"] for b in u["blockers"]] == [[["line_description"]]]
+    assert body["proposal"]["document_identity"] == "SYNTHETIC_COST_RECORD"
+    assert ["invoice_number"] not in body["requirement_groups"]
+    # the person names the description by hand: imported as operating costs
+    manual = by_hand(body["proposal"])
+    manual["columns"] = [
+        {**c, "field": "line_description"} if c["header"] == "Campo 2" else c
+        for c in manual["columns"]
+    ]
+    result = import_mapped(api_client, env, COSTS, "costi.csv", content, manual)
+    assert result.json()["succeeded"] is True, result.json()
+    assert all(r.invoice_number is None for r in records(db_session, env))
+
+
+def test_a_hand_claim_of_operating_costs_is_never_taken_for_a_file_with_document_numbers(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """A file whose number column is filled is classified as documents: a matching built by hand
+    that leaves the number out and says "operating costs" does not make it so - the number stays
+    required and nothing is written."""
+    headers = ["Numero documento", *OPERATIONAL_HEADERS]
+    content = csv([[f"FA/{i}", *row] for i, row in enumerate(OCTOBER, start=1)], headers)
+    body = ask(api_client, env, content)
+    assert body["proposal"]["document_identity"] is None
+    assert ["invoice_number"] in body["requirement_groups"]  # documents: the number is required
+    manual = by_hand(body["proposal"])
+    manual["document_identity"] = "SYNTHETIC_COST_RECORD"
+    manual["columns"] = [
+        {**c, "field": None} if c["field"] == "invoice_number" else c for c in manual["columns"]
+    ]
+
+    result = import_mapped(api_client, env, COSTS, "costi.csv", content, manual)
+
+    assert result.json().get("succeeded") is not True, result.json()
     assert records(db_session, env) == []
 
 
