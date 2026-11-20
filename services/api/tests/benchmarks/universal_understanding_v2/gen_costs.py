@@ -2276,7 +2276,10 @@ def adv_row_counter_number(rng: random.Random) -> Built:
         name=rng.choice(XLSX_NAMES),
         # Truth revised by ADR 0057 (gate test T15): a row counter is no document number and no
         # document signal; the register is operating costs, READY with a synthetic identity, the
-        # counter left unmapped (it was NOT_AUTOMATIC when every cost needed a number).
+        # counter left unmapped (it was NOT_AUTOMATIC when every cost needed a number). This case
+        # makes TWO documents of the unseen corpus, UC104 ("Nr.") and UC117 ("Doc. n."): the same
+        # truth for both, accepted for both (UC104 stays MANUAL for another reason: its amount is
+        # read as the invoice's net amount, so the line total is missing).
         absent=("invoice_number",),
         note=(
             f"'{header}' counts the rows 1..n: it is not the number of an invoice. Operating costs."
