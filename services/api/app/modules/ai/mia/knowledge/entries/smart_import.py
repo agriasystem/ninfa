@@ -696,6 +696,24 @@ ENTRIES: tuple[KnowledgeEntry, ...] = (
         keywords=("formati misti", "date diverse", "numeri misti"),
     ),
     entry(
+        "import.question_document_number_column",
+        FEATURE,
+        "Domanda: quale colonna contiene il numero del documento",
+        "Se la persona dice che un file di costi contiene fatture ma nessuna colonna ha un nome da "
+        "numero di documento, NINFA chiede quale colonna lo contiene, proponendo solo le colonne "
+        "del file che potrebbero contenerlo (codici come 2026/105) e Nessuna di queste.",
+        copy("Quale colonna contiene il numero del documento?"),
+        enum(f"{_QUESTION}.DOCUMENT_NUMBER_COLUMN"),
+        details=(
+            "Con una colonna scelta le fatture vengono importate con il loro numero; con Nessuna "
+            "di queste il file non viene importato.",
+            "NINFA non propone mai una colonna che il file non ha.",
+        ),
+        where=_IMPORT_PAGE,
+        related=("import.question_document_identity", "import.blocker_document_number_missing"),
+        keywords=("numero documento", "numero fattura", "quale colonna"),
+    ),
+    entry(
         "import.blocker_document_number_missing",
         FEATURE,
         "Fatture senza numero del documento",

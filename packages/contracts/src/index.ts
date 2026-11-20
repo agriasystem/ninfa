@@ -1116,7 +1116,9 @@ export type UnderstandingQuestionKind =
   /** This kind of file is remembered as complete and would take something away: a memory does not do that alone. */
   | "FILE_SCOPE_CONFIRM"
   /** A file of costs with no document number: record them as operating costs, with an internal reference? */
-  | "DOCUMENT_IDENTITY";
+  | "DOCUMENT_IDENTITY"
+  /** Costs said to be invoices: which of these columns (the `choices`, or "NONE") holds the document number? */
+  | "DOCUMENT_NUMBER_COLUMN";
 
 export type UnderstandingOriginKind =
   | "COLUMN"
@@ -1244,6 +1246,8 @@ export interface UnderstandAnswers {
    * reference (never an invoice number); "DOCUMENT_NUMBER" = fiscal documents, whose number is then required.
    */
   document_identity?: "SYNTHETIC_COST_RECORD" | "DOCUMENT_NUMBER" | null;
+  /** Costs said to be invoices: "NONE" = none of the columns offered holds the number (one that does is a `column_fields` answer). */
+  document_number_column?: "NONE" | null;
   column_fields?: Record<string, string>;
   /**
    * Set by the server in the decisions it issues, never built here: columns whose name the semantic

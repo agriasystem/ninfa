@@ -710,3 +710,140 @@ def test_t25_a_complete_register_never_takes_away_the_costs_of_another_register(
     left = counting(db_session, env)
     assert result["succeeded"] is True, result
     assert (shown, result["removed"], len(left)) == (1, 1, 9), (shown, result["removed"], len(left))
+
+
+# --- a document number in a column nobody named (PC_unnamed02-like): T26, T27 ------------------
+
+UNNAMED_HEADERS = ["Data", "Fornitore", "Descrizione", "Imponibile", "Campo 1"]
+INVOICES = [
+    [f"2026-10-{day:02d}", supplier, description, net, f"2026/{100 + day}"]
+    for day, supplier, description, net in [
+        (5, "Enel Energia", "Energia elettrica", "100.00"),
+        (6, "Acqua Salento", "Acqua", "40.00"),
+        (7, "Lavanderia Salento", "Lavaggio biancheria", "55.00"),
+        (8, "Gas Puglia", "Gas", "30.00"),
+        (9, "Telecom", "Telefono", "20.00"),
+        (12, "Rifiuti Lecce", "Rifiuti", "25.00"),
+    ]
+]
+WHICH_COLUMN = {
+    "document_identity": "DOCUMENT_NUMBER",
+    "column_fields": {"Campo 1": "invoice_number"},
+}
+
+
+def unnamed(rows: list[list[Any]]) -> bytes:
+    return csv(rows, UNNAMED_HEADERS)
+
+
+def test_t27_invoices_whose_number_nobody_named_are_asked_and_imported_with_their_numbers(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T27: the number is in "Campo 1" (2026/105, ...). Never read as operating costs by itself: one
+    question; "fatture" -> which column, offering ONLY that column and "none of these"; the column
+    chosen -> an import of invoices with their real numbers, no synthetic cost."""
+    content = unnamed(INVOICES)
+
+    first = ask(api_client, env, content)
+    assert_asks_what_it_holds(first)
+
+    which = ask(api_client, env, content, NUMBER)
+    u = which["understanding"]
+    assert u["level"] == "ASK" and u["blockers"] == []
+    assert kinds(which) == ["DOCUMENT_NUMBER_COLUMN"]
+    [question] = u["questions"]
+    assert [choice["value"] for choice in question["choices"]] == ["Campo 1", "NONE"]
+
+    chosen = ask(api_client, env, content, WHICH_COLUMN)
+    assert chosen["understanding"]["level"] == "READY", chosen["understanding"]
+    assert chosen["proposal"]["document_identity"] is None
+    fields = {c["header"]: c["field"] for c in chosen["proposal"]["columns"]}
+    assert fields["Campo 1"] == "invoice_number"
+    assert imported(api_client, env, content, chosen)["succeeded"] is True
+    saved = records(db_session, env)
+    assert len(saved) == 6
+    assert all(r.identity_origin == IdentityOrigin.DOCUMENT_NUMBER for r in saved)
+    assert sorted(r.invoice_number or "" for r in saved) == sorted(row[4] for row in INVOICES)
+
+
+def test_none_of_the_columns_offered_is_a_plain_no(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    content = unnamed(INVOICES)
+
+    body = ask(api_client, env, content, {**NUMBER, "document_number_column": "NONE"})
+
+    assert_refused_as_invoices_without_number(body)
+    assert records(db_session, env) == []
+
+
+def test_a_column_that_was_not_offered_is_never_the_number(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    """Only a column the file has, and that may be it, is ever the number: naming another one (or
+    one that does not exist) changes nothing."""
+    content = unnamed(INVOICES)
+
+    body = ask(
+        api_client,
+        env,
+        content,
+        {
+            "document_identity": "DOCUMENT_NUMBER",
+            "column_fields": {"Numero fattura": "invoice_number"},
+        },
+    )
+
+    assert kinds(body) == ["DOCUMENT_NUMBER_COLUMN"]
+    assert "invoice_number" not in {c["field"] for c in body["proposal"]["columns"]}
+
+
+def test_said_to_be_operating_costs_the_column_stays_out_and_nothing_is_a_number(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    content = unnamed(INVOICES)
+
+    body = ask(api_client, env, content, YES)
+
+    assert body["understanding"]["level"] == "READY"
+    assert body["proposal"]["document_identity"] == "SYNTHETIC_COST_RECORD"
+    fields = {c["header"]: c["field"] for c in body["proposal"]["columns"]}
+    assert fields["Campo 1"] is None
+    assert imported(api_client, env, content, body)["succeeded"] is True
+    assert all(r.invoice_number is None for r in records(db_session, env))
+
+
+def test_t26_a_family_said_to_be_invoices_is_refused_without_asking_again(
+    api_client: TestClient, env: SourcesEnv, db_session: Session
+) -> None:
+    """T26, exception (b): the family's saved answer is "fatture o documenti" (it was imported as
+    invoices, its number in "Campo 1"). The next file of the same structure lost its numbers: no
+    question, the same plain refusal as T17, nothing written."""
+    first = unnamed(INVOICES)
+    chosen = ask(api_client, env, first, WHICH_COLUMN)
+    assert imported(api_client, env, first, chosen)["succeeded"] is True
+    [item] = remembered(api_client, env, source_id(db_session, env))["files"]
+    assert item["answers"]["document_identity"] == "DOCUMENT_NUMBER"
+    without_numbers = unnamed(
+        [[*row[:4], ""] for row in INVOICES[:5]] + [[*INVOICES[5][:4], "2026/200"]]
+    )
+
+    body = ask(api_client, env, without_numbers)
+
+    assert_refused_as_invoices_without_number(body)
+    assert len(records(db_session, env)) == 6  # only the first file's invoices
+
+
+# --- T28: a movement counter is no document number -----------------------------------------------
+
+
+def test_t28_a_register_with_a_movement_id_1_to_n_is_operating_costs_with_no_question(
+    api_client: TestClient, env: SourcesEnv
+) -> None:
+    rows = [[str(i), *row] for i, row in enumerate(OCTOBER, start=1)]
+
+    body = ask(api_client, env, csv(rows, ["ID movimento", *OPERATIONAL_HEADERS]))
+
+    assert_operating_costs_without_question(body)
+    fields = {c["header"]: c["field"] for c in body["proposal"]["columns"]}
+    assert fields["ID movimento"] is None

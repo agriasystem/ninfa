@@ -444,6 +444,43 @@ export function StrutturaImportQuestion({ step, flow }: StrutturaImportQuestionP
         </>
       );
       break;
+    case "DOCUMENT_NUMBER_COLUMN": {
+      // Costs said to be invoices, whose number nobody named: only the columns of THIS file that may hold it
+      // are offered, each with what it holds, and "none of these" - never a column the file does not have.
+      const examplesOf = (header: string) =>
+        step.inspection.columns.find((column) => column.header === header)?.examples.slice(0, 2) ?? [];
+      body = (
+        <>
+          {heading(COPY.DOCUMENT_NUMBER_COLUMN.title)}
+          <p className="struttura-flow__note">{COPY.DOCUMENT_NUMBER_COLUMN.why}</p>
+          <div className="struttura-question__choices struttura-question__choices--stacked">
+            {question.choices
+              .filter((choice) => choice.value !== "NONE")
+              .map((choice) => (
+                <StrutturaButton
+                  key={choice.value}
+                  variant="outline"
+                  onClick={() =>
+                    void flow.answer({
+                      document_identity: "DOCUMENT_NUMBER",
+                      column_fields: { [choice.value]: "invoice_number" },
+                    })
+                  }
+                >
+                  {COPY.DOCUMENT_NUMBER_COLUMN.column(choice.value, examplesOf(choice.value))}
+                </StrutturaButton>
+              ))}
+            <StrutturaButton
+              variant="outline"
+              onClick={() => void flow.answer({ document_identity: "DOCUMENT_NUMBER", document_number_column: "NONE" })}
+            >
+              {COPY.DOCUMENT_NUMBER_COLUMN.none}
+            </StrutturaButton>
+          </div>
+        </>
+      );
+      break;
+    }
     case "FILE_SCOPE_CONFIRM":
       body = (
         <StrutturaScopeConfirmation

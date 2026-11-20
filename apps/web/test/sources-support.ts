@@ -212,7 +212,7 @@ const BOOKINGS_FIELDS: ImportFieldSpec[] = [
   { key: "channel", kind: "TEXT", constant: { kind: "TEXT", choices: [], default: null } },
 ];
 
-function column(
+export function column(
   position: number,
   header: string,
   examples: string[],

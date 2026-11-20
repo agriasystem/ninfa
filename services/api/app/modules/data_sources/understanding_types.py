@@ -50,6 +50,10 @@ class QuestionKind(StrEnum):
     # commissions): NINFA can record them as operating costs with an internal reference of its own,
     # never inventing an invoice number. Asked only when everything else the import needs is there.
     DOCUMENT_IDENTITY = "DOCUMENT_IDENTITY"
+    # Costs said to be invoices, in a file whose number nobody named but one or more columns MAY
+    # hold it ("Campo 1": 2026/102, ...): which one is it? Only those columns are offered, with
+    # "none of these" - never a column the file does not have.
+    DOCUMENT_NUMBER_COLUMN = "DOCUMENT_NUMBER_COLUMN"
 
 
 class UnderstandingLevel(StrEnum):

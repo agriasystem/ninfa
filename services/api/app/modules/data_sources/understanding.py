@@ -69,6 +69,7 @@ from app.modules.data_sources.mapping_types import (
     SmartImportDecision,
     SuggestionLevel,
 )
+from app.modules.data_sources.number_candidates import number_candidates
 from app.modules.data_sources.proposal import CONTESTED, ColumnProposal, Proposal
 from app.modules.data_sources.semantics import DomainSem, Level, NameMatch
 from app.modules.data_sources.semantics_bookings import BOOKINGS
@@ -226,6 +227,9 @@ class UnderstandAnswers(BaseModel):
     # operating costs, recorded with an internal reference of NINFA's own (never an invoice number).
     # "DOCUMENT_NUMBER": fiscal documents, whose number is then required.
     document_identity: Literal["SYNTHETIC_COST_RECORD", "DOCUMENT_NUMBER"] | None = None
+    # Costs said to be invoices: "NONE" = none of the columns offered holds the document number (a
+    # column that does is answered as `column_fields`: {header: "invoice_number"}).
+    document_number_column: Literal["NONE"] | None = None
     # What THIS file says about the records it does not hold.
     file_scope: FileScope | None = None
     # That answer is also for the next files of this structure: only then does the memory change.
@@ -795,11 +799,21 @@ class UnderstandingService:
         )
         said_identity = effective.document_identity
         identity_open = False
+        number_column_open = False
         as_if_operating = decision
         if identity is not None:
             as_if_operating = _as_operating_costs(decision, identity)
             if said_identity == "DOCUMENT_NUMBER":
-                blockers.append(Blocker(BlockerCode.DOCUMENT_NUMBER_MISSING))
+                # invoices: the number may be in a column nobody named - which one, among those
+                # only; with none of them (or none at all) there is nothing to register them by
+                if (
+                    identity.candidates
+                    and identity.complete
+                    and answers.document_number_column != "NONE"
+                ):
+                    number_column_open = True
+                else:
+                    blockers.append(Blocker(BlockerCode.DOCUMENT_NUMBER_MISSING))
             elif identity.complete and (
                 identity.kind == "OPERATING" or said_identity == "SYNTHETIC_COST_RECORD"
             ):
@@ -972,6 +986,8 @@ class UnderstandingService:
                     questions.extend(unread_questions)
         if identity_open and decision.document_identity is None:
             questions.append(_identity_question())
+        if number_column_open and identity is not None:
+            questions.append(_number_column_question(identity.candidates))
         questions = _without_premature(_domain_first(questions), blockers)
         people = self._count_people(table, proposal) if domain == DataSourceDomain.LABOR else None
         # (the same reading on every file of a source: the file still does not say)
@@ -2122,6 +2138,8 @@ class _IdentityCase:
     # a column read as the document number but empty in most rows: it identifies nothing, and a
     # register of operating costs leaves it out
     sparse_number: str | None = None
+    # unmapped columns that MAY hold a document number nobody named (`number_candidates`)
+    candidates: tuple[str, ...] = ()
 
 
 def _identity_case(
@@ -2154,6 +2172,7 @@ def _identity_case(
         return None
     fields = set(assigned) - {"invoice_number"}
     evidence = document_evidence(fields)
+    candidates = number_candidates(proposal, samples)
     provided = fields | set(decision.constants)
     complete = all(
         any(key in provided for key in group)
@@ -2161,8 +2180,8 @@ def _identity_case(
             decision.model_copy(update={"document_identity": "SYNTHETIC_COST_RECORD"})
         )
     )
-    documentary = sparse is not None or evidence == DocumentEvidence.STRONG
-    return _IdentityCase("AMBIGUOUS" if documentary else "OPERATING", complete, sparse)
+    documentary = sparse is not None or evidence == DocumentEvidence.STRONG or bool(candidates)
+    return _IdentityCase("AMBIGUOUS" if documentary else "OPERATING", complete, sparse, candidates)
 
 
 def _mostly_filled(sample: ColumnSample) -> bool:
@@ -2187,6 +2206,16 @@ def _as_operating_costs(decision: MappingInput, identity: _IdentityCase) -> Mapp
     ]
     return decision.model_copy(
         update={"document_identity": "SYNTHETIC_COST_RECORD", "columns": columns}
+    )
+
+
+def _number_column_question(candidates: Sequence[str]) -> Question:
+    """Which column holds the document number: only the columns that may, or none of them."""
+    return Question(
+        id="DOCUMENT_NUMBER_COLUMN",
+        kind=QuestionKind.DOCUMENT_NUMBER_COLUMN,
+        field="invoice_number",
+        choices=(*(Choice(header) for header in candidates), Choice("NONE")),
     )
 
 

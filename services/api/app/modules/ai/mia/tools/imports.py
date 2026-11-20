@@ -636,6 +636,27 @@ QUESTIONS: dict[QuestionKind, _Explained] = {
             "righe uguali nel file restano due costi."
         ),
     ),
+    QuestionKind.DOCUMENT_NUMBER_COLUMN: _Explained(
+        asked="Quale colonna contiene il numero del documento?",
+        meaning=(
+            "Hai detto che il file contiene fatture, ma nessuna colonna ha un nome da numero di "
+            "documento. NINFA mostra solo le colonne del file che potrebbero contenerlo (codici "
+            "come 2026/105), ciascuna con qualche esempio, e non propone mai una colonna che il "
+            "file non ha."
+        ),
+        answers=(
+            (
+                "Una delle colonne proposte",
+                "Le fatture vengono importate con il numero di quella colonna.",
+            ),
+            (
+                "Nessuna di queste",
+                "Il file non viene importato: senza il numero del documento le fatture non si "
+                "possono registrare.",
+            ),
+        ),
+        remembered="NINFA ricorda la colonna scelta per i prossimi file fatti così.",
+    ),
 }
 
 TOPICS: dict[ImportTopic, _Explained] = {
@@ -690,6 +711,7 @@ SHORT_NAMES: dict[str, str] = {
     "FILE_SCOPE": "completo o parziale",
     "FILE_SCOPE_CONFIRM": "conferma completo",
     "DOCUMENT_IDENTITY": "costi senza numero",
+    "DOCUMENT_NUMBER_COLUMN": "colonna del numero",
     "NO_NEW_DATA": "import senza novità",
     "SAME_DAY_FILES": "file nello stesso giorno",
     "ANALYSIS_AFTER_IMPORT": "analisi dopo import",

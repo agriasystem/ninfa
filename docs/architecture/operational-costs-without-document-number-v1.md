@@ -65,6 +65,8 @@ A real invoice is never removed by any file. Registers identified by document nu
     ("Un registro di costi operativi" / "Fatture o documenti"), asked only when every other required group (supplier, date, description, line total) is present;
   * "Fatture o documenti" (answered now, or remembered): `BLOCKED` with `DOCUMENT_NUMBER_MISSING` - not imported, a plain reason, never the matching screen;
   * a number column empty in most rows is left out of the decision when the file is operating costs;
+  * an unmapped column that may hold a document number (`number_candidates`) is a document signal; after "Fatture o documenti" the question `DOCUMENT_NUMBER_COLUMN` offers only
+    those columns and "Nessuna di queste" (`answers.document_number_column = NONE` -> `DOCUMENT_NUMBER_MISSING`; a column -> `column_fields`, read as invoices);
   * the provisional check is always made as operating costs, so no blocker ever lists a number the file does not have.
 * Rows of a register of operating costs whose document type is a credit note are refused (`INVOICE_CREDIT_NOTE_WITHOUT_NUMBER`); a negative amount alone is never a credit note.
 * Level: `READY` with no question for operating costs; `ASK` with the one question when a document signal is there (a provisional check is made as if the answer were given, so the file is not

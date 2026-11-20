@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   checkOf,
+  column,
   csvFile,
   DEPARTMENT_CHOICES,
   laborInspection,
@@ -1033,5 +1034,67 @@ describe("a file of costs with no document number in which something points at d
     expect(flat(panel())).not.toContain("invoice_number");
     expect(validateImportMock).not.toHaveBeenCalled();
     expect(importMatchedFileMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("costs said to be invoices, whose number is in a column nobody named", () => {
+  const whichColumn = () =>
+    ok(
+      understoodInspection(
+        {
+          level: "ASK",
+          questions: [
+            questionOf("DOCUMENT_NUMBER_COLUMN", {
+              field: "invoice_number",
+              choices: [
+                { value: "Campo 1", count: null, sheets: [], columns: [] },
+                { value: "NONE", count: null, sheets: [], columns: [] },
+              ],
+            }),
+          ],
+        },
+        {
+          domain: "COSTS",
+          columns: [
+            column(0, "Data", ["2026-10-05"], { field: "invoice_date", level: "RECOGNIZED" }),
+            column(1, "Campo 1", ["2026/105", "2026/106", "2026/107"]),
+          ],
+        },
+      ),
+    );
+
+  it("offers only the columns of the file that may hold it, with what they hold, and none of these", async () => {
+    understandFileMock.mockResolvedValueOnce(whichColumn());
+    const user = renderFlow();
+
+    await pick(user, csvFile("acquisti.csv"));
+
+    await within(panel()).findByRole("heading", { level: 3, name: "Quale colonna contiene il numero del documento?" });
+    const buttons = within(panel())
+      .getAllByRole("button")
+      .map((button) => button.textContent);
+    expect(buttons).toContain("Campo 1 (per esempio 2026/105, 2026/106)");
+    expect(buttons).toContain("Nessuna di queste");
+    expect(buttons).not.toContain("Data (per esempio 2026-10-05)"); // a column that was not offered
+    const text = flat(panel());
+    for (const absent of ["Abbina le colonne", "invoice_number", "NONE", "DOCUMENT_NUMBER"]) {
+      expect(text).not.toContain(absent);
+    }
+  });
+
+  it.each([
+    ["Campo 1 (per esempio 2026/105, 2026/106)", { document_identity: "DOCUMENT_NUMBER", column_fields: { "Campo 1": "invoice_number" } }],
+    ["Nessuna di queste", { document_identity: "DOCUMENT_NUMBER", document_number_column: "NONE" }],
+  ])("«%s» is sent as the person's answer", async (label, sent) => {
+    understandFileMock.mockResolvedValueOnce(whichColumn());
+    understandFileMock.mockResolvedValueOnce(ok(understoodInspection({}, { domain: "COSTS" })));
+    validateImportMock.mockResolvedValue(ok(realisticValidation()));
+    const user = renderFlow();
+
+    await pick(user, csvFile("acquisti.csv"));
+    await user.click(await within(panel()).findByRole("button", { name: label }));
+
+    await waitFor(() => expect(understandFileMock).toHaveBeenCalledTimes(2));
+    expect(understandFileMock.mock.calls[1]?.[0]).toMatchObject({ answers: sent });
   });
 });

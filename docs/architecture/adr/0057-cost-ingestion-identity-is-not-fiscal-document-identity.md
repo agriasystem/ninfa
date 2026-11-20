@@ -62,6 +62,12 @@ model was to **invent a number**, i.e. to store a fiscal fact that does not exis
      number is needed to register invoices and points at the electronic invoice (XML) or a register exported with the number column. It is never the matching screen and never a request to point
      at a column the file does not have;
    * a number column empty in most rows is left out of a register of operating costs (its few numbers identify nothing);
+   * **a column that may hold a number nobody named** (`data_sources.number_candidates`: unmapped, filled in at least half of the rows, codes with a digit and only letters / - _ .,
+     not dates, amounts, VAT numbers, tax codes or IBANs, not a row counter, not numbers of one or two digits, at least 3 distinct values and 25% of the values) is a document signal too:
+     the semantic question is asked; "Fatture o documenti" then asks **"Quale colonna contiene il numero del documento?"** (`DOCUMENT_NUMBER_COLUMN`) offering only those columns and
+     "Nessuna di queste". A column chosen is a person's `column_fields` answer: the file is read as invoices with that column as the number (validators unchanged) and the family
+     remembers it; "Nessuna di queste" is `DOCUMENT_NUMBER_MISSING`. "Un registro di costi operativi" leaves the column out. Calibrated on the benchmark corpora: of 1,026 documents
+     only one changes (`PC_unnamed02`, invoices with their number in "Campo 1", READY -> ASK).
    * with a document type column kept in a register of operating costs, a row whose type is a **credit note** ("Nota di credito", "NC", TD04, TD08...) is refused row by row
      (`CREDIT_NOTE_WITHOUT_NUMBER`), never recorded as a synthetic cost. A negative amount alone is never read as a credit note.
    The mapping (`InvoiceMappingConfig`) no longer refuses a synthetic identity next to a document type or a due date: whether a file WITHOUT a number holds operating costs is decided before a

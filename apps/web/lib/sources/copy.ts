@@ -713,6 +713,14 @@ export const sourcesCopy = {
         documents: "Fatture o documenti",
         remembered: "NINFA lo ricorderà per i prossimi file fatti così.",
       },
+      // Costs said to be invoices, whose number is in a column nobody named: which one (only those that may be).
+      DOCUMENT_NUMBER_COLUMN: {
+        title: "Quale colonna contiene il numero del documento?",
+        why: "Per registrare le fatture serve il numero di ogni documento. Queste colonne del file potrebbero contenerlo.",
+        column: (header: string, examples: string[]) =>
+          examples.length > 0 ? `${header} (per esempio ${examples.join(", ")})` : header,
+        none: "Nessuna di queste",
+      },
       DATE_ORDER: { title: "Come sono scritte le date di questo file?" },
       DECIMAL_STYLE: { title: "Come sono scritti i numeri con i decimali?" },
       FILE_SCOPE: {

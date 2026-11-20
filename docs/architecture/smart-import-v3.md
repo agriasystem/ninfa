@@ -131,7 +131,8 @@ Category words are NINFA's own lexicon (Utenze, Lavanderia, Consulenze...) plus 
 | `DOCUMENT_IDENTITY` | a costs file with everything the import needs except a column of document numbers filled in most rows, and a document signal (a document type, or due date + row number + a fiscal supplier identifier, or a number column empty in most rows); with no signal, or only a due date / a row number, the file is read as operating costs with no question ([ADR 0057](adr/0057-cost-ingestion-identity-is-not-fiscal-document-identity.md)) | "un registro di costi operativi" (internal reference, no invoice number created; remembered by the family) / "fatture o documenti" (`DOCUMENT_NUMBER_MISSING`: not imported) |
 
 Blockers: `NO_TABLE`, `MISSING_REQUIRED`, `PERIOD_SUMMARY_ONLY`, `GRID_NOT_SUPPORTED`, `GRID_NOT_HOURS`, `AMOUNT_NOT_NET`,
-`MIXED_FORMATS`, `DOCUMENT_NUMBER_MISSING`. What the person says is never asked again (`answers`).
+`MIXED_FORMATS`, `DOCUMENT_NUMBER_MISSING`. After "fatture o documenti" with columns that may hold the number, `DOCUMENT_NUMBER_COLUMN` asks which one (only those, or none of
+these). What the person says is never asked again (`answers`).
 
 ## API
 
