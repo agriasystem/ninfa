@@ -312,6 +312,10 @@ class InvoiceRepository:
                     ),
                     bindparam("job_id", import_job_id, type_=Uuid),
                 ),
+                # (the id is PostgreSQL's gen_random_uuid(), one per row: the ORM's Python default
+                # would be evaluated ONCE and repeated on every row of an INSERT ... SELECT, so a
+                # complete file taking away two records or more would break the primary key)
+                include_defaults=False,
             )
             .returning(InvoiceRemoval.id)
         ).all()

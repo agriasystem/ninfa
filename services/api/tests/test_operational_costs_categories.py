@@ -484,3 +484,19 @@ def test_t22_an_occurrence_taken_away_and_back_is_restored_with_a_coherent_histo
     # the same file again: nothing more comes back, nothing is duplicated
     again = import_costs(world, [row(LAUNDRY), row(LAUNDRY), row(LAUNDRY)])
     assert not again.changed_data and len(all_records(db_session, world)) == 4
+
+
+def test_a_complete_file_can_take_away_several_records_at_once(
+    db_session: Session, world: CostWorld
+) -> None:
+    """Found by T25: each removal is its own row with its own id. (The ORM's Python default for the
+    id was evaluated once for the whole INSERT ... SELECT, so taking away two records or more broke
+    the primary key and the import failed.)"""
+    other = cost_row(description="Acqua ottobre", net="40.00")
+    import_costs(world, [X, X, X, other, other])
+
+    result = import_costs(world, [X], scope=full(4))
+
+    assert result.succeeded and result.records_removed == 4, result.error_code
+    assert len(current_records(db_session, world)) == 1
+    assert len({r.id for r in removals(db_session, world)}) == 4
